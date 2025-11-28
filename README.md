@@ -1,4 +1,4 @@
-# Rasen
+# 🌀 Rasen
 
 <p align="center">
   <strong>らせん (Spiral)</strong><br>
@@ -12,8 +12,12 @@
   <a href="#packages">Packages</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#cross-platform-examples">Cross-Platform</a> •
+  <a href="#roadmap">Roadmap</a> •
   <a href="#documentation">Documentation</a>
 </p>
+
+> ⚠️ **Warning: This project is under active development and is NOT ready for production use.**
+> APIs may change without notice. Use at your own risk.
 
 ## Features
 
@@ -176,6 +180,32 @@ See [examples/](./examples) for complete demos:
 
 - **Web** ([examples/web](./examples/web)) - DOM, Canvas 2D, JSX demos
 - **React Native** ([examples/react-native](./examples/react-native)) - Mobile app without React
+
+## Roadmap
+
+All features are currently **under development**. Here's what we're working on:
+
+### Render Targets (Hosts)
+
+| Host | Status | Description |
+|------|--------|-------------|
+| DOM | 🚧 In Progress | Browser DOM rendering |
+| Canvas 2D | 🚧 In Progress | 2D graphics & animations |
+| React Native | 🚧 In Progress | Mobile apps via Fabric (no React) |
+| Three.js | 📋 Planned | 3D graphics & WebGL |
+
+### Compilers & Tooling
+
+| Tool | Status | Description |
+|------|--------|-------------|
+| SFC Compiler | 📋 Planned | Single File Components with static hoisting |
+| Mini Program SFC | 📋 Planned | WeChat/Alipay mini program support |
+
+### Legend
+
+- ✅ Complete
+- 🚧 In Progress
+- 📋 Planned
 
 ## Documentation
 
