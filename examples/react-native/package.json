@@ -1,0 +1,40 @@
+{
+  "name": "@rasenjs/examples-react-native",
+  "version": "0.1.0",
+  "description": "Rasen React Native examples - No React, direct Fabric binding",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "bundle:ios": "cd ../.. && npx metro build examples/react-native/index.js -O examples/react-native/bundle.ios.js -p ios",
+    "bundle:android": "cd ../.. && npx metro build examples/react-native/index.js -O examples/react-native/bundle.android.js -p android",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/react-native": "workspace:*",
+    "@rasenjs/reactive-vue": "workspace:*",
+    "react": "18.3.1",
+    "react-native": "0.76.9",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0",
+    "@babel/runtime": "^7.23.0",
+    "@react-native-community/cli": "15.1.3",
+    "@react-native-community/cli-platform-android": "15.1.3",
+    "@react-native-community/cli-platform-ios": "15.1.3",
+    "@react-native/babel-preset": "0.76.9",
+    "@react-native/metro-config": "0.76.9",
+    "@react-native/typescript-config": "0.76.9",
+    "@types/react": "^18.2.0",
+    "@types/react-native": "^0.73.0",
+    "metro-react-native-babel-preset": "^0.77.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

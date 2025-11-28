@@ -2,193 +2,212 @@
 
 <p align="center">
   <strong>らせん (Spiral)</strong><br>
-  A reactive rendering framework that is agnostic to both reactive systems and rendering targets
+  <em>One Reactive Core, Multiple Render Targets</em><br><br>
+  A reactive rendering framework agnostic to both reactive systems and rendering targets.<br>
+  Write once, render to <b>DOM</b>, <b>Canvas 2D</b>, <b>React Native</b>, and more.
+</p>
+
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#packages">Packages</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#cross-platform-examples">Cross-Platform</a> •
+  <a href="#documentation">Documentation</a>
 </p>
 
 ## Features
 
-- **Reactive System Agnostic**: Works with any reactive library (Vue, Solid, Preact Signals, etc.)
-- **Rendering Target Agnostic**: Supports Canvas 2D, WebGL, SVG, DOM, and more
-- **Pure Function Components**: No virtual DOM, no component instances
-- **Self-Controlled Rendering**: Components control their own rendering logic through watchers
-- **Monorepo Architecture**: Modular packages for different use cases
+- **Cross-Platform Rendering** - Same reactive logic, different render targets (DOM, Canvas, React Native)
+- **Reactive System Agnostic** - Works with Vue, Signals, or any reactive library
+- **Pure Function Components** - No virtual DOM, no component instances
+- **Self-Controlled Rendering** - Components control their own rendering via watchers
+- **JSX Support** - Optional JSX/TSX syntax with configurable tags
+- **TypeScript First** - Full type safety and inference
 
 ## Packages
 
-- **[@rasenjs/core](./packages/core)** - Core framework and reactive runtime adapters
-- **[@rasenjs/dom](./packages/dom)** - DOM rendering components
-- **[@rasenjs/canvas-2d](./packages/canvas-2d)** - Canvas 2D rendering components
-- **[@rasenjs/jsx-runtime](./packages/jsx-runtime)** - JSX runtime for using TSX/JSX syntax
-- **[@rasenjs/reactive-vue](./packages/reactive-vue)** - Vue 3 reactive system adapter
-- **[@rasenjs/reactive-signals](./packages/reactive-signals)** - Signals-based reactive system adapter
-
-## Installation
-
-```bash
-# Core package
-npm install @rasenjs/core
-
-# DOM rendering
-npm install @rasenjs/dom
-
-# Canvas 2D rendering
-npm install @rasenjs/canvas-2d
-
-# JSX support
-npm install @rasenjs/jsx-runtime
-
-# Reactive adapters (choose one)
-npm install @rasenjs/reactive-vue vue
-npm install @rasenjs/reactive-signals signal-polyfill
-```
+| Package | Description |
+|---------|-------------|
+| [@rasenjs/core](./packages/core) | Core runtime and type definitions |
+| [@rasenjs/dom](./packages/dom) | DOM rendering components |
+| [@rasenjs/canvas-2d](./packages/canvas-2d) | Canvas 2D rendering components |
+| [@rasenjs/react-native](./packages/react-native) | React Native Fabric renderer |
+| [@rasenjs/jsx-runtime](./packages/jsx-runtime) | JSX/TSX runtime support |
+| [@rasenjs/reactive-vue](./packages/reactive-vue) | Vue 3 reactivity adapter |
+| [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter |
 
 ## Quick Start
 
-### 1. Setup Reactive Runtime
+### Installation
 
-Rasen doesn't depend on any specific reactive library. You need to set up a reactive runtime first:
+```bash
+# Core + DOM rendering + Vue reactivity
+npm install @rasenjs/core @rasenjs/dom @rasenjs/reactive-vue vue
+
+# Or with Signals
+npm install @rasenjs/core @rasenjs/dom @rasenjs/reactive-signals signal-polyfill
+
+# Optional: JSX support
+npm install @rasenjs/jsx-runtime
+```
+
+### Basic Example
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { div, button, mount } from '@rasenjs/dom'
 import { ref, computed } from 'vue'
 
-// Using Vue 3 Composition API
+// 1. Setup reactive runtime
 setReactiveRuntime(createVueRuntime())
-```
 
-Or with TC39 Signals:
-
-```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createSignalsRuntime } from '@rasenjs/reactive-signals'
-import { Signal } from 'signal-polyfill'
-
-setReactiveRuntime(createSignalsRuntime())
-```
-
-### 2. Create Components
-
-```typescript
-import { ref, computed } from 'vue'
-import { div, h2, p, button } from '@rasenjs/dom'
-
+// 2. Create reactive state
 const count = ref(0)
 
-const Counter = () => {
-  return div({
-    children: [
-      h2({ textContent: 'Counter Example' }),
-      p({
-        textContent: computed(() => `Count: ${count.value}`),
-        style: { fontSize: '24px' }
-      }),
-      button({
-        textContent: 'Increment',
-        on: { click: () => count.value++ }
-      })
-    ]
-  })
-}
+// 3. Define component
+const Counter = () => div({
+  children: [
+    div({ textContent: computed(() => `Count: ${count.value}`) }),
+    button({
+      textContent: 'Increment',
+      on: { click: () => count.value++ }
+    })
+  ]
+})
 
-// Mount to DOM
-const container = document.getElementById('app')
-const unmount = Counter()(container)
-```
-
-### 3. Canvas 2D Example
-
-```typescript
-import { ref, computed } from 'vue'
-import { canvas } from '@rasenjs/dom'
-import { context as canvas2DContext, rect, circle } from '@rasenjs/canvas-2d'
-
-const x = ref(50)
-
-const CanvasDemo = () => {
-  return canvas({
-    width: 400,
-    height: 300,
-    children: [
-      canvas2DContext({
-        children: [
-          rect({
-            x: computed(() => x.value),
-            y: 100,
-            width: 100,
-            height: 50,
-            fill: '#4CAF50'
-          }),
-          circle({
-            x: 200,
-            y: 200,
-            radius: 30,
-            fill: '#2196F3'
-          })
-        ]
-      })
-    ]
-  })
-}
-```
-
-### 4. Using JSX/TSX
-
-Rasen supports JSX syntax for a more familiar developer experience. First, configure TypeScript:
-
-```json
-// tsconfig.json
-{
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "jsxImportSource": "@rasenjs/jsx-runtime"
-  }
-}
-```
-
-Then write components using JSX:
-
-```tsx
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createSignalsRuntime, ref, computed } from '@rasenjs/reactive-signals'
-import { mount } from '@rasenjs/dom'
-
-setReactiveRuntime(createSignalsRuntime())
-
-const Counter = () => {
-  const count = ref(0)
-  const double = computed(() => count.value * 2)
-
-  return (
-    <div style={{ padding: '20px' }}>
-      <h2>JSX Counter</h2>
-      <p>Count: {count}</p>
-      <p>Double: {double}</p>
-      <button onClick={() => count.value++}>Increment</button>
-      <button onClick={() => count.value--}>Decrement</button>
-    </div>
-  )
-}
-
+// 4. Mount to DOM
 mount(Counter(), document.getElementById('app'))
 ```
 
-You can also configure custom tags for different rendering targets:
+## Cross-Platform Examples
 
-```tsx
-import { configureTags } from '@rasenjs/jsx-runtime'
-import * as dom from '@rasenjs/dom'
-import * as canvas2d from '@rasenjs/canvas-2d'
+Rasen's power lies in its ability to render to **any host** with the same reactive model:
 
-configureTags({
-  '': dom,                 // DOM tags without prefix: <div>, <button>
-  'canvas-2d-': canvas2d   // Canvas tags with prefix: <canvas-2d-rect>
+### 🖥️ DOM
+
+```typescript
+import { div, button, mount } from '@rasenjs/dom'
+
+const count = ref(0)
+
+mount(
+  div({
+    children: [
+      div({ textContent: computed(() => `Count: ${count.value}`) }),
+      button({ textContent: '+', on: { click: () => count.value++ } })
+    ]
+  }),
+  document.getElementById('app')
+)
+```
+
+### 🎨 Canvas 2D
+
+```typescript
+import { canvas } from '@rasenjs/dom'
+import { context, rect, text } from '@rasenjs/canvas-2d'
+
+const x = ref(50)
+
+mount(
+  canvas({
+    width: 400, height: 200,
+    children: context({
+      children: [
+        rect({ x: x, y: 50, width: 100, height: 80, fill: '#4CAF50' }),
+        text({ text: computed(() => `X: ${x.value}`), x: 10, y: 20 })
+      ]
+    })
+  }),
+  document.getElementById('app')
+)
+
+// Animate
+setInterval(() => x.value = 50 + Math.sin(Date.now() / 500) * 100, 16)
+```
+
+### 📱 React Native (No React!)
+
+```typescript
+import { view, text, touchableOpacity } from '@rasenjs/react-native'
+
+const count = ref(0)
+
+view({
+  style: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  children: [
+    text({ 
+      style: { fontSize: 48 }, 
+      children: computed(() => `${count.value}`) 
+    }),
+    touchableOpacity({
+      onPress: () => count.value++,
+      children: text({ children: '+' })
+    })
+  ]
 })
 ```
 
-## Development
+### With JSX
 
-This is a monorepo managed with Yarn workspaces.
+```tsx
+// tsconfig.json: { "jsx": "react-jsx", "jsxImportSource": "@rasenjs/jsx-runtime" }
+
+const Counter = () => {
+  const count = ref(0)
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => count.value++}>Increment</button>
+    </div>
+  )
+}
+```
+
+## Examples
+
+```bash
+# Run web examples
+yarn examples:dev
+```
+
+See [examples/](./examples) for complete demos:
+
+- **Web** ([examples/web](./examples/web)) - DOM, Canvas 2D, JSX demos
+- **React Native** ([examples/react-native](./examples/react-native)) - Mobile app without React
+
+## Documentation
+
+Each package has detailed documentation:
+
+- **[Core Concepts](./packages/core/README.md)** - Component model, lifecycle, reactive runtime
+- **[DOM Rendering](./packages/dom/README.md)** - DOM components and mounting
+- **[Canvas 2D](./packages/canvas-2d/README.md)** - 2D graphics rendering
+- **[React Native](./packages/react-native/README.md)** - Fabric architecture binding
+- **[JSX Runtime](./packages/jsx-runtime/README.md)** - JSX configuration and usage
+- **[Vue Adapter](./packages/reactive-vue/README.md)** - Vue 3 reactivity integration
+- **[Signals Adapter](./packages/reactive-signals/README.md)** - TC39 Signals integration
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Your Application                        │
+├─────────────────────────────────────────────────────────────┤
+│              @rasenjs/jsx-runtime (optional)                 │
+├──────────────────┬──────────────────┬───────────────────────┤
+│   @rasenjs/dom   │ @rasenjs/canvas-2d│ @rasenjs/react-native │
+│   (Renderers)    │                   │                       │
+├──────────────────┴──────────────────┴───────────────────────┤
+│                       @rasenjs/core                          │
+├─────────────────────────────────────────────────────────────┤
+│     @rasenjs/reactive-vue    |    @rasenjs/reactive-signals  │
+│                    (Reactive Adapters)                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Development
 
 ```bash
 # Install dependencies
@@ -200,29 +219,11 @@ yarn build
 # Run tests
 yarn test
 
-# Run linter
-yarn lint
-
 # Type check
 yarn typecheck
 
-# Run examples
-yarn examples:dev
-```
-
-## Examples
-
-Check out the [examples/](./examples) directory for more examples:
-
-- **counter.html** - DOM rendering with reactive state
-- **counter-jsx.html** - JSX/TSX syntax example
-- **canvas.html** - Canvas 2D animations
-- **todo.html** - Todo list application
-
-Run examples locally:
-
-```bash
-yarn examples:dev
+# Lint
+yarn lint
 ```
 
 ## Project Structure
@@ -230,20 +231,18 @@ yarn examples:dev
 ```
 rasen/
 ├── packages/
-│   ├── core/              # Core framework
-│   ├── dom/               # DOM rendering
-│   ├── canvas-2d/         # Canvas 2D rendering
-│   ├── jsx-runtime/       # JSX runtime
+│   ├── core/              # Core runtime
+│   ├── dom/               # DOM renderer
+│   ├── canvas-2d/         # Canvas 2D renderer
+│   ├── react-native/      # React Native renderer
+│   ├── jsx-runtime/       # JSX support
 │   ├── reactive-vue/      # Vue adapter
 │   └── reactive-signals/  # Signals adapter
 ├── examples/
-│   └── web/               # Web examples
+│   ├── web/               # Web examples
+│   └── react-native/      # RN example app
 └── ...
 ```
-
-## Contributing
-
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
 
 ## License
 
