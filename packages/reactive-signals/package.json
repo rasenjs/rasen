@@ -1,0 +1,42 @@
+{
+  "name": "@rasenjs/reactive-signals",
+  "version": "0.1.0",
+  "description": "TC39 Signals adapter for Rasen",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "keywords": [
+    "rasen",
+    "signals",
+    "reactive",
+    "adapter",
+    "tc39"
+  ],
+  "author": "Rasen Team",
+  "license": "MIT",
+  "dependencies": {
+    "@rasenjs/core": "workspace:*",
+    "signal-polyfill": "^0.1.2"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^27",
+    "jsdom": "^27.2.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

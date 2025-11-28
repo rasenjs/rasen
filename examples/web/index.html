@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rasen Examples</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 2rem;
+    }
+    .examples {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+    .example-card {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .example-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .example-card h2 {
+      margin-top: 0;
+      color: #555;
+      font-size: 1.25rem;
+    }
+    .example-card a {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background: #007bff;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    .example-card a:hover {
+      background: #0056b3;
+    }
+    .example-card p {
+      color: #666;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌀 Rasen Examples</h1>
+  <div class="examples">
+    <div class="example-card">
+      <h2>Simple Counter</h2>
+      <p>Basic reactive counter with increment/decrement buttons</p>
+      <a href="/counter.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h2>Todo List</h2>
+      <p>Simple todo list with add/remove functionality</p>
+      <a href="/todo.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h2>Canvas 2D</h2>
+      <p>Interactive canvas with reactive shapes</p>
+      <a href="/canvas.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h2>JSX Counter</h2>
+      <p>Counter example using JSX/TSX syntax</p>
+      <a href="/counter-jsx.html">View Example</a>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+{
+  "name": "@rasenjs/canvas-2d",
+  "version": "0.1.0",
+  "description": "Rasen Canvas 2D renderer",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "canvas",
+    "2d",
+    "renderer"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/canvas-2d"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/canvas-2d",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT",
+  "dependencies": {
+    "@rasenjs/core": "workspace:*"
+  }
+}

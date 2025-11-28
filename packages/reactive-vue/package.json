@@ -1,0 +1,39 @@
+{
+  "name": "@rasenjs/reactive-vue",
+  "version": "0.1.0",
+  "description": "Vue Composition API adapter for Rasen",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "keywords": [
+    "rasen",
+    "vue",
+    "reactive",
+    "adapter"
+  ],
+  "author": "Rasen Team",
+  "license": "MIT",
+  "dependencies": {
+    "@rasenjs/core": "workspace:*",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

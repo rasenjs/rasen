@@ -1,0 +1,54 @@
+{
+  "name": "@rasenjs/jsx-runtime",
+  "version": "0.1.0",
+  "description": "JSX runtime for Rasen",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js",
+      "require": "./dist/jsx-runtime.cjs"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.ts",
+      "import": "./dist/jsx-dev-runtime.js",
+      "require": "./dist/jsx-dev-runtime.cjs"
+    },
+    "./jsx": {
+      "types": "./jsx.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "jsx.d.ts"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "rasen",
+    "jsx",
+    "tsx",
+    "runtime"
+  ],
+  "author": "Rasen Team",
+  "license": "MIT",
+  "dependencies": {
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/dom": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

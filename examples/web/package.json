@@ -1,0 +1,24 @@
+{
+  "name": "@rasenjs/examples-web",
+  "version": "0.1.0",
+  "description": "Rasen web examples",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rasenjs/canvas-2d": "workspace:*",
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/dom": "workspace:*",
+    "@rasenjs/jsx-runtime": "workspace:*",
+    "@rasenjs/reactive-vue": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.7"
+  }
+}

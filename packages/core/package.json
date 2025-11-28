@@ -1,0 +1,63 @@
+{
+  "name": "@rasenjs/core",
+  "version": "0.1.0",
+  "description": "Rasen core - Framework-agnostic reactive rendering",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./components": {
+      "require": "./dist/components.cjs",
+      "import": "./dist/components.js",
+      "types": "./dist/components.d.ts"
+    },
+    "./test-utils": {
+      "require": "./dist/test-utils.cjs",
+      "import": "./dist/test-utils.js",
+      "types": "./dist/test-utils.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "reactive",
+    "rendering",
+    "framework"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/core",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "vue": "^3.3.10"
+  },
+  "peerDependencies": {
+    "vue": "^3.3.0"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    }
+  }
+}
