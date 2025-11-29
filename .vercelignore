@@ -1,0 +1,23 @@
+# Dependencies
+node_modules
+
+# React Native example (too large, not needed for docs)
+examples/react-native
+
+# Build outputs
+dist
+*.tsbuildinfo
+
+# Testing
+coverage
+
+# OS
+.DS_Store
+
+# IDE
+.vscode
+.idea
+
+# Cache
+.cache
+.temp

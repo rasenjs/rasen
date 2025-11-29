@@ -65,3 +65,5 @@ examples/react-native/android/build/
 examples/react-native/android/local.properties
 examples/react-native/bundle*.js
 examples/react-native/*.jsbundle
+.vercel
+.env*.local
