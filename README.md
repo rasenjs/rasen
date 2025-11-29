@@ -4,16 +4,16 @@
   <strong>らせん (Spiral)</strong><br>
   <em>One Reactive Core, Multiple Render Targets</em><br><br>
   A reactive rendering framework agnostic to both reactive systems and rendering targets.<br>
-  Write once, render to <b>DOM</b>, <b>Canvas 2D</b>, <b>React Native</b>, and more.
+  Write once, render to <b>DOM</b>, <b>Canvas 2D</b>, <b>React Native</b>, <b>SSR</b>, and more.
 </p>
 
 <p align="center">
+  <a href="./docs/DESIGN.md"><strong>📖 Design Philosophy</strong></a> •
   <a href="#features">Features</a> •
   <a href="#packages">Packages</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#cross-platform-examples">Cross-Platform</a> •
-  <a href="#roadmap">Roadmap</a> •
-  <a href="#documentation">Documentation</a>
+  <a href="#roadmap">Roadmap</a>
 </p>
 
 > 🚧 **Work In Progress**
@@ -41,6 +41,7 @@
 | [@rasenjs/dom](./packages/dom) | DOM rendering components |
 | [@rasenjs/canvas-2d](./packages/canvas-2d) | Canvas 2D rendering components |
 | [@rasenjs/react-native](./packages/react-native) | React Native Fabric renderer |
+| [@rasenjs/html](./packages/html) | HTML renderer for SSR/SSG |
 | [@rasenjs/jsx-runtime](./packages/jsx-runtime) | JSX/TSX runtime support |
 | [@rasenjs/reactive-vue](./packages/reactive-vue) | Vue 3 reactivity adapter |
 | [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter |
@@ -158,6 +159,27 @@ view({
 })
 ```
 
+### 🖥️ Server-Side Rendering (SSR)
+
+```typescript
+import { renderToString, div, p, ul, li } from '@rasenjs/html'
+
+// No reactive runtime needed for SSR!
+const html = renderToString(
+  div(
+    { class: 'container' },
+    p({ class: 'title' }, 'Hello from SSR!'),
+    ul(
+      { class: 'list' },
+      li('Item 1'),
+      li('Item 2'),
+      li('Item 3')
+    )
+  )
+)
+// Output: <div class="container"><p class="title">Hello from SSR!</p><ul class="list"><li>Item 1</li>...</ul></div>
+```
+
 ### With JSX
 
 ```tsx
@@ -197,6 +219,7 @@ All features are currently **under development**. Here's what we're working on:
 | DOM | 🚧 In Progress | Browser DOM rendering |
 | Canvas 2D | 🚧 In Progress | 2D graphics & animations |
 | React Native | 🚧 In Progress | Mobile apps via Fabric (no React) |
+| HTML (SSR/SSG) | 🚧 In Progress | Server-side rendering to HTML strings |
 | Three.js | 📋 Planned | 3D graphics & WebGL |
 
 ### Compilers & Tooling
@@ -220,6 +243,7 @@ Each package has detailed documentation:
 - **[DOM Rendering](./packages/dom/README.md)** - DOM components and mounting
 - **[Canvas 2D](./packages/canvas-2d/README.md)** - 2D graphics rendering
 - **[React Native](./packages/react-native/README.md)** - Fabric architecture binding
+- **[HTML/SSR](./packages/html/README.md)** - Server-side rendering to HTML strings
 - **[JSX Runtime](./packages/jsx-runtime/README.md)** - JSX configuration and usage
 - **[Vue Adapter](./packages/reactive-vue/README.md)** - Vue 3 reactivity integration
 - **[Signals Adapter](./packages/reactive-signals/README.md)** - TC39 Signals integration
@@ -227,19 +251,20 @@ Each package has detailed documentation:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Your Application                        │
-├─────────────────────────────────────────────────────────────┤
-│              @rasenjs/jsx-runtime (optional)                 │
-├──────────────────┬──────────────────┬───────────────────────┤
-│   @rasenjs/dom   │ @rasenjs/canvas-2d│ @rasenjs/react-native │
-│   (Renderers)    │                   │                       │
-├──────────────────┴──────────────────┴───────────────────────┤
-│                       @rasenjs/core                          │
-├─────────────────────────────────────────────────────────────┤
-│     @rasenjs/reactive-vue    |    @rasenjs/reactive-signals  │
-│                    (Reactive Adapters)                       │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Your Application                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                 @rasenjs/jsx-runtime (optional)                      │
+├───────────────┬────────────────┬──────────────────┬─────────────────┤
+│ @rasenjs/dom  │@rasenjs/canvas │@rasenjs/react-   │  @rasenjs/html  │
+│               │     -2d        │    native        │   (SSR/SSG)     │
+│               │                │                  │                 │
+├───────────────┴────────────────┴──────────────────┴─────────────────┤
+│                          @rasenjs/core                               │
+├─────────────────────────────────────────────────────────────────────┤
+│      @rasenjs/reactive-vue     |     @rasenjs/reactive-signals       │
+│                       (Reactive Adapters)                            │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Development
@@ -270,6 +295,7 @@ rasen/
 │   ├── dom/               # DOM renderer
 │   ├── canvas-2d/         # Canvas 2D renderer
 │   ├── react-native/      # React Native renderer
+│   ├── html/              # HTML renderer (SSR/SSG)
 │   ├── jsx-runtime/       # JSX support
 │   ├── reactive-vue/      # Vue adapter
 │   └── reactive-signals/  # Signals adapter

@@ -2450,6 +2450,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@rasenjs/string@workspace:packages/string":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/string@workspace:packages/string"
+  dependencies:
+    "@rasenjs/core": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
 "@react-native-community/cli-clean@npm:15.1.3":
   version: 15.1.3
   resolution: "@react-native-community/cli-clean@npm:15.1.3"
