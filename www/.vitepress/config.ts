@@ -4,6 +4,9 @@ export default defineConfig({
   title: 'Rasen',
   description: 'A reactive rendering framework agnostic to both reactive systems and rendering targets',
   
+  // Ignore dead links from included README files (they use relative paths for the monorepo)
+  ignoreDeadLinks: true,
+
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
   ],
