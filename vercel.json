@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "yarn www:build",
   "outputDirectory": "www/.vitepress/dist",
-  "installCommand": "yarn install",
+  "installCommand": "YARN_ENABLE_IMMUTABLE_INSTALLS=false yarn install",
   "framework": null
 }
