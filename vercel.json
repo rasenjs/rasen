@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "yarn www:build",
   "outputDirectory": "www/.vitepress/dist",
-  "installCommand": "corepack enable && yarn install",
+  "installCommand": "yarn install",
   "framework": null
 }
