@@ -16,8 +16,13 @@
   <a href="#documentation">Documentation</a>
 </p>
 
-> ⚠️ **Warning: This project is under active development and is NOT ready for production use.**
-> APIs may change without notice. Use at your own risk.
+> 🚧 **Work In Progress**
+>
+> This framework is still under active development and has **NOT been published to npm**.
+>
+> **Please do not use this in production.** APIs are unstable and may change at any time.
+>
+> If you're interested in this project, feel free to ⭐ star and watch for updates!
 
 ## Features
 

@@ -272,19 +272,77 @@ React Native style properties are fully supported:
 
 ## Architecture
 
+Rasen bypasses React entirely and directly interfaces with React Native's Fabric architecture at the lowest available JavaScript layer.
+
+### How React Native Works (with React)
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Your Application                          │
+│                     React Application                        │
+│                  (JSX → React Elements)                      │
 ├─────────────────────────────────────────────────────────────┤
-│  @rasenjs/reactive-vue  │  @rasenjs/core  │  @rasenjs/rn    │
-│  (Reactivity System)    │  (Core Runtime) │  (RN Renderer)  │
+│                    React Reconciler                          │
+│              (Fiber, Diff, Scheduling)                       │
 ├─────────────────────────────────────────────────────────────┤
-│              React Native Fabric Architecture                │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │  UIManager  │  ShadowTree  │  Yoga Layout  │  Native UI │ │
-│  └─────────────────────────────────────────────────────────┘ │
+│                      ReactFabric                             │
+│         (Compiled bundle with HostConfig impl)               │
+│    ┌─────────────────────────────────────────────────────┐  │
+│    │  Internally uses:                                    │  │
+│    │  - nativeFabricUIManager (C++ bindings)             │  │
+│    │  - ReactNativePrivateInterface (JS utilities)       │  │
+│    └─────────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                   Fabric C++ Core                            │
+│       (Shadow Tree, Yoga Layout, Native Views)               │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### How Rasen Works (without React)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Rasen Application                          │
+│             (Component Functions → Instances)                │
+├─────────────────────────────────────────────────────────────┤
+│  @rasenjs/reactive-*    │           @rasenjs/react-native   │
+│  (Signal System)        │           (Fabric Renderer)       │
+│                         │                                    │
+│  - signal-polyfill      │    ┌──────────────────────────┐   │
+│  - @preact/signals      │    │ Direct API Access:       │   │
+│  - Vue reactivity       │    │                          │   │
+│                         │    │ nativeFabricUIManager    │   │
+│                         │    │   - createNode()         │   │
+│                         │    │   - appendChild()        │   │
+│                         │    │   - cloneNodeWithNewProps│   │
+│                         │    │   - setNativeProps()     │   │
+│                         │    │   - completeRoot()       │   │
+│                         │    │                          │   │
+│                         │    │ ReactNativePrivateInterface│  │
+│                         │    │   - ViewConfigRegistry   │   │
+│                         │    │   - createAttributePayload│  │
+│                         │    │   - createPublicInstance │   │
+│                         │    └──────────────────────────┘   │
+├─────────────────────────────────────────────────────────────┤
+│                   Fabric C++ Core                            │
+│       (Shadow Tree, Yoga Layout, Native Views)               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Why This Approach?
+
+| Layer | React's Usage | Rasen's Access | Notes |
+|-------|---------------|----------------|-------|
+| `ReactFabric` | Entry point (`render()`) | ❌ Cannot use | Requires React Elements |
+| `ReactFiberConfigFabric` | Internal HostConfig | ❌ Not exported | Compiled into ReactFabric bundle |
+| `nativeFabricUIManager` | Used internally | ✅ Direct access | Global C++ binding |
+| `ReactNativePrivateInterface` | Used internally | ✅ Direct access | Exported JS utilities |
+
+**Key insight**: React's HostConfig implementation (`ReactFiberConfigFabric.js`) is compiled into `ReactFabric-prod.js` and not separately exported. We access the same underlying APIs that React uses:
+
+- `nativeFabricUIManager` - C++ bindings injected as global variable
+- `ReactNativePrivateInterface` - JS utility module from `react-native`
+
+This allows Rasen to drive native UI updates using **Signal-based reactivity** instead of React's reconciler.
 
 ## Notes
 

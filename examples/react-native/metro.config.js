@@ -8,16 +8,12 @@ const monorepoRoot = path.resolve(__dirname, '../..');
  * Metro configuration for Yarn Workspaces monorepo
  * https://reactnative.dev/docs/metro
  *
- * 注意：由于 metro 在 monorepo 中的路径解析问题，
- * 需要从根目录运行打包命令：
- *
- *   cd /path/to/rasen
- *   npx metro build examples/react-native/index.js -O examples/react-native/bundle.js -p ios
- *
  * @type {import('metro-config').MetroConfig}
  */
 const config = {
-  projectRoot: monorepoRoot,
+  // Project root is examples/react-native (where index.js is)
+  projectRoot: __dirname,
+  // Watch the entire monorepo to detect changes in packages
   watchFolders: [monorepoRoot],
   resolver: {
     nodeModulesPaths: [

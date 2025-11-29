@@ -1,20 +1,11 @@
 /**
- * React Native 组件导出
+ * React Native Components
  */
 
-export { view } from './view'
-export { text } from './text'
-export { image } from './image'
-export { textInput } from './text-input'
-export { scrollView } from './scroll-view'
-export { touchableOpacity } from './touchable-opacity'
-export { flatList } from './flat-list'
+// 核心组件函数
+export { component, type RNMountFunction, type RNComponent, type Child, type ComponentProps } from './component'
 
-// 组件别名（更符合 RN 命名习惯）
-export { view as View } from './view'
-export { text as Text } from './text'
-export { image as Image } from './image'
-export { textInput as TextInput } from './text-input'
-export { scrollView as ScrollView } from './scroll-view'
-export { touchableOpacity as TouchableOpacity } from './touchable-opacity'
-export { flatList as FlatList } from './flat-list'
+// 便捷组件
+export { view, type ViewProps } from './view'
+export { text, type TextProps } from './text'
+export { touchable, type TouchableProps } from './touchable'

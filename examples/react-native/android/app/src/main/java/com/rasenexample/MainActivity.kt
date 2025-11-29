@@ -1,4 +1,4 @@
-package com.rasentemp
+package com.rasenexample
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

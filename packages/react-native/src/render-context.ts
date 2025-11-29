@@ -1,297 +1,379 @@
 /**
- * React Native 渲染上下文
+ * React Native Render Context
  *
- * 管理原生视图树的创建、更新和销毁
- * 直接调用 Fabric UIManager API
+ * RenderContext 包含了渲染所需的一切：
+ * - hostConfig: ReactNativePrivateInterface
+ * - rootTag: 根视图标签
+ * - hostContext: 当前宿主上下文
+ *
+ * mount() 函数接收 hostConfig 和 rootTag，创建 RenderContext 并传递给组件。
  */
 
-import type {
-  NativeHandle,
-  FabricUIManager,
-  RNHostContext,
-  ChildSet
-} from './types'
+// ============================================================================
+// Types
+// ============================================================================
 
-// 全局视图标签计数器
-let nextTag = 1
+export type Node = unknown
+export type Container = number
+export type ChildSet = unknown
+export type UpdatePayload = Record<string, unknown> | null
+export type Props = Record<string, unknown>
 
-/**
- * 生成唯一的视图标签
- */
-export function generateTag(): number {
-  return nextTag++
+export interface ViewConfig {
+  uiViewClassName: string
+  validAttributes: Record<string, unknown>
+  bubblingEventTypes?: Record<string, unknown>
+  directEventTypes?: Record<string, unknown>
+}
+
+export interface Instance {
+  node: Node
+  canonical: {
+    nativeTag: number
+    viewConfig: ViewConfig
+    currentProps: Props
+    internalInstanceHandle: object
+    publicInstance: unknown
+  }
+  parentTag?: number  // 父节点的 nativeTag，用于事件冒泡
+}
+
+export interface TextInstance {
+  node: Node
+  publicInstance?: unknown
+  parentTag?: number  // 父节点的 nativeTag
+}
+
+export interface HostContext {
+  isInAParentText: boolean
+}
+
+// ============================================================================
+// HostConfig Interface
+// ============================================================================
+
+export interface HostConfig {
+  ReactNativeViewConfigRegistry: {
+    get: (name: string) => ViewConfig
+  }
+  createPublicInstance: (
+    tag: number,
+    viewConfig: ViewConfig,
+    internalInstanceHandle: object
+  ) => unknown
+  createPublicTextInstance: (internalInstanceHandle: object) => unknown
+  createAttributePayload: (
+    props: Props,
+    validAttributes: Record<string, unknown>
+  ) => Props
+  diffAttributePayloads: (
+    oldProps: Props | null,
+    newProps: Props,
+    validAttributes: Record<string, unknown>
+  ) => Props | null
+}
+
+// ============================================================================
+// Render Context
+// ============================================================================
+
+export interface RenderContext {
+  hostConfig: HostConfig
+  rootTag: Container
+  hostContext: HostContext
+}
+
+// ============================================================================
+// Fabric UI Manager
+// ============================================================================
+
+interface FabricUIManager {
+  createNode: (reactTag: number, viewName: string, rootTag: number, props: Props, instanceHandle: object) => Node
+  cloneNodeWithNewProps: (node: Node, newProps: Props) => Node
+  createChildSet: (rootTag: number) => ChildSet
+  appendChild: (parentNode: Node, child: Node) => Node
+  appendChildToSet: (childSet: ChildSet, child: Node) => void
+  completeRoot: (rootTag: number, childSet: ChildSet) => void
+  registerEventHandler?: (dispatchEvent: (instanceHandle: object, type: string, payload: Record<string, unknown>) => void) => void
+}
+
+function getFabricUIManager(): FabricUIManager {
+  const g = globalThis as { nativeFabricUIManager?: FabricUIManager }
+  if (!g.nativeFabricUIManager) {
+    throw new Error('[Rasen] nativeFabricUIManager not available')
+  }
+  return g.nativeFabricUIManager
+}
+
+// ============================================================================
+// Event Management
+// ============================================================================
+
+// 使用全局标志确保只注册一次（即使模块被重新加载）
+const RASEN_EVENT_HANDLER_KEY = '__RASEN_EVENT_HANDLER_REGISTERED__'
+const RASEN_INSTANCE_MAP_KEY = '__RASEN_INSTANCE_MAP__'
+
+// 获取全局 instance 映射表（tag -> Instance）
+export function getInstanceMap(): Map<number, Instance> {
+  const g = globalThis as Record<string, unknown>
+  if (!g[RASEN_INSTANCE_MAP_KEY]) {
+    g[RASEN_INSTANCE_MAP_KEY] = new Map<number, Instance>()
+  }
+  return g[RASEN_INSTANCE_MAP_KEY] as Map<number, Instance>
 }
 
 /**
- * 重置标签计数器（仅用于测试）
+ * 注册 instance 到全局映射
  */
+export function registerInstance(tag: number, instance: Instance): void {
+  getInstanceMap().set(tag, instance)
+}
+
+/**
+ * 注销 instance
+ */
+export function unregisterInstance(tag: number): void {
+  getInstanceMap().delete(tag)
+}
+
+/**
+ * 获取 instance 的父节点 tag
+ */
+export function getParentTag(instance: Instance | TextInstance): number | undefined {
+  return instance.parentTag
+}
+
+/**
+ * 事件分发函数 - 实现事件冒泡
+ * 
+ * 类似 React Fiber 的 traverseTwoPhase，但只实现 bubble 阶段
+ */
+function dispatchEventWithBubble(
+  _instanceHandle: object,
+  type: string,
+  nativeEvent: Record<string, unknown>
+): void {
+  const target = nativeEvent?.target as number | undefined
+  if (!target) return
+
+  const instanceMap = getInstanceMap()
+  let currentTag: number | undefined = target
+
+  // 向上冒泡查找事件处理器（类似 React 的 traverseTwoPhase）
+  while (currentTag !== undefined) {
+    const instance = instanceMap.get(currentTag)
+    
+    if (!instance) break
+
+    const props = instance.canonical?.currentProps
+    if (props) {
+      // 转换事件名（如 topTouchEnd -> onTouchEnd）
+      const propName = 'on' + type.replace(/^top/, '')
+      const handler = props[propName]
+
+      if (typeof handler === 'function') {
+        ;(handler as (event: Record<string, unknown>) => void)(nativeEvent)
+        return // 事件已处理，停止冒泡
+      }
+    }
+    
+    // 继续向上冒泡
+    currentTag = instance.parentTag
+  }
+}
+
+/**
+ * 初始化事件系统
+ * 
+ * 调用 nativeFabricUIManager.registerEventHandler 注册事件处理器
+ */
+export function initEventSystem(): void {
+  const g = globalThis as Record<string, unknown>
+  
+  // 严格检查 - 如果已经注册过，直接返回
+  if (g[RASEN_EVENT_HANDLER_KEY] === true) {
+    return
+  }
+
+  const fabricUIManager = getFabricUIManager()
+  
+  if (fabricUIManager.registerEventHandler) {
+    fabricUIManager.registerEventHandler(dispatchEventWithBubble)
+    g[RASEN_EVENT_HANDLER_KEY] = true
+  } else {
+    console.warn('[Rasen] registerEventHandler not available')
+  }
+}
+
+/**
+ * @deprecated 使用 initEventSystem 代替
+ */
+export function initEventListener(_hostConfig: HostConfig): void {
+  initEventSystem()
+}
+
+// ============================================================================
+// Tag Counter
+// ============================================================================
+
+let nextReactTag = 2
+
+function allocateTag(): number {
+  const tag = nextReactTag
+  nextReactTag += 2
+  return tag
+}
+
 export function resetTagCounter(): void {
-  nextTag = 1
+  nextReactTag = 2
 }
 
-/**
- * Fabric UIManager 获取器
- * React Native 的 UIManager 是通过 NativeModules 暴露的
- */
-let fabricUIManager: FabricUIManager | null = null
+// ============================================================================
+// Context Helpers
+// ============================================================================
 
-/**
- * 设置 Fabric UIManager
- * 需要在应用启动时调用
- */
-export function setFabricUIManager(manager: FabricUIManager): void {
-  fabricUIManager = manager
-}
-
-/**
- * 获取 Fabric UIManager
- */
-export function getFabricUIManager(): FabricUIManager {
-  if (!fabricUIManager) {
-    // 尝试从 React Native 运行时获取
-    try {
-      // React Native 0.72+ 新架构
-      // 使用动态导入来避免编译时依赖
-      const globalRequire = (globalThis as unknown as { require?: (id: string) => unknown }).require
-      const ReactNative = globalRequire?.('react-native') as {
-        TurboModuleRegistry?: { get: (name: string) => unknown }
-        UIManager?: LegacyUIManager
-      } | undefined
-      
-      if (ReactNative?.TurboModuleRegistry) {
-        const nativeFabric = ReactNative.TurboModuleRegistry.get('FabricUIManager')
-        if (nativeFabric) {
-          fabricUIManager = nativeFabric as FabricUIManager
-        }
-      }
-      // 降级到旧的 UIManager
-      if (!fabricUIManager && ReactNative?.UIManager) {
-        fabricUIManager = createUIManagerAdapter(ReactNative.UIManager)
-      }
-    } catch {
-      // 可能在非 RN 环境中运行
-    }
-  }
-
-  if (!fabricUIManager) {
-    throw new Error(
-      'FabricUIManager not available. Please call setFabricUIManager() first or ensure React Native is properly initialized.'
-    )
-  }
-
-  return fabricUIManager
-}
-
-/**
- * Legacy UIManager 接口
- */
-interface LegacyUIManager {
-  createView(tag: number, viewType: string, rootTag: number, props: Record<string, unknown>): void
-  updateView(tag: number, viewType: string, props: Record<string, unknown>): void
-  setChildren(tag: number, childTags: number[]): void
-}
-
-/**
- * 创建 UIManager 适配器
- * 将旧版 UIManager API 适配为 Fabric API
- */
-function createUIManagerAdapter(legacyUIManager: LegacyUIManager): FabricUIManager {
+export function createRenderContext(hostConfig: HostConfig, rootTag: Container): RenderContext {
+  // 初始化事件监听
+  initEventListener(hostConfig)
+  
   return {
-    createNode(
-      tag: number,
-      viewType: string,
-      rootTag: number,
-      props: Record<string, unknown>,
-      _instanceHandle: object
-    ): NativeHandle {
-      legacyUIManager.createView(
-        tag,
-        viewType,
-        rootTag,
-        flattenStyle(props)
-      )
-      return { _nativeTag: tag, _viewType: viewType }
-    },
-
-    cloneNodeWithNewProps(
-      node: NativeHandle,
-      newProps: Record<string, unknown>
-    ): NativeHandle {
-      legacyUIManager.updateView(
-        node._nativeTag,
-        node._viewType,
-        flattenStyle(newProps)
-      )
-      return node
-    },
-
-    cloneNodeWithNewChildren(node: NativeHandle): NativeHandle {
-      return node
-    },
-
-    appendChild(parent: NativeHandle, child: NativeHandle): void {
-      legacyUIManager.setChildren(parent._nativeTag, [child._nativeTag])
-    },
-
-    createChildSet(_rootTag: number): ChildSet {
-      return { _children: [] }
-    },
-
-    appendChildToSet(childSet: ChildSet, child: NativeHandle): void {
-      ;(childSet._children as NativeHandle[]).push(child)
-    },
-
-    completeRoot(rootTag: number, childSet: ChildSet): void {
-      const childTags = childSet._children.map((c) => c._nativeTag)
-      legacyUIManager.setChildren(rootTag, childTags)
-    },
-
-    getRootHostContext(rootTag: number) {
-      return { rootTag }
-    }
+    hostConfig,
+    rootTag,
+    hostContext: { isInAParentText: false },
   }
 }
 
-/**
- * 扁平化样式对象
- */
-function flattenStyle(props: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = { ...props }
+export function getChildContext(ctx: RenderContext, type: string): RenderContext {
+  const isInAParentText =
+    type === 'AndroidTextInput' ||
+    type === 'RCTMultilineTextInputView' ||
+    type === 'RCTSinglelineTextInputView' ||
+    type === 'RCTText' ||
+    type === 'RCTVirtualText'
 
-  if (props.style && typeof props.style === 'object') {
-    const style = props.style as Record<string, unknown>
-    for (const [key, value] of Object.entries(style)) {
-      result[key] = value
-    }
-    delete result.style
+  if (ctx.hostContext.isInAParentText !== isInAParentText) {
+    return { ...ctx, hostContext: { isInAParentText } }
   }
-
-  return result
+  return ctx
 }
 
-/**
- * 渲染上下文实现
- */
-export class RNRenderContext implements RNHostContext {
-  private children: NativeHandle[] = []
-  private uiManagerInstance: FabricUIManager
+// ============================================================================
+// HostConfig Methods
+// ============================================================================
 
-  constructor(
-    public readonly parentHandle: NativeHandle | null,
-    public readonly rootTag: number
-  ) {
-    this.uiManagerInstance = getFabricUIManager()
+export function createInstance(ctx: RenderContext, type: string, props: Props): Instance {
+  const { hostConfig, rootTag } = ctx
+  const fabricUIManager = getFabricUIManager()
+
+  const tag = allocateTag()
+  const viewConfig = hostConfig.ReactNativeViewConfigRegistry.get(type)
+  const updatePayload = hostConfig.createAttributePayload(props, viewConfig.validAttributes)
+
+  const instanceHandle = { tag: 5, stateNode: null as unknown }
+
+  const node = fabricUIManager.createNode(
+    tag,
+    viewConfig.uiViewClassName,
+    rootTag,
+    updatePayload,
+    instanceHandle
+  )
+
+  const publicInstance = hostConfig.createPublicInstance(tag, viewConfig, instanceHandle)
+
+  const instance: Instance = {
+    node,
+    canonical: {
+      nativeTag: tag,
+      viewConfig,
+      currentProps: props,
+      internalInstanceHandle: instanceHandle,
+      publicInstance,
+    },
   }
 
-  get uiManager(): FabricUIManager {
-    return this.uiManagerInstance
-  }
+  // 注册 instance 到全局映射，用于事件分发
+  registerInstance(tag, instance)
 
-  /**
-   * 创建原生视图
-   */
-  createView(viewType: string, props: Record<string, unknown>): NativeHandle {
-    const tag = generateTag()
-    const handle = this.uiManagerInstance.createNode(
-      tag,
-      viewType,
-      this.rootTag,
-      flattenStyle(props),
-      {} // instanceHandle
-    )
-    return handle
-  }
-
-  /**
-   * 追加子视图
-   */
-  appendChild(child: NativeHandle): void {
-    this.children.push(child)
-
-    if (this.parentHandle) {
-      this.uiManagerInstance.appendChild(this.parentHandle, child)
-    }
-  }
-
-  /**
-   * 移除子视图
-   */
-  removeChild(child: NativeHandle): void {
-    const index = this.children.findIndex(
-      (c) => c._nativeTag === child._nativeTag
-    )
-    if (index !== -1) {
-      this.children.splice(index, 1)
-    }
-
-    // 在 Fabric 中，移除是通过重新设置子节点集合实现的
-    if (this.parentHandle) {
-      const childSet = this.uiManagerInstance.createChildSet(this.rootTag)
-      for (const c of this.children) {
-        this.uiManagerInstance.appendChildToSet(childSet, c)
-      }
-      // 注意：这需要更新父节点的子节点列表
-      // 在实际实现中可能需要更复杂的处理
-    }
-  }
-
-  /**
-   * 更新视图属性
-   */
-  updateProps(handle: NativeHandle, props: Record<string, unknown>): void {
-    this.uiManagerInstance.cloneNodeWithNewProps(handle, flattenStyle(props))
-  }
-
-  /**
-   * 创建子上下文
-   */
-  createChildContext(parentHandle: NativeHandle): RNRenderContext {
-    return new RNRenderContext(parentHandle, this.rootTag)
-  }
-
-  /**
-   * 提交所有子视图到根节点
-   */
-  commitToRoot(): void {
-    const childSet = this.uiManagerInstance.createChildSet(this.rootTag)
-    for (const child of this.children) {
-      this.uiManagerInstance.appendChildToSet(childSet, child)
-    }
-    this.uiManagerInstance.completeRoot(this.rootTag, childSet)
-  }
-
-  /**
-   * 获取所有子视图
-   */
-  getChildren(): NativeHandle[] {
-    return [...this.children]
-  }
+  instanceHandle.stateNode = instance
+  return instance
 }
 
-/**
- * 根上下文存储
- */
-const rootContextMap = new Map<number, RNRenderContext>()
+export function createTextInstance(ctx: RenderContext, text: string): TextInstance {
+  const { rootTag, hostContext } = ctx
+  const fabricUIManager = getFabricUIManager()
 
-/**
- * 创建根渲染上下文
- */
-export function createRootContext(rootTag: number): RNRenderContext {
-  const context = new RNRenderContext(null, rootTag)
-  rootContextMap.set(rootTag, context)
-  return context
+  if (!hostContext.isInAParentText) {
+    console.warn('[Rasen] Text strings must be rendered within a <Text> component.')
+  }
+
+  const tag = allocateTag()
+  const instanceHandle = { tag: 6, stateNode: null as unknown }
+
+  const node = fabricUIManager.createNode(tag, 'RCTRawText', rootTag, { text }, instanceHandle)
+
+  const textInstance: TextInstance = { node }
+  instanceHandle.stateNode = textInstance
+  return textInstance
 }
 
-/**
- * 获取根渲染上下文
- */
-export function getRootContext(rootTag: number): RNRenderContext | undefined {
-  return rootContextMap.get(rootTag)
+export function appendChild(parent: Instance, child: Instance | TextInstance): void {
+  // 设置父子关系，用于事件冒泡
+  child.parentTag = parent.canonical.nativeTag
+  getFabricUIManager().appendChild(parent.node, child.node)
 }
 
-/**
- * 移除根渲染上下文
- */
-export function removeRootContext(rootTag: number): void {
-  rootContextMap.delete(rootTag)
+export function commitUpdate(instance: Instance, updatePayload: UpdatePayload, newProps: Props): void {
+  if (!updatePayload) return
+  
+  const uiManager = getFabricUIManager()
+  const mgr = uiManager as unknown as Record<string, unknown>
+  
+  // 使用 setNativeProps 直接更新（Fabric）
+  if (typeof mgr['setNativeProps'] === 'function') {
+    const setNativeProps = mgr['setNativeProps'] as (node: Node, props: Props) => void
+    setNativeProps(instance.node, updatePayload)
+  }
+  
+  // 更新内部状态
+  instance.node = uiManager.cloneNodeWithNewProps(instance.node, updatePayload)
+  instance.canonical.currentProps = newProps
+}
+
+export function commitTextUpdate(textInstance: TextInstance, newText: string): void {
+  const uiManager = getFabricUIManager()
+  const mgr = uiManager as unknown as Record<string, unknown>
+  
+  // 使用 setNativeProps 直接更新文本（Fabric）
+  if (typeof mgr['setNativeProps'] === 'function') {
+    const setNativeProps = mgr['setNativeProps'] as (node: Node, props: Props) => void
+    setNativeProps(textInstance.node, { text: newText })
+  }
+  
+  // 更新内部状态
+  textInstance.node = uiManager.cloneNodeWithNewProps(textInstance.node, { text: newText })
+}
+
+// ============================================================================
+// Container Operations
+// ============================================================================
+
+export function createChildSet(rootTag: Container): ChildSet {
+  return getFabricUIManager().createChildSet(rootTag)
+}
+
+export function appendChildToSet(childSet: ChildSet, child: Instance | TextInstance): void {
+  getFabricUIManager().appendChildToSet(childSet, child.node)
+}
+
+export function completeRoot(rootTag: Container, childSet: ChildSet): void {
+  getFabricUIManager().completeRoot(rootTag, childSet)
+}
+
+export function mountToContainer(rootTag: Container, ...instances: (Instance | TextInstance)[]): void {
+  const childSet = createChildSet(rootTag)
+  for (const instance of instances) {
+    appendChildToSet(childSet, instance)
+  }
+  completeRoot(rootTag, childSet)
 }

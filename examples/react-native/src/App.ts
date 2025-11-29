@@ -315,7 +315,18 @@ function App(): RNMountFunction {
  * @returns Unmount function
  */
 export function createApp(rootTag: number): () => void {
-  return mount(App(), rootTag);
+  // 测试最简单的 View
+  const SimpleApp = (): RNMountFunction => {
+    return view({
+      style: {
+        flex: 1,
+        backgroundColor: '#ff0000',  // 红色背景应该很明显
+      },
+      children: [],  // 暂时不添加任何子节点
+    });
+  };
+  
+  return mount(SimpleApp(), rootTag);
 }
 
 // Default export for React Native AppRegistry compatibility

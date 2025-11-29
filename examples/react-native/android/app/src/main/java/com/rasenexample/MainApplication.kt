@@ -1,4 +1,4 @@
-package com.rasentemp
+package com.rasenexample
 
 import android.app.Application
 import com.facebook.react.PackageList

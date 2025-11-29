@@ -1,151 +1,71 @@
 /**
- * React Native 渲染器工具函数
+ * React Native Utils
  */
 
-import { getReactiveRuntime, unrefValue } from '@rasenjs/core'
-import type { PropValue } from '@rasenjs/core'
-import type { ViewStyleProps, TextStyleProps } from './types'
+import type { Props } from './render-context'
+import { getReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
 
 /**
- * 解包 PropValue
+ * 解包响应式值
  */
-export function unref<T>(value: PropValue<T>): T {
-  return unrefValue(value)
+export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
+  try {
+    const runtime = getReactiveRuntime()
+    return runtime.unref(value)
+  } catch {
+    // 如果没有设置响应式运行时，简单返回值
+    if (value && typeof value === 'object' && 'value' in value) {
+      return (value as Ref<T>).value
+    }
+    return value as T
+  }
 }
 
 /**
- * 监听属性变化
+ * 判断是否为响应式引用
+ */
+export function isRef(value: unknown): value is Ref<unknown> {
+  try {
+    const runtime = getReactiveRuntime()
+    return runtime.isRef(value)
+  } catch {
+    // 简单判断
+    return value !== null && typeof value === 'object' && 'value' in value
+  }
+}
+
+/**
+ * 设置响应式属性监听
+ * 当 getter 返回的值变化时，调用 setter
  */
 export function watchProp<T>(
   getter: () => T,
   setter: (value: T) => void
 ): () => void {
-  const stop = getReactiveRuntime().watch(getter, setter, { immediate: true })
-  return stop
+  try {
+    const runtime = getReactiveRuntime()
+    return runtime.watch(getter, setter, { immediate: true })
+  } catch {
+    // 如果没有响应式运行时，直接执行一次
+    setter(getter())
+    return () => {}
+  }
 }
 
 /**
- * 将样式对象转换为 RN 原生格式
+ * 解析样式
  */
-export function resolveStyle(
-  style: ViewStyleProps | TextStyleProps | undefined
-): Record<string, unknown> {
+export function resolveStyle(style: unknown): Props {
   if (!style) return {}
-
-  const result: Record<string, unknown> = {}
-
-  for (const [key, value] of Object.entries(style)) {
-    if (value !== undefined) {
-      result[key] = unref(value as PropValue<unknown>)
-    }
+  if (typeof style === 'function') {
+    return resolveStyle(style())
   }
-
-  return result
-}
-
-/**
- * 解析事件处理器
- * 将事件名转换为 RN 原生事件名
- */
-export function resolveEventName(event: string): string {
-  const eventMap: Record<string, string> = {
-    press: 'onPress',
-    longPress: 'onLongPress',
-    pressIn: 'onPressIn',
-    pressOut: 'onPressOut',
-    layout: 'onLayout',
-    scroll: 'onScroll',
-    changeText: 'onChangeText',
-    submitEditing: 'onSubmitEditing',
-    focus: 'onFocus',
-    blur: 'onBlur',
-    load: 'onLoad',
-    error: 'onError',
-    loadStart: 'onLoadStart',
-    loadEnd: 'onLoadEnd'
+  if (Array.isArray(style)) {
+    return style.reduce((acc, s) => ({ ...acc, ...resolveStyle(s) }), {})
   }
-
-  return eventMap[event] || `on${event.charAt(0).toUpperCase()}${event.slice(1)}`
-}
-
-/**
- * 合并属性
- */
-export function mergeProps(
-  ...propsList: Array<Record<string, unknown> | undefined>
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-
-  for (const props of propsList) {
-    if (!props) continue
-    for (const [key, value] of Object.entries(props)) {
-      if (value !== undefined) {
-        result[key] = value
-      }
-    }
+  // 解包响应式样式
+  if (isRef(style)) {
+    return resolveStyle(unref(style))
   }
-
-  return result
-}
-
-/**
- * 创建组件属性收集器
- * 收集所有响应式属性的当前值
- */
-export function collectProps<T extends Record<string, PropValue<unknown>>>(
-  props: T
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-
-  for (const [key, value] of Object.entries(props)) {
-    if (value !== undefined) {
-      result[key] = unref(value)
-    }
-  }
-
-  return result
-}
-
-/**
- * 检查是否为响应式值
- */
-export function isReactive(value: unknown): boolean {
-  return getReactiveRuntime().isRef(value)
-}
-
-/**
- * 获取响应式属性列表
- */
-export function getReactiveProps<T extends Record<string, PropValue<unknown>>>(
-  props: T
-): string[] {
-  const reactiveKeys: string[] = []
-
-  for (const [key, value] of Object.entries(props)) {
-    if (isReactive(value)) {
-      reactiveKeys.push(key)
-    }
-  }
-
-  return reactiveKeys
-}
-
-/**
- * 规范化 children 为数组
- */
-export function normalizeChildren<T>(
-  children: T | T[] | (() => T | T[]) | undefined
-): T[] {
-  if (!children) return []
-
-  if (typeof children === 'function') {
-    const result = (children as () => T | T[])()
-    return Array.isArray(result) ? result : [result]
-  }
-
-  if (Array.isArray(children)) {
-    return children
-  }
-
-  return [children]
+  return style as Props
 }
