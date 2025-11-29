@@ -1,0 +1,23 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="spiral-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+  </defs>
+  <path
+    d="M50 10
+       A40 40 0 0 1 90 50
+       A35 35 0 0 1 55 85
+       A30 30 0 0 1 25 55
+       A25 25 0 0 1 50 30
+       A20 20 0 0 1 70 50
+       A15 15 0 0 1 55 65
+       A10 10 0 0 1 45 55
+       A5 5 0 0 1 50 50"
+    fill="none"
+    stroke="url(#spiral-gradient)"
+    stroke-width="4"
+    stroke-linecap="round"
+  />
+</svg>
