@@ -1,6 +1,10 @@
 # 🌀 Rasen
 
 <p align="center">
+  <img src="./logo.svg" alt="Rasen Logo" width="120" height="120" />
+</p>
+
+<p align="center">
   <strong>らせん (Spiral)</strong><br>
   <em>One Reactive Core, Multiple Render Targets</em><br><br>
   A reactive rendering framework agnostic to both reactive systems and rendering targets.<br>

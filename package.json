@@ -16,6 +16,7 @@
     "lint": "yarn workspaces foreach -Apt run lint",
     "typecheck": "yarn workspaces foreach -Apt run typecheck",
     "clean": "yarn workspaces foreach -Apt run clean && rm -rf node_modules",
+    "sync-snippets": "node scripts/sync-snippets.mjs",
     "examples:web:dev": "yarn workspace @rasenjs/examples-web dev",
     "examples:web:build": "yarn workspace @rasenjs/examples-web build",
     "examples:web:preview": "yarn workspace @rasenjs/examples-web preview",

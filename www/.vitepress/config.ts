@@ -1,19 +1,30 @@
 import { defineConfig } from 'vitepress'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   title: 'Rasen',
-  description: 'A reactive rendering framework agnostic to both reactive systems and rendering targets',
-  
+  description:
+    'A reactive rendering framework agnostic to both reactive systems and rendering targets',
+
   // Ignore dead links from included README files (they use relative paths for the monorepo)
   ignoreDeadLinks: true,
 
-  head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
-  ],
+  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }]],
+
+  vite: {
+    resolve: {
+      alias: {
+        '@snippets': resolve(__dirname, '../snippets')
+      }
+    }
+  },
 
   themeConfig: {
     logo: '/logo.svg',
-    
+
     nav: [
       { text: 'Guide', link: '/guide/introduction' },
       { text: 'API', link: '/api/' },
@@ -26,14 +37,17 @@ export default defineConfig({
           { text: '@rasenjs/canvas-2d', link: '/packages/canvas-2d' },
           { text: '@rasenjs/react-native', link: '/packages/react-native' },
           { text: '@rasenjs/html', link: '/packages/html' },
-          { text: '@rasenjs/jsx-runtime', link: '/packages/jsx-runtime' },
+          { text: '@rasenjs/jsx-runtime', link: '/packages/jsx-runtime' }
         ]
       },
       {
         text: 'Links',
         items: [
           { text: 'GitHub', link: 'https://github.com/rasenjs/rasen' },
-          { text: 'Changelog', link: 'https://github.com/rasenjs/rasen/releases' },
+          {
+            text: 'Changelog',
+            link: 'https://github.com/rasenjs/rasen/releases'
+          }
         ]
       }
     ],
@@ -45,16 +59,19 @@ export default defineConfig({
           items: [
             { text: 'What is Rasen?', link: '/guide/introduction' },
             { text: 'Design Philosophy', link: '/guide/design-philosophy' },
-            { text: 'Getting Started', link: '/guide/getting-started' },
+            { text: 'Getting Started', link: '/guide/getting-started' }
           ]
         },
         {
           text: 'Core Concepts',
           items: [
-            { text: 'Three-Phase Functions', link: '/guide/three-phase-functions' },
+            {
+              text: 'Three-Phase Functions',
+              link: '/guide/three-phase-functions'
+            },
             { text: 'Reactive Runtime', link: '/guide/reactive-runtime' },
             { text: 'Render Targets', link: '/guide/render-targets' },
-            { text: 'Components', link: '/guide/components' },
+            { text: 'Components', link: '/guide/components' }
           ]
         },
         {
@@ -63,15 +80,21 @@ export default defineConfig({
             { text: 'DOM', link: '/guide/targets/dom' },
             { text: 'Canvas 2D', link: '/guide/targets/canvas-2d' },
             { text: 'React Native', link: '/guide/targets/react-native' },
-            { text: 'HTML (SSR)', link: '/guide/targets/html-ssr' },
+            { text: 'HTML (SSR)', link: '/guide/targets/html-ssr' }
           ]
         },
         {
           text: 'Advanced',
           items: [
             { text: 'JSX Support', link: '/guide/advanced/jsx' },
-            { text: 'Custom Render Targets', link: '/guide/advanced/custom-targets' },
-            { text: 'Custom Reactive Runtime', link: '/guide/advanced/custom-reactive' },
+            {
+              text: 'Custom Render Targets',
+              link: '/guide/advanced/custom-targets'
+            },
+            {
+              text: 'Custom Reactive Runtime',
+              link: '/guide/advanced/custom-reactive'
+            }
           ]
         }
       ],
@@ -82,7 +105,7 @@ export default defineConfig({
             { text: 'Overview', link: '/api/' },
             { text: 'setReactiveRuntime', link: '/api/set-reactive-runtime' },
             { text: 'MountFunction', link: '/api/mount-function' },
-            { text: 'Component Types', link: '/api/component-types' },
+            { text: 'Component Types', link: '/api/component-types' }
           ]
         }
       ],
@@ -97,15 +120,25 @@ export default defineConfig({
             { text: '@rasenjs/html', link: '/packages/html' },
             { text: '@rasenjs/jsx-runtime', link: '/packages/jsx-runtime' },
             { text: '@rasenjs/reactive-vue', link: '/packages/reactive-vue' },
-            { text: '@rasenjs/reactive-signals', link: '/packages/reactive-signals' },
+            {
+              text: '@rasenjs/reactive-signals',
+              link: '/packages/reactive-signals'
+            }
+          ]
+        }
+      ],
+      '/examples/': [
+        {
+          text: 'Examples',
+          items: [
+            { text: 'Overview', link: '/examples/' },
+            { text: 'Interactive Playground', link: '/examples/playground' }
           ]
         }
       ]
     },
 
-    socialLinks: [
-      { icon: 'github', link: 'https://github.com/rasenjs/rasen' }
-    ],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/rasenjs/rasen' }],
 
     footer: {
       message: 'Released under the MIT License.',
