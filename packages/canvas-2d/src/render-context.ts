@@ -15,14 +15,36 @@ export interface ComponentInstance {
 }
 
 /**
+ * 渲染上下文配置选项
+ */
+export interface RenderContextOptions {
+  /**
+   * 是否启用脏区域检测
+   * 默认为 true（开启，只重绘脏区域）
+   *
+   * 开启时：只清除并重绘脏区域内的组件
+   * 关闭时：每次变化都清空整个画布并重绘所有组件
+   */
+  dirtyTracking?: boolean
+}
+
+/**
  * 渲染上下文
  */
 export class RenderContext {
   private components = new Map<symbol, ComponentInstance>()
   private dirtyRegions: Bounds[] = []
   private rafId: number | null = null
+  private needsFullRedraw: boolean = false
+  private options: Required<RenderContextOptions>
 
-  constructor(private ctx: CanvasRenderingContext2D) {
+  constructor(
+    private ctx: CanvasRenderingContext2D,
+    options: RenderContextOptions = {}
+  ) {
+    this.options = {
+      dirtyTracking: options.dirtyTracking ?? true
+    }
     // 将此 RenderContext 关联到 canvas context
     setRenderContext(ctx, this)
   }
@@ -46,8 +68,13 @@ export class RenderContext {
   /**
    * 标记脏区域
    */
-  markDirty(bounds: Bounds) {
-    this.dirtyRegions.push(bounds)
+  markDirty(bounds?: Bounds) {
+    if (this.options.dirtyTracking && bounds) {
+      this.dirtyRegions.push(bounds)
+    } else {
+      // 不启用脏区域检测时，标记需要全量重绘
+      this.needsFullRedraw = true
+    }
     this.scheduleDraw()
   }
 
@@ -74,22 +101,98 @@ export class RenderContext {
   }
 
   /**
+   * 合并重叠的脏区域
+   */
+  private mergeDirtyRegions(): Bounds | null {
+    if (this.dirtyRegions.length === 0) return null
+
+    // 计算所有脏区域的包围盒
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+
+    for (const region of this.dirtyRegions) {
+      minX = Math.min(minX, region.x)
+      minY = Math.min(minY, region.y)
+      maxX = Math.max(maxX, region.x + region.width)
+      maxY = Math.max(maxY, region.y + region.height)
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    }
+  }
+
+  /**
+   * 检查两个边界是否相交
+   */
+  private boundsIntersect(a: Bounds, b: Bounds): boolean {
+    return !(
+      a.x + a.width < b.x ||
+      b.x + b.width < a.x ||
+      a.y + a.height < b.y ||
+      b.y + b.height < a.y
+    )
+  }
+
+  /**
    * 执行绘制
    */
   private flush() {
-    if (this.dirtyRegions.length === 0) return
-
-    // 清空脏区域
-    this.dirtyRegions = []
-
-    // 清空整个 canvas 并重绘所有组件
     const canvas = this.ctx.canvas
-    this.ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // 重绘所有组件
-    this.components.forEach((comp) => {
-      comp.draw()
-    })
+    if (this.options.dirtyTracking) {
+      // 脏区域检测模式
+      if (this.dirtyRegions.length === 0) return
+
+      const dirtyBounds = this.mergeDirtyRegions()
+      this.dirtyRegions = []
+
+      if (!dirtyBounds) return
+
+      // 只清除脏区域
+      this.ctx.save()
+      this.ctx.beginPath()
+      this.ctx.rect(
+        dirtyBounds.x,
+        dirtyBounds.y,
+        dirtyBounds.width,
+        dirtyBounds.height
+      )
+      this.ctx.clip()
+      this.ctx.clearRect(
+        dirtyBounds.x,
+        dirtyBounds.y,
+        dirtyBounds.width,
+        dirtyBounds.height
+      )
+
+      // 只重绘与脏区域相交的组件
+      this.components.forEach((comp) => {
+        const compBounds = comp.bounds()
+        if (compBounds && this.boundsIntersect(compBounds, dirtyBounds)) {
+          comp.draw()
+        }
+      })
+
+      this.ctx.restore()
+    } else {
+      // 全量重绘模式（默认）
+      if (!this.needsFullRedraw) return
+      this.needsFullRedraw = false
+
+      // 清空整个 canvas 并重绘所有组件
+      this.ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+      // 重绘所有组件
+      this.components.forEach((comp) => {
+        comp.draw()
+      })
+    }
   }
 
   /**

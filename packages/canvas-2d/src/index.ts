@@ -19,7 +19,11 @@ export {
   point,
   group
 } from './components'
-export { RenderContext, type Bounds } from './render-context'
+export {
+  RenderContext,
+  type Bounds,
+  type RenderContextOptions
+} from './render-context'
 export * from './utils'
 
 // 导出path相关类型

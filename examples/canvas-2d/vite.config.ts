@@ -11,7 +11,8 @@ export default defineConfig({
         paths: './paths.html',
         transforms: './transforms.html',
         text: './text.html',
-        advanced: './advanced.html'
+        advanced: './advanced.html',
+        performance: './performance.html'
       }
     }
   }
