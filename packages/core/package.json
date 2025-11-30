@@ -8,29 +8,29 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     },
     "./components": {
-      "require": "./dist/components.cjs",
+      "types": "./dist/components.d.ts",
       "import": "./dist/components.js",
-      "types": "./dist/components.d.ts"
+      "require": "./dist/components.cjs"
     },
     "./test-utils": {
-      "require": "./dist/test-utils.cjs",
+      "types": "./dist/test-utils.d.ts",
       "import": "./dist/test-utils.js",
-      "types": "./dist/test-utils.d.ts"
+      "require": "./dist/test-utils.cjs"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "dev": "tsup --watch",
-    "build": "tsup",
-    "test": "vitest",
-    "typecheck": "tsc --noEmit",
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "build": "../../node_modules/.bin/tsup",
+    "test": "../../node_modules/.bin/vitest",
+    "typecheck": "../../node_modules/.bin/tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "keywords": [

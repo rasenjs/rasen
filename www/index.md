@@ -2,8 +2,8 @@
 layout: home
 
 hero:
-  name: "🌀 Rasen"
-  text: "One Reactive Core, Multiple Render Targets"
+  name: '🌀 Rasen'
+  text: 'One Reactive Core, Multiple Render Targets'
   tagline: A reactive rendering framework agnostic to both reactive systems and rendering targets.
   actions:
     - theme: brand
@@ -58,35 +58,35 @@ setReactiveRuntime(createVueRuntime())
 
 const count = ref(0)
 
-const Counter = () => div({
-  children: [
-    div({ textContent: () => `Count: ${count.value}` }),
-    button({ 
-      textContent: '+', 
-      on: { click: () => count.value++ } 
-    })
-  ]
-})
+const Counter = () =>
+  div({
+    children: [
+      div({ textContent: () => `Count: ${count.value}` }),
+      button({
+        textContent: '+',
+        on: { click: () => count.value++ }
+      })
+    ]
+  })
 
 mount(Counter(), document.getElementById('app'))
 ```
 
 ```typescript [Canvas 2D]
 import { canvas } from '@rasenjs/dom'
-import { context, rect, text } from '@rasenjs/canvas-2d'
+import { rect, text } from '@rasenjs/canvas-2d'
 import { ref } from 'vue'
 
 const x = ref(50)
 
 mount(
   canvas({
-    width: 400, height: 200,
-    children: context({
-      children: [
-        rect({ x, y: 50, width: 100, height: 80, fill: '#4CAF50' }),
-        text({ text: () => `X: ${x.value}`, x: 10, y: 20 })
-      ]
-    })
+    width: 400,
+    height: 200,
+    children: [
+      rect({ x, y: 50, width: 100, height: 80, fill: '#4CAF50' }),
+      text({ text: () => `X: ${x.value}`, x: 10, y: 20 })
+    ]
   }),
   document.getElementById('app')
 )
@@ -101,9 +101,9 @@ const count = ref(0)
 view({
   style: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   children: [
-    text({ 
-      style: { fontSize: 48 }, 
-      children: () => `${count.value}` 
+    text({
+      style: { fontSize: 48 },
+      children: () => `${count.value}`
     }),
     touchableOpacity({
       onPress: () => count.value++,
@@ -120,12 +120,7 @@ const html = renderToString(
   div(
     { class: 'container' },
     p({ class: 'title' }, 'Hello from SSR!'),
-    ul(
-      { class: 'list' },
-      li('Item 1'),
-      li('Item 2'),
-      li('Item 3')
-    )
+    ul({ class: 'list' }, li('Item 1'), li('Item 2'), li('Item 3'))
   )
 )
 ```

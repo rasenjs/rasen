@@ -1,40 +1,38 @@
-import { getReactiveRuntime } from '@rasenjs/core'
 import type { SyncComponent } from '@rasenjs/core'
 import type { ReadonlyRef, Ref } from '@rasenjs/core'
-import {
-  getRenderContext,
-  hasRenderContext,
-  type Bounds
-} from '../render-context'
 import { unref } from '../utils'
+import { element } from './element'
+
+/**
+ * text 组件属性
+ */
+export interface TextProps {
+  text: string | Ref<string> | ReadonlyRef<string>
+  x: number | Ref<number> | ReadonlyRef<number>
+  y: number | Ref<number> | ReadonlyRef<number>
+  fill?: string | Ref<string> | ReadonlyRef<string>
+  font?: string | Ref<string> | ReadonlyRef<string>
+  textAlign?:
+    | CanvasTextAlign
+    | Ref<CanvasTextAlign>
+    | ReadonlyRef<CanvasTextAlign>
+  textBaseline?:
+    | CanvasTextBaseline
+    | Ref<CanvasTextBaseline>
+    | ReadonlyRef<CanvasTextBaseline>
+  letterSpacing?: number | Ref<number> | ReadonlyRef<number>
+  textDecoration?: 'underline' | Ref<'underline'> | ReadonlyRef<'underline'>
+}
 
 /**
  * text 组件 - 绘制文本
  */
-export const text: SyncComponent<
-  CanvasRenderingContext2D,
-  {
-    text: string | Ref<string> | ReadonlyRef<string>
-    x: number | Ref<number> | ReadonlyRef<number>
-    y: number | Ref<number> | ReadonlyRef<number>
-    fill?: string | Ref<string> | ReadonlyRef<string>
-    font?: string | Ref<string> | ReadonlyRef<string>
-    textAlign?:
-      | CanvasTextAlign
-      | Ref<CanvasTextAlign>
-      | ReadonlyRef<CanvasTextAlign>
-    textBaseline?:
-      | CanvasTextBaseline
-      | Ref<CanvasTextBaseline>
-      | ReadonlyRef<CanvasTextBaseline>
-  }
-> = (props) => {
-  return (ctx) => {
-    let currentBounds: Bounds | null = null
-    let componentId: symbol | null = null
-
-    const getBounds = (): Bounds => {
-      const text = unref(props.text)
+export const text: SyncComponent<CanvasRenderingContext2D, TextProps> = (
+  props
+) => {
+  return element({
+    getBounds: (ctx) => {
+      const textContent = unref(props.text)
       const x = unref(props.x)
       const y = unref(props.y)
       const font = props.font ? unref(props.font) : '16px sans-serif'
@@ -42,14 +40,21 @@ export const text: SyncComponent<
       const textBaseline = props.textBaseline
         ? unref(props.textBaseline)
         : 'alphabetic'
+      const letterSpacing = props.letterSpacing ? unref(props.letterSpacing) : 0
 
       ctx.font = font
       ctx.textAlign = textAlign
       ctx.textBaseline = textBaseline
 
-      const metrics = ctx.measureText(text)
+      let textWidth = ctx.measureText(textContent).width
+
+      // 如果有字间距,需要计算额外宽度
+      if (letterSpacing > 0) {
+        const numChars = textContent.length
+        textWidth += (numChars - 1) * letterSpacing
+      }
+
       let textX = x
-      const textWidth = metrics.width
 
       if (textAlign === 'center') {
         textX = x - textWidth / 2
@@ -78,10 +83,10 @@ export const text: SyncComponent<
         width: textWidth + padding * 2,
         height: textHeight + padding * 2
       }
-    }
+    },
 
-    const drawFn = () => {
-      const text = unref(props.text)
+    draw: (ctx) => {
+      const textContent = unref(props.text)
       const x = unref(props.x)
       const y = unref(props.y)
       const fill = props.fill ? unref(props.fill) : '#000000'
@@ -90,61 +95,112 @@ export const text: SyncComponent<
       const textBaseline = props.textBaseline
         ? unref(props.textBaseline)
         : 'alphabetic'
+      const letterSpacing = props.letterSpacing ? unref(props.letterSpacing) : 0
+      const textDecoration = props.textDecoration
+        ? unref(props.textDecoration)
+        : undefined
 
       ctx.fillStyle = fill
       ctx.font = font
       ctx.textAlign = textAlign
       ctx.textBaseline = textBaseline
-      ctx.fillText(text, x, y)
-    }
 
-    const update = () => {
-      const newBounds = getBounds()
+      if (letterSpacing > 0) {
+        // 逐字符绘制以支持字间距
+        let currentX = x
+        const chars = textContent.split('')
 
-      if (hasRenderContext(ctx)) {
-        const renderContext = getRenderContext(ctx)
-        if (currentBounds) {
-          renderContext.markDirty(currentBounds)
+        // 调整起始位置（考虑textAlign）
+        if (
+          textAlign === 'center' ||
+          textAlign === 'right' ||
+          textAlign === 'end'
+        ) {
+          let totalWidth = 0
+          for (const char of chars) {
+            totalWidth += ctx.measureText(char).width + letterSpacing
+          }
+          totalWidth -= letterSpacing // 最后一个字符不需要额外间距
+
+          if (textAlign === 'center') {
+            currentX = x - totalWidth / 2
+          } else {
+            currentX = x - totalWidth
+          }
         }
-        renderContext.markDirty(newBounds)
-        currentBounds = newBounds
+
+        for (let i = 0; i < chars.length; i++) {
+          ctx.fillText(chars[i], currentX, y)
+          const charWidth = ctx.measureText(chars[i]).width
+          currentX += charWidth + letterSpacing
+        }
+
+        // 绘制下划线
+        if (textDecoration === 'underline') {
+          const totalWidth =
+            currentX -
+            (textAlign === 'center' ||
+            textAlign === 'right' ||
+            textAlign === 'end'
+              ? (x - currentX + x) / 2
+              : x)
+          const fontSize = parseFloat(font)
+          const underlineY = y + fontSize * 0.1
+          const startX =
+            textAlign === 'center'
+              ? x - totalWidth / 2
+              : textAlign === 'right' || textAlign === 'end'
+                ? x - totalWidth
+                : x
+
+          ctx.save()
+          ctx.strokeStyle = fill
+          ctx.lineWidth = Math.max(1, fontSize * 0.05)
+          ctx.beginPath()
+          ctx.moveTo(startX, underlineY)
+          ctx.lineTo(startX + totalWidth - letterSpacing, underlineY)
+          ctx.stroke()
+          ctx.restore()
+        }
       } else {
-        drawFn()
-        currentBounds = newBounds
-      }
-    }
+        ctx.fillText(textContent, x, y)
 
-    if (hasRenderContext(ctx)) {
-      const renderContext = getRenderContext(ctx)
-      componentId = renderContext.register({
-        bounds: () => currentBounds,
-        draw: drawFn
-      })
-    }
+        // 绘制下划线
+        if (textDecoration === 'underline') {
+          const metrics = ctx.measureText(textContent)
+          const textWidth = metrics.width
+          const fontSize = parseFloat(font)
+          const underlineY = y + fontSize * 0.1
 
-    const stop = getReactiveRuntime().watch(
-      () => [
-        unref(props.text),
-        unref(props.x),
-        unref(props.y),
-        props.fill ? unref(props.fill) : undefined,
-        props.font ? unref(props.font) : undefined,
-        props.textAlign ? unref(props.textAlign) : undefined,
-        props.textBaseline ? unref(props.textBaseline) : undefined
-      ],
-      update,
-      { immediate: true }
-    )
+          let startX = x
+          if (textAlign === 'center') {
+            startX = x - textWidth / 2
+          } else if (textAlign === 'right' || textAlign === 'end') {
+            startX = x - textWidth
+          }
 
-    return () => {
-      stop()
-      if (hasRenderContext(ctx) && componentId) {
-        const renderContext = getRenderContext(ctx)
-        if (currentBounds) {
-          renderContext.markDirty(currentBounds)
+          ctx.save()
+          ctx.strokeStyle = fill
+          ctx.lineWidth = Math.max(1, fontSize * 0.05)
+          ctx.beginPath()
+          ctx.moveTo(startX, underlineY)
+          ctx.lineTo(startX + textWidth, underlineY)
+          ctx.stroke()
+          ctx.restore()
         }
-        renderContext.unregister(componentId)
       }
-    }
-  }
+    },
+
+    deps: () => [
+      unref(props.text),
+      unref(props.x),
+      unref(props.y),
+      props.fill ? unref(props.fill) : undefined,
+      props.font ? unref(props.font) : undefined,
+      props.textAlign ? unref(props.textAlign) : undefined,
+      props.textBaseline ? unref(props.textBaseline) : undefined,
+      props.letterSpacing ? unref(props.letterSpacing) : undefined,
+      props.textDecoration ? unref(props.textDecoration) : undefined
+    ]
+  })
 }

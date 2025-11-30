@@ -35,16 +35,16 @@
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| [@rasenjs/core](./packages/core) | Core runtime and type definitions |
-| [@rasenjs/dom](./packages/dom) | DOM rendering components |
-| [@rasenjs/canvas-2d](./packages/canvas-2d) | Canvas 2D rendering components |
-| [@rasenjs/react-native](./packages/react-native) | React Native Fabric renderer |
-| [@rasenjs/html](./packages/html) | HTML renderer for SSR/SSG |
-| [@rasenjs/jsx-runtime](./packages/jsx-runtime) | JSX/TSX runtime support |
-| [@rasenjs/reactive-vue](./packages/reactive-vue) | Vue 3 reactivity adapter |
-| [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter |
+| Package                                                  | Description                       |
+| -------------------------------------------------------- | --------------------------------- |
+| [@rasenjs/core](./packages/core)                         | Core runtime and type definitions |
+| [@rasenjs/dom](./packages/dom)                           | DOM rendering components          |
+| [@rasenjs/canvas-2d](./packages/canvas-2d)               | Canvas 2D rendering components    |
+| [@rasenjs/react-native](./packages/react-native)         | React Native Fabric renderer      |
+| [@rasenjs/html](./packages/html)                         | HTML renderer for SSR/SSG         |
+| [@rasenjs/jsx-runtime](./packages/jsx-runtime)           | JSX/TSX runtime support           |
+| [@rasenjs/reactive-vue](./packages/reactive-vue)         | Vue 3 reactivity adapter          |
+| [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter              |
 
 ## Quick Start
 
@@ -76,15 +76,16 @@ setReactiveRuntime(createVueRuntime())
 const count = ref(0)
 
 // 3. Define component
-const Counter = () => div({
-  children: [
-    div({ textContent: computed(() => `Count: ${count.value}`) }),
-    button({
-      textContent: 'Increment',
-      on: { click: () => count.value++ }
-    })
-  ]
-})
+const Counter = () =>
+  div({
+    children: [
+      div({ textContent: computed(() => `Count: ${count.value}`) }),
+      button({
+        textContent: 'Increment',
+        on: { click: () => count.value++ }
+      })
+    ]
+  })
 
 // 4. Mount to DOM
 mount(Counter(), document.getElementById('app'))
@@ -116,25 +117,24 @@ mount(
 
 ```typescript
 import { canvas } from '@rasenjs/dom'
-import { context, rect, text } from '@rasenjs/canvas-2d'
+import { rect, text } from '@rasenjs/canvas-2d'
 
 const x = ref(50)
 
 mount(
   canvas({
-    width: 400, height: 200,
-    children: context({
-      children: [
-        rect({ x: x, y: 50, width: 100, height: 80, fill: '#4CAF50' }),
-        text({ text: computed(() => `X: ${x.value}`), x: 10, y: 20 })
-      ]
-    })
+    width: 400,
+    height: 200,
+    children: [
+      rect({ x: x, y: 50, width: 100, height: 80, fill: '#4CAF50' }),
+      text({ text: computed(() => `X: ${x.value}`), x: 10, y: 20 })
+    ]
   }),
   document.getElementById('app')
 )
 
 // Animate
-setInterval(() => x.value = 50 + Math.sin(Date.now() / 500) * 100, 16)
+setInterval(() => (x.value = 50 + Math.sin(Date.now() / 500) * 100), 16)
 ```
 
 ### 📱 React Native (No React!)
@@ -147,9 +147,9 @@ const count = ref(0)
 view({
   style: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   children: [
-    text({ 
-      style: { fontSize: 48 }, 
-      children: computed(() => `${count.value}`) 
+    text({
+      style: { fontSize: 48 },
+      children: computed(() => `${count.value}`)
     }),
     touchableOpacity({
       onPress: () => count.value++,
@@ -169,12 +169,7 @@ const html = renderToString(
   div(
     { class: 'container' },
     p({ class: 'title' }, 'Hello from SSR!'),
-    ul(
-      { class: 'list' },
-      li('Item 1'),
-      li('Item 2'),
-      li('Item 3')
-    )
+    ul({ class: 'list' }, li('Item 1'), li('Item 2'), li('Item 3'))
   )
 )
 // Output: <div class="container"><p class="title">Hello from SSR!</p><ul class="list"><li>Item 1</li>...</ul></div>
@@ -214,20 +209,20 @@ All features are currently **under development**. Here's what we're working on:
 
 ### Render Targets (Hosts)
 
-| Host | Status | Description |
-|------|--------|-------------|
-| DOM | 🚧 In Progress | Browser DOM rendering |
-| Canvas 2D | 🚧 In Progress | 2D graphics & animations |
-| React Native | 🚧 In Progress | Mobile apps via Fabric (no React) |
+| Host           | Status         | Description                           |
+| -------------- | -------------- | ------------------------------------- |
+| DOM            | 🚧 In Progress | Browser DOM rendering                 |
+| Canvas 2D      | 🚧 In Progress | 2D graphics & animations              |
+| React Native   | 🚧 In Progress | Mobile apps via Fabric (no React)     |
 | HTML (SSR/SSG) | 🚧 In Progress | Server-side rendering to HTML strings |
-| Three.js | 📋 Planned | 3D graphics & WebGL |
+| Three.js       | 📋 Planned     | 3D graphics & WebGL                   |
 
 ### Compilers & Tooling
 
-| Tool | Status | Description |
-|------|--------|-------------|
-| SFC Compiler | 📋 Planned | Single File Components with static hoisting |
-| Mini Program SFC | 📋 Planned | WeChat/Alipay mini program support |
+| Tool             | Status     | Description                                 |
+| ---------------- | ---------- | ------------------------------------------- |
+| SFC Compiler     | 📋 Planned | Single File Components with static hoisting |
+| Mini Program SFC | 📋 Planned | WeChat/Alipay mini program support          |
 
 ### Legend
 

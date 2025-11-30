@@ -35,8 +35,12 @@ type MountFunction<Host = unknown> = (host: Host) => (() => void) | undefined
 
 // Component types
 type SyncComponent<Host, Props> = (props: Props) => MountFunction<Host>
-type AsyncComponent<Host, Props> = (props: Props) => Promise<MountFunction<Host>>
-type Component<Host, Props> = SyncComponent<Host, Props> | AsyncComponent<Host, Props>
+type AsyncComponent<Host, Props> = (
+  props: Props
+) => Promise<MountFunction<Host>>
+type Component<Host, Props> =
+  | SyncComponent<Host, Props>
+  | AsyncComponent<Host, Props>
 
 // Reactive value types
 type PropValue<T> = T | Ref<T> | ReadonlyRef<T>
@@ -61,11 +65,34 @@ const unmount = mount(component, document.getElementById('app'))
 All HTML elements are available as components:
 
 ```typescript
-import { 
-  div, span, button, input, a, img, p,
-  h1, h2, h3, ul, ol, li, form, label,
-  textarea, select, option, canvas, svg,
-  section, article, header, footer, nav, main, aside
+import {
+  div,
+  span,
+  button,
+  input,
+  a,
+  img,
+  p,
+  h1,
+  h2,
+  h3,
+  ul,
+  ol,
+  li,
+  form,
+  label,
+  textarea,
+  select,
+  option,
+  canvas,
+  svg,
+  section,
+  article,
+  header,
+  footer,
+  nav,
+  main,
+  aside
 } from '@rasenjs/dom'
 ```
 
@@ -87,7 +114,7 @@ element({
 ### Components
 
 ```typescript
-import { context, rect, circle, line, text } from '@rasenjs/canvas-2d'
+import { rect, circle, line, text } from '@rasenjs/canvas-2d'
 ```
 
 ### RenderContext
@@ -114,8 +141,12 @@ registerApp('MyApp', App)
 
 ```typescript
 import {
-  view, text, image, textInput,
-  touchableOpacity, scrollView
+  view,
+  text,
+  image,
+  textInput,
+  touchableOpacity,
+  scrollView
 } from '@rasenjs/react-native'
 ```
 
@@ -135,8 +166,20 @@ const html = renderToString(component)
 
 ```typescript
 import {
-  html, head, body, div, span, p,
-  h1, h2, h3, ul, ol, li, a, img
+  html,
+  head,
+  body,
+  div,
+  span,
+  p,
+  h1,
+  h2,
+  h3,
+  ul,
+  ol,
+  li,
+  a,
+  img
 } from '@rasenjs/html'
 ```
 

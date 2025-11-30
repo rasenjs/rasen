@@ -1,7 +1,7 @@
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createSignalsRuntime, ref } from '@rasenjs/reactive-signals'
 import { div, h1, button, mount, canvas } from '@rasenjs/dom'
-import { context, rect, circle, text } from '@rasenjs/canvas-2d'
+import { rect, circle, text } from '@rasenjs/canvas-2d'
 
 // 初始化 Signals 响应式运行时
 setReactiveRuntime(createSignalsRuntime())
@@ -40,31 +40,27 @@ const app = div(
     width: 400,
     height: 400,
     children: [
-      context({
-        children: [
-          rect({
-            x: 0,
-            y: 0,
-            width: 400,
-            height: 400,
-            fill: '#f0f9ff'
-          }),
-          circle({
-            x,
-            y,
-            radius,
-            fill: '#667eea'
-          }),
-          text({
-            x,
-            y,
-            text: '🌀',
-            font: '24px sans-serif',
-            textAlign: 'center',
-            textBaseline: 'middle',
-            fill: 'white'
-          })
-        ]
+      rect({
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 400,
+        fill: '#f0f9ff'
+      }),
+      circle({
+        x,
+        y,
+        radius,
+        fill: '#667eea'
+      }),
+      text({
+        x,
+        y,
+        text: '🌀',
+        font: '24px sans-serif',
+        textAlign: 'center',
+        textBaseline: 'middle',
+        fill: 'white'
       })
     ]
   }),

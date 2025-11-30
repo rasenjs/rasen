@@ -22,7 +22,10 @@ export class RenderContext {
   private dirtyRegions: Bounds[] = []
   private rafId: number | null = null
 
-  constructor(private ctx: CanvasRenderingContext2D) {}
+  constructor(private ctx: CanvasRenderingContext2D) {
+    // 将此 RenderContext 关联到 canvas context
+    setRenderContext(ctx, this)
+  }
 
   /**
    * 注册组件
@@ -54,10 +57,20 @@ export class RenderContext {
   private scheduleDraw() {
     if (this.rafId !== null) return
 
-    this.rafId = requestAnimationFrame(() => {
-      this.rafId = null
-      this.flush()
-    })
+    // 在浏览器环境使用 requestAnimationFrame，在测试环境使用 queueMicrotask
+    if (typeof requestAnimationFrame !== 'undefined') {
+      this.rafId = requestAnimationFrame(() => {
+        this.rafId = null
+        this.flush()
+      })
+    } else {
+      // 测试环境：使用 queueMicrotask 立即执行
+      this.rafId = 1 as unknown as number
+      queueMicrotask(() => {
+        this.rafId = null
+        this.flush()
+      })
+    }
   }
 
   /**
@@ -71,9 +84,7 @@ export class RenderContext {
 
     // 清空整个 canvas 并重绘所有组件
     const canvas = this.ctx.canvas
-    const width = canvas.width / (window.devicePixelRatio || 1)
-    const height = canvas.height / (window.devicePixelRatio || 1)
-    this.ctx.clearRect(0, 0, width, height)
+    this.ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     // 重绘所有组件
     this.components.forEach((comp) => {
@@ -82,13 +93,35 @@ export class RenderContext {
   }
 
   /**
+   * 同步刷新 - 供测试使用
+   * 在测试环境中，queueMicrotask 可能不会立即执行
+   * 这个方法可以强制立即执行渲染
+   */
+  flushSync() {
+    // 取消已调度的渲染
+    if (this.rafId !== null) {
+      this.rafId = null
+    }
+
+    // 强制清屏并重绘所有组件（即使没有脏区域）
+    const canvas = this.ctx.canvas
+    this.ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    // 重绘所有组件
+    this.components.forEach((comp) => {
+      comp.draw()
+    })
+
+    // 清空脏区域列表
+    this.dirtyRegions = []
+  }
+
+  /**
    * 销毁上下文
    */
   destroy() {
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId)
-      this.rafId = null
-    }
+    // 清空调度标记
+    this.rafId = null
     this.components.clear()
     this.dirtyRegions = []
   }
@@ -96,6 +129,65 @@ export class RenderContext {
 
 // 用于存储上下文的 WeakMap
 const contextMap = new WeakMap<CanvasRenderingContext2D, RenderContext>()
+
+// 用于存储当前 group 上下文的栈（支持嵌套 group）
+const groupContextStack = new WeakMap<
+  CanvasRenderingContext2D,
+  GroupContext[]
+>()
+
+/**
+ * Group 上下文 - 用于收集子组件的绘制函数
+ */
+export interface GroupContext {
+  /** 子组件的绘制函数列表 */
+  childDrawFunctions: (() => void)[]
+  /** 子组件的 ID 列表（用于清理） */
+  childComponentIds: symbol[]
+}
+
+/**
+ * 进入 group 上下文
+ * 在此上下文中注册的组件会被收集到 group 中
+ */
+export function enterGroupContext(ctx: CanvasRenderingContext2D): GroupContext {
+  const groupContext: GroupContext = {
+    childDrawFunctions: [],
+    childComponentIds: []
+  }
+
+  let stack = groupContextStack.get(ctx)
+  if (!stack) {
+    stack = []
+    groupContextStack.set(ctx, stack)
+  }
+  stack.push(groupContext)
+
+  return groupContext
+}
+
+/**
+ * 退出 group 上下文
+ */
+export function exitGroupContext(ctx: CanvasRenderingContext2D): void {
+  const stack = groupContextStack.get(ctx)
+  if (stack && stack.length > 0) {
+    stack.pop()
+  }
+}
+
+/**
+ * 获取当前 group 上下文（如果在 group 内部）
+ */
+export function getCurrentGroupContext(
+  ctx: CanvasRenderingContext2D
+): GroupContext | null {
+  const stack = groupContextStack.get(ctx)
+  if (stack && stack.length > 0) {
+    return stack[stack.length - 1]
+  }
+  return null
+}
 
 /**
  * 设置渲染上下文

@@ -189,6 +189,13 @@ export function canvas<Ctx>(props: {
       )
     }
 
+    // 对 2D context 应用 DPR 缩放
+    const contextType = props.contextType || '2d'
+    if (contextType === '2d' && !props.getContext) {
+      const ctx2d = ctx as unknown as CanvasRenderingContext2D
+      ctx2d.scale(dpr, dpr)
+    }
+
     // 挂载子组件到渲染上下文
     const childUnmounts = props.children.map((child) => child(ctx))
 

@@ -31,8 +31,8 @@
     "jsx.d.ts"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "../../node_modules/.bin/tsup",
+    "dev": "../../node_modules/.bin/tsup --watch",
     "clean": "rm -rf dist"
   },
   "keywords": [
