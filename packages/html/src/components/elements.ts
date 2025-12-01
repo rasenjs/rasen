@@ -9,13 +9,13 @@ interface BaseProps {
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
   attrs?: PropValue<Record<string, string | number | boolean>>
-  textContent?: PropValue<string>
+  /** Text content or child mount functions */
+  children?: PropValue<string> | Array<StringMountFunction>
   // SSR 不需要事件，但保持 API 兼容
   on?: Record<string, (e: Event) => void>
   onClick?: (e: Event) => void
   onInput?: (e: Event) => void
   onKeyPress?: (e: Event) => void
-  children?: Array<StringMountFunction>
 }
 
 /**
@@ -31,9 +31,9 @@ function normalizeArgs(...args: any[]): BaseProps {
 
   // 单个参数
   if (args.length === 1) {
-    // 如果是字符串，作为 textContent
+    // 如果是字符串，作为 children (text content)
     if (typeof first === 'string') {
-      return { textContent: first }
+      return { children: first }
     }
     // 如果是函数，当作 child mount 函数
     if (typeof first === 'function') {
@@ -54,7 +54,7 @@ function normalizeArgs(...args: any[]): BaseProps {
       if (typeof child === 'function') {
         children.push(child)
       } else if (typeof child === 'string') {
-        // 字符串 child 转换为 textContent 的 mount 函数
+        // 字符串 child 转换为 text node 的 mount 函数
         children.push((host: StringHost) => {
           host.append(escapeHtml(child))
           return undefined
@@ -137,7 +137,6 @@ export const a: SyncComponent<
   BaseProps & {
     href?: PropValue<string>
     target?: PropValue<string>
-    textContent?: PropValue<string>
   }
 > = (props) => {
   return element({ tag: 'a', ...props })
@@ -249,12 +248,12 @@ export function textarea(
     ...(cols !== undefined ? { cols } : {})
   }
 
-  // textarea 的 value 应该作为 textContent
+  // textarea 的 value 应该作为 children (text content)
   return element({
     tag: 'textarea',
     ...restProps,
     attrs: newAttrs as any,
-    ...(value !== undefined ? { textContent: String(value) } : {})
+    ...(value !== undefined ? { children: String(value) } : {})
   })
 }
 

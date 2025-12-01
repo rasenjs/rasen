@@ -1,0 +1,15 @@
+{
+  "name": "@rasen-examples/gpui",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rasen-gpui run",
+    "build": "rasen-gpui build",
+    "init": "rasen-gpui init"
+  },
+  "dependencies": {
+    "@rasenjs/gpui": "workspace:*",
+    "@rasenjs/reactive-signals": "workspace:*"
+  }
+}

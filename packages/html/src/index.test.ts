@@ -76,7 +76,7 @@ describe('@rasenjs/html', () => {
 
     it('should render link with href', () => {
       const html = renderToString(
-        a({ attrs: { href: 'https://example.com', target: '_blank' }, textContent: 'Link' })
+        a({ attrs: { href: 'https://example.com', target: '_blank' }, children: 'Link' })
       )
       expect(html).toBe('<a href="https://example.com" target="_blank">Link</a>')
     })

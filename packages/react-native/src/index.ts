@@ -60,8 +60,8 @@ export * from './components'
 // 导出工具函数
 export * from './utils'
 
-import type { HostConfig, RenderContext, Instance, TextInstance } from './render-context'
-import type { RNMountFunction } from './components'
+import type { HostConfig } from './render-context'
+import type { RNComponent, RNMountFunction } from './components'
 import { createRenderContext, createChildSet, appendChildToSet, completeRoot, initEventSystem } from './render-context'
 
 // React Native 依赖 - 使用静态 import
@@ -78,116 +78,70 @@ import 'react-native/Libraries/Components/View/ViewNativeComponent'
 
 /**
  * 应用组件类型
- * 返回 RNMountFunction 的函数
+ * 返回一个挂载函数（即 `RNMountFunction`）。该函数在内部接收 `RenderContext` 并执行渲染/提交操作。
  */
 export type AppComponent = () => RNMountFunction
 
 /**
- * 注册应用
- * 
- * 这是 Rasen React Native 的主入口。自动处理：
- * - 获取 HostConfig
- * - 注册内置组件
- * - 初始化事件系统
- * - 调用 AppRegistry.registerRunnable
- * 
- * @param appName - 应用名称（需要与 app.json 中的 name 一致）
- * @param App - 应用组件函数
- * @returns 重新渲染函数
- * 
+ * 挂载应用并返回可手动触发的重新渲染函数。
+ *
+ * 说明：
+ * - 初始化事件系统（`initEventSystem`）。
+ * - 通过 `AppRegistry.registerRunnable` 注册一个 runnable（名称为 `RasenReactNativeApp`），在 runnable 被触发时会：
+ *   - 使用 `ReactNativePrivateInterface` 作为 `HostConfig`（内部 React Native 私有接口）并基于 `rootTag` 创建 `RenderContext`。
+ *   - 调用传入的 `component`，拿到要挂载的实例（可以是单个实例或数组），将它们收集到 `ChildSet` 并通过 `completeRoot` 提交到原生层。
+ * - 挂载通过 `AppRegistry` 注册的 runnable 执行首次渲染和后续内部渲染，但不会向外部返回可调用的 `rerender` 函数。
+ *
+ * @param component - 应用组件（应返回一个挂载函数，见 `RNComponent`）
+ *
  * @example
  * ```ts
- * import { registerApp, view, text } from '@rasenjs/react-native';
- * 
+ * import { mount, view, text } from '@rasenjs/react-native';
+ *
  * const App = () => view({
  *   style: { flex: 1, backgroundColor: '#fff' },
- *   children: [
- *     text({ children: 'Hello Rasen!' })
- *   ]
+ *   children: [ text({ children: 'Hello Rasen!' }) ]
  * });
- * 
- * const rerender = registerApp('MyApp', App);
- * 
- * // 需要更新时调用
- * rerender();
+ *
+ * // 将 App 传入 mount，注册后的 runnable 会在应用启动时进行渲染
+ * mount(App);
  * ```
  */
-export function registerApp(
-  appName: string,
-  App: AppComponent
-): () => void {
+export function mount(
+  component: RNComponent,
+): void {
   // 初始化事件系统
   initEventSystem()
   
   let rerenderFn: (() => void) | null = null
   
   // 使用顶部导入的 AppRegistry
-  AppRegistry.registerRunnable(appName, ({ rootTag }: { rootTag: number }) => {
+  AppRegistry.registerRunnable('RasenReactNativeApp', ({ rootTag }: { rootTag: number }) => {
     // 使用顶部导入的 ReactNativePrivateInterface 作为 hostConfig
     const hostConfig = ReactNativePrivateInterface as HostConfig
-    
+    const ctx = createRenderContext(hostConfig, rootTag)
+
     // 创建重新渲染函数
     rerenderFn = () => {
-      mount(hostConfig, rootTag, App())
+        // 创建根 RenderContext
+
+      // 渲染组件
+      const result = component()(ctx)
+
+      // 收集实例
+      const instances = Array.isArray(result) ? result : [result]
+
+      // 提交到原生层
+      const childSet = createChildSet(rootTag)
+      for (const instance of instances) {
+        appendChildToSet(childSet, instance)
+      }
+      completeRoot(rootTag, childSet)
     }
     
     // 首次渲染
     rerenderFn()
   })
   
-  // 返回重新渲染函数（外部可调用）
-  return () => {
-    if (rerenderFn) {
-      rerenderFn()
-    }
-  }
-}
-
-// ============================================================================
-// Mount API (Low-level)
-// ============================================================================
-
-/**
- * 组件类型：接收 RenderContext，返回 Instance
- * 
- * @deprecated 使用 RNMountFunction 代替
- */
-export type RasenComponent = (ctx: RenderContext) => Instance | TextInstance | (Instance | TextInstance)[]
-
-/**
- * 挂载 Rasen 应用（底层 API）
- *
- * 大多数情况下应使用 `registerApp` 代替。
- * 此函数用于需要更细粒度控制的场景。
- *
- * @param hostConfig - ReactNativePrivateInterface
- * @param rootTag - 根视图标签
- * @param component - 组件（MountFunction 或返回 Instance 的函数）
- * @returns 卸载函数
- */
-export function mount(
-  hostConfig: HostConfig,
-  rootTag: number,
-  component: RNMountFunction | RasenComponent
-): () => void {
-  // 创建根 RenderContext
-  const ctx = createRenderContext(hostConfig, rootTag)
-
-  // 渲染组件
-  const result = component(ctx)
-
-  // 收集实例
-  const instances = Array.isArray(result) ? result : [result]
-
-  // 提交到原生层
-  const childSet = createChildSet(rootTag)
-  for (const instance of instances) {
-    appendChildToSet(childSet, instance)
-  }
-  completeRoot(rootTag, childSet)
-
-  // 返回卸载函数
-  return () => {
-    // TODO: 实现卸载逻辑
-  }
+  // 不对外返回 rerender，渲染由 AppRegistry 注册的 runnable 内部触发
 }

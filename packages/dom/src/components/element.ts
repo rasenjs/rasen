@@ -12,11 +12,11 @@ export const element: SyncComponent<
     className?: PropValue<string>
     style?: PropValue<Record<string, string | number>>
     attrs?: PropValue<Record<string, string | number | boolean>>
-    textContent?: PropValue<string>
+    /** Text content or child mount functions */
+    children?: PropValue<string> | Array<(host: HTMLElement) => (() => void) | undefined>
     innerHTML?: PropValue<string>
     value?: PropValue<string | number>
     on?: Record<string, (e: Event) => void>
-    children?: Array<(host: HTMLElement) => (() => void) | undefined>
   }
 > = (props) => {
   return (host) => {
@@ -78,20 +78,28 @@ export const element: SyncComponent<
       )
     }
 
-    // textContent
-    if (props.textContent !== undefined) {
-      stops.push(
-        watchProp(
-          () => {
-            const value = unref(props.textContent)
-            // 转换为字符串
-            return String(value)
-          },
-          (value) => {
-            element.textContent = value || ''
-          }
+    // children (text content or mount functions)
+    if (props.children !== undefined) {
+      const children = props.children
+      if (typeof children === 'string' || (typeof children === 'object' && 'value' in (children as any))) {
+        // String content (or ref to string) - set as textContent
+        stops.push(
+          watchProp(
+            () => {
+              const value = unref(children as PropValue<string>)
+              return String(value)
+            },
+            (value) => {
+              element.textContent = value || ''
+            }
+          )
         )
-      )
+      } else if (Array.isArray(children)) {
+        // Mount functions
+        for (const childMount of children) {
+          childUnmounts.push(childMount(element))
+        }
+      }
     }
 
     // value (for input, textarea, select)
@@ -127,13 +135,6 @@ export const element: SyncComponent<
       for (const [event, handler] of Object.entries(props.on)) {
         console.log(`Adding event listener: ${event}`)
         element.addEventListener(event, handler)
-      }
-    }
-
-    // children
-    if (props.children) {
-      for (const childMount of props.children) {
-        childUnmounts.push(childMount(element))
       }
     }
 

@@ -2,6 +2,8 @@
  * Rasen Canvas 2D - Canvas 2D 渲染适配器
  */
 
+import { SyncComponent } from '@rasenjs/core'
+
 export {
   rect,
   text,
@@ -70,3 +72,14 @@ export type {
   ImageConfig,
   GroupConfig
 } from './types'
+
+
+type Canvas2DAppComponent = SyncComponent<CanvasRenderingContext2D, object>
+
+export function mount(component: Canvas2DAppComponent, props: object, ctx: CanvasRenderingContext2D): () => void {
+  const mountFunction = component(props)
+  const cleanup = mountFunction(ctx)
+  return () => {
+    cleanup?.()
+  }
+}

@@ -45,6 +45,7 @@
 | [@rasenjs/dom](./packages/dom)                           | DOM rendering components          |
 | [@rasenjs/canvas-2d](./packages/canvas-2d)               | Canvas 2D rendering components    |
 | [@rasenjs/react-native](./packages/react-native)         | React Native Fabric renderer      |
+| [@rasenjs/gpui](./packages/gpui)                         | GPU-accelerated native desktop (Zed's GPUI) |
 | [@rasenjs/html](./packages/html)                         | HTML renderer for SSR/SSG         |
 | [@rasenjs/jsx-runtime](./packages/jsx-runtime)           | JSX/TSX runtime support           |
 | [@rasenjs/reactive-vue](./packages/reactive-vue)         | Vue 3 reactivity adapter          |
@@ -163,7 +164,39 @@ view({
 })
 ```
 
-### 🖥️ Server-Side Rendering (SSR)
+### 🖥️ Native Desktop (GPUI)
+
+<p align="center">
+  <img src="./packages/gpui/screenshot.png" alt="GPUI Demo" width="500" />
+</p>
+
+```typescript
+import { div, text, button, run } from '@rasenjs/gpui'
+import { ref } from '@rasenjs/reactive-signals'
+
+const App = () => {
+  const count = ref(0)
+  
+  return div({
+    class: "flex flex-col gap-4 bg-[#1a1a2e] size-full justify-center items-center",
+    children: [
+      text({ class: "text-4xl text-white", children: "🌀 Rasen GPUI" }),
+      text({ class: "text-5xl text-white", children: count }),  // reactive!
+      div({
+        class: "flex gap-3",
+        children: [
+          button({ class: "px-4 py-2 bg-[#e94560] rounded-lg", onClick: () => count.value--, children: [text({ children: "−" })] }),
+          button({ class: "px-4 py-2 bg-[#0f3460] rounded-lg", onClick: () => count.value++, children: [text({ children: "+" })] }),
+        ],
+      }),
+    ],
+  })
+}
+
+run(App)  // GPU-accelerated native window!
+```
+
+### 📄 Server-Side Rendering (SSR)
 
 ```typescript
 import { renderToString, div, p, ul, li } from '@rasenjs/html'

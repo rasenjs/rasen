@@ -28,7 +28,7 @@ export type RNMountFunction = (ctx: RenderContext) => Instance
  * RN 同步组件
  * 接收 props，返回 mount 函数
  */
-export type RNComponent<P = Record<string, unknown>> = (props: P) => RNMountFunction
+export type RNComponent<P = Record<string, unknown>> = (props?: P) => RNMountFunction
 
 /**
  * 响应式值类型

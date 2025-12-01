@@ -9,12 +9,12 @@ interface BaseProps {
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
   attrs?: PropValue<Record<string, string | number | boolean>>
-  textContent?: PropValue<string>
+  /** Text content or child mount functions */
+  children?: PropValue<string> | Array<MountFunction<HTMLElement>>
   on?: Record<string, (e: Event) => void>
   onClick?: (e: Event) => void
   onInput?: (e: Event) => void
   onKeyPress?: (e: Event) => void
-  children?: Array<MountFunction<HTMLElement>>
 }
 
 /**
@@ -30,12 +30,12 @@ function normalizeArgs(...args: any[]): BaseProps {
   
   // 单个参数
   if (args.length === 1) {
-    // 如果是字符串，作为 textContent
+    // 如果是字符串，作为 children (text content)
     if (typeof first === 'string') {
-      return { textContent: first }
+      return { children: first }
     }
     // 如果是函数，当作 child mount 函数
-    // （对于需要响应式 textContent 的情况，应该用 { textContent: () => ... } 的形式）
+    // （对于需要响应式 children 的情况，应该用 { children: () => ... } 的形式）
     if (typeof first === 'function') {
       return { children: [first] }
     }
@@ -56,7 +56,7 @@ function normalizeArgs(...args: any[]): BaseProps {
       if (typeof child === 'function') {
         children.push(child)
       } else if (typeof child === 'string') {
-        // 字符串 child 转换为 textContent 的 mount 函数
+        // 字符串 child 转换为 text node 的 mount 函数
         children.push((host: HTMLElement) => {
           const textNode = document.createTextNode(child)
           host.appendChild(textNode)
@@ -175,7 +175,6 @@ export const a: SyncComponent<
   BaseProps & {
     href?: PropValue<string>
     target?: PropValue<string>
-    textContent?: PropValue<string>
   }
 > = (props) => {
   return element({ tag: 'a', ...props })
@@ -202,7 +201,6 @@ export const img: SyncComponent<
 export const p: SyncComponent<
   HTMLElement,
   BaseProps & {
-    textContent?: PropValue<string>
     innerHTML?: PropValue<string>
   }
 > = (props) => {
@@ -271,7 +269,6 @@ export const label: SyncComponent<
   HTMLElement,
   BaseProps & {
     htmlFor?: PropValue<string>
-    textContent?: PropValue<string>
   }
 > = (props) => {
   return element({ tag: 'label', ...props })
@@ -306,7 +303,6 @@ export const option: SyncComponent<
   HTMLElement,
   BaseProps & {
     value?: PropValue<string>
-    textContent?: PropValue<string>
     selected?: PropValue<boolean>
   }
 > = (props) => {

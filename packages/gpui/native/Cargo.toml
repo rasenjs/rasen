@@ -1,0 +1,22 @@
+[package]
+name = "rasen-gpui"
+version = "0.1.0"
+edition = "2021"
+description = "GPUI binding for Rasen - Run JavaScript UI with GPU acceleration"
+
+[[bin]]
+name = "rasen-gpui"
+path = "src/main.rs"
+
+[dependencies]
+gpui = { git = "https://github.com/zed-industries/zed", package = "gpui" }
+rquickjs = { version = "0.6", features = ["full-async", "parallel"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+oxc_resolver = "11"  # ESM/CJS module resolution
+regex = "1"          # For ESM transform
+
+[build-dependencies]
+# For potential asset bundling
