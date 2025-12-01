@@ -24,7 +24,6 @@ declare global {
       
       // 内容
       textContent?: PropValue<string | number>
-      innerHTML?: PropValue<string>
       
       // 事件
       onClick?: (e: Event) => void

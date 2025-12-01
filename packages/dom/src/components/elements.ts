@@ -200,9 +200,7 @@ export const img: SyncComponent<
  */
 export const p: SyncComponent<
   HTMLElement,
-  BaseProps & {
-    innerHTML?: PropValue<string>
-  }
+  BaseProps
 > = (props) => {
   return element({ tag: 'p', ...props })
 }

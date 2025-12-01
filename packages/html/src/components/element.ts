@@ -23,7 +23,6 @@ export const element: SyncComponent<
     attrs?: PropValue<Record<string, string | number | boolean>>
     /** Text content or child mount functions */
     children?: PropValue<string> | Array<StringMountFunction>
-    innerHTML?: PropValue<string>
     value?: PropValue<string | number>
     // SSR 不需要事件处理，但保持 API 兼容
     on?: Record<string, (e: Event) => void>
@@ -78,35 +77,29 @@ export const element: SyncComponent<
       return undefined
     }
 
-    // innerHTML（优先级最高）
-    const innerHTML = unref(props.innerHTML)
-    if (innerHTML !== undefined) {
-      html += innerHTML
-    } else {
-      // children (text content or mount functions)
-      const children = props.children
-      if (children !== undefined) {
-        if (typeof children === 'string' || (typeof children === 'object' && 'value' in (children as any))) {
-          // String content (or ref to string)
-          html += escapeHtml(String(unref(children as PropValue<string>)))
-        } else if (Array.isArray(children) && children.length > 0) {
-          // Mount functions - 创建子宿主收集子元素内容
-          const childHost: StringHost = {
-            fragments: [],
-            append(s: string) {
-              this.fragments.push(s)
-            },
-            toString() {
-              return this.fragments.join('')
-            }
+    // children (text content or mount functions)
+    const children = props.children
+    if (children !== undefined) {
+      if (typeof children === 'string' || (typeof children === 'object' && 'value' in (children as any))) {
+        // String content (or ref to string)
+        html += escapeHtml(String(unref(children as PropValue<string>)))
+      } else if (Array.isArray(children) && children.length > 0) {
+        // Mount functions - 创建子宿主收集子元素内容
+        const childHost: StringHost = {
+          fragments: [],
+          append(s: string) {
+            this.fragments.push(s)
+          },
+          toString() {
+            return this.fragments.join('')
           }
-
-          for (const childMount of children) {
-            childMount(childHost)
-          }
-
-          html += childHost.toString()
         }
+
+        for (const childMount of children) {
+          childMount(childHost)
+        }
+
+        html += childHost.toString()
       }
     }
 

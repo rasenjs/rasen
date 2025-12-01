@@ -7059,6 +7059,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"js-framework-benchmark-rasen@workspace:examples/benchmark":
+  version: 0.0.0-use.local
+  resolution: "js-framework-benchmark-rasen@workspace:examples/benchmark"
+  dependencies:
+    "@rasenjs/core": "workspace:*"
+    "@rasenjs/dom": "workspace:*"
+    "@rasenjs/reactive-vue": "workspace:*"
+    typescript: "npm:^5.3.0"
+    vite: "npm:^5.0.0"
+  languageName: unknown
+  linkType: soft
+
 "js-tokens@npm:^3.0.0 || ^4.0.0, js-tokens@npm:^4.0.0":
   version: 4.0.0
   resolution: "js-tokens@npm:4.0.0"
@@ -10412,7 +10424,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:^5.3.2, typescript@npm:^5.3.3, typescript@npm:^5.7.2":
+"typescript@npm:^5.3.0, typescript@npm:^5.3.2, typescript@npm:^5.3.3, typescript@npm:^5.7.2":
   version: 5.9.3
   resolution: "typescript@npm:5.9.3"
   bin:
@@ -10422,7 +10434,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@npm%3A^5.3.2#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.3.3#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.7.2#optional!builtin<compat/typescript>":
+"typescript@patch:typescript@npm%3A^5.3.0#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.3.2#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.3.3#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.7.2#optional!builtin<compat/typescript>":
   version: 5.9.3
   resolution: "typescript@patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"
   bin:

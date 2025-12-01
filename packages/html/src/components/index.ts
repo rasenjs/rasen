@@ -4,6 +4,7 @@
 
 export { stringContext, renderToString, renderToStringMultiple } from './string-context'
 export { element } from './element'
+export { html } from './html'
 export {
   // 基础元素
   div,

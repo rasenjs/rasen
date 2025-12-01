@@ -4,6 +4,7 @@
 
 export { domContext } from './dom-context'
 export { element } from './element'
+export { html } from './html'
 export { canvas, contextGetters } from './canvas'
 export type { ContextGetter } from './canvas'
 export {

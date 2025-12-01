@@ -14,7 +14,6 @@ export const element: SyncComponent<
     attrs?: PropValue<Record<string, string | number | boolean>>
     /** Text content or child mount functions */
     children?: PropValue<string> | Array<(host: HTMLElement) => (() => void) | undefined>
-    innerHTML?: PropValue<string>
     value?: PropValue<string | number>
     on?: Record<string, (e: Event) => void>
   }
@@ -112,18 +111,6 @@ export const element: SyncComponent<
             if (el.value !== String(value ?? '')) {
               el.value = String(value ?? '')
             }
-          }
-        )
-      )
-    }
-
-    // innerHTML
-    if (props.innerHTML !== undefined) {
-      stops.push(
-        watchProp(
-          () => unref(props.innerHTML),
-          (value) => {
-            element.innerHTML = value || ''
           }
         )
       )
