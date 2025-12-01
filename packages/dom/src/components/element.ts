@@ -1,4 +1,4 @@
-import type { SyncComponent, PropValue } from '@rasenjs/core'
+import type { SyncComponent, PropValue, Ref } from '@rasenjs/core'
 import { unref, setAttribute, setStyle, watchProp } from '../utils'
 
 /**
@@ -13,9 +13,13 @@ export const element: SyncComponent<
     style?: PropValue<Record<string, string | number>>
     attrs?: PropValue<Record<string, string | number | boolean>>
     /** Text content or child mount functions */
-    children?: PropValue<string> | Array<(host: HTMLElement) => (() => void) | undefined>
+    children?:
+      | PropValue<string>
+      | Array<(host: HTMLElement) => (() => void) | undefined>
     value?: PropValue<string | number>
     on?: Record<string, (e: Event) => void>
+    /** 元素引用 - 挂载后会设置为 DOM 元素 */
+    ref?: Ref<HTMLElement | null>
   }
 > = (props) => {
   return (host) => {
@@ -80,7 +84,10 @@ export const element: SyncComponent<
     // children (text content or mount functions)
     if (props.children !== undefined) {
       const children = props.children
-      if (typeof children === 'string' || (typeof children === 'object' && 'value' in (children as any))) {
+      if (
+        typeof children === 'string' ||
+        (typeof children === 'object' && 'value' in (children as any))
+      ) {
         // String content (or ref to string) - set as textContent
         stops.push(
           watchProp(
@@ -107,7 +114,10 @@ export const element: SyncComponent<
         watchProp(
           () => unref(props.value),
           (value) => {
-            const el = element as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+            const el = element as
+              | HTMLInputElement
+              | HTMLTextAreaElement
+              | HTMLSelectElement
             if (el.value !== String(value ?? '')) {
               el.value = String(value ?? '')
             }
@@ -125,9 +135,18 @@ export const element: SyncComponent<
       }
     }
 
+    // ref - 设置元素引用
+    if (props.ref) {
+      props.ref.value = element
+    }
+
     host.appendChild(element)
 
     return () => {
+      // 清理 ref
+      if (props.ref) {
+        props.ref.value = null
+      }
       stops.forEach((stop) => stop())
       childUnmounts.forEach((unmount) => unmount?.())
       if (props.on) {

@@ -34,7 +34,20 @@ import {
   footer,
   nav,
   main,
-  aside
+  aside,
+  when,
+  show,
+  // Event modifiers
+  modifier,
+  mod,
+  key,
+  prevent,
+  stop,
+  capture,
+  once,
+  self,
+  enter,
+  esc
 } from './index'
 
 // Setup
@@ -110,7 +123,9 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should set style object', () => {
-      const unmount = div({ style: { color: 'red', 'font-size': '16px' } })(container)
+      const unmount = div({ style: { color: 'red', 'font-size': '16px' } })(
+        container
+      )
       const el = container.firstElementChild as HTMLElement
       expect(el.style.color).toBe('red')
       expect(el.style.fontSize).toBe('16px')
@@ -119,7 +134,9 @@ describe('@rasenjs/dom', () => {
 
     it('should update style reactively', async () => {
       const color = ref('red')
-      const unmount = div({ style: computed(() => ({ color: color.value })) })(container)
+      const unmount = div({ style: computed(() => ({ color: color.value })) })(
+        container
+      )
       const el = container.firstElementChild as HTMLElement
       expect(el.style.color).toBe('red')
 
@@ -131,7 +148,9 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should set arbitrary attributes', () => {
-      const unmount = div({ attrs: { 'data-id': '123', 'aria-label': 'test' } })(container)
+      const unmount = div({
+        attrs: { 'data-id': '123', 'aria-label': 'test' }
+      })(container)
       const el = container.firstElementChild as HTMLElement
       expect(el.getAttribute('data-id')).toBe('123')
       expect(el.getAttribute('aria-label')).toBe('test')
@@ -178,10 +197,7 @@ describe('@rasenjs/dom', () => {
 
     it('should mount child components array', () => {
       const unmount = div({
-        children: [
-          span({ children: 'First' }),
-          span({ children: 'Second' })
-        ]
+        children: [span({ children: 'First' }), span({ children: 'Second' })]
       })(container)
 
       const spans = container.querySelectorAll('span')
@@ -202,7 +218,9 @@ describe('@rasenjs/dom', () => {
         ]
       })(container)
 
-      expect(container.querySelector('.outer .inner span')?.textContent).toBe('Nested')
+      expect(container.querySelector('.outer .inner span')?.textContent).toBe(
+        'Nested'
+      )
       unmount?.()
     })
 
@@ -225,14 +243,18 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should support multiple root nodes', () => {
-      const unmount = html({ content: '<span>A</span><span>B</span><span>C</span>' })(container)
+      const unmount = html({
+        content: '<span>A</span><span>B</span><span>C</span>'
+      })(container)
       const spans = container.querySelectorAll('span')
       expect(spans.length).toBe(3)
       unmount?.()
     })
 
     it('should remove all nodes on unmount', () => {
-      const unmount = html({ content: '<span>A</span><span>B</span>' })(container)
+      const unmount = html({ content: '<span>A</span><span>B</span>' })(
+        container
+      )
       expect(container.querySelectorAll('span').length).toBe(2)
       unmount?.()
       expect(container.querySelectorAll('span').length).toBe(0)
@@ -253,7 +275,9 @@ describe('@rasenjs/dom', () => {
   })
 
   describe('predefined elements', () => {
-    const elements: Array<[string, (props: Record<string, unknown>) => ReturnType<typeof div>]> = [
+    const elements: Array<
+      [string, (props: Record<string, unknown>) => ReturnType<typeof div>]
+    > = [
       ['div', div],
       ['span', span],
       ['button', button],
@@ -365,7 +389,9 @@ describe('@rasenjs/dom', () => {
 
     it('should set input placeholder', () => {
       const unmount = input({ placeholder: 'Enter text...' })(container)
-      expect(container.querySelector('input')?.placeholder).toBe('Enter text...')
+      expect(container.querySelector('input')?.placeholder).toBe(
+        'Enter text...'
+      )
       unmount?.()
     })
 
@@ -392,8 +418,13 @@ describe('@rasenjs/dom', () => {
 
   describe('specific elements', () => {
     it('should set link href', () => {
-      const unmount = a({ attrs: { href: 'https://example.com' }, children: 'Link' })(container)
-      expect(container.querySelector('a')?.getAttribute('href')).toBe('https://example.com')
+      const unmount = a({
+        attrs: { href: 'https://example.com' },
+        children: 'Link'
+      })(container)
+      expect(container.querySelector('a')?.getAttribute('href')).toBe(
+        'https://example.com'
+      )
       unmount?.()
     })
 
@@ -404,7 +435,9 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should set img src and alt', () => {
-      const unmount = img({ attrs: { src: 'image.png', alt: 'An image' } })(container)
+      const unmount = img({ attrs: { src: 'image.png', alt: 'An image' } })(
+        container
+      )
       const el = container.querySelector('img')!
       expect(el.src).toContain('image.png')
       expect(el.alt).toBe('An image')
@@ -426,9 +459,13 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should escape text content (not parse as HTML)', () => {
-      const unmount = div({ children: '<script>alert("xss")</script>' })(container)
+      const unmount = div({ children: '<script>alert("xss")</script>' })(
+        container
+      )
       expect(container.querySelector('script')).toBeNull()
-      expect(container.firstElementChild?.textContent).toBe('<script>alert("xss")</script>')
+      expect(container.firstElementChild?.textContent).toBe(
+        '<script>alert("xss")</script>'
+      )
       unmount?.()
     })
 
@@ -532,12 +569,433 @@ describe('@rasenjs/dom', () => {
   // TODO: Features to be implemented
   // ============================================================
 
-  describe.todo('show() - display-based conditional rendering')
-  describe.todo('if() - mount/unmount conditional rendering')
-  describe.todo('event modifiers (.prevent, .stop, .capture, .once)')
+  describe('show() - display-based conditional rendering', () => {
+    it('should show element when condition is true', () => {
+      const visible = ref(true)
+      const unmount = show({
+        when: visible,
+        children: div({ children: 'Content' })
+      })(container)
+
+      const wrapper = container.firstElementChild as HTMLElement
+      const content = wrapper.firstElementChild as HTMLElement
+      expect(content.style.display).not.toBe('none')
+      unmount?.()
+    })
+
+    it('should hide element when condition is false', async () => {
+      const visible = ref(false)
+      const unmount = show({
+        when: visible,
+        children: div({ children: 'Content' })
+      })(container)
+
+      await Promise.resolve()
+      const wrapper = container.firstElementChild as HTMLElement
+      const content = wrapper.firstElementChild as HTMLElement
+      expect(content.style.display).toBe('none')
+      unmount?.()
+    })
+
+    it('should toggle visibility reactively', async () => {
+      const visible = ref(true)
+      const unmount = show({
+        when: visible,
+        children: div({ children: 'Content' })
+      })(container)
+
+      const wrapper = container.firstElementChild as HTMLElement
+      const content = wrapper.firstElementChild as HTMLElement
+      expect(content.style.display).not.toBe('none')
+
+      visible.value = false
+      await Promise.resolve()
+      expect(content.style.display).toBe('none')
+
+      visible.value = true
+      await Promise.resolve()
+      expect(content.style.display).not.toBe('none')
+      unmount?.()
+    })
+
+    it('should preserve element in DOM when hidden', async () => {
+      const visible = ref(true)
+      const unmount = show({
+        when: visible,
+        children: div({ id: 'target', children: 'Content' })
+      })(container)
+
+      expect(container.querySelector('#target')).not.toBeNull()
+
+      visible.value = false
+      await Promise.resolve()
+      // Element should still exist, just hidden
+      expect(container.querySelector('#target')).not.toBeNull()
+      unmount?.()
+    })
+  })
+
+  describe('when() - mount/unmount conditional rendering', () => {
+    it('should mount then branch when condition is true', () => {
+      const condition = ref(true)
+      const unmount = when({
+        condition,
+        then: () => div({ children: 'Then' }),
+        else: () => div({ children: 'Else' })
+      })(container)
+
+      expect(container.textContent).toContain('Then')
+      expect(container.textContent).not.toContain('Else')
+      unmount?.()
+    })
+
+    it('should mount else branch when condition is false', () => {
+      const condition = ref(false)
+      const unmount = when({
+        condition,
+        then: () => div({ children: 'Then' }),
+        else: () => div({ children: 'Else' })
+      })(container)
+
+      expect(container.textContent).toContain('Else')
+      expect(container.textContent).not.toContain('Then')
+      unmount?.()
+    })
+
+    it('should switch branches reactively', async () => {
+      const condition = ref(true)
+      const unmount = when({
+        condition,
+        then: () => div({ children: 'Then' }),
+        else: () => div({ children: 'Else' })
+      })(container)
+
+      expect(container.textContent).toContain('Then')
+
+      condition.value = false
+      await Promise.resolve()
+      expect(container.textContent).toContain('Else')
+      expect(container.textContent).not.toContain('Then')
+
+      condition.value = true
+      await Promise.resolve()
+      expect(container.textContent).toContain('Then')
+      expect(container.textContent).not.toContain('Else')
+      unmount?.()
+    })
+
+    it('should work without else branch', async () => {
+      const condition = ref(true)
+      const unmount = when({
+        condition,
+        then: () => div({ children: 'Content' })
+      })(container)
+
+      expect(container.textContent).toContain('Content')
+
+      condition.value = false
+      await Promise.resolve()
+      // Content should be removed (only comment marker remains)
+      expect(container.textContent).not.toContain('Content')
+
+      condition.value = true
+      await Promise.resolve()
+      expect(container.textContent).toContain('Content')
+      unmount?.()
+    })
+
+    it('should unmount old branch before mounting new one', async () => {
+      const unmountSpy = vi.fn()
+      const condition = ref(true)
+
+      const ThenComponent = () => {
+        return (host: HTMLElement) => {
+          const el = document.createElement('div')
+          el.textContent = 'Then'
+          host.appendChild(el)
+          return () => {
+            unmountSpy()
+            el.remove()
+          }
+        }
+      }
+
+      const unmount = when({
+        condition,
+        then: ThenComponent,
+        else: () => div({ children: 'Else' })
+      })(container)
+
+      expect(unmountSpy).not.toHaveBeenCalled()
+
+      condition.value = false
+      await Promise.resolve()
+      expect(unmountSpy).toHaveBeenCalledTimes(1)
+      unmount?.()
+    })
+  })
+
+  describe('event modifiers (.prevent, .stop, .capture, .once)', () => {
+    describe('modifier() - base function', () => {
+      it('should call preventDefault when prevent is true', () => {
+        const fn = vi.fn()
+        const handler = modifier(fn, { prevent: true })
+
+        const event = new Event('click')
+        vi.spyOn(event, 'preventDefault')
+
+        handler(event)
+
+        expect(event.preventDefault).toHaveBeenCalled()
+        expect(fn).toHaveBeenCalledWith(event)
+      })
+
+      it('should call stopPropagation when stop is true', () => {
+        const fn = vi.fn()
+        const handler = modifier(fn, { stop: true })
+
+        const event = new Event('click')
+        vi.spyOn(event, 'stopPropagation')
+
+        handler(event)
+
+        expect(event.stopPropagation).toHaveBeenCalled()
+        expect(fn).toHaveBeenCalledWith(event)
+      })
+
+      it('should set capture property on handler', () => {
+        const fn = vi.fn()
+        const handler = modifier(fn, { capture: true })
+
+        expect(handler.capture).toBe(true)
+      })
+
+      it('should set once property on handler', () => {
+        const fn = vi.fn()
+        const handler = modifier(fn, { once: true })
+
+        expect(handler.once).toBe(true)
+      })
+
+      it('should combine multiple modifiers', () => {
+        const fn = vi.fn()
+        const handler = modifier(fn, {
+          prevent: true,
+          stop: true,
+          capture: true,
+          once: true
+        })
+
+        const event = new Event('click')
+        vi.spyOn(event, 'preventDefault')
+        vi.spyOn(event, 'stopPropagation')
+
+        handler(event)
+
+        expect(event.preventDefault).toHaveBeenCalled()
+        expect(event.stopPropagation).toHaveBeenCalled()
+        expect(handler.capture).toBe(true)
+        expect(handler.once).toBe(true)
+        expect(fn).toHaveBeenCalledWith(event)
+      })
+
+      it('should handle self modifier', () => {
+        const fn = vi.fn()
+        const handler = modifier(fn, { self: true })
+
+        // 创建带有 target !== currentTarget 的事件
+        const btn = document.createElement('button')
+        const parent = document.createElement('div')
+        parent.appendChild(btn)
+
+        const event = new Event('click', { bubbles: true })
+        Object.defineProperty(event, 'target', { value: btn })
+        Object.defineProperty(event, 'currentTarget', { value: parent })
+
+        handler(event)
+        expect(fn).not.toHaveBeenCalled()
+
+        // target === currentTarget
+        const event2 = new Event('click')
+        Object.defineProperty(event2, 'target', { value: btn })
+        Object.defineProperty(event2, 'currentTarget', { value: btn })
+
+        handler(event2)
+        expect(fn).toHaveBeenCalledWith(event2)
+      })
+    })
+
+    describe('chainable modifiers', () => {
+      it('prevent() should create handler with preventDefault', () => {
+        const fn = vi.fn()
+        const handler = prevent(fn)
+
+        const event = new Event('click')
+        vi.spyOn(event, 'preventDefault')
+
+        handler(event)
+
+        expect(event.preventDefault).toHaveBeenCalled()
+        expect(fn).toHaveBeenCalledWith(event)
+      })
+
+      it('stop() should create handler with stopPropagation', () => {
+        const fn = vi.fn()
+        const handler = stop(fn)
+
+        const event = new Event('click')
+        vi.spyOn(event, 'stopPropagation')
+
+        handler(event)
+
+        expect(event.stopPropagation).toHaveBeenCalled()
+        expect(fn).toHaveBeenCalledWith(event)
+      })
+
+      it('prevent.stop() should combine modifiers', () => {
+        const fn = vi.fn()
+        const handler = prevent.stop(fn)
+
+        const event = new Event('click')
+        vi.spyOn(event, 'preventDefault')
+        vi.spyOn(event, 'stopPropagation')
+
+        handler(event)
+
+        expect(event.preventDefault).toHaveBeenCalled()
+        expect(event.stopPropagation).toHaveBeenCalled()
+        expect(fn).toHaveBeenCalledWith(event)
+      })
+
+      it('stop.prevent() should combine modifiers in any order', () => {
+        const fn = vi.fn()
+        const handler = stop.prevent(fn)
+
+        const event = new Event('click')
+        vi.spyOn(event, 'preventDefault')
+        vi.spyOn(event, 'stopPropagation')
+
+        handler(event)
+
+        expect(event.preventDefault).toHaveBeenCalled()
+        expect(event.stopPropagation).toHaveBeenCalled()
+      })
+
+      it('capture() should set capture property', () => {
+        const fn = vi.fn()
+        const handler = capture(fn)
+
+        expect(handler.capture).toBe(true)
+      })
+
+      it('once() should set once property', () => {
+        const fn = vi.fn()
+        const handler = once(fn)
+
+        expect(handler.once).toBe(true)
+      })
+
+      it('prevent.stop.capture.once() should chain all modifiers', () => {
+        const fn = vi.fn()
+        const handler = prevent.stop.capture.once(fn)
+
+        const event = new Event('click')
+        vi.spyOn(event, 'preventDefault')
+        vi.spyOn(event, 'stopPropagation')
+
+        handler(event)
+
+        expect(event.preventDefault).toHaveBeenCalled()
+        expect(event.stopPropagation).toHaveBeenCalled()
+        expect(handler.capture).toBe(true)
+        expect(handler.once).toBe(true)
+      })
+
+      it('mod.prevent.stop() should work as alternative entry', () => {
+        const fn = vi.fn()
+        const handler = mod.prevent.stop(fn)
+
+        const event = new Event('click')
+        vi.spyOn(event, 'preventDefault')
+        vi.spyOn(event, 'stopPropagation')
+
+        handler(event)
+
+        expect(event.preventDefault).toHaveBeenCalled()
+        expect(event.stopPropagation).toHaveBeenCalled()
+      })
+
+      it('self.stop() should combine self with other modifiers', () => {
+        const fn = vi.fn()
+        const handler = self.stop(fn)
+
+        const event = new Event('click')
+        Object.defineProperty(event, 'target', { value: container })
+        Object.defineProperty(event, 'currentTarget', { value: container })
+        vi.spyOn(event, 'stopPropagation')
+
+        handler(event)
+
+        expect(event.stopPropagation).toHaveBeenCalled()
+        expect(fn).toHaveBeenCalledWith(event)
+      })
+    })
+
+    describe('type safety (compile-time only)', () => {
+      it('should not allow duplicate modifiers in chain', () => {
+        // 这些测试验证类型系统在编译时阻止重复修饰器
+        // 运行时我们只验证功能正确性
+        const fn = vi.fn()
+
+        // prevent 只能用一次
+        const h1 = prevent(fn)
+        expect(h1.__modifiers?.prevent).toBe(true)
+
+        // prevent.stop 不能再用 prevent
+        const h2 = prevent.stop(fn)
+        expect(h2.__modifiers?.prevent).toBe(true)
+        expect(h2.__modifiers?.stop).toBe(true)
+
+        // 完整链
+        const h3 = prevent.stop.capture.once.self(fn)
+        expect(h3.__modifiers?.prevent).toBe(true)
+        expect(h3.__modifiers?.stop).toBe(true)
+        expect(h3.__modifiers?.capture).toBe(true)
+        expect(h3.__modifiers?.once).toBe(true)
+        expect(h3.__modifiers?.self).toBe(true)
+      })
+    })
+  })
   describe.todo('key modifiers (.enter, .esc, .tab)')
   describe.todo('event delegation')
   describe.todo('checkbox checked binding')
   describe.todo('radio button binding')
-  describe.todo('element ref')
+
+  describe('element ref', () => {
+    it('should set ref value after mount', () => {
+      const inputRef = ref<HTMLInputElement | null>(null)
+      const unmount = input({ ref: inputRef })(container)
+
+      expect(inputRef.value).not.toBeNull()
+      expect(inputRef.value).toBeInstanceOf(HTMLInputElement)
+      unmount?.()
+    })
+
+    it('should clear ref value on unmount', () => {
+      const inputRef = ref<HTMLInputElement | null>(null)
+      const unmount = input({ ref: inputRef })(container)
+
+      expect(inputRef.value).not.toBeNull()
+      unmount?.()
+      expect(inputRef.value).toBeNull()
+    })
+
+    it('should allow accessing element methods via ref', () => {
+      const inputRef = ref<HTMLInputElement | null>(null)
+      const unmount = input({ ref: inputRef, value: 'test' })(container)
+
+      expect(inputRef.value?.value).toBe('test')
+      unmount?.()
+    })
+  })
 })

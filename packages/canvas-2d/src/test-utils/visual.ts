@@ -11,6 +11,7 @@ import { PNG } from 'pngjs'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { dirname, resolve } from 'path'
 import { setReactiveRuntime } from '@rasenjs/core'
+import { getRenderContext, hasRenderContext } from '../render-context'
 
 /**
  * 初始化 mock 响应式运行时
@@ -293,6 +294,12 @@ export async function runVisualTest(
   // 选择渲染函数：基准模式用 baseline，测试模式用 render
   const renderFn = USE_BASELINE ? scene.baseline : scene.render
   await renderFn(ctx)
+
+  // 等待异步渲染完成（RenderContext 使用 queueMicrotask 调度渲染）
+  // 如果组件注册了 RenderContext，需要同步刷新以确保渲染完成
+  if (hasRenderContext(ctx)) {
+    getRenderContext(ctx).flushSync()
+  }
 
   const snapshotPath = resolve(snapshotsDir, `${scene.name}.png`)
 

@@ -136,8 +136,8 @@ describe('group', () => {
   describe('使用 each 和 fragment', () => {
     it('应该使用each组件迭代列表', async () => {
       const shapes = [
-        { x: 10, y: 10, width: 20, height: 20, fill: 'red' },
-        { x: 40, y: 10, width: 20, height: 20, fill: 'blue' }
+        { id: 1, x: 10, y: 10, width: 20, height: 20, fill: 'red' },
+        { id: 2, x: 40, y: 10, width: 20, height: 20, fill: 'blue' }
       ]
 
       const mount = each(shapes, (shape) => rect(shape))

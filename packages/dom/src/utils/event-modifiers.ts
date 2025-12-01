@@ -1,0 +1,381 @@
+/**
+ * 事件修饰器工具
+ *
+ * 基于 @rasenjs/core 的通用装饰器链实现
+ *
+ * 提供两种使用方式：
+ * 1. 底层函数：modifier(fn, { prevent: true, stop: true })
+ * 2. 链式 API：prevent.stop(fn) 或 stop.prevent.once(fn)
+ *
+ * 支持两种语法风格：
+ * - prevent.stop(fn)
+ * - prevent().stop()(fn)
+ */
+
+import {
+  createModifierChain,
+  type ModifierPlugin as CoreModifierPlugin
+} from '@rasenjs/core'
+
+// ============================================
+// 事件修饰器插件接口
+// ============================================
+
+/**
+ * 事件修饰器插件 - 扩展 core 的插件接口
+ */
+export interface EventModifierPlugin<
+  E extends Event = Event,
+  K extends string = string,
+  V = boolean
+> extends CoreModifierPlugin<K, { [P in K]?: V }> {
+  /**
+   * 过滤器：返回 false 则不执行后续处理
+   */
+  filter?: (event: E, options: Record<string, unknown>) => boolean
+
+  /**
+   * 处理器：在原始函数之前执行
+   */
+  handle?: (event: E, options: Record<string, unknown>) => void
+}
+
+// ============================================
+// 事件修饰器插件定义
+// ============================================
+
+/**
+ * prevent 插件 - 阻止默认行为
+ */
+export const preventPlugin: EventModifierPlugin<Event, 'prevent', boolean> = {
+  name: 'prevent',
+  apply: (options) => ({ ...options, prevent: true }),
+  handle: (event: Event, options: Record<string, unknown>) => {
+    if (options.prevent) {
+      event.preventDefault()
+    }
+  }
+}
+
+/**
+ * stop 插件 - 阻止事件冒泡
+ */
+export const stopPlugin: EventModifierPlugin<Event, 'stop', boolean> = {
+  name: 'stop',
+  apply: (options) => ({ ...options, stop: true }),
+  handle: (event: Event, options: Record<string, unknown>) => {
+    if (options.stop) {
+      event.stopPropagation()
+    }
+  }
+}
+
+/**
+ * capture 插件 - 使用捕获阶段
+ * 注意：capture 不在 handle 中处理，而是通过返回值附加到 handler 上
+ */
+export const capturePlugin: EventModifierPlugin<Event, 'capture', boolean> = {
+  name: 'capture',
+  apply: (options) => ({ ...options, capture: true })
+}
+
+/**
+ * once 插件 - 只执行一次
+ * 注意：once 不在 handle 中处理，而是通过返回值附加到 handler 上
+ */
+export const oncePlugin: EventModifierPlugin<Event, 'once', boolean> = {
+  name: 'once',
+  apply: (options) => ({ ...options, once: true })
+}
+
+/**
+ * self 插件 - 只在目标元素上触发
+ */
+export const selfPlugin: EventModifierPlugin<Event, 'self', boolean> = {
+  name: 'self',
+  apply: (options) => ({ ...options, self: true }),
+  filter: (event: Event, options: Record<string, unknown>) => {
+    if (options.self && event.target !== event.currentTarget) {
+      return false
+    }
+    return true
+  }
+}
+
+/**
+ * 所有事件修饰器插件
+ */
+export const eventPlugins = [
+  preventPlugin,
+  stopPlugin,
+  capturePlugin,
+  oncePlugin,
+  selfPlugin
+] as const
+
+// ============================================
+// 按键修饰器插件
+// ============================================
+
+/**
+ * 创建按键修饰器插件
+ */
+function createKeyPlugin(
+  name: string,
+  keys: string[]
+): EventModifierPlugin<KeyboardEvent, string, boolean> {
+  return {
+    name,
+    apply: (options: object) => ({ ...options, [name]: true }),
+    filter: (event: KeyboardEvent, options: Record<string, unknown>) => {
+      if (options[name] && !keys.includes(event.key)) {
+        return false
+      }
+      return true
+    }
+  }
+}
+
+export const enterPlugin = createKeyPlugin('enter', ['Enter'])
+export const escPlugin = createKeyPlugin('esc', ['Escape'])
+export const tabPlugin = createKeyPlugin('tab', ['Tab'])
+export const spacePlugin = createKeyPlugin('space', [' '])
+export const deletePlugin = createKeyPlugin('delete', ['Delete', 'Backspace'])
+export const upPlugin = createKeyPlugin('up', ['ArrowUp'])
+export const downPlugin = createKeyPlugin('down', ['ArrowDown'])
+export const leftPlugin = createKeyPlugin('left', ['ArrowLeft'])
+export const rightPlugin = createKeyPlugin('right', ['ArrowRight'])
+
+/**
+ * 所有按键修饰器插件
+ */
+export const keyPlugins = [
+  enterPlugin,
+  escPlugin,
+  tabPlugin,
+  spacePlugin,
+  deletePlugin,
+  upPlugin,
+  downPlugin,
+  leftPlugin,
+  rightPlugin
+] as const
+
+// ============================================
+// 包装后的处理器类型
+// ============================================
+
+/**
+ * 包装后的事件处理器
+ */
+export interface ModifiedHandler<E extends Event = Event> {
+  (event: E): void
+  /** addEventListener 的 capture 选项 */
+  capture?: boolean
+  /** addEventListener 的 once 选项 */
+  once?: boolean
+  /** 原始选项（用于调试） */
+  __modifiers?: Record<string, unknown>
+}
+
+// ============================================
+// 创建自定义 finalizer
+// ============================================
+
+/**
+ * 事件修饰器的 finalizer
+ * 将 capture/once 附加到返回的 handler 上
+ */
+function eventFinalizer(
+  fn: (event: Event) => void,
+  options: object,
+  plugins: readonly EventModifierPlugin[]
+): ModifiedHandler<Event> {
+  const opts = options as Record<string, unknown>
+  const handler: ModifiedHandler<Event> = (event: Event) => {
+    // 先执行 filter
+    for (const plugin of plugins) {
+      if (plugin.filter && !plugin.filter(event, opts)) {
+        return
+      }
+    }
+
+    // 执行 handle（在原始函数之前）
+    for (const plugin of plugins) {
+      if (plugin.handle) {
+        plugin.handle(event, opts)
+      }
+    }
+
+    // 执行原始处理器
+    fn(event)
+  }
+
+  // 附加 addEventListener 选项
+  if (opts.capture) handler.capture = true
+  if (opts.once) handler.once = true
+  handler.__modifiers = opts
+
+  return handler
+}
+
+// ============================================
+// 创建链式 API
+// ============================================
+
+// 合并所有插件
+const allEventPlugins = [...eventPlugins, ...keyPlugins] as EventModifierPlugin<
+  Event,
+  string,
+  boolean
+>[]
+
+/**
+ * mod - 通用事件修饰器入口
+ *
+ * @example
+ * onClick: mod.prevent.stop(fn)
+ * onKeydown: mod.enter.prevent(fn)
+ */
+export const mod = createModifierChain(allEventPlugins, eventFinalizer)
+
+/**
+ * prevent - 阻止默认行为
+ *
+ * @example
+ * onClick: prevent(handleClick)
+ * onClick: prevent.stop(handleClick)
+ */
+export const prevent = mod.prevent
+
+/**
+ * stop - 阻止事件冒泡
+ *
+ * @example
+ * onClick: stop(handleClick)
+ * onClick: stop.prevent(handleClick)
+ */
+export const stop = mod.stop
+
+/**
+ * capture - 使用捕获阶段
+ *
+ * @example
+ * onClick: capture(handleClick)
+ * onClick: capture.once(handleClick)
+ */
+export const capture = mod.capture
+
+/**
+ * once - 只执行一次
+ *
+ * @example
+ * onClick: once(handleClick)
+ * onClick: once.prevent(handleClick)
+ */
+export const once = mod.once
+
+/**
+ * self - 只在目标元素上触发
+ *
+ * @example
+ * onClick: self(handleClick)
+ * onClick: self.stop(handleClick)
+ */
+export const self = mod.self
+
+// ============================================
+// 按键修饰器入口
+// ============================================
+
+/**
+ * key - 按键修饰器入口
+ *
+ * @example
+ * onKeydown: key.enter(handleSubmit)
+ * onKeydown: key.enter.prevent(handleSubmit)
+ * onKeydown: key.esc(handleCancel)
+ */
+export const key = {
+  enter: mod.enter,
+  esc: mod.esc,
+  tab: mod.tab,
+  space: mod.space,
+  delete: mod.delete,
+  up: mod.up,
+  down: mod.down,
+  left: mod.left,
+  right: mod.right
+}
+
+// 单独导出按键修饰器，便于直接使用
+export const enter = mod.enter
+export const esc = mod.esc
+export const tab = mod.tab
+export const space = mod.space
+export const del = mod.delete // delete 是保留字
+export const up = mod.up
+export const down = mod.down
+export const left = mod.left
+export const right = mod.right
+
+// ============================================
+// 底层 modifier 函数（兼容旧 API）
+// ============================================
+
+/**
+ * 修饰器配置选项（兼容旧 API）
+ */
+export interface ModifierOptions {
+  /** 调用 event.preventDefault() */
+  prevent?: boolean
+  /** 调用 event.stopPropagation() */
+  stop?: boolean
+  /** 使用捕获阶段 (通过返回值传递给 addEventListener) */
+  capture?: boolean
+  /** 只执行一次后自动移除 (通过返回值传递给 addEventListener) */
+  once?: boolean
+  /** 只在 event.target === event.currentTarget 时触发 */
+  self?: boolean
+}
+
+/**
+ * 底层修饰器函数
+ *
+ * @example
+ * const handler = modifier(handleClick, { prevent: true, stop: true })
+ * element.addEventListener('click', handler)
+ */
+export function modifier<E extends Event = Event>(
+  fn: (event: E) => void,
+  options: ModifierOptions = {}
+): ModifiedHandler<E> {
+  const { prevent, stop, capture, once, self } = options
+
+  const handler: ModifiedHandler<E> = (event: E) => {
+    // self 修饰器：只在目标元素上触发
+    if (self && event.target !== event.currentTarget) {
+      return
+    }
+
+    // prevent 修饰器
+    if (prevent) {
+      event.preventDefault()
+    }
+
+    // stop 修饰器
+    if (stop) {
+      event.stopPropagation()
+    }
+
+    // 执行原始处理器
+    fn(event)
+  }
+
+  // 附加 addEventListener 选项
+  if (capture) handler.capture = true
+  if (once) handler.once = true
+  handler.__modifiers = options as Record<string, unknown>
+
+  return handler
+}
