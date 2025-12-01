@@ -240,11 +240,7 @@ See [examples/](./examples) for complete demos:
 - **Web** ([examples/web](./examples/web)) - DOM, Canvas 2D, JSX demos
 - **React Native** ([examples/react-native](./examples/react-native)) - Mobile app without React
 
-## Roadmap
-
-| DOM            | 🚧 In Progress | Browser DOM rendering                 |
 ## Preview
--------
 
 Here is an animated preview from the React Native demo:
 
@@ -252,8 +248,15 @@ Here is an animated preview from the React Native demo:
   <img src="./examples/react-native/public/demo.webp" alt="Rasen React Native Demo" width="360" />
   <br/>
   <em>If the animation doesn't play in your viewer, open it on GitHub or a browser.</em>
-  
 </p>
+
+## Roadmap
+
+### Render Targets
+
+| Target         | Status         | Description                           |
+| -------------- | -------------- | ------------------------------------- |
+| DOM            | 🚧 In Progress | Browser DOM rendering                 |
 | Canvas 2D      | 🚧 In Progress | 2D graphics & animations              |
 | React Native   | 🚧 In Progress | Mobile apps via Fabric (no React)     |
 | HTML (SSR/SSG) | 🚧 In Progress | Server-side rendering to HTML strings |
