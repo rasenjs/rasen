@@ -209,13 +209,18 @@ See [examples/](./examples) for complete demos:
 
 ## Roadmap
 
-All features are currently **under development**. Here's what we're working on:
-
-### Render Targets (Hosts)
-
-| Host           | Status         | Description                           |
-| -------------- | -------------- | ------------------------------------- |
 | DOM            | 🚧 In Progress | Browser DOM rendering                 |
+## Preview
+-------
+
+Here is an animated preview from the React Native demo:
+
+<p align="center">
+  <img src="./examples/react-native/public/demo.webp" alt="Rasen React Native Demo" width="360" />
+  <br/>
+  <em>If the animation doesn't play in your viewer, open it on GitHub or a browser.</em>
+  
+</p>
 | Canvas 2D      | 🚧 In Progress | 2D graphics & animations              |
 | React Native   | 🚧 In Progress | Mobile apps via Fabric (no React)     |
 | HTML (SSR/SSG) | 🚧 In Progress | Server-side rendering to HTML strings |

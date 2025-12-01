@@ -4,6 +4,14 @@ React Native Fabric renderer for the Rasen reactive rendering framework.
 
 **Directly calls React Native's Fabric architecture APIs without using React.**
 
+## Preview
+
+<p align="center">
+  <img src="../../examples/react-native/public/demo.webp" alt="React Native Demo" width="360" />
+  <br/>
+  <em>If the animation doesn't play in your viewer, open it on GitHub or a browser.</em>
+</p>
+
 ## Installation
 
 ```bash
