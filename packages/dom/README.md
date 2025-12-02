@@ -16,12 +16,12 @@ npm install @rasenjs/dom @rasenjs/core
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, input, mount } from '@rasenjs/dom'
 import { ref, computed } from 'vue'
 
 // Setup reactive runtime
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 // Create reactive state
 const name = ref('World')

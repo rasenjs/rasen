@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/react-native",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha",
   "description": "Rasen React Native renderer - Direct binding to RN Fabric architecture",
   "type": "module",
   "main": "./dist/index.js",

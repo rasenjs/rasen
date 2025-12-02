@@ -41,9 +41,9 @@ npm install @rasenjs/react-native @rasenjs/core
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 ```
 
 ### 2. Create Components

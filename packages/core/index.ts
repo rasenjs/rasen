@@ -49,6 +49,3 @@ export * from './canvas-2d'
 
 // DOM 适配器
 export * from './dom'
-
-// Vue 适配器
-export { createVueRuntime } from './adapters/vue'

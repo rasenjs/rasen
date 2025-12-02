@@ -16,13 +16,13 @@ npm install @rasenjs/canvas-2d @rasenjs/core @rasenjs/dom
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { canvas, mount } from '@rasenjs/dom'
 import { rect, circle, text } from '@rasenjs/canvas-2d'
 import { ref, computed } from 'vue'
 
 // Setup reactive runtime
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 // Create reactive state
 const x = ref(50)

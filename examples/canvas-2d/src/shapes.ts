@@ -1,5 +1,5 @@
 import { setReactiveRuntime, type MountFunction } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, h1, p, a, canvas, mount } from '@rasenjs/dom'
 import {
   rect,
@@ -12,7 +12,7 @@ import {
   wedge
 } from '@rasenjs/canvas-2d'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 // Helper function to create an example card
 function createExample(

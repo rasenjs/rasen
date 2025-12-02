@@ -34,11 +34,11 @@ npm install @rasenjs/core @rasenjs/react-native @rasenjs/reactive-vue vue
 ```javascript
 // index.js
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { registerApp, view, text } from '@rasenjs/react-native'
 import { ref } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const App = () => {
   const greeting = ref('Hello Rasen!')
@@ -133,11 +133,11 @@ image({
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { view, text, touchableOpacity, registerApp } from '@rasenjs/react-native'
 import { ref } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const App = () => {
   const count = ref(0)

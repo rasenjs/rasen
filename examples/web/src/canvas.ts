@@ -1,10 +1,10 @@
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createSignalsRuntime, ref } from '@rasenjs/reactive-signals'
+import { createReactiveRuntime, ref } from '@rasenjs/reactive-signals'
 import { div, h1, button, mount, canvas } from '@rasenjs/dom'
 import { rect, circle, text } from '@rasenjs/canvas-2d'
 
 // 初始化 Signals 响应式运行时
-setReactiveRuntime(createSignalsRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const x = ref(100)
 const y = ref(100)

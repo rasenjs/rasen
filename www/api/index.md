@@ -10,9 +10,9 @@ Sets the global reactive runtime. Must be called before mounting any components.
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 ```
 
 [Learn more →](/api/set-reactive-runtime)
@@ -188,15 +188,15 @@ import {
 ### Vue Adapter
 
 ```typescript
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 ```
 
 ### Signals Adapter
 
 ```typescript
-import { createSignalsRuntime, ref, computed } from '@rasenjs/reactive-signals'
+import { createReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
 
-setReactiveRuntime(createSignalsRuntime())
+setReactiveRuntime(createReactiveRuntime())
 ```

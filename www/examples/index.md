@@ -10,11 +10,11 @@ A simple counter demonstrating reactive state:
 
 ```typescript [DOM]
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, span, mount } from '@rasenjs/dom'
 import { ref } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const count = ref(0)
 
@@ -48,7 +48,7 @@ mount(Counter(), document.getElementById('app'))
 
 ```typescript [React Native]
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import {
   view,
   text,
@@ -57,7 +57,7 @@ import {
 } from '@rasenjs/react-native'
 import { ref } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const App = () => {
   const count = ref(0)
@@ -105,11 +105,11 @@ A complete todo application:
 
 ```typescript
 import { setReactiveRuntime, each } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, input, button, ul, li, span, mount } from '@rasenjs/dom'
 import { ref, computed } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 interface Todo {
   id: number
@@ -228,12 +228,12 @@ Animated graphics using Canvas 2D:
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { canvas, mount } from '@rasenjs/dom'
 import { rect, circle, text } from '@rasenjs/canvas-2d'
 import { ref, computed } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const time = ref(0)
 const x = computed(() => 200 + Math.sin(time.value * 0.02) * 150)

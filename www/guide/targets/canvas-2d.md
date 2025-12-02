@@ -33,12 +33,12 @@ import {
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { canvas, mount } from '@rasenjs/dom'
 import { rect, circle } from '@rasenjs/canvas-2d'
 import { ref } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const x = ref(100)
 

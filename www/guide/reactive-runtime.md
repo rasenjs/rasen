@@ -32,9 +32,9 @@ Before using Rasen, you must set up a reactive runtime:
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 ```
 
 This should be done once at app initialization, before mounting any components.
@@ -47,10 +47,10 @@ The recommended adapter for most use cases:
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { ref, computed, watch } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 // Use Vue's reactive primitives directly
 const count = ref(0)
@@ -63,9 +63,9 @@ For projects preferring the emerging Signals standard:
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createSignalsRuntime, ref } from '@rasenjs/reactive-signals'
+import { createReactiveRuntime, ref } from '@rasenjs/reactive-signals'
 
-setReactiveRuntime(createSignalsRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 // Use the adapter's ref
 const count = ref(0)
@@ -214,9 +214,9 @@ Set the reactive runtime before any components are created:
 ```typescript
 // main.ts
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 // Now safe to import and use components
 import { App } from './App'

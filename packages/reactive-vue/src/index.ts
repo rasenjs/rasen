@@ -18,7 +18,7 @@ import type { ReactiveRuntime } from '@rasenjs/core'
 /**
  * 创建 Vue 响应式运行时
  */
-export function createVueRuntime(): ReactiveRuntime {
+export function createReactiveRuntime(): ReactiveRuntime {
   return {
     watch: (source: any, callback: any, options: any) => {
       return vueWatch(source, callback, options) as any

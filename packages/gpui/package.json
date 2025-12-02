@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/gpui",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha",
   "description": "Rasen GPUI binding - GPU-accelerated UI framework adapter for Rasen",
   "type": "module",
   "main": "./dist/index.cjs",

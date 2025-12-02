@@ -1,10 +1,10 @@
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { canvas, mount } from '@rasenjs/dom'
 import { rect, circle, text } from '@rasenjs/canvas-2d'
 import { ref, computed } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const time = ref(0)
 const x = computed(() => 200 + Math.sin(time.value * 0.02) * 150)

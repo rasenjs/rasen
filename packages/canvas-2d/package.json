@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/canvas-2d",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha",
   "description": "Rasen Canvas 2D renderer",
   "type": "module",
   "main": "./dist/index.cjs",

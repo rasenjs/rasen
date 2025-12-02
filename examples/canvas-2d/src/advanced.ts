@@ -1,10 +1,10 @@
 import { setReactiveRuntime, type MountFunction } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { ref } from 'vue'
 import { div, h1, p, a, button, canvas, mount } from '@rasenjs/dom'
 import { group, rect, circle } from '@rasenjs/canvas-2d'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const groupRotation = ref(0)
 const animX = ref(100)

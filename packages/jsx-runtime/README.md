@@ -30,11 +30,11 @@ npm install @rasenjs/jsx-runtime @rasenjs/core @rasenjs/dom
 
 ```tsx
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { mount } from '@rasenjs/dom'
 import { ref } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const count = ref(0)
 

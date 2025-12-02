@@ -51,9 +51,9 @@ Rasen requires a reactive runtime to be initialized before rendering. This templ
 
 ```tsx
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createSignalsRuntime } from '@rasenjs/reactive-signals'
+import { createReactiveRuntime } from '@rasenjs/reactive-signals'
 
-setReactiveRuntime(createSignalsRuntime())
+setReactiveRuntime(createReactiveRuntime())
 ```
 
 ### Reactive State

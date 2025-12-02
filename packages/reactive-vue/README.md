@@ -16,11 +16,11 @@ npm install @rasenjs/reactive-vue @rasenjs/core vue
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { ref, computed, watch } from 'vue'
 
 // Setup runtime (do this once at app startup)
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 // Now you can use Vue reactivity with Rasen components
 const count = ref(0)
@@ -33,15 +33,15 @@ watch(count, (newVal, oldVal) => {
 
 ## API
 
-### `createVueRuntime()`
+### `createReactiveRuntime()`
 
 Creates a Rasen-compatible reactive runtime using Vue 3's reactivity system.
 
 ```typescript
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { setReactiveRuntime } from '@rasenjs/core'
 
-const runtime = createVueRuntime()
+const runtime = createReactiveRuntime()
 setReactiveRuntime(runtime)
 ```
 

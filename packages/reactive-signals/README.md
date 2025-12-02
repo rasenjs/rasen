@@ -16,10 +16,10 @@ npm install @rasenjs/reactive-signals @rasenjs/core signal-polyfill
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createSignalsRuntime, ref, computed } from '@rasenjs/reactive-signals'
+import { createReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
 
 // Setup runtime (do this once at app startup)
-setReactiveRuntime(createSignalsRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 // Use Signals-based reactivity
 const count = ref(0)
@@ -32,15 +32,15 @@ console.log(double.value) // 10
 
 ## API
 
-### `createSignalsRuntime()`
+### `createReactiveRuntime()`
 
 Creates a Rasen-compatible reactive runtime using TC39 Signals.
 
 ```typescript
-import { createSignalsRuntime } from '@rasenjs/reactive-signals'
+import { createReactiveRuntime } from '@rasenjs/reactive-signals'
 import { setReactiveRuntime } from '@rasenjs/core'
 
-const runtime = createSignalsRuntime()
+const runtime = createReactiveRuntime()
 setReactiveRuntime(runtime)
 ```
 
@@ -109,10 +109,10 @@ watch(source, callback, {
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createSignalsRuntime, ref, computed } from '@rasenjs/reactive-signals'
+import { createReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
 import { div, button, mount } from '@rasenjs/dom'
 
-setReactiveRuntime(createSignalsRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 const count = ref(0)
 

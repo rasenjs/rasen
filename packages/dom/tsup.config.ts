@@ -8,5 +8,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
-  external: ['@rasen/core']
+  external: ['@rasenjs/core']
 })

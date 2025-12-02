@@ -12,7 +12,7 @@ let runtime: ReactiveRuntime | undefined
 /**
  * 创建 Signals 响应式运行时
  */
-export function createSignalsRuntime(): ReactiveRuntime {
+export function createReactiveRuntime(): ReactiveRuntime {
   return {
     watch: (source, callback, options) => {
       let oldValue: any = undefined
@@ -132,7 +132,7 @@ export function createSignalsRuntime(): ReactiveRuntime {
 // 获取或创建单例运行时
 function getRuntime(): ReactiveRuntime {
   if (!runtime) {
-    runtime = createSignalsRuntime()
+    runtime = createReactiveRuntime()
   }
   return runtime
 }

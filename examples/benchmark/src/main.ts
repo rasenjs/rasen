@@ -4,12 +4,12 @@
  */
 
 import { setReactiveRuntime, each } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { ref, shallowRef, watch } from 'vue'
 import { mount } from '@rasenjs/dom'
 
 // Initialize reactive runtime
-const runtime = createVueRuntime()
+const runtime = createReactiveRuntime()
 setReactiveRuntime(runtime)
 
 // ============================================================================

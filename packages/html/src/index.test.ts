@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import {
   renderToString,
   div,
@@ -16,7 +16,7 @@ import {
 } from './index'
 
 beforeEach(() => {
-  setReactiveRuntime(createVueRuntime())
+  setReactiveRuntime(createReactiveRuntime())
 })
 
 describe('@rasenjs/html', () => {

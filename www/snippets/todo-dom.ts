@@ -1,9 +1,9 @@
 import { setReactiveRuntime, each } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, input, button, ul, li, span, mount } from '@rasenjs/dom'
 import { ref, computed } from 'vue'
 
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 interface Todo {
   id: number

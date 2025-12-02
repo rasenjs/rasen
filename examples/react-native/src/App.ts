@@ -6,7 +6,7 @@
  */
 
 import { setReactiveRuntime } from '@rasenjs/core';
-import { createVueRuntime } from '@rasenjs/reactive-vue';
+import { createReactiveRuntime } from '@rasenjs/reactive-vue';
 import { ref, type Ref } from 'vue';
 import {
   view,
@@ -19,7 +19,7 @@ import {
 } from '@rasenjs/react-native';
 
 // Create and set Vue reactive runtime
-setReactiveRuntime(createVueRuntime());
+setReactiveRuntime(createReactiveRuntime());
 
 // Type alias for Todo item
 interface TodoItem {

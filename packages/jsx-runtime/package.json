@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/jsx-runtime",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha",
   "description": "JSX runtime for Rasen",
   "type": "module",
   "main": "./dist/index.cjs",

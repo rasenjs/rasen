@@ -1,10 +1,10 @@
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createVueRuntime } from '@rasenjs/reactive-vue'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, mount } from '@rasenjs/dom'
 import { ref, computed } from 'vue'
 
 // 1. Setup reactive runtime
-setReactiveRuntime(createVueRuntime())
+setReactiveRuntime(createReactiveRuntime())
 
 // 2. Create reactive state
 const count = ref(0)
