@@ -1,0 +1,15 @@
+{
+  "name": "example-lvgl-app",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "rasen-lvgl run",
+    "build": "rasen-lvgl build",
+    "build:esp32": "rasen-lvgl build --target esp32",
+    "build:rpi": "rasen-lvgl build --target rpi"
+  },
+  "dependencies": {
+    "@rasenjs/lvgl": "workspace:*",
+    "@rasenjs/reactive-signals": "workspace:*"
+  }
+}

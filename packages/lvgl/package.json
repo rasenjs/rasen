@@ -1,0 +1,73 @@
+{
+  "name": "@rasenjs/lvgl",
+  "version": "0.1.0-alpha",
+  "description": "Rasen LVGL binding - Embedded UI framework adapter for Rasen using LVGL + QuickJS",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "native"
+  ],
+  "bin": {
+    "rasen-lvgl": "./bin/rasen-lvgl.cjs"
+  },
+  "scripts": {
+    "build": "tsup",
+    "setup": "npx tsx native/scripts/setup-deps.ts",
+    "build:simulator": "cd native/simulator/build && cmake --build . --config Release --target rasen_simulator",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "peerDependencies": {
+    "@rasenjs/reactive-signals": "workspace:*",
+    "@rasenjs/reactive-vue": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@rasenjs/reactive-signals": {
+      "optional": true
+    },
+    "@rasenjs/reactive-vue": {
+      "optional": true
+    }
+  },
+  "author": "rasenjs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/rasen.git",
+    "directory": "packages/lvgl"
+  },
+  "keywords": [
+    "rasen",
+    "lvgl",
+    "embedded",
+    "quickjs",
+    "ui",
+    "tailwind",
+    "reactive"
+  ]
+}

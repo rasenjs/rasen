@@ -1,0 +1,15 @@
+# Dependencies (downloaded by scripts/setup-deps.ts)
+native/simulator/deps/
+
+# Build output
+native/simulator/build/
+native/esp32/build/
+
+# Compiled output
+dist/
+*.lib
+*.a
+*.exe
+*.dll
+*.so
+*.dylib
