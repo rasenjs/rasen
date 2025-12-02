@@ -1,7 +1,7 @@
 {
   "name": "rasen-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,10 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@rasenjs/core": "workspace:*",
-    "@rasenjs/dom": "workspace:*",
-    "@rasenjs/jsx-runtime": "workspace:*",
-    "@rasenjs/reactive-signals": "workspace:*"
+    "@rasenjs/core": "^0.1.0-alpha",
+    "@rasenjs/dom": "^0.1.0-alpha",
+    "@rasenjs/jsx-runtime": "^0.1.0-alpha",
+    "@rasenjs/reactive-signals": "^0.1.0-alpha"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
