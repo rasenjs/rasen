@@ -39,17 +39,18 @@
 
 ## Packages
 
-| Package                                                  | Description                       |
-| -------------------------------------------------------- | --------------------------------- |
-| [@rasenjs/core](./packages/core)                         | Core runtime and type definitions |
-| [@rasenjs/dom](./packages/dom)                           | DOM rendering components          |
-| [@rasenjs/canvas-2d](./packages/canvas-2d)               | Canvas 2D rendering components    |
-| [@rasenjs/react-native](./packages/react-native)         | React Native Fabric renderer      |
-| [@rasenjs/gpui](./packages/gpui)                         | GPU-accelerated native desktop (Zed's GPUI) |
-| [@rasenjs/html](./packages/html)                         | HTML renderer for SSR/SSG         |
-| [@rasenjs/jsx-runtime](./packages/jsx-runtime)           | JSX/TSX runtime support           |
-| [@rasenjs/reactive-vue](./packages/reactive-vue)         | Vue 3 reactivity adapter          |
-| [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter              |
+| Package                                                  | Description                                  |
+| -------------------------------------------------------- | -------------------------------------------- |
+| [@rasenjs/core](./packages/core)                         | Core runtime and type definitions            |
+| [@rasenjs/dom](./packages/dom)                           | DOM rendering components                     |
+| [@rasenjs/canvas-2d](./packages/canvas-2d)               | Canvas 2D rendering components               |
+| [@rasenjs/react-native](./packages/react-native)         | React Native Fabric renderer                 |
+| [@rasenjs/gpui](./packages/gpui)                         | GPU-accelerated native desktop (Zed's GPUI)  |
+| [@rasenjs/lvgl](./packages/lvgl)                         | Embedded UI for ESP32/STM32 (LVGL + QuickJS) |
+| [@rasenjs/html](./packages/html)                         | HTML renderer for SSR/SSG                    |
+| [@rasenjs/jsx-runtime](./packages/jsx-runtime)           | JSX/TSX runtime support                      |
+| [@rasenjs/reactive-vue](./packages/reactive-vue)         | Vue 3 reactivity adapter                     |
+| [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter                         |
 
 ## Quick Start
 
@@ -176,24 +177,93 @@ import { ref } from '@rasenjs/reactive-signals'
 
 const App = () => {
   const count = ref(0)
-  
+
   return div({
-    class: "flex flex-col gap-4 bg-[#1a1a2e] size-full justify-center items-center",
+    class:
+      'flex flex-col gap-4 bg-[#1a1a2e] size-full justify-center items-center',
     children: [
-      text({ class: "text-4xl text-white", children: "🌀 Rasen GPUI" }),
-      text({ class: "text-5xl text-white", children: count }),  // reactive!
+      text({ class: 'text-4xl text-white', children: '🌀 Rasen GPUI' }),
+      text({ class: 'text-5xl text-white', children: count }), // reactive!
       div({
-        class: "flex gap-3",
+        class: 'flex gap-3',
         children: [
-          button({ class: "px-4 py-2 bg-[#e94560] rounded-lg", onClick: () => count.value--, children: [text({ children: "−" })] }),
-          button({ class: "px-4 py-2 bg-[#0f3460] rounded-lg", onClick: () => count.value++, children: [text({ children: "+" })] }),
-        ],
-      }),
-    ],
+          button({
+            class: 'px-4 py-2 bg-[#e94560] rounded-lg',
+            onClick: () => count.value--,
+            children: [text({ children: '−' })]
+          }),
+          button({
+            class: 'px-4 py-2 bg-[#0f3460] rounded-lg',
+            onClick: () => count.value++,
+            children: [text({ children: '+' })]
+          })
+        ]
+      })
+    ]
   })
 }
 
-run(App)  // GPU-accelerated native window!
+run(App) // GPU-accelerated native window!
+```
+
+### 🔌 Embedded Devices (LVGL + QuickJS)
+
+<p align="center">
+  <img src="./packages/lvgl/screenshot.png" alt="LVGL Simulator Demo" width="400" />
+</p>
+
+Run Rasen on ESP32, STM32 and other embedded devices with LVGL graphics library:
+
+```typescript
+// Works on ESP32-C6, STM32, or desktop simulator!
+function App() {
+  var count = ref(0)
+  
+  return div({
+    class: 'flex flex-col items-center justify-center size-full bg-gray-900 gap-4',
+    children: [
+      label({
+        class: 'text-2xl text-white',
+        children: function() { return 'Count: ' + count.value }
+      }),
+      div({
+        class: 'flex flex-row gap-2',
+        children: [
+          button({
+            class: 'px-4 py-2 bg-blue-500 rounded-lg',
+            onClick: function() { count.value-- },
+            children: [label({ class: 'text-white', children: '-' })]
+          }),
+          button({
+            class: 'px-4 py-2 bg-blue-500 rounded-lg',
+            onClick: function() { count.value++ },
+            children: [label({ class: 'text-white', children: '+' })]
+          })
+        ]
+      })
+    ]
+  })
+}
+
+run(App)
+```
+
+**Setup for LVGL development:**
+
+```bash
+cd packages/lvgl
+
+# 1. Download dependencies (LVGL, QuickJS-ng, SDL2)
+pnpm setup
+
+# 2. Build simulator (Windows/macOS/Linux)
+cd native/simulator
+mkdir build && cd build
+cmake ..
+cmake --build . --config Release
+
+# 3. Run your app
+./Release/rasen_simulator your-app.js
 ```
 
 ### 📄 Server-Side Rendering (SSR)
