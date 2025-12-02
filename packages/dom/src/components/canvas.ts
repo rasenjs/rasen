@@ -1,4 +1,5 @@
-import type { PropValue } from '@rasenjs/core'
+import type { PropValue, Mountable } from '@rasenjs/core'
+import { unrefValue, mount, mountable } from '@rasenjs/core'
 
 /**
  * 获取 Canvas 渲染上下文的函数类型
@@ -76,8 +77,8 @@ export function canvas(props: {
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<(host: CanvasRenderingContext2D) => (() => void) | undefined>
-}): (domHost: HTMLElement) => (() => void) | undefined
+  children: Array<Mountable<CanvasRenderingContext2D>>
+}): Mountable<HTMLElement>
 
 export function canvas(props: {
   width: PropValue<number>
@@ -86,8 +87,8 @@ export function canvas(props: {
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<(host: WebGLRenderingContext) => (() => void) | undefined>
-}): (domHost: HTMLElement) => (() => void) | undefined
+  children: Array<Mountable<WebGLRenderingContext>>
+}): Mountable<HTMLElement>
 
 export function canvas(props: {
   width: PropValue<number>
@@ -96,8 +97,8 @@ export function canvas(props: {
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<(host: WebGL2RenderingContext) => (() => void) | undefined>
-}): (domHost: HTMLElement) => (() => void) | undefined
+  children: Array<Mountable<WebGL2RenderingContext>>
+}): Mountable<HTMLElement>
 
 export function canvas<Ctx>(props: {
   width: PropValue<number>
@@ -106,8 +107,8 @@ export function canvas<Ctx>(props: {
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<(host: Ctx) => (() => void) | undefined>
-}): (domHost: HTMLElement) => (() => void) | undefined
+  children: Array<Mountable<Ctx>>
+}): Mountable<HTMLElement>
 
 // 实现
 export function canvas<Ctx>(props: {
@@ -118,21 +119,15 @@ export function canvas<Ctx>(props: {
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<(host: Ctx) => (() => void) | undefined>
-}): (domHost: HTMLElement) => (() => void) | undefined {
-  return (domHost: HTMLElement) => {
+  children: Array<Mountable<Ctx>>
+}): Mountable<HTMLElement> {
+  return mountable((domHost: HTMLElement) => {
     // 创建 canvas 元素
     const canvasEl = document.createElement('canvas')
 
     // 设置尺寸（逻辑像素）
-    const width =
-      typeof props.width === 'object' && 'value' in props.width
-        ? props.width.value
-        : props.width
-    const height =
-      typeof props.height === 'object' && 'value' in props.height
-        ? props.height.value
-        : props.height
+    const width = unrefValue(props.width)
+    const height = unrefValue(props.height)
 
     // 获取 DPR
     const dpr =
@@ -149,18 +144,12 @@ export function canvas<Ctx>(props: {
 
     // 设置样式
     if (props.className) {
-      const className =
-        typeof props.className === 'object' && 'value' in props.className
-          ? props.className.value
-          : props.className
+      const className = unrefValue(props.className)
       if (className) canvasEl.className = className
     }
 
     if (props.style) {
-      const style =
-        typeof props.style === 'object' && 'value' in props.style
-          ? props.style.value
-          : props.style
+      const style = unrefValue(props.style)
       if (style) {
         Object.entries(style).forEach(([key, value]) => {
           canvasEl.style.setProperty(key, String(value))
@@ -197,12 +186,12 @@ export function canvas<Ctx>(props: {
     }
 
     // 挂载子组件到渲染上下文
-    const childUnmounts = props.children.map((child) => child(ctx))
+    const childUnmounts = props.children.map((child) => mount(child, ctx))
 
     // 返回 unmount 函数
     return () => {
       childUnmounts.forEach((unmount) => unmount?.())
       canvasEl.remove()
     }
-  }
+  })
 }

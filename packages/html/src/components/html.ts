@@ -1,6 +1,6 @@
-import type { SyncComponent, PropValue } from '@rasenjs/core'
+import type { PropValue, Mountable } from '@rasenjs/core'
+import { unrefValue, mountable } from '@rasenjs/core'
 import type { StringHost } from '../types'
-import { unref } from '../utils'
 
 /**
  * html 组件 - 用于插入原始 HTML 内容（字符串版本）
@@ -17,19 +17,16 @@ import { unref } from '../utils'
  * // 结果: <div><p>paragraph</p><span>text</span></div>
  * ```
  */
-export const html: SyncComponent<
-  StringHost,
-  {
-    /** 原始 HTML 内容 */
-    content: PropValue<string>
-  }
-> = (props) => {
-  return (host) => {
-    const content = unref(props.content) || ''
+export const html = (props: {
+  /** 原始 HTML 内容 */
+  content: PropValue<string>
+}): Mountable<StringHost> => {
+  return mountable((host: StringHost) => {
+    const content = unrefValue(props.content) || ''
     // 直接输出 HTML 内容，不添加包裹元素
     host.append(content)
 
     // SSR 不需要 unmount
     return undefined
-  }
+  })
 }

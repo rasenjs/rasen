@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   getCallArgs,
@@ -36,7 +36,7 @@ describe('rect', () => {
 
   describe('基础绘制', () => {
     it('应该使用正确的参数绘制填充矩形', async () => {
-      const mount = rect({
+      const mountable = rect({
         x: 10,
         y: 20,
         width: 100,
@@ -44,7 +44,7 @@ describe('rect', () => {
         fill: '#ff0000'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -57,7 +57,7 @@ describe('rect', () => {
     })
 
     it('应该使用正确的参数绘制描边矩形', async () => {
-      const mount = rect({
+      const mountable = rect({
         x: 10,
         y: 20,
         width: 100,
@@ -66,7 +66,7 @@ describe('rect', () => {
         lineWidth: 2
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -80,7 +80,7 @@ describe('rect', () => {
     })
 
     it('应该同时支持填充和描边', async () => {
-      const mount = rect({
+      const mountable = rect({
         x: 0,
         y: 0,
         width: 50,
@@ -90,7 +90,7 @@ describe('rect', () => {
         lineWidth: 3
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -102,7 +102,7 @@ describe('rect', () => {
 
   describe('默认值', () => {
     it('描边宽度默认应该为 1', async () => {
-      const mount = rect({
+      const mountable = rect({
         x: 0,
         y: 0,
         width: 100,
@@ -110,7 +110,7 @@ describe('rect', () => {
         stroke: 'black'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -122,7 +122,7 @@ describe('rect', () => {
   describe('圆角矩形', () => {
     it('应该支持单一圆角半径', async () => {
       const cornerRadius = 10
-      const mount = rect({
+      const mountable = rect({
         x: 10,
         y: 10,
         width: 100,
@@ -131,7 +131,7 @@ describe('rect', () => {
         cornerRadius
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -154,7 +154,7 @@ describe('rect', () => {
 
     it('应该支持四个角独立圆角半径', async () => {
       const cornerRadius = [10, 20, 30, 40] // 左上、右上、右下、左下
-      const mount = rect({
+      const mountable = rect({
         x: 10,
         y: 10,
         width: 100,
@@ -163,7 +163,7 @@ describe('rect', () => {
         cornerRadius
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

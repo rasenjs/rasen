@@ -1,4 +1,5 @@
-import type { SyncComponent, MountFunction } from '@rasenjs/core'
+import type { Mountable } from '@rasenjs/core'
+import { mountable, mount } from '@rasenjs/core'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -37,7 +38,7 @@ export interface PathProps
   // 方式2: 使用SVG路径数据(会被转换成points)
   data?: string | Ref<string> | ReadonlyRef<string>
   // 方式3: 使用子组件(point组件,会收集成points数组)
-  children?: Array<MountFunction<CanvasRenderingContext2D>>
+  children?: Array<Mountable<CanvasRenderingContext2D>>
   stroke?: string | Ref<string> | ReadonlyRef<string>
   fill?: string | Ref<string> | ReadonlyRef<string>
   lineWidth?: number | Ref<number> | ReadonlyRef<number>
@@ -56,16 +57,16 @@ let currentPathContext: PathContext | null = null
 /**
  * point 组件 - 定义路径中的一个点
  */
-export const point: SyncComponent<CanvasRenderingContext2D, PathPoint> = (
+export const point = (
   props: PathPoint
-) => {
-  return () => {
+): Mountable<CanvasRenderingContext2D> => {
+  return mountable(() => {
     // 将point添加到当前path上下文
     if (currentPathContext) {
       currentPathContext.points.push(props)
     }
     return undefined
-  }
+  })
 }
 
 /**
@@ -191,9 +192,9 @@ function calculatePathBounds(points: PathPoint[]): {
  * 2. SVG路径字符串(转换成segments)
  * 3. 子segment组件(收集成segments)
  */
-export const path: SyncComponent<CanvasRenderingContext2D, PathProps> = (
+export const path = (
   props: PathProps
-) => {
+): Mountable<CanvasRenderingContext2D> => {
   // 在 setup 阶段预先收集 children 的数据
   let collectedChildPoints: PathPoint[] | null = null
   if (props.children) {
@@ -202,9 +203,8 @@ export const path: SyncComponent<CanvasRenderingContext2D, PathProps> = (
     // 模拟 mount 阶段收集点
     // 注意：这里需要一个临时的 ctx，但 point 组件只是收集数据，不需要真正的 ctx
     for (const child of props.children) {
-      const mount = child
       // point 组件的 setup 返回 mount，mount 执行时收集点
-      mount(null as unknown as CanvasRenderingContext2D)
+      mount(child, null as unknown as CanvasRenderingContext2D)
     }
     collectedChildPoints = pathContext.points
     currentPathContext = null

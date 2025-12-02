@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   getCallArgs,
@@ -36,14 +36,14 @@ describe('text', () => {
 
   describe('基础绘制', () => {
     it('应该使用正确的参数绘制文本', async () => {
-      const mount = text({
+      const mountable = text({
         text: 'Hello World',
         x: 50,
         y: 100,
         fill: '#333333'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -58,7 +58,7 @@ describe('text', () => {
     })
 
     it('应该支持自定义字体', async () => {
-      const mount = text({
+      const mountable = text({
         text: 'Custom Font',
         x: 0,
         y: 0,
@@ -66,7 +66,7 @@ describe('text', () => {
         fill: 'black'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -77,14 +77,14 @@ describe('text', () => {
 
   describe('文本对齐', () => {
     it('应该支持水平对齐', async () => {
-      const mount = text({
+      const mountable = text({
         text: 'Centered',
         x: 200,
         y: 100,
         textAlign: 'center'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -93,14 +93,14 @@ describe('text', () => {
     })
 
     it('应该支持垂直对齐', async () => {
-      const mount = text({
+      const mountable = text({
         text: 'Middle',
         x: 200,
         y: 100,
         textBaseline: 'middle'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -111,13 +111,13 @@ describe('text', () => {
 
   describe('默认值', () => {
     it('填充颜色默认应该为黑色', async () => {
-      const mount = text({
+      const mountable = text({
         text: 'Default',
         x: 0,
         y: 0
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -126,13 +126,13 @@ describe('text', () => {
     })
 
     it('字体默认应该为 16px sans-serif', async () => {
-      const mount = text({
+      const mountable = text({
         text: 'Default Font',
         x: 0,
         y: 0
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -141,13 +141,13 @@ describe('text', () => {
     })
 
     it('水平对齐默认应该为 start', async () => {
-      const mount = text({
+      const mountable = text({
         text: 'Default Align',
         x: 0,
         y: 0
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -169,13 +169,13 @@ describe('text', () => {
     })
 
     it('应该支持下划线', async () => {
-      const mount = text({
+      const mountable = text({
         text: 'Underlined Text',
         x: 10,
         y: 10,
         textDecoration: 'underline'
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       expect(ctx.fillText).toHaveBeenCalledWith('Underlined Text', 10, 10)
@@ -186,13 +186,13 @@ describe('text', () => {
     })
 
     it('应该支持字间距', async () => {
-      const mount = text({
+      const mountable = text({
         text: 'Test',
         x: 10,
         y: 10,
         letterSpacing: 5
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       // 有字间距时,文本会被拆分为单个字符绘制

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   wasCalled,
@@ -35,7 +35,7 @@ describe('ring', () => {
 
   describe('基础绘制', () => {
     it('应该使用正确的参数绘制圆环', async () => {
-      const mount = ring({
+      const mountable = ring({
         x: 100,
         y: 100,
         innerRadius: 30,
@@ -43,7 +43,7 @@ describe('ring', () => {
         fill: '#ff0000'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -65,7 +65,7 @@ describe('ring', () => {
     })
 
     it('应该支持描边', async () => {
-      const mount = ring({
+      const mountable = ring({
         x: 100,
         y: 100,
         innerRadius: 30,
@@ -74,7 +74,7 @@ describe('ring', () => {
         lineWidth: 2
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -85,7 +85,7 @@ describe('ring', () => {
     })
 
     it('应该同时支持填充和描边', async () => {
-      const mount = ring({
+      const mountable = ring({
         x: 100,
         y: 100,
         innerRadius: 25,
@@ -95,7 +95,7 @@ describe('ring', () => {
         lineWidth: 1
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

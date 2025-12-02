@@ -1,5 +1,4 @@
-import { getReactiveRuntime } from '@rasenjs/core'
-import type { SyncComponent, MountFunction } from '@rasenjs/core'
+import { getReactiveRuntime, mountable, mount, type Mountable, type Unmount } from '@rasenjs/core'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -19,7 +18,7 @@ import {
 export interface GroupProps
   extends Partial<CommonDrawProps>, Partial<TransformProps> {
   // 子组件
-  children: Array<MountFunction<CanvasRenderingContext2D>>
+  children: Array<Mountable<CanvasRenderingContext2D>>
   // 位置偏移
   x?: number | Ref<number> | ReadonlyRef<number>
   y?: number | Ref<number> | ReadonlyRef<number>
@@ -45,12 +44,12 @@ export interface GroupProps
  *
  * 所有子组件会在同一个变换上下文中绘制
  */
-export const group: SyncComponent<CanvasRenderingContext2D, GroupProps> = (
+export const group = (
   props: GroupProps
-) => {
-  return (ctx: CanvasRenderingContext2D) => {
+): Mountable<CanvasRenderingContext2D> => {
+  return mountable((ctx: CanvasRenderingContext2D) => {
     // 子组件的 unmount 函数列表
-    const childUnmounts: ((() => void) | undefined)[] = []
+    const childUnmounts: (Unmount | undefined)[] = []
     let componentId: symbol | null = null
     let groupContext: GroupContext | null = null
 
@@ -107,7 +106,7 @@ export const group: SyncComponent<CanvasRenderingContext2D, GroupProps> = (
 
       // mount 所有子组件（在 group 上下文中）
       for (const child of props.children) {
-        const unmount = child(ctx)
+        const unmount = mount(child, ctx)
         childUnmounts.push(unmount)
       }
 
@@ -140,7 +139,7 @@ export const group: SyncComponent<CanvasRenderingContext2D, GroupProps> = (
 
       // mount 所有子组件
       for (const child of props.children) {
-        const unmount = child(ctx)
+        const unmount = mount(child, ctx)
         childUnmounts.push(unmount)
       }
 
@@ -160,5 +159,5 @@ export const group: SyncComponent<CanvasRenderingContext2D, GroupProps> = (
         getRenderContext(ctx).unregister(componentId)
       }
     }
-  }
+  })
 }

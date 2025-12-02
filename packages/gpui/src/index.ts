@@ -10,7 +10,8 @@
  * Users choose their own reactivity (e.g., @rasenjs/reactive-signals).
  */
 
-import type { SyncComponent, PropValue, MountFunction, Ref } from '@rasenjs/core'
+import type { SyncComponent, PropValue, Mountable, Ref } from '@rasenjs/core'
+import { mount, mountable } from '@rasenjs/core'
 
 // ============ GPUI Host Type ============
 
@@ -44,7 +45,7 @@ export interface DivProps {
   onClick?: () => void
   onMouseEnter?: () => void
   onMouseLeave?: () => void
-  children?: MountFunction<GpuiHost>[]
+  children?: Mountable<GpuiHost>[]
 }
 
 export interface TextProps {
@@ -88,7 +89,7 @@ export const div: SyncComponent<GpuiHost, DivProps> = (props) => {
   // === Setup Phase ===
   
   // === Return Mount Function ===
-  return (host) => {
+  return mountable((host: GpuiHost) => {
     // === Mount Phase ===
     const childUnmounts: ((() => void) | undefined)[] = []
     
@@ -117,8 +118,8 @@ export const div: SyncComponent<GpuiHost, DivProps> = (props) => {
     // Mount children into this descriptor's children array
     if (props.children) {
       const childHost = createChildHost(descriptor)
-      for (const childMount of props.children) {
-        childUnmounts.push(childMount(childHost))
+      for (const childMountable of props.children) {
+        childUnmounts.push(mount(childMountable, childHost))
       }
     }
     
@@ -129,7 +130,7 @@ export const div: SyncComponent<GpuiHost, DivProps> = (props) => {
       cleanups.forEach(cleanup => cleanup())
       childUnmounts.forEach(unmount => unmount?.())
     }
-  }
+  })
 }
 
 /**
@@ -141,7 +142,7 @@ export const text: SyncComponent<GpuiHost, TextProps> = (props) => {
   // === Setup Phase ===
   
   // === Return Mount Function ===
-  return (host) => {
+  return mountable((host: GpuiHost) => {
     // === Mount Phase ===
     const descriptor: ElementDescriptor = {
       type: 'text',
@@ -155,14 +156,14 @@ export const text: SyncComponent<GpuiHost, TextProps> = (props) => {
     return () => {
       // cleanup
     }
-  }
+  })
 }
 
 /**
  * button - Interactive button component
  */
 export const button: SyncComponent<GpuiHost, DivProps & { label?: PropValue<string> }> = (props) => {
-  return (host) => {
+  return mountable((host: GpuiHost) => {
     const childUnmounts: ((() => void) | undefined)[] = []
     
     const descriptor: ElementDescriptor = {
@@ -182,8 +183,8 @@ export const button: SyncComponent<GpuiHost, DivProps & { label?: PropValue<stri
     // Mount children into this descriptor's children array
     if (props.children) {
       const childHost = createChildHost(descriptor)
-      for (const childMount of props.children) {
-        childUnmounts.push(childMount(childHost))
+      for (const childMountable of props.children) {
+        childUnmounts.push(mount(childMountable, childHost))
       }
     }
     
@@ -193,12 +194,12 @@ export const button: SyncComponent<GpuiHost, DivProps & { label?: PropValue<stri
       cleanups.forEach(cleanup => cleanup())
       childUnmounts.forEach(unmount => unmount?.())
     }
-  }
+  })
 }
 
 // ============ App Runner ============
 
-export type GpuiApp = MountFunction<GpuiHost>
+export type GpuiApp = Mountable<GpuiHost>
 
 // Internal state for re-rendering
 let __mountFn: GpuiApp | null = null
@@ -239,7 +240,7 @@ function __rerender(): ElementDescriptor | null {
   
   // Create fresh host and mount
   const rootHost = createHost()
-  const result = __mountFn(rootHost)
+  const result = mount(__mountFn, rootHost)
   __unmountFn = typeof result === 'function' ? result : null
   
   const elements = rootHost.getElements()

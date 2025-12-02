@@ -21,10 +21,15 @@ import type { PropValue } from './types'
 
 /**
  * 解包响应式值
- * 委托给响应式运行时处理
+ * 先处理 Getter 函数，然后委托给响应式运行时处理 Ref/ReadonlyRef
  */
 export function unrefValue<T>(value: PropValue<T>): T {
-  return getReactiveRuntime().unref(value)
+  // 先处理 Getter 函数
+  if (typeof value === 'function') {
+    return (value as () => T)()
+  }
+  // 再委托给响应式运行时处理 Ref/ReadonlyRef
+  return getReactiveRuntime().unref(value as T | Ref<T> | ReadonlyRef<T>)
 }
 
 /**
@@ -71,8 +76,9 @@ export interface ReactiveRuntime {
   computed<T>(getter: () => T): ReadonlyRef<T>
 
   /**
-   * 解包响应式值
-   * 由具体的响应式库实现判断逻辑
+   * 解包响应式引用
+   * 支持：Ref、ReadonlyRef、普通值
+   * Getter 函数由 core 的 unrefValue 处理
    */
   unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T
 

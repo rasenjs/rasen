@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -33,12 +33,12 @@ describe('polygon', () => {
 
   describe('自定义多边形', () => {
     it('应该使用点数组绘制多边形', async () => {
-      const mount = polygon({
+      const mountable = polygon({
         points: [23, 20, 40, 80, 5, 80],
         fill: 'red'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -60,14 +60,14 @@ describe('polygon', () => {
     })
 
     it('应该绘制不闭合的折线 (polyline)', async () => {
-      const mount = polygon({
+      const mountable = polygon({
         points: [0, 0, 50, 50, 100, 0],
         stroke: 'black',
         lineWidth: 2,
         closed: false
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -83,7 +83,7 @@ describe('polygon', () => {
 
   describe('正多边形', () => {
     it('应该支持正三角形', async () => {
-      const mount = polygon({
+      const mountable = polygon({
         x: 100,
         y: 100,
         sides: 3,
@@ -91,7 +91,7 @@ describe('polygon', () => {
         fill: 'blue'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -102,7 +102,7 @@ describe('polygon', () => {
     })
 
     it('应该支持正六边形', async () => {
-      const mount = polygon({
+      const mountable = polygon({
         x: 100,
         y: 100,
         sides: 6,
@@ -110,7 +110,7 @@ describe('polygon', () => {
         fill: 'green'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -121,7 +121,7 @@ describe('polygon', () => {
     })
 
     it('应该支持圆角正多边形', async () => {
-      const mount = polygon({
+      const mountable = polygon({
         x: 50,
         y: 50,
         sides: 6,
@@ -130,7 +130,7 @@ describe('polygon', () => {
         fill: 'lightblue',
         stroke: 'darkblue'
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()

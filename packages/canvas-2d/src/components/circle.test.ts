@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   getCallArgs,
@@ -36,14 +36,14 @@ describe('circle', () => {
 
   describe('基础绘制', () => {
     it('应该使用正确的参数绘制填充圆形', async () => {
-      const mount = circle({
+      const mountable = circle({
         x: 100,
         y: 100,
         radius: 50,
         fill: '#ff0000'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -63,7 +63,7 @@ describe('circle', () => {
     })
 
     it('应该使用正确的参数绘制描边圆形', async () => {
-      const mount = circle({
+      const mountable = circle({
         x: 100,
         y: 100,
         radius: 50,
@@ -71,7 +71,7 @@ describe('circle', () => {
         lineWidth: 5
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -84,14 +84,14 @@ describe('circle', () => {
 
   describe('默认值', () => {
     it('描边宽度默认应该为 1', async () => {
-      const mount = circle({
+      const mountable = circle({
         x: 0,
         y: 0,
         radius: 10,
         stroke: 'black'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -102,7 +102,7 @@ describe('circle', () => {
 
   describe('圆弧', () => {
     it('应该支持起始和结束角度', async () => {
-      const mount = circle({
+      const mountable = circle({
         x: 100,
         y: 100,
         radius: 50,
@@ -111,7 +111,7 @@ describe('circle', () => {
         endAngle: Math.PI
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -126,7 +126,7 @@ describe('circle', () => {
     })
 
     it('应该支持逆时针绘制', async () => {
-      const mount = circle({
+      const mountable = circle({
         x: 100,
         y: 100,
         radius: 50,
@@ -136,7 +136,7 @@ describe('circle', () => {
         anticlockwise: true
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

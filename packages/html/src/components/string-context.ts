@@ -1,26 +1,28 @@
 /**
  * htmlContext 组件 - 提供 HTML 渲染上下文
  */
-import type { StringHost, StringMountFunction } from '../types'
+import type { Mountable } from '@rasenjs/core'
+import { mount, mountable } from '@rasenjs/core'
+import type { StringHost } from '../types'
 import { createStringHost } from '../types'
 
 /**
  * 创建字符串渲染上下文
  */
 export function stringContext(props: {
-  children: Array<StringMountFunction>
-}): StringMountFunction {
-  return (host: StringHost) => {
+  children: Array<Mountable<StringHost>>
+}): Mountable<StringHost> {
+  return mountable((host: StringHost) => {
     const { children } = props
 
     // 挂载所有子组件
-    for (const mountFn of children) {
-      mountFn(host)
+    for (const child of children) {
+      mount(child, host)
     }
 
     // SSR 不需要 unmount
     return undefined
-  }
+  })
 }
 
 /**
@@ -28,19 +30,19 @@ export function stringContext(props: {
  *
  * 这是 SSR 的主要入口
  */
-export function renderToString(component: StringMountFunction): string {
+export function renderToString(component: Mountable<StringHost>): string {
   const host = createStringHost()
-  component(host)
+  mount(component, host)
   return host.toString()
 }
 
 /**
  * 将多个组件渲染为 HTML 字符串
  */
-export function renderToStringMultiple(components: StringMountFunction[]): string {
+export function renderToStringMultiple(components: Mountable<StringHost>[]): string {
   const host = createStringHost()
   for (const component of components) {
-    component(host)
+    mount(component, host)
   }
   return host.toString()
 }

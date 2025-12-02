@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -33,11 +33,11 @@ describe('path', () => {
 
   describe('SVG 路径', () => {
     it('应该支持 SVG 路径数据', async () => {
-      const mount = path({
+      const mountable = path({
         data: 'M 10 10 L 50 50 L 90 10 Z',
         fill: 'green'
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -49,11 +49,11 @@ describe('path', () => {
     })
 
     it('应该支持贝塞尔曲线路径', async () => {
-      const mount = path({
+      const mountable = path({
         data: 'M 10 80 Q 95 10 180 80',
         stroke: 'blue'
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -63,12 +63,12 @@ describe('path', () => {
     })
 
     it('应该支持复杂路径', async () => {
-      const mount = path({
+      const mountable = path({
         data: 'M 0 0 C 50 0 50 100 100 100 S 150 0 200 100',
         stroke: 'red',
         fill: 'pink'
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()

@@ -4,6 +4,7 @@ import path from 'path'
 export default defineConfig({
   resolve: {
     alias: {
+      '@rasenjs/core/test-utils': path.resolve(__dirname, 'packages/core/src/test-utils.ts'),
       '@rasenjs/core': path.resolve(__dirname, 'packages/core/src/index.ts'),
       '@rasenjs/dom': path.resolve(__dirname, 'packages/dom/src/index.ts'),
       '@rasenjs/reactive-vue': path.resolve(

@@ -1,5 +1,5 @@
 import { getReactiveRuntime } from '../reactive'
-import type { MountFunction, Ref } from '../types'
+import { mount, mountable, type Mountable, type Ref } from '../types'
 
 /**
  * each 组件 - 对象列表渲染
@@ -43,8 +43,8 @@ export interface EachHostHooks<Host = unknown, N = unknown> {
  */
 export function each<T extends object, Host = unknown>(
   items: T[] | Ref<T[]> | (() => T[]),
-  render: (item: T, index: number) => MountFunction<Host>
-): MountFunction<Host> {
+  render: (item: T, index: number) => Mountable<Host>
+): Mountable<Host> {
   // 判断是否为 Ref（有 value 属性）
   const isRef = (v: unknown): v is Ref<T[]> =>
     v !== null && typeof v === 'object' && 'value' in v
@@ -64,7 +64,7 @@ export function each<T extends object, Host = unknown>(
  */
 interface EachImplConfig<T extends object, Host, N> {
   items: () => T[]
-  render: (item: T, index: number) => MountFunction<Host>
+  render: (item: T, index: number) => Mountable<Host>
 
   // 可选的宿主操作钩子
   createMarker?: () => N
@@ -84,8 +84,8 @@ interface EachImplConfig<T extends object, Host, N> {
  */
 function eachImpl<T extends object, Host = unknown, N = unknown>(
   config: EachImplConfig<T, Host, N>
-): MountFunction<Host> {
-  return (host: Host) => {
+): Mountable<Host> {
+  return mountable((host: Host) => {
     const runtime = getReactiveRuntime()
 
     // 用 WeakMap 追踪对象引用 -> 实例
@@ -120,13 +120,11 @@ function eachImpl<T extends object, Host = unknown, N = unknown>(
       const instance: Instance<N> = {}
 
       const mountResult = config.render(item, index)
-      if (typeof mountResult === 'function') {
-        const unmount = mountResult(targetHost)
-        instance.unmount = unmount
-        // 从 unmount 函数上获取节点引用
-        if (unmount && typeof unmount === 'function' && 'node' in unmount) {
-          instance.node = (unmount as { node?: N }).node
-        }
+      const unmount = mount(mountResult, targetHost)
+      instance.unmount = unmount
+      // 从 unmount 函数上获取节点引用
+      if (unmount && typeof unmount === 'function' && 'node' in unmount) {
+        instance.node = (unmount as { node?: N }).node
       }
 
       return instance
@@ -265,7 +263,7 @@ function eachImpl<T extends object, Host = unknown, N = unknown>(
         config.removeMarker(endMarker)
       }
     }
-  }
+  })
 }
 
 /**
@@ -284,18 +282,18 @@ function eachImpl<T extends object, Host = unknown, N = unknown>(
  */
 export function repeat<T, Host = unknown>(
   items: Ref<T[]> | (() => T[]),
-  render: (item: T, index: number) => MountFunction<Host>
-): MountFunction<Host>
+  render: (item: T, index: number) => Mountable<Host>
+): Mountable<Host>
 
 export function repeat<Host = unknown>(
   count: Ref<number> | (() => number),
-  render: (index: number) => MountFunction<Host>
-): MountFunction<Host>
+  render: (index: number) => Mountable<Host>
+): Mountable<Host>
 
 export function repeat<T, Host = unknown>(
   itemsOrCount: Ref<T[]> | Ref<number> | (() => T[]) | (() => number),
-  render: ((item: T, index: number) => MountFunction<Host>) | ((index: number) => MountFunction<Host>)
-): MountFunction<Host> {
+  render: ((item: T, index: number) => Mountable<Host>) | ((index: number) => Mountable<Host>)
+): Mountable<Host> {
   return repeatImpl({
     items: () => {
       const value = typeof itemsOrCount === 'function'
@@ -308,7 +306,7 @@ export function repeat<T, Host = unknown>(
       }
       return value as T[]
     },
-    render: render as (item: T, index: number) => MountFunction<Host>
+    render: render as (item: T, index: number) => Mountable<Host>
   })
 }
 
@@ -317,7 +315,7 @@ export function repeat<T, Host = unknown>(
  */
 interface RepeatImplConfig<T, Host, N> {
   items: () => T[]
-  render: (item: T, index: number) => MountFunction<Host>
+  render: (item: T, index: number) => Mountable<Host>
 
   // 可选的宿主操作钩子
   createMarker?: () => N
@@ -336,8 +334,8 @@ interface RepeatImplConfig<T, Host, N> {
  */
 function repeatImpl<T, Host = unknown, N = unknown>(
   config: RepeatImplConfig<T, Host, N>
-): MountFunction<Host> {
-  return (host: Host) => {
+): Mountable<Host> {
+  return mountable((host: Host) => {
     const runtime = getReactiveRuntime()
 
     // 按索引存储实例
@@ -377,12 +375,10 @@ function repeatImpl<T, Host = unknown, N = unknown>(
           for (let i = oldLength; i < newLength; i++) {
             const instance: Instance<N> = {}
             const mountResult = config.render(newItems[i], i)
-            if (typeof mountResult === 'function') {
-              const unmount = mountResult(fragmentHost)
-              instance.unmount = unmount
-              if (unmount && typeof unmount === 'function' && 'node' in unmount) {
-                instance.node = (unmount as { node?: N }).node
-              }
+            const unmount = mount(mountResult, fragmentHost)
+            instance.unmount = unmount
+            if (unmount && typeof unmount === 'function' && 'node' in unmount) {
+              instance.node = (unmount as { node?: N }).node
             }
             instances.push(instance)
           }
@@ -392,12 +388,10 @@ function repeatImpl<T, Host = unknown, N = unknown>(
           for (let i = oldLength; i < newLength; i++) {
             const instance: Instance<N> = {}
             const mountResult = config.render(newItems[i], i)
-            if (typeof mountResult === 'function') {
-              const unmount = mountResult(host)
-              instance.unmount = unmount
-              if (unmount && typeof unmount === 'function' && 'node' in unmount) {
-                instance.node = (unmount as { node?: N }).node
-              }
+            const unmount = mount(mountResult, host)
+            instance.unmount = unmount
+            if (unmount && typeof unmount === 'function' && 'node' in unmount) {
+              instance.node = (unmount as { node?: N }).node
             }
             instances.push(instance)
           }
@@ -425,7 +419,7 @@ function repeatImpl<T, Host = unknown, N = unknown>(
         config.removeMarker(endMarker)
       }
     }
-  }
+  })
 }
 
 // 导出供 DOM 等模块使用

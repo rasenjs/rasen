@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -33,7 +33,7 @@ describe('wedge', () => {
 
   describe('基础绘制', () => {
     it('应该绘制楔形（扇形）', async () => {
-      const mount = wedge({
+      const mountable = wedge({
         x: 100,
         y: 100,
         radius: 70,
@@ -41,7 +41,7 @@ describe('wedge', () => {
         fill: 'red'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

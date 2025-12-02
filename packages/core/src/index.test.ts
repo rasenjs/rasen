@@ -11,6 +11,8 @@ import {
   each,
   repeat,
   when,
+  mountable,
+  mount,
   type ReactiveRuntime,
   type MountFunction,
   type Ref
@@ -162,44 +164,44 @@ describe('@rasenjs/core', () => {
       const mountCalls: string[] = []
       const unmountCalls: string[] = []
 
-      const child1: MountFunction<unknown> = () => {
+      const child1 = mountable(() => {
         mountCalls.push('child1')
         return () => unmountCalls.push('child1')
-      }
+      })
 
-      const child2: MountFunction<unknown> = () => {
+      const child2 = mountable(() => {
         mountCalls.push('child2')
         return () => unmountCalls.push('child2')
-      }
+      })
 
-      const mount = fragment({ children: [child1, child2] })
-      const unmount = mount({})
+      const frag = fragment({ children: [child1, child2] })
+      const cleanup = mount(frag, {})
 
       expect(mountCalls).toEqual(['child1', 'child2'])
       expect(unmountCalls).toEqual([])
 
-      unmount?.()
+      cleanup?.()
       expect(unmountCalls).toEqual(['child1', 'child2'])
     })
 
     it('应该支持空子组件列表', () => {
-      const mount = fragment({ children: [] })
-      const unmount = mount({})
-      expect(unmount).toBeDefined()
-      unmount?.()
+      const frag = fragment({ children: [] })
+      const cleanup = mount(frag, {})
+      expect(cleanup).toBeDefined()
+      cleanup?.()
     })
 
     it('应该传递正确的 host 给子组件', () => {
       const receivedHosts: unknown[] = []
 
-      const child: MountFunction<{ id: string }> = (host) => {
+      const child = mountable((host: { id: string }) => {
         receivedHosts.push(host)
         return () => {}
-      }
+      })
 
       const testHost = { id: 'test-host' }
-      const mount = fragment({ children: [child, child] })
-      mount(testHost)
+      const frag = fragment({ children: [child, child] })
+      mount(frag, testHost)
 
       expect(receivedHosts).toEqual([testHost, testHost])
     })
@@ -214,19 +216,19 @@ describe('@rasenjs/core', () => {
       const thenMounted = vi.fn()
       const elseMounted = vi.fn()
 
-      const mount = when({
+      const whenMountable = when({
         condition: true,
-        then: () => () => {
+        then: () => mountable(() => {
           thenMounted()
           return () => {}
-        },
-        else: () => () => {
+        }),
+        else: () => mountable(() => {
           elseMounted()
           return () => {}
-        }
+        })
       })
 
-      mount({})
+      mount(whenMountable, {})
 
       expect(thenMounted).toHaveBeenCalled()
       expect(elseMounted).not.toHaveBeenCalled()
@@ -236,19 +238,19 @@ describe('@rasenjs/core', () => {
       const thenMounted = vi.fn()
       const elseMounted = vi.fn()
 
-      const mount = when({
+      const whenMountable = when({
         condition: false,
-        then: () => () => {
+        then: () => mountable(() => {
           thenMounted()
           return () => {}
-        },
-        else: () => () => {
+        }),
+        else: () => mountable(() => {
           elseMounted()
           return () => {}
-        }
+        })
       })
 
-      mount({})
+      mount(whenMountable, {})
 
       expect(thenMounted).not.toHaveBeenCalled()
       expect(elseMounted).toHaveBeenCalled()
@@ -257,15 +259,15 @@ describe('@rasenjs/core', () => {
     it('当没有 else 分支且条件为 false 时不应该渲染任何内容', () => {
       const thenMounted = vi.fn()
 
-      const mount = when({
+      const whenMountable = when({
         condition: false,
-        then: () => () => {
+        then: () => mountable(() => {
           thenMounted()
           return () => {}
-        }
+        })
       })
 
-      mount({})
+      mount(whenMountable, {})
 
       expect(thenMounted).not.toHaveBeenCalled()
     })
@@ -274,15 +276,15 @@ describe('@rasenjs/core', () => {
       const condition = mockRuntime.ref(true)
       const thenMounted = vi.fn()
 
-      const mount = when({
+      const whenMountable = when({
         condition,
-        then: () => () => {
+        then: () => mountable(() => {
           thenMounted()
           return () => {}
-        }
+        })
       })
 
-      mount({})
+      mount(whenMountable, {})
 
       expect(thenMounted).toHaveBeenCalled()
     })
@@ -290,14 +292,14 @@ describe('@rasenjs/core', () => {
     it('unmount 时应该清理子组件', () => {
       const childUnmounted = vi.fn()
 
-      const mount = when({
+      const whenMountable = when({
         condition: true,
-        then: () => () => {
+        then: () => mountable(() => {
           return () => childUnmounted()
-        }
+        })
       })
 
-      const unmount = mount({})
+      const unmount = mount(whenMountable, {})
       expect(childUnmounted).not.toHaveBeenCalled()
 
       unmount?.()
@@ -314,12 +316,14 @@ describe('@rasenjs/core', () => {
       const items = [{ id: 1 }, { id: 2 }, { id: 3 }]
       const mountedItems: number[] = []
 
-      const mount = each(items, (item) => () => {
-        mountedItems.push(item.id)
-        return () => {}
-      })
+      const eachMountable = each(items, (item) =>
+        mountable(() => {
+          mountedItems.push(item.id)
+          return () => {}
+        })
+      )
 
-      mount({})
+      mount(eachMountable, {})
 
       expect(mountedItems).toEqual([1, 2, 3])
     })
@@ -328,12 +332,14 @@ describe('@rasenjs/core', () => {
       const items = mockRuntime.ref([{ id: 1 }, { id: 2 }])
       const mountedItems: number[] = []
 
-      const mount = each(items, (item) => () => {
-        mountedItems.push(item.id)
-        return () => {}
-      })
+      const eachMountable = each(items, (item) =>
+        mountable(() => {
+          mountedItems.push(item.id)
+          return () => {}
+        })
+      )
 
-      mount({})
+      mount(eachMountable, {})
 
       expect(mountedItems).toEqual([1, 2])
     })
@@ -342,15 +348,16 @@ describe('@rasenjs/core', () => {
       const items = [{ id: 1 }, { id: 2 }]
       const mountedItems: number[] = []
 
-      const mount = each(
+      const eachMountable = each(
         () => items,
-        (item) => () => {
-          mountedItems.push(item.id)
-          return () => {}
-        }
+        (item) =>
+          mountable(() => {
+            mountedItems.push(item.id)
+            return () => {}
+          })
       )
 
-      mount({})
+      mount(eachMountable, {})
 
       expect(mountedItems).toEqual([1, 2])
     })
@@ -359,12 +366,14 @@ describe('@rasenjs/core', () => {
       const items = [{ name: 'a' }, { name: 'b' }, { name: 'c' }]
       const receivedIndices: number[] = []
 
-      const mount = each(items, (_, index) => () => {
-        receivedIndices.push(index)
-        return () => {}
-      })
+      const eachMountable = each(items, (_, index) =>
+        mountable(() => {
+          receivedIndices.push(index)
+          return () => {}
+        })
+      )
 
-      mount({})
+      mount(eachMountable, {})
 
       expect(receivedIndices).toEqual([0, 1, 2])
     })
@@ -373,14 +382,16 @@ describe('@rasenjs/core', () => {
       const items = [{ id: 1 }, { id: 2 }]
       const unmountedItems: number[] = []
 
-      const mount = each(items, (item) => () => {
-        return () => unmountedItems.push(item.id)
-      })
+      const eachMountable = each(items, (item) =>
+        mountable(() => {
+          return () => unmountedItems.push(item.id)
+        })
+      )
 
-      const unmount = mount({})
+      const cleanup = mount(eachMountable, {})
       expect(unmountedItems).toEqual([])
 
-      unmount?.()
+      cleanup?.()
       expect(unmountedItems).toEqual([1, 2])
     })
 
@@ -388,12 +399,14 @@ describe('@rasenjs/core', () => {
       const items: { id: number }[] = []
       const mountedItems: number[] = []
 
-      const mount = each(items, (item) => () => {
-        mountedItems.push(item.id)
-        return () => {}
-      })
+      const eachMountable = each(items, (item) =>
+        mountable(() => {
+          mountedItems.push(item.id)
+          return () => {}
+        })
+      )
 
-      mount({})
+      mount(eachMountable, {})
 
       expect(mountedItems).toEqual([])
     })
@@ -408,12 +421,14 @@ describe('@rasenjs/core', () => {
       const count = mockRuntime.ref(3)
       const mountedIndices: number[] = []
 
-      const mount = repeat(count, (index) => () => {
-        mountedIndices.push(index)
-        return () => {}
-      })
+      const repeatMountable = repeat(count, (index) =>
+        mountable(() => {
+          mountedIndices.push(index)
+          return () => {}
+        })
+      )
 
-      mount({})
+      mount(repeatMountable, {})
 
       expect(mountedIndices).toEqual([0, 1, 2])
     })
@@ -422,12 +437,14 @@ describe('@rasenjs/core', () => {
       const items = mockRuntime.ref(['a', 'b', 'c'])
       const mountedItems: string[] = []
 
-      const mount = repeat(items, (item) => () => {
-        mountedItems.push(item)
-        return () => {}
-      })
+      const repeatMountable = repeat(items, (item) =>
+        mountable(() => {
+          mountedItems.push(item)
+          return () => {}
+        })
+      )
 
-      mount({})
+      mount(repeatMountable, {})
 
       expect(mountedItems).toEqual(['a', 'b', 'c'])
     })
@@ -435,15 +452,16 @@ describe('@rasenjs/core', () => {
     it('应该支持 getter 函数返回数量', () => {
       const mountedIndices: number[] = []
 
-      const mount = repeat(
+      const repeatMountable = repeat(
         () => 2,
-        (index) => () => {
-          mountedIndices.push(index)
-          return () => {}
-        }
+        (index) =>
+          mountable(() => {
+            mountedIndices.push(index)
+            return () => {}
+          })
       )
 
-      mount({})
+      mount(repeatMountable, {})
 
       expect(mountedIndices).toEqual([0, 1])
     })
@@ -452,15 +470,16 @@ describe('@rasenjs/core', () => {
       const items = ['x', 'y']
       const mountedItems: string[] = []
 
-      const mount = repeat(
+      const repeatMountable = repeat(
         () => items,
-        (item) => () => {
-          mountedItems.push(item)
-          return () => {}
-        }
+        (item) =>
+          mountable(() => {
+            mountedItems.push(item)
+            return () => {}
+          })
       )
 
-      mount({})
+      mount(repeatMountable, {})
 
       expect(mountedItems).toEqual(['x', 'y'])
     })
@@ -469,14 +488,16 @@ describe('@rasenjs/core', () => {
       const count = mockRuntime.ref(2)
       const unmountedIndices: number[] = []
 
-      const mount = repeat(count, (index) => () => {
-        return () => unmountedIndices.push(index)
-      })
+      const repeatMountable = repeat(count, (index) =>
+        mountable(() => {
+          return () => unmountedIndices.push(index)
+        })
+      )
 
-      const unmount = mount({})
+      const cleanup = mount(repeatMountable, {})
       expect(unmountedIndices).toEqual([])
 
-      unmount?.()
+      cleanup?.()
       expect(unmountedIndices).toEqual([0, 1])
     })
   })

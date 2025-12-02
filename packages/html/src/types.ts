@@ -2,6 +2,8 @@
  * 字符串渲染器类型定义
  */
 
+import type { Mountable } from '@rasenjs/core'
+
 /**
  * 字符串渲染宿主
  * 用于收集渲染结果
@@ -40,6 +42,7 @@ export function createStringHost(): StringHost {
 }
 
 /**
- * 字符串渲染的 Mount 函数类型
+ * 字符串渲染的 Mountable 类型
+ * @deprecated 使用 Mountable<StringHost> 替代
  */
-export type StringMountFunction = (host: StringHost) => (() => void) | undefined
+export type StringMountFunction = Mountable<StringHost>

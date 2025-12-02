@@ -1,17 +1,3 @@
-import type { ReadonlyRef, Ref } from '@rasenjs/core'
-
-/**
- * 解包 Ref 或 ReadonlyRef
- * SSR 版本：直接检查 value 属性，不依赖响应式运行时
- */
-export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
-  // 检查是否是 Ref-like 对象（有 value 属性）
-  if (value !== null && typeof value === 'object' && 'value' in value) {
-    return (value as Ref<T>).value
-  }
-  return value as T
-}
-
 /**
  * HTML 转义字符映射
  */

@@ -21,6 +21,9 @@ export {
   h1,
   h2,
   h3,
+  h4,
+  h5,
+  h6,
   ul,
   ol,
   li,
@@ -37,5 +40,12 @@ export {
   footer,
   nav,
   main,
-  aside
+  aside,
+  code,
+  pre,
+  strong,
+  em,
+  small,
+  br,
+  hr
 } from './elements'

@@ -3,11 +3,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime, mountable } from '@rasenjs/core'
 import { createVueRuntime } from '@rasenjs/reactive-vue'
 import { ref, computed } from 'vue'
 import {
   mount,
+  hydrate,
   element,
   html,
   div,
@@ -42,14 +43,11 @@ import {
   // Event modifiers
   modifier,
   mod,
-  key,
   prevent,
   stop,
   capture,
   once,
-  self,
-  enter,
-  esc
+  self
 } from './index'
 
 // Setup
@@ -68,27 +66,27 @@ afterEach(() => {
 describe('@rasenjs/dom', () => {
   describe('element', () => {
     it('should create element with specified tag', () => {
-      const unmount = element({ tag: 'article' })(container)
+      const unmount = mount(element({ tag: 'article' }), container)
       expect(container.querySelector('article')).not.toBeNull()
       unmount?.()
     })
 
     it('should remove element on unmount', () => {
-      const unmount = element({ tag: 'div' })(container)
+      const unmount = mount(element({ tag: 'div' }), container)
       expect(container.children.length).toBe(1)
       unmount?.()
       expect(container.children.length).toBe(0)
     })
 
     it('should set id attribute', () => {
-      const unmount = div({ id: 'my-div' })(container)
+      const unmount = mount(div({ id: 'my-div' }), container)
       expect(container.querySelector('#my-div')).not.toBeNull()
       unmount?.()
     })
 
     it('should update id reactively', async () => {
       const id = ref('id-1')
-      const unmount = div({ id })(container)
+      const unmount = mount(div({ id }), container)
       expect(container.querySelector('#id-1')).not.toBeNull()
 
       id.value = 'id-2'
@@ -100,20 +98,20 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should set className', () => {
-      const unmount = div({ className: 'container' })(container)
+      const unmount = mount(div({ className: 'container' }), container)
       expect(container.querySelector('.container')).not.toBeNull()
       unmount?.()
     })
 
     it('should support class alias', () => {
-      const unmount = div({ class: 'wrapper' })(container)
+      const unmount = mount(div({ class: 'wrapper' }), container)
       expect(container.querySelector('.wrapper')).not.toBeNull()
       unmount?.()
     })
 
     it('should update className reactively', async () => {
       const cls = ref('active')
-      const unmount = div({ className: cls })(container)
+      const unmount = mount(div({ className: cls }), container)
       expect(container.querySelector('.active')).not.toBeNull()
 
       cls.value = 'inactive'
@@ -125,9 +123,7 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should set style object', () => {
-      const unmount = div({ style: { color: 'red', 'font-size': '16px' } })(
-        container
-      )
+      const unmount = mount(div({ style: { color: 'red', 'font-size': '16px' } }), container)
       const el = container.firstElementChild as HTMLElement
       expect(el.style.color).toBe('red')
       expect(el.style.fontSize).toBe('16px')
@@ -136,9 +132,7 @@ describe('@rasenjs/dom', () => {
 
     it('should update style reactively', async () => {
       const color = ref('red')
-      const unmount = div({ style: computed(() => ({ color: color.value })) })(
-        container
-      )
+      const unmount = mount(div({ style: computed(() => ({ color: color.value })) }), container)
       const el = container.firstElementChild as HTMLElement
       expect(el.style.color).toBe('red')
 
@@ -150,9 +144,9 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should set arbitrary attributes', () => {
-      const unmount = div({
+      const unmount = mount(div({
         attrs: { 'data-id': '123', 'aria-label': 'test' }
-      })(container)
+      }), container)
       const el = container.firstElementChild as HTMLElement
       expect(el.getAttribute('data-id')).toBe('123')
       expect(el.getAttribute('aria-label')).toBe('test')
@@ -160,34 +154,34 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should handle boolean attribute true', () => {
-      const unmount = input({ attrs: { disabled: true } })(container)
+      const unmount = mount(input({ attrs: { disabled: true } }), container)
       const el = container.querySelector('input') as HTMLInputElement
       expect(el.hasAttribute('disabled')).toBe(true)
       unmount?.()
     })
 
     it('should handle boolean attribute false', () => {
-      const unmount = input({ attrs: { disabled: false } })(container)
+      const unmount = mount(input({ attrs: { disabled: false } }), container)
       const el = container.querySelector('input') as HTMLInputElement
       expect(el.hasAttribute('disabled')).toBe(false)
       unmount?.()
     })
 
     it('should set string children as text content', () => {
-      const unmount = div({ children: 'Hello World' })(container)
+      const unmount = mount(div({ children: 'Hello World' }), container)
       expect(container.firstElementChild?.textContent).toBe('Hello World')
       unmount?.()
     })
 
     it('should support shorthand text children', () => {
-      const unmount = div('Hello')(container)
+      const unmount = mount(div('Hello'), container)
       expect(container.firstElementChild?.textContent).toBe('Hello')
       unmount?.()
     })
 
     it('should update text content reactively', async () => {
       const text = ref('Initial')
-      const unmount = div({ children: text })(container)
+      const unmount = mount(div({ children: text }), container)
       expect(container.firstElementChild?.textContent).toBe('Initial')
 
       text.value = 'Updated'
@@ -198,9 +192,9 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should mount child components array', () => {
-      const unmount = div({
+      const unmount = mount(div({
         children: [span({ children: 'First' }), span({ children: 'Second' })]
-      })(container)
+      }), container)
 
       const spans = container.querySelectorAll('span')
       expect(spans.length).toBe(2)
@@ -210,7 +204,7 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should support nested components', () => {
-      const unmount = div({
+      const unmount = mount(div({
         className: 'outer',
         children: [
           div({
@@ -218,7 +212,7 @@ describe('@rasenjs/dom', () => {
             children: [span({ children: 'Nested' })]
           })
         ]
-      })(container)
+      }), container)
 
       expect(container.querySelector('.outer .inner span')?.textContent).toBe(
         'Nested'
@@ -227,9 +221,9 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should unmount all children when parent unmounts', () => {
-      const unmount = div({
+      const unmount = mount(div({
         children: [span({}), span({})]
-      })(container)
+      }), container)
 
       expect(container.querySelectorAll('span').length).toBe(2)
       unmount?.()
@@ -239,24 +233,22 @@ describe('@rasenjs/dom', () => {
 
   describe('html', () => {
     it('should insert HTML content', () => {
-      const unmount = html({ content: '<p>Paragraph</p>' })(container)
+      const unmount = mount(html({ content: '<p>Paragraph</p>' }), container)
       expect(container.querySelector('p')?.textContent).toBe('Paragraph')
       unmount?.()
     })
 
     it('should support multiple root nodes', () => {
-      const unmount = html({
+      const unmount = mount(html({
         content: '<span>A</span><span>B</span><span>C</span>'
-      })(container)
+      }), container)
       const spans = container.querySelectorAll('span')
       expect(spans.length).toBe(3)
       unmount?.()
     })
 
     it('should remove all nodes on unmount', () => {
-      const unmount = html({ content: '<span>A</span><span>B</span>' })(
-        container
-      )
+      const unmount = mount(html({ content: '<span>A</span><span>B</span>' }), container)
       expect(container.querySelectorAll('span').length).toBe(2)
       unmount?.()
       expect(container.querySelectorAll('span').length).toBe(0)
@@ -264,7 +256,7 @@ describe('@rasenjs/dom', () => {
 
     it('should update HTML content reactively', async () => {
       const content = ref('<p>Original</p>')
-      const unmount = html({ content })(container)
+      const unmount = mount(html({ content }), container)
       expect(container.querySelector('p')?.textContent).toBe('Original')
 
       content.value = '<span>Replaced</span>'
@@ -302,7 +294,7 @@ describe('@rasenjs/dom', () => {
     ]
 
     it.each(elements)('should create %s element', (tagName, component) => {
-      const unmount = component({})(container)
+      const unmount = mount(component({}), container)
       expect(container.querySelector(tagName)).not.toBeNull()
       unmount?.()
     })
@@ -332,7 +324,7 @@ describe('@rasenjs/dom', () => {
   describe('events', () => {
     it('should bind click event via on object', () => {
       const handler = vi.fn()
-      const unmount = button({ on: { click: handler } })(container)
+      const unmount = mount(button({ on: { click: handler } }), container)
       container.querySelector('button')?.click()
       expect(handler).toHaveBeenCalledTimes(1)
       unmount?.()
@@ -340,7 +332,7 @@ describe('@rasenjs/dom', () => {
 
     it('should bind input event via on object', () => {
       const handler = vi.fn()
-      const unmount = input({ on: { input: handler } })(container)
+      const unmount = mount(input({ on: { input: handler } }), container)
       container.querySelector('input')?.dispatchEvent(new Event('input'))
       expect(handler).toHaveBeenCalledTimes(1)
       unmount?.()
@@ -348,7 +340,7 @@ describe('@rasenjs/dom', () => {
 
     it('should support onClick shorthand', () => {
       const handler = vi.fn()
-      const unmount = button({ onClick: handler })(container)
+      const unmount = mount(button({ onClick: handler }), container)
       container.querySelector('button')?.click()
       expect(handler).toHaveBeenCalledTimes(1)
       unmount?.()
@@ -356,7 +348,7 @@ describe('@rasenjs/dom', () => {
 
     it('should support onInput shorthand', () => {
       const handler = vi.fn()
-      const unmount = input({ onInput: handler })(container)
+      const unmount = mount(input({ onInput: handler }), container)
       container.querySelector('input')?.dispatchEvent(new Event('input'))
       expect(handler).toHaveBeenCalledTimes(1)
       unmount?.()
@@ -365,20 +357,20 @@ describe('@rasenjs/dom', () => {
 
   describe('form elements', () => {
     it('should set input type', () => {
-      const unmount = input({ type: 'password' })(container)
+      const unmount = mount(input({ type: 'password' }), container)
       expect(container.querySelector('input')?.type).toBe('password')
       unmount?.()
     })
 
     it('should set input value', () => {
-      const unmount = input({ value: 'initial' })(container)
+      const unmount = mount(input({ value: 'initial' }), container)
       expect(container.querySelector('input')?.value).toBe('initial')
       unmount?.()
     })
 
     it('should update input value reactively', async () => {
       const value = ref('initial')
-      const unmount = input({ value })(container)
+      const unmount = mount(input({ value }), container)
       const el = container.querySelector('input')!
       expect(el.value).toBe('initial')
 
@@ -390,7 +382,7 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should set input placeholder', () => {
-      const unmount = input({ placeholder: 'Enter text...' })(container)
+      const unmount = mount(input({ placeholder: 'Enter text...' }), container)
       expect(container.querySelector('input')?.placeholder).toBe(
         'Enter text...'
       )
@@ -398,18 +390,18 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should create textarea', () => {
-      const unmount = textarea({})(container)
+      const unmount = mount(textarea({}), container)
       expect(container.querySelector('textarea')).not.toBeNull()
       unmount?.()
     })
 
     it('should create select with options', () => {
-      const unmount = select({
+      const unmount = mount(select({
         children: [
           option({ attrs: { value: 'a' }, children: 'Option A' }),
           option({ attrs: { value: 'b' }, children: 'Option B' })
         ]
-      })(container)
+      }), container)
 
       const selectEl = container.querySelector('select')!
       expect(selectEl.options.length).toBe(2)
@@ -420,10 +412,10 @@ describe('@rasenjs/dom', () => {
 
   describe('specific elements', () => {
     it('should set link href', () => {
-      const unmount = a({
+      const unmount = mount(a({
         attrs: { href: 'https://example.com' },
         children: 'Link'
-      })(container)
+      }), container)
       expect(container.querySelector('a')?.getAttribute('href')).toBe(
         'https://example.com'
       )
@@ -431,15 +423,13 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should set link target', () => {
-      const unmount = a({ attrs: { href: '#', target: '_blank' } })(container)
+      const unmount = mount(a({ attrs: { href: '#', target: '_blank' } }), container)
       expect(container.querySelector('a')?.target).toBe('_blank')
       unmount?.()
     })
 
     it('should set img src and alt', () => {
-      const unmount = img({ attrs: { src: 'image.png', alt: 'An image' } })(
-        container
-      )
+      const unmount = mount(img({ attrs: { src: 'image.png', alt: 'An image' } }), container)
       const el = container.querySelector('img')!
       expect(el.src).toContain('image.png')
       expect(el.alt).toBe('An image')
@@ -449,21 +439,19 @@ describe('@rasenjs/dom', () => {
 
   describe('edge cases', () => {
     it('should handle undefined children', () => {
-      const unmount = div({ children: undefined })(container)
+      const unmount = mount(div({ children: undefined }), container)
       expect(container.firstElementChild).not.toBeNull()
       unmount?.()
     })
 
     it('should handle empty children array', () => {
-      const unmount = div({ children: [] })(container)
+      const unmount = mount(div({ children: [] }), container)
       expect(container.firstElementChild?.children.length).toBe(0)
       unmount?.()
     })
 
     it('should escape text content (not parse as HTML)', () => {
-      const unmount = div({ children: '<script>alert("xss")</script>' })(
-        container
-      )
+      const unmount = mount(div({ children: '<script>alert("xss")</script>' }), container)
       expect(container.querySelector('script')).toBeNull()
       expect(container.firstElementChild?.textContent).toBe(
         '<script>alert("xss")</script>'
@@ -474,12 +462,12 @@ describe('@rasenjs/dom', () => {
     it('should support multiple mount/unmount cycles', () => {
       const Component = () => div({ children: 'Hello' })
 
-      let unmount = Component()(container)
+      let unmount = mount(Component(), container)
       expect(container.textContent).toBe('Hello')
       unmount?.()
       expect(container.children.length).toBe(0)
 
-      unmount = Component()(container)
+      unmount = mount(Component(), container)
       expect(container.textContent).toBe('Hello')
       unmount?.()
       expect(container.children.length).toBe(0)
@@ -491,7 +479,7 @@ describe('@rasenjs/dom', () => {
       const Button = (props: { label: string }) =>
         button({ children: props.label })
 
-      const unmount = Button({ label: 'Click me' })(container)
+      const unmount = mount(Button({ label: 'Click me' }), container)
       expect(container.querySelector('button')?.textContent).toBe('Click me')
       unmount?.()
     })
@@ -506,7 +494,7 @@ describe('@rasenjs/dom', () => {
           ]
         })
 
-      const unmount = Card({ title: 'Title', content: 'Content' })(container)
+      const unmount = mount(Card({ title: 'Title', content: 'Content' }), container)
       expect(container.querySelector('.card h1')?.textContent).toBe('Title')
       expect(container.querySelector('.card p')?.textContent).toBe('Content')
       unmount?.()
@@ -525,24 +513,24 @@ describe('@rasenjs/dom', () => {
       expect(setupSpy).not.toHaveBeenCalled()
       const mountFn = Component()
       expect(setupSpy).toHaveBeenCalledTimes(1)
-      mountFn(container)?.()
+      mount(mountFn, container)?.()
     })
 
     it('should execute mount phase when mount function is called', () => {
       const mountSpy = vi.fn()
 
       const Component = () => {
-        return (host: HTMLElement) => {
+        return mountable((host: HTMLElement) => {
           mountSpy()
           const el = document.createElement('div')
           host.appendChild(el)
           return () => el.remove()
-        }
+        })
       }
 
-      const mountFn = Component()
+      const comp = Component()
       expect(mountSpy).not.toHaveBeenCalled()
-      mountFn(container)
+      mount(comp, container)
       expect(mountSpy).toHaveBeenCalledTimes(1)
     })
 
@@ -550,17 +538,17 @@ describe('@rasenjs/dom', () => {
       const unmountSpy = vi.fn()
 
       const Component = () => {
-        return (host: HTMLElement) => {
+        return mountable((host: HTMLElement) => {
           const el = document.createElement('div')
           host.appendChild(el)
           return () => {
             unmountSpy()
             el.remove()
           }
-        }
+        })
       }
 
-      const unmount = Component()(container)
+      const unmount = mount(Component(), container)
       expect(unmountSpy).not.toHaveBeenCalled()
       unmount?.()
       expect(unmountSpy).toHaveBeenCalledTimes(1)
@@ -574,10 +562,10 @@ describe('@rasenjs/dom', () => {
   describe('show() - display-based conditional rendering', () => {
     it('should show element when condition is true', () => {
       const visible = ref(true)
-      const unmount = show({
+      const unmount = mount(show({
         when: visible,
         children: div({ children: 'Content' })
-      })(container)
+      }), container)
 
       const wrapper = container.firstElementChild as HTMLElement
       const content = wrapper.firstElementChild as HTMLElement
@@ -587,10 +575,10 @@ describe('@rasenjs/dom', () => {
 
     it('should hide element when condition is false', async () => {
       const visible = ref(false)
-      const unmount = show({
+      const unmount = mount(show({
         when: visible,
         children: div({ children: 'Content' })
-      })(container)
+      }), container)
 
       await Promise.resolve()
       const wrapper = container.firstElementChild as HTMLElement
@@ -601,10 +589,10 @@ describe('@rasenjs/dom', () => {
 
     it('should toggle visibility reactively', async () => {
       const visible = ref(true)
-      const unmount = show({
+      const unmount = mount(show({
         when: visible,
         children: div({ children: 'Content' })
-      })(container)
+      }), container)
 
       const wrapper = container.firstElementChild as HTMLElement
       const content = wrapper.firstElementChild as HTMLElement
@@ -622,10 +610,10 @@ describe('@rasenjs/dom', () => {
 
     it('should preserve element in DOM when hidden', async () => {
       const visible = ref(true)
-      const unmount = show({
+      const unmount = mount(show({
         when: visible,
         children: div({ id: 'target', children: 'Content' })
-      })(container)
+      }), container)
 
       expect(container.querySelector('#target')).not.toBeNull()
 
@@ -640,11 +628,11 @@ describe('@rasenjs/dom', () => {
   describe('when() - mount/unmount conditional rendering', () => {
     it('should mount then branch when condition is true', () => {
       const condition = ref(true)
-      const unmount = when({
+      const unmount = mount(when({
         condition,
         then: () => div({ children: 'Then' }),
         else: () => div({ children: 'Else' })
-      })(container)
+      }), container)
 
       expect(container.textContent).toContain('Then')
       expect(container.textContent).not.toContain('Else')
@@ -653,11 +641,11 @@ describe('@rasenjs/dom', () => {
 
     it('should mount else branch when condition is false', () => {
       const condition = ref(false)
-      const unmount = when({
+      const unmount = mount(when({
         condition,
         then: () => div({ children: 'Then' }),
         else: () => div({ children: 'Else' })
-      })(container)
+      }), container)
 
       expect(container.textContent).toContain('Else')
       expect(container.textContent).not.toContain('Then')
@@ -666,11 +654,11 @@ describe('@rasenjs/dom', () => {
 
     it('should switch branches reactively', async () => {
       const condition = ref(true)
-      const unmount = when({
+      const unmount = mount(when({
         condition,
         then: () => div({ children: 'Then' }),
         else: () => div({ children: 'Else' })
-      })(container)
+      }), container)
 
       expect(container.textContent).toContain('Then')
 
@@ -688,10 +676,10 @@ describe('@rasenjs/dom', () => {
 
     it('should work without else branch', async () => {
       const condition = ref(true)
-      const unmount = when({
+      const unmount = mount(when({
         condition,
         then: () => div({ children: 'Content' })
-      })(container)
+      }), container)
 
       expect(container.textContent).toContain('Content')
 
@@ -711,7 +699,7 @@ describe('@rasenjs/dom', () => {
       const condition = ref(true)
 
       const ThenComponent = () => {
-        return (host: HTMLElement) => {
+        return mountable((host: HTMLElement) => {
           const el = document.createElement('div')
           el.textContent = 'Then'
           host.appendChild(el)
@@ -719,14 +707,14 @@ describe('@rasenjs/dom', () => {
             unmountSpy()
             el.remove()
           }
-        }
+        })
       }
 
-      const unmount = when({
+      const unmount = mount(when({
         condition,
         then: ThenComponent,
         else: () => div({ children: 'Else' })
-      })(container)
+      }), container)
 
       expect(unmountSpy).not.toHaveBeenCalled()
 
@@ -970,13 +958,91 @@ describe('@rasenjs/dom', () => {
   })
   describe.todo('key modifiers (.enter, .esc, .tab)')
   describe.todo('event delegation')
-  describe.todo('checkbox checked binding')
-  describe.todo('radio button binding')
+
+  describe('checkbox checked binding', () => {
+    it('should bind checked state', () => {
+      const isChecked = ref(true)
+      const unmount = mount(input({ type: 'checkbox', checked: isChecked }), container)
+
+      const checkbox = container.querySelector('input') as HTMLInputElement
+      expect(checkbox.checked).toBe(true)
+      unmount?.()
+    })
+
+    it('should update checked state reactively', async () => {
+      const isChecked = ref(false)
+      const unmount = mount(input({ type: 'checkbox', checked: isChecked }), container)
+
+      const checkbox = container.querySelector('input') as HTMLInputElement
+      expect(checkbox.checked).toBe(false)
+
+      isChecked.value = true
+      await Promise.resolve()
+      expect(checkbox.checked).toBe(true)
+
+      isChecked.value = false
+      await Promise.resolve()
+      expect(checkbox.checked).toBe(false)
+      unmount?.()
+    })
+  })
+
+  describe('radio button binding', () => {
+    it('should bind checked state based on value match', () => {
+      const gender = ref('male')
+
+      const unmount1 = mount(input({
+        type: 'radio',
+        attrs: { name: 'gender', value: 'male' },
+        checked: computed(() => gender.value === 'male')
+      }), container)
+
+      const unmount2 = mount(input({
+        type: 'radio',
+        attrs: { name: 'gender', value: 'female' },
+        checked: computed(() => gender.value === 'female')
+      }), container)
+
+      const radios = container.querySelectorAll('input[type="radio"]') as NodeListOf<HTMLInputElement>
+      expect(radios[0].checked).toBe(true)
+      expect(radios[1].checked).toBe(false)
+      unmount1?.()
+      unmount2?.()
+    })
+
+    it('should update radio selection reactively', async () => {
+      const gender = ref('male')
+
+      const unmount1 = mount(input({
+        type: 'radio',
+        attrs: { name: 'gender', value: 'male' },
+        checked: computed(() => gender.value === 'male')
+      }), container)
+
+      const unmount2 = mount(input({
+        type: 'radio',
+        attrs: { name: 'gender', value: 'female' },
+        checked: computed(() => gender.value === 'female')
+      }), container)
+
+      const radios = container.querySelectorAll('input[type="radio"]') as NodeListOf<HTMLInputElement>
+      expect(radios[0].checked).toBe(true)
+      expect(radios[1].checked).toBe(false)
+
+      gender.value = 'female'
+      await Promise.resolve()
+      expect(radios[0].checked).toBe(false)
+      expect(radios[1].checked).toBe(true)
+
+      unmount1?.()
+      unmount2?.()
+    })
+  })
 
   describe('element ref', () => {
     it('should set ref value after mount', () => {
       const inputRef = ref<HTMLInputElement | null>(null)
-      const unmount = input({ ref: inputRef })(container)
+      const unmount = mount(input({ ref: inputRef }), container)
 
       expect(inputRef.value).not.toBeNull()
       expect(inputRef.value).toBeInstanceOf(HTMLInputElement)
@@ -985,7 +1051,7 @@ describe('@rasenjs/dom', () => {
 
     it('should clear ref value on unmount', () => {
       const inputRef = ref<HTMLInputElement | null>(null)
-      const unmount = input({ ref: inputRef })(container)
+      const unmount = mount(input({ ref: inputRef }), container)
 
       expect(inputRef.value).not.toBeNull()
       unmount?.()
@@ -994,7 +1060,7 @@ describe('@rasenjs/dom', () => {
 
     it('should allow accessing element methods via ref', () => {
       const inputRef = ref<HTMLInputElement | null>(null)
-      const unmount = input({ ref: inputRef, value: 'test' })(container)
+      const unmount = mount(input({ ref: inputRef, value: 'test' }), container)
 
       expect(inputRef.value?.value).toBe('test')
       unmount?.()
@@ -1009,9 +1075,9 @@ describe('@rasenjs/dom', () => {
         { id: 3, name: 'Charlie' }
       ])
 
-      const unmount = each(items, (item) =>
+      const unmount = mount(each(items, (item) =>
         div({ children: item.name })
-      )(container)
+      ), container)
 
       const divs = container.querySelectorAll('div')
       expect(divs.length).toBe(3)
@@ -1026,9 +1092,9 @@ describe('@rasenjs/dom', () => {
       const item1 = { id: 1, name: 'Alice' }
       const items = ref([item1])
 
-      const unmount = each(items, (item) =>
+      const unmount = mount(each(items, (item) =>
         div({ children: item.name })
-      )(container)
+      ), container)
 
       expect(container.querySelectorAll('div').length).toBe(1)
 
@@ -1049,9 +1115,9 @@ describe('@rasenjs/dom', () => {
       const item2 = { id: 2, name: 'Bob' }
       const items = ref([item1, item2])
 
-      const unmount = each(items, (item) =>
+      const unmount = mount(each(items, (item) =>
         div({ children: item.name })
-      )(container)
+      ), container)
 
       expect(container.querySelectorAll('div').length).toBe(2)
 
@@ -1070,9 +1136,9 @@ describe('@rasenjs/dom', () => {
       const item2 = { id: 2, name: 'Bob' }
       const items = ref([item1, item2])
 
-      const unmount = each(items, (item) =>
+      const unmount = mount(each(items, (item) =>
         div({ children: item.name })
-      )(container)
+      ), container)
 
       const divs = container.querySelectorAll('div')
       const node1 = divs[0]
@@ -1096,9 +1162,9 @@ describe('@rasenjs/dom', () => {
       const item1 = { id: 1, name: 'Alice' }
       const items = ref([item1])
 
-      const unmount = each(items, (item) =>
+      const unmount = mount(each(items, (item) =>
         div({ children: item.name })
-      )(container)
+      ), container)
 
       const originalNode = container.querySelector('div')
 
@@ -1117,10 +1183,10 @@ describe('@rasenjs/dom', () => {
     it('should work with getter function', async () => {
       const items = ref([{ id: 1, name: 'Test' }])
 
-      const unmount = each(
+      const unmount = mount(each(
         () => items.value,
         (item) => div({ children: item.name })
-      )(container)
+      ), container)
 
       expect(container.querySelectorAll('div').length).toBe(1)
 
@@ -1133,9 +1199,9 @@ describe('@rasenjs/dom', () => {
         { id: 2, name: 'Bob' }
       ])
 
-      const unmount = each(items, (item) =>
+      const unmount = mount(each(items, (item) =>
         div({ children: item.name })
-      )(container)
+      ), container)
 
       expect(container.querySelectorAll('div').length).toBe(2)
 
@@ -1153,9 +1219,9 @@ describe('@rasenjs/dom', () => {
         { id: 2, name: 'Bob' }
       ])
 
-      const unmount = each(items, (item) =>
+      const unmount = mount(each(items, (item) =>
         div({ children: item.name })
-      )(container)
+      ), container)
 
       expect(container.querySelectorAll('div').length).toBe(2)
 
@@ -1169,9 +1235,9 @@ describe('@rasenjs/dom', () => {
     it('should render list of values', () => {
       const tags = ref(['red', 'blue', 'green'])
 
-      const unmount = repeat(tags, (tag) =>
+      const unmount = mount(repeat(tags, (tag) =>
         span({ children: tag })
-      )(container)
+      ), container)
 
       const spans = container.querySelectorAll('span')
       expect(spans.length).toBe(3)
@@ -1185,9 +1251,9 @@ describe('@rasenjs/dom', () => {
     it('should render by count', () => {
       const count = ref(5)
 
-      const unmount = repeat(count, (index) =>
+      const unmount = mount(repeat(count, (index) =>
         div({ children: String(index) })
-      )(container)
+      ), container)
 
       const divs = container.querySelectorAll('div')
       expect(divs.length).toBe(5)
@@ -1200,9 +1266,9 @@ describe('@rasenjs/dom', () => {
     it('should add items when count increases', async () => {
       const count = ref(2)
 
-      const unmount = repeat(count, (index) =>
+      const unmount = mount(repeat(count, (index) =>
         div({ children: String(index) })
-      )(container)
+      ), container)
 
       expect(container.querySelectorAll('div').length).toBe(2)
 
@@ -1217,9 +1283,9 @@ describe('@rasenjs/dom', () => {
     it('should remove items when count decreases', async () => {
       const count = ref(4)
 
-      const unmount = repeat(count, (index) =>
+      const unmount = mount(repeat(count, (index) =>
         div({ children: String(index) })
-      )(container)
+      ), container)
 
       expect(container.querySelectorAll('div').length).toBe(4)
 
@@ -1234,10 +1300,10 @@ describe('@rasenjs/dom', () => {
     it('should work with getter function', () => {
       const count = ref(3)
 
-      const unmount = repeat(
+      const unmount = mount(repeat(
         () => count.value,
         (index) => div({ children: String(index) })
-      )(container)
+      ), container)
 
       expect(container.querySelectorAll('div').length).toBe(3)
 
@@ -1247,15 +1313,103 @@ describe('@rasenjs/dom', () => {
     it('should cleanup on unmount', () => {
       const count = ref(3)
 
-      const unmount = repeat(count, (index) =>
+      const unmount = mount(repeat(count, (index) =>
         div({ children: String(index) })
-      )(container)
+      ), container)
 
       expect(container.querySelectorAll('div').length).toBe(3)
 
       unmount?.()
 
       expect(container.querySelectorAll('div').length).toBe(0)
+    })
+  })
+
+  describe('hydrate() - client-side hydration', () => {
+    it('should reuse existing DOM elements', () => {
+      // 模拟服务端渲染的 HTML
+      container.innerHTML = '<div id="test">Hello</div>'
+      const existingDiv = container.querySelector('#test')
+
+      const unmount = hydrate(div({ id: 'test', children: 'Hello' }), container)
+
+      // 应该复用已有元素，而不是创建新的
+      expect(container.querySelector('#test')).toBe(existingDiv)
+      expect(container.children.length).toBe(1)
+      unmount?.()
+    })
+
+    it('should bind events to existing elements', () => {
+      container.innerHTML = '<button>Click me</button>'
+      const handler = vi.fn()
+
+      const unmount = hydrate(button({ onClick: handler, children: 'Click me' }), container)
+
+      container.querySelector('button')?.click()
+      expect(handler).toHaveBeenCalledTimes(1)
+      unmount?.()
+    })
+
+    it('should connect reactive data to existing DOM', async () => {
+      container.innerHTML = '<div>Initial</div>'
+      const text = ref('Initial')
+
+      const unmount = hydrate(div({ children: text }), container)
+
+      expect(container.firstElementChild?.textContent).toBe('Initial')
+
+      text.value = 'Updated'
+      await Promise.resolve()
+
+      expect(container.firstElementChild?.textContent).toBe('Updated')
+      unmount?.()
+    })
+
+    it('should handle nested elements', () => {
+      container.innerHTML = '<div class="outer"><span class="inner">Nested</span></div>'
+      const existingSpan = container.querySelector('.inner')
+
+      const unmount = hydrate(
+        div({
+          className: 'outer',
+          children: [span({ className: 'inner', children: 'Nested' })]
+        }),
+        container
+      )
+
+      // 应该复用嵌套的元素
+      expect(container.querySelector('.inner')).toBe(existingSpan)
+      unmount?.()
+    })
+
+    it('should warn on hydration mismatch', () => {
+      container.innerHTML = '<span>Wrong tag</span>'
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const unmount = hydrate(div({ children: 'Expected div' }), container)
+
+      // 应该有 mismatch 警告
+      expect(warnSpy).toHaveBeenCalled()
+      warnSpy.mockRestore()
+      unmount?.()
+    })
+
+    it('should warn on extra nodes', () => {
+      container.innerHTML = '<div>First</div><div>Extra</div>'
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const unmount = hydrate(div({ children: 'First' }), container)
+
+      // 应该警告有额外节点
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Extra nodes')
+      )
+      warnSpy.mockRestore()
+      unmount?.()
+    })
+
+    it('should throw when container is null', () => {
+      expect(() => hydrate(div({}), null)).toThrow()
     })
   })
 })

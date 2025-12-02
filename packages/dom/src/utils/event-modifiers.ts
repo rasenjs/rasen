@@ -394,6 +394,8 @@ export interface ModifierOptions {
   once?: boolean
   /** 只在 event.target === event.currentTarget 时触发 */
   self?: boolean
+  /** 事件委托选择器 */
+  delegateSelector?: string
 }
 
 /**
@@ -407,9 +409,23 @@ export function modifier<E extends Event = Event>(
   fn: (event: E) => void,
   options: ModifierOptions = {}
 ): ModifiedHandler<E> {
-  const { prevent, stop, capture, once, self } = options
+  const { prevent, stop, capture, once, self, delegateSelector } = options
 
   const handler: ModifiedHandler<E> = (event: E) => {
+    // delegated 修饰器：只在匹配选择器的元素上触发
+    if (delegateSelector) {
+      const target = event.target as Element
+      if (!target || typeof target.closest !== 'function') {
+        return
+      }
+      const delegateTarget = target.closest(delegateSelector)
+      if (!delegateTarget) {
+        return
+      }
+      // 将委托目标附加到事件上，便于处理器访问
+      ;(event as E & { delegateTarget: Element }).delegateTarget = delegateTarget
+    }
+
     // self 修饰器：只在目标元素上触发
     if (self && event.target !== event.currentTarget) {
       return
@@ -435,4 +451,35 @@ export function modifier<E extends Event = Event>(
   handler.__modifiers = options as Record<string, unknown>
 
   return handler
+}
+
+// ============================================
+// delegated 修饰符 - 事件委托
+// ============================================
+
+/**
+ * delegated - 事件委托修饰符
+ *
+ * 在父元素上监听事件，但只响应来自匹配选择器的子元素的事件
+ *
+ * @example
+ * ul({
+ *   onClick: delegated('li')(handleItemClick),
+ *   onClick: delegated('li').stop(handleItemClick),
+ *   onClick: prevent.delegated('.btn')(handleClick),
+ *   children: items.map(item => li({ ... }))
+ * })
+ *
+ * // 在处理器中可以通过 event.delegateTarget 访问匹配的元素
+ * function handleItemClick(event) {
+ *   const li = event.delegateTarget // 匹配的 li 元素
+ *   console.log(li.textContent)
+ * }
+ */
+export function delegated(selector: string) {
+  return function <E extends Event = Event>(
+    fn: (event: E & { delegateTarget: Element }) => void
+  ): ModifiedHandler<E> {
+    return modifier(fn as (event: E) => void, { delegateSelector: selector })
+  }
 }

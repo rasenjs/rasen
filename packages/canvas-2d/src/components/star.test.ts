@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   wasCalled,
@@ -35,7 +35,7 @@ describe('star', () => {
 
   describe('基础绘制', () => {
     it('应该绘制五角星', async () => {
-      const mount = star({
+      const mountable = star({
         x: 100,
         y: 100,
         numPoints: 5,
@@ -44,7 +44,7 @@ describe('star', () => {
         fill: 'yellow'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -61,7 +61,7 @@ describe('star', () => {
     })
 
     it('应该支持不同角数的星形', async () => {
-      const mount = star({
+      const mountable = star({
         x: 100,
         y: 100,
         numPoints: 6, // 六角星
@@ -70,7 +70,7 @@ describe('star', () => {
         fill: 'blue'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -81,7 +81,7 @@ describe('star', () => {
     })
 
     it('应该同时支持填充和描边', async () => {
-      const mount = star({
+      const mountable = star({
         x: 100,
         y: 100,
         numPoints: 5,
@@ -92,7 +92,7 @@ describe('star', () => {
         lineWidth: 2
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

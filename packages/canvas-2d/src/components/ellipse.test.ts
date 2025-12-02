@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   getCallArgs,
@@ -36,7 +36,7 @@ describe('ellipse', () => {
 
   describe('基础绘制', () => {
     it('应该使用正确的参数绘制填充椭圆', async () => {
-      const mount = ellipse({
+      const mountable = ellipse({
         x: 100,
         y: 100,
         radiusX: 50,
@@ -44,7 +44,7 @@ describe('ellipse', () => {
         fill: '#ff0000'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -66,7 +66,7 @@ describe('ellipse', () => {
     })
 
     it('应该使用正确的参数绘制描边椭圆', async () => {
-      const mount = ellipse({
+      const mountable = ellipse({
         x: 100,
         y: 100,
         radiusX: 60,
@@ -75,7 +75,7 @@ describe('ellipse', () => {
         lineWidth: 5
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -86,7 +86,7 @@ describe('ellipse', () => {
     })
 
     it('应该同时支持填充和描边', async () => {
-      const mount = ellipse({
+      const mountable = ellipse({
         x: 100,
         y: 100,
         radiusX: 50,
@@ -96,7 +96,7 @@ describe('ellipse', () => {
         lineWidth: 2
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -108,7 +108,7 @@ describe('ellipse', () => {
 
   describe('椭圆弧', () => {
     it('应该支持起始和结束角度', async () => {
-      const mount = ellipse({
+      const mountable = ellipse({
         x: 100,
         y: 100,
         radiusX: 50,
@@ -118,7 +118,7 @@ describe('ellipse', () => {
         endAngle: Math.PI
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -133,7 +133,7 @@ describe('ellipse', () => {
     })
 
     it('应该支持逆时针绘制', async () => {
-      const mount = ellipse({
+      const mountable = ellipse({
         x: 100,
         y: 100,
         radiusX: 50,
@@ -144,7 +144,7 @@ describe('ellipse', () => {
         anticlockwise: true
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -159,7 +159,7 @@ describe('ellipse', () => {
 
   describe('默认值', () => {
     it('描边宽度默认应该为 1', async () => {
-      const mount = ellipse({
+      const mountable = ellipse({
         x: 100,
         y: 100,
         radiusX: 50,
@@ -167,7 +167,7 @@ describe('ellipse', () => {
         stroke: 'black'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

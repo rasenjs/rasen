@@ -1,5 +1,7 @@
-import type { SyncComponent, PropValue, Ref } from '@rasenjs/core'
+import type { SyncComponent, PropValue, Ref, Mountable } from '@rasenjs/core'
+import { mount, mountable } from '@rasenjs/core'
 import { unref, setAttribute, setStyle, watchProp } from '../utils'
+import { getHydrationContext } from '../hydration-context'
 
 /**
  * element 组件 - 通用 HTML 元素组件
@@ -15,26 +17,63 @@ export const element: SyncComponent<
     /** Text content or child mount functions */
     children?:
       | PropValue<string>
-      | Array<(host: HTMLElement) => (() => void) | undefined>
+      | Array<Mountable<HTMLElement>>
     value?: PropValue<string | number>
+    /** checkbox/radio 的选中状态 */
+    checked?: PropValue<boolean>
     on?: Record<string, (e: Event) => void>
     /** 元素引用 - 挂载后会设置为 DOM 元素 */
     ref?: Ref<HTMLElement | null>
   }
 > = (props) => {
-  return (host) => {
-    const element = document.createElement(props.tag)
+  return mountable((host) => {
+    const ctx = getHydrationContext()
+    let el: HTMLElement
+    let hydrated = false
+
+    if (ctx?.isHydrating) {
+      // === Hydration 模式：复用已有 DOM ===
+      const existing = ctx.claim()
+      
+      if (existing && existing.nodeType === Node.ELEMENT_NODE) {
+        const existingEl = existing as HTMLElement
+        if (existingEl.tagName.toLowerCase() === props.tag.toLowerCase()) {
+          // 标签匹配，复用元素
+          el = existingEl
+          hydrated = true
+        } else {
+          // 标签不匹配，警告并创建新元素
+          console.warn(
+            `[Rasen Hydration] Tag mismatch: expected <${props.tag}>, got <${existingEl.tagName.toLowerCase()}>`
+          )
+          el = document.createElement(props.tag)
+        }
+      } else {
+        // 没有可复用的元素节点
+        if (existing) {
+          console.warn(
+            `[Rasen Hydration] Expected element <${props.tag}>, got ${existing.nodeType === Node.TEXT_NODE ? 'text node' : 'other node'}`
+          )
+        }
+        el = document.createElement(props.tag)
+      }
+    } else {
+      // === 正常模式：创建新元素 ===
+      el = document.createElement(props.tag)
+    }
+
     const stops: Array<() => void> = []
     const childUnmounts: Array<(() => void) | undefined> = []
 
-    // id
+    // id - hydration 模式下跳过初始设置（已存在）
     if (props.id !== undefined) {
       stops.push(
         watchProp(
           () => unref(props.id),
           (value) => {
-            if (value) element.id = value
-          }
+            if (value) el.id = value
+          },
+          hydrated // hydrated 时跳过 immediate
         )
       )
     }
@@ -45,8 +84,9 @@ export const element: SyncComponent<
         watchProp(
           () => unref(props.className),
           (value) => {
-            element.className = value || ''
-          }
+            el.className = value || ''
+          },
+          hydrated
         )
       )
     }
@@ -57,8 +97,9 @@ export const element: SyncComponent<
         watchProp(
           () => unref(props.style),
           (value) => {
-            if (value) setStyle(element, value)
-          }
+            if (value) setStyle(el, value)
+          },
+          hydrated
         )
       )
     }
@@ -73,10 +114,11 @@ export const element: SyncComponent<
               for (const [key, val] of Object.entries(value)) {
                 // 跳过无效的属性名（数字开头或纯数字）
                 if (/^\d/.test(key)) continue
-                setAttribute(element, key, val)
+                setAttribute(el, key, val)
               }
             }
-          }
+          },
+          hydrated
         )
       )
     }
@@ -96,14 +138,23 @@ export const element: SyncComponent<
               return String(value)
             },
             (value) => {
-              element.textContent = value || ''
-            }
+              el.textContent = value || ''
+            },
+            hydrated
           )
         )
       } else if (Array.isArray(children)) {
-        // Mount functions
-        for (const childMount of children) {
-          childUnmounts.push(childMount(element))
+        // Mount functions - 进入子节点
+        if (ctx?.isHydrating) {
+          ctx.enterChildren(el)
+        }
+        
+        for (const child of children) {
+          childUnmounts.push(mount(child, el))
+        }
+        
+        if (ctx?.isHydrating) {
+          ctx.exitChildren()
         }
       }
     }
@@ -114,33 +165,51 @@ export const element: SyncComponent<
         watchProp(
           () => unref(props.value),
           (value) => {
-            const el = element as
+            const inputEl = el as
               | HTMLInputElement
               | HTMLTextAreaElement
               | HTMLSelectElement
-            if (el.value !== String(value ?? '')) {
-              el.value = String(value ?? '')
+            if (inputEl.value !== String(value ?? '')) {
+              inputEl.value = String(value ?? '')
             }
-          }
+          },
+          hydrated
         )
       )
     }
 
-    // event listeners
+    // checked (for checkbox, radio)
+    if (props.checked !== undefined) {
+      stops.push(
+        watchProp(
+          () => unref(props.checked),
+          (checked) => {
+            const inputEl = el as HTMLInputElement
+            if (inputEl.checked !== !!checked) {
+              inputEl.checked = !!checked
+            }
+          },
+          hydrated
+        )
+      )
+    }
+
+    // event listeners - 总是需要绑定（SSR 不输出事件）
     if (props.on) {
-      console.log('Adding event listeners:', props.on, 'to element:', element)
       for (const [event, handler] of Object.entries(props.on)) {
-        console.log(`Adding event listener: ${event}`)
-        element.addEventListener(event, handler)
+        el.addEventListener(event, handler)
       }
     }
 
     // ref - 设置元素引用
     if (props.ref) {
-      props.ref.value = element
+      props.ref.value = el
     }
 
-    host.appendChild(element)
+    // 只有非 hydration 模式才需要 appendChild
+    if (!hydrated) {
+      host.appendChild(el)
+    }
 
     // 创建带 node 属性的 unmount 函数
     const unmount = () => {
@@ -152,15 +221,15 @@ export const element: SyncComponent<
       childUnmounts.forEach((unmount) => unmount?.())
       if (props.on) {
         for (const [event, handler] of Object.entries(props.on)) {
-          element.removeEventListener(event, handler)
+          el.removeEventListener(event, handler)
         }
       }
-      element.remove()
+      el.remove()
     }
     
     // 附加 node 引用，供 each 组件进行节点移动
-    ;(unmount as { node?: Node }).node = element
+    ;(unmount as { node?: Node }).node = el
     
     return unmount
-  }
+  })
 }

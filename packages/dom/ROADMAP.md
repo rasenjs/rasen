@@ -18,10 +18,11 @@
 | 核心渲染 | 6 | 1 | 86% |
 | 响应式集成 | 4 | 0 | 100% |
 | 组件系统 | 4 | 1 | 80% |
-| 条件渲染 | 0 | 2 | 0% |
-| 事件系统 | 2 | 3 | 40% |
-| 表单元素 | 3 | 2 | 60% |
-| 元素引用 | 0 | 1 | 0% |
+| 条件渲染 | 2 | 0 | 100% |
+| 事件系统 | 5 | 1 | 83% |
+| 表单元素 | 5 | 0 | 100% |
+| 元素引用 | 1 | 0 | 100% |
+| 客户端水合 | 5 | 0 | 100% |
 
 ---
 
@@ -137,35 +138,43 @@
 ### ✅ 已实现
 
 - [x] **基础事件绑定** - `on: { click, input, keypress }` 
-- [x] **事件简写** - `onClick`, `onInput`, `onKeyPress` 属性
-
-### ⬜ 待实现
-
-- [ ] **事件修饰符** - stop, prevent, capture, once, passive, self
+- [x] **事件简写** - `onClick`, `onInput`, `onKeyPress`, `onChange` 属性
+- [x] **事件修饰符** - stop, prevent, capture, once, self
   ```ts
   button({
-    'onClick.prevent.stop': handleClick,
-    'onSubmit.prevent': handleSubmit
+    onClick: prevent.stop(handleClick)
+  })
+  // 或使用链式调用
+  form({
+    onSubmit: prevent(handleSubmit)
   })
   ```
-
-- [ ] **按键修饰符** - enter, tab, esc, space, up, down, left, right
+- [x] **按键修饰符** - enter, tab, esc, space, delete, up, down, left, right
   ```ts
   input({
-    'onKeydown.enter': submitForm,
-    'onKeydown.esc': cancelEdit
+    onKeydown: enter(submitForm),
+    // 可以和事件修饰符组合
+    onKeydown: enter.prevent(submitForm)
   })
   ```
-
-- [ ] **事件委托** - 可选的事件委托模式提升性能
+- [x] **事件委托** - 通过 `delegated()` 修饰符实现
   ```ts
   ul({
-    delegate: {
-      'click:li': handleItemClick
-    },
+    // 在 ul 上监听，但只响应来自 li 的事件
+    onClick: delegated('li')(handleItemClick),
+    // 可以和其他修饰符组合
+    onClick: delegated('.btn').stop(handleClick),
     children: items.map(item => li({ ... }))
   })
+  
+  // 在处理器中通过 event.delegateTarget 访问匹配的元素
+  function handleItemClick(event) {
+    const li = event.delegateTarget
+    console.log(li.textContent)
+  }
   ```
+
+### ⬜ 待实现
 
 - [ ] **完整事件类型** - 所有 DOM 事件的 TypeScript 类型安全支持
 
@@ -178,10 +187,7 @@
 - [x] **input 基础** - type, value, placeholder, disabled
 - [x] **textarea** - value, placeholder, rows, cols
 - [x] **select/option** - 基础实现
-
-### ⬜ 待实现
-
-- [ ] **checkbox 增强** - checked 属性响应式绑定
+- [x] **checkbox 增强** - checked 属性响应式绑定
   ```ts
   input({
     type: 'checkbox',
@@ -189,13 +195,11 @@
     onChange: (e) => isAgree.value = e.target.checked
   })
   ```
-
-- [ ] **radio 增强** - name 分组，checked 绑定
+- [x] **radio 增强** - name 分组，checked 绑定
   ```ts
   input({
     type: 'radio',
-    name: 'gender',
-    value: 'male',
+    attrs: { name: 'gender', value: 'male' },
     checked: computed(() => gender.value === 'male')
   })
   ```
@@ -204,9 +208,9 @@
 
 ## Phase 7: 元素引用 (Element Refs)
 
-### ⬜ 待实现
+### ✅ 已实现
 
-- [ ] **ref 属性** - 获取 DOM 元素引用
+- [x] **ref 属性** - 获取 DOM 元素引用
   ```ts
   const inputRef = ref<HTMLInputElement>()
   
@@ -222,6 +226,173 @@
 ### 📝 设计说明
 
 ref 实现可能在 @rasenjs/core 中定义接口，@rasenjs/dom 中实现具体逻辑
+
+---
+
+## Phase 8: 客户端水合 (Client-Side Hydration)
+
+> 支持服务端渲染的 HTML 在客户端"激活"，复用已有 DOM 而非重新创建
+
+### ✅ 已实现
+
+- [x] **`hydrate()` 函数** - 水合入口，复用现有 DOM
+  ```ts
+  import { hydrate } from '@rasenjs/dom'
+  
+  // 服务端已渲染好 HTML
+  // <div id="app"><button>Count: 0</button></div>
+  
+  // 客户端水合，复用现有 DOM，绑定事件和响应式
+  hydrate(App(), document.getElementById('app'))
+  ```
+
+- [x] **元素复用逻辑** - element 组件支持 hydrate 模式
+  ```ts
+  // 内部实现：hydrate 模式下不创建新元素
+  // 而是查找并复用已存在的元素
+  const element = hydrating 
+    ? ctx.claim()                        // 复用现有节点
+    : document.createElement(props.tag)  // 创建新元素
+  ```
+
+- [x] **事件绑定** - 给已有元素添加事件监听
+- [x] **响应式连接** - 将响应式数据与现有 DOM 值同步
+- [x] **Mismatch 处理** - SSR/CSR 不一致时的警告
+
+### 📝 实现细节
+
+#### 1. Hydration 上下文 (`hydration-context.ts`)
+
+```ts
+interface HydrationContext {
+  isHydrating: boolean
+  currentNode: Node | null
+  parentStack: Node[]
+  claim(): Node | null      // 获取当前节点并移动到下一个
+  enterChildren(parent): void // 进入子节点
+  exitChildren(): void       // 退出子节点
+}
+  nextSibling(): Node | null
+  firstChild(): Node | null
+}
+
+let hydrationContext: HydrationContext | null = null
+
+export function getHydrationContext() {
+  return hydrationContext
+}
+
+export function setHydrationContext(ctx: HydrationContext | null) {
+  hydrationContext = ctx
+}
+```
+
+#### 2. 修改 element 组件
+
+```ts
+// element.ts (修改后)
+export const element = (props) => {
+  return (host) => {
+    const ctx = getHydrationContext()
+    let el: HTMLElement
+    
+    if (ctx?.isHydrating) {
+      // === Hydration 模式 ===
+      // 1. 获取当前位置的已有元素
+      const existing = ctx.currentNode as HTMLElement
+      
+      // 2. 验证标签匹配
+      if (existing?.tagName?.toLowerCase() !== props.tag) {
+        console.warn(`Hydration mismatch: expected <${props.tag}>, got <${existing?.tagName}>`)
+        // 回退到正常创建
+        el = document.createElement(props.tag)
+        host.appendChild(el)
+      } else {
+        // 3. 复用已有元素（不需要 appendChild）
+        el = existing
+        ctx.nextSibling() // 移动指针到下一个兄弟节点
+      }
+    } else {
+      // === 正常模式 ===
+      el = document.createElement(props.tag)
+      host.appendChild(el)
+    }
+    
+    // 后续逻辑相同：绑定属性、事件、子元素...
+    bindProps(el, props)
+    bindEvents(el, props.on)
+    // ...
+  }
+}
+```
+
+#### 3. hydrate 入口函数
+
+```ts
+// index.ts
+export function hydrate(
+  component: MountFunction<HTMLElement>,
+  container: HTMLElement
+) {
+  // 1. 创建 hydration 上下文
+  const ctx: HydrationContext = {
+    isHydrating: true,
+    currentNode: container.firstChild,
+    nextSibling() {
+      this.currentNode = this.currentNode?.nextSibling ?? null
+      return this.currentNode
+    },
+    firstChild() {
+      this.currentNode = (this.currentNode as Element)?.firstChild ?? null
+      return this.currentNode
+    }
+  }
+  
+  // 2. 设置全局上下文
+  setHydrationContext(ctx)
+  
+  try {
+    // 3. 执行组件（会复用 DOM 而非创建）
+    const unmount = component(container)
+    
+    // 4. 验证是否有未消费的节点
+    if (ctx.currentNode) {
+      console.warn('Hydration: extra nodes in container')
+    }
+    
+    return unmount
+  } finally {
+    // 5. 清理上下文
+    setHydrationContext(null)
+  }
+}
+```
+
+#### 4. 子元素处理
+
+```ts
+// 处理 children 时，需要进入子元素的 hydration
+if (ctx?.isHydrating) {
+  ctx.firstChild() // 进入子元素
+}
+
+for (const childMount of children) {
+  childUnmounts.push(childMount(el))
+}
+
+if (ctx?.isHydrating) {
+  // 回到父级的下一个兄弟
+  ctx.currentNode = el.nextSibling
+}
+```
+
+### 📝 关键点
+
+1. **DOM 遍历顺序** - 必须与 SSR 渲染顺序一致（深度优先）
+2. **条件渲染** - `when()` 需要特殊处理，条件为 false 时跳过对应 DOM
+3. **列表渲染** - `each()` 需要按顺序匹配现有元素
+4. **文本节点** - 处理纯文本内容的水合
+5. **注释节点** - 可用于标记条件渲染的位置
 
 ---
 
@@ -244,16 +415,16 @@ ref 实现可能在 @rasenjs/core 中定义接口，@rasenjs/dom 中实现具体
 
 ### 🔴 P0 - 核心功能
 
-1. **`if()` 条件渲染** - 条件挂载/卸载
-2. **`show()` 条件显示** - 基于 display 的显示隐藏
-3. **元素引用 ref** - 获取 DOM 元素引用
-4. **checkbox/radio 增强** - 表单元素完善
+1. ~~**`if()` 条件渲染** - 条件挂载/卸载~~ ✅ 已实现为 `when()`
+2. ~~**`show()` 条件显示** - 基于 display 的显示隐藏~~ ✅ 已实现
+3. ~~**元素引用 ref** - 获取 DOM 元素引用~~ ✅ 已实现
+4. ~~**checkbox/radio 增强** - 表单元素完善~~ ✅ 已实现
 
 ### 🟡 P1 - 重要功能
 
-5. **事件修饰符** - stop, prevent, capture 等
-6. **按键修饰符** - enter, esc 等快捷键
-7. **事件委托** - 性能优化
+5. ~~**事件修饰符** - stop, prevent, capture 等~~ ✅ 已实现
+6. ~~**按键修饰符** - enter, esc 等快捷键~~ ✅ 已实现
+7. ~~**事件委托** - 性能优化~~ ✅ 已实现 `delegated()` 修饰符
 8. **完整事件类型** - TypeScript 类型安全
 
 ### 🟢 P2 - 增强功能
@@ -267,7 +438,7 @@ ref 实现可能在 @rasenjs/core 中定义接口，@rasenjs/dom 中实现具体
 
 ```ts
 // 目标 API 示例
-import { div, input, button, show, if as when } from '@rasenjs/dom'
+import { div, input, button, show, when, delegated, enter, prevent } from '@rasenjs/dom'
 import { each, fragment } from '@rasenjs/core'
 import { ref, computed } from '@rasenjs/reactive-vue' // 或其他响应式库
 
@@ -296,7 +467,7 @@ function TodoApp() {
           ref: inputRef,
           value: newTodo,
           placeholder: 'What needs to be done?',
-          'onKeydown.enter': addTodo,
+          onKeydown: enter(addTodo),  // 使用修饰符
           onInput: (e) => newTodo.value = e.target.value
         }),
         button({ onClick: addTodo }, 'Add'),
@@ -328,7 +499,8 @@ function TodoApp() {
 | 版本 | 目标 | 状态 |
 |------|------|------|
 | v0.1.0 | 核心渲染 + 响应式集成 | ✅ 已完成 |
-| v0.2.0 | 条件渲染 (if/show) + 元素引用 | 📍 当前 |
-| v0.3.0 | 事件系统增强 (修饰符/委托) | 计划中 |
-| v0.4.0 | 表单元素完善 + Props 验证 | 计划中 |
+| v0.2.0 | 条件渲染 (when/show) + 元素引用 | ✅ 已完成 |
+| v0.3.0 | 事件系统增强 (修饰符/按键/委托) | ✅ 已完成 |
+| v0.4.0 | 表单元素完善 (checkbox/radio) | ✅ 已完成 |
+| v0.5.0 | 完整事件类型 + Props 验证 | 📍 当前 |
 | v1.0.0 | 生产就绪 + 完整文档 | 计划中 |

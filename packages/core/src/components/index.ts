@@ -11,4 +11,4 @@ export {
   type RepeatImplConfig
 } from './each'
 export { when, type WhenConfig, type WhenHostHooks } from './when'
-export { fragment } from './fragment'
+export { fragment, f } from './fragment'

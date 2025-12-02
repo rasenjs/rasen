@@ -1,5 +1,5 @@
 import { getReactiveRuntime } from '../reactive'
-import type { MountFunction, PropValue } from '../types'
+import { type Mountable, type PropValue, mountable, mount } from '../types'
 
 /**
  * 宿主操作钩子 - 全部可选，与 each 保持一致
@@ -30,8 +30,8 @@ export interface WhenHostHooks<Host = unknown, N = unknown> {
  */
 export interface WhenConfig<Host, N = unknown> {
   condition: PropValue<boolean>
-  then: () => MountFunction<Host>
-  else?: () => MountFunction<Host>
+  then: () => Mountable<Host>
+  else?: () => Mountable<Host>
 
   // 可选的宿主操作钩子
   createMarker?: () => N
@@ -68,8 +68,8 @@ export interface WhenConfig<Host, N = unknown> {
  */
 export function when<Host = unknown, N = unknown>(
   config: WhenConfig<Host, N>
-): MountFunction<Host> {
-  return (host: Host) => {
+): Mountable<Host> {
+  return mountable((host: Host) => {
     const runtime = getReactiveRuntime()
 
     // 创建标记（可选）
@@ -112,8 +112,8 @@ export function when<Host = unknown, N = unknown>(
         } as unknown as Host
       }
 
-      const mountFn = factory()
-      currentUnmount = mountFn(targetHost)
+      const mountableChild = factory()
+      currentUnmount = mount(mountableChild, targetHost)
       currentBranch = branch
     }
 
@@ -154,5 +154,5 @@ export function when<Host = unknown, N = unknown>(
         config.removeMarker(marker)
       }
     }
-  }
+  })
 }

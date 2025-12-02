@@ -1,7 +1,7 @@
-import type { SyncComponent, PropValue } from '@rasenjs/core'
-import type { StringHost, StringMountFunction } from '../types'
+import type { PropValue, Mountable } from '@rasenjs/core'
+import { unrefValue, mountable, mount } from '@rasenjs/core'
+import type { StringHost } from '../types'
 import {
-  unref,
   stringifyAttr,
   stringifyStyle,
   escapeHtml,
@@ -13,22 +13,19 @@ import {
  *
  * SSR 场景下不需要响应式更新，直接取值渲染
  */
-export const element: SyncComponent<
-  StringHost,
-  {
-    tag: string
-    id?: PropValue<string>
-    className?: PropValue<string>
-    style?: PropValue<Record<string, string | number>>
-    attrs?: PropValue<Record<string, string | number | boolean>>
-    /** Text content or child mount functions */
-    children?: PropValue<string> | Array<StringMountFunction>
-    value?: PropValue<string | number>
-    // SSR 不需要事件处理，但保持 API 兼容
-    on?: Record<string, (e: Event) => void>
-  }
-> = (props) => {
-  return (host) => {
+export const element = (props: {
+  tag: string
+  id?: PropValue<string>
+  className?: PropValue<string>
+  style?: PropValue<Record<string, string | number>>
+  attrs?: PropValue<Record<string, string | number | boolean>>
+  /** Text content or child mount functions */
+  children?: PropValue<string> | Array<Mountable<StringHost>>
+  value?: PropValue<string | number>
+  // SSR 不需要事件处理，但保持 API 兼容
+  on?: Record<string, (e: Event) => void>
+}): Mountable<StringHost> => {
+  return mountable((host: StringHost) => {
     const tag = props.tag
     const isVoid = isVoidElement(tag)
 
@@ -36,31 +33,31 @@ export const element: SyncComponent<
     let html = `<${tag}`
 
     // id
-    const id = unref(props.id)
+    const id = unrefValue(props.id)
     if (id) {
       html += stringifyAttr('id', id)
     }
 
     // className
-    const className = unref(props.className)
+    const className = unrefValue(props.className)
     if (className) {
       html += stringifyAttr('class', className)
     }
 
     // style
-    const style = unref(props.style)
+    const style = unrefValue(props.style)
     if (style && Object.keys(style).length > 0) {
       html += stringifyAttr('style', stringifyStyle(style))
     }
 
     // value (for input, textarea, select)
-    const value = unref(props.value)
+    const value = unrefValue(props.value)
     if (value !== undefined) {
       html += stringifyAttr('value', String(value))
     }
 
     // attrs
-    const attrs = unref(props.attrs)
+    const attrs = unrefValue(props.attrs)
     if (attrs) {
       for (const [key, val] of Object.entries(attrs)) {
         // 跳过无效的属性名（数字开头或纯数字）
@@ -82,9 +79,9 @@ export const element: SyncComponent<
     if (children !== undefined) {
       if (typeof children === 'string' || (typeof children === 'object' && 'value' in (children as any))) {
         // String content (or ref to string)
-        html += escapeHtml(String(unref(children as PropValue<string>)))
+        html += escapeHtml(String(unrefValue(children as PropValue<string>)))
       } else if (Array.isArray(children) && children.length > 0) {
-        // Mount functions - 创建子宿主收集子元素内容
+        // Mountable children - 创建子宿主收集子元素内容
         const childHost: StringHost = {
           fragments: [],
           append(s: string) {
@@ -95,8 +92,8 @@ export const element: SyncComponent<
           }
         }
 
-        for (const childMount of children) {
-          childMount(childHost)
+        for (const child of children) {
+          mount(child, childHost)
         }
 
         html += childHost.toString()
@@ -110,5 +107,5 @@ export const element: SyncComponent<
 
     // SSR 不需要 unmount
     return undefined
-  }
+  })
 }

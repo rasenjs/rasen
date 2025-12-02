@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   getCallArgs,
@@ -36,7 +36,7 @@ describe('line', () => {
 
   describe('基础绘制', () => {
     it('应该使用正确的参数绘制线条', async () => {
-      const mount = line({
+      const mountable = line({
         x1: 10,
         y1: 20,
         x2: 100,
@@ -44,7 +44,7 @@ describe('line', () => {
         stroke: '#000000'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -62,7 +62,7 @@ describe('line', () => {
     })
 
     it('应该支持自定义线条宽度', async () => {
-      const mount = line({
+      const mountable = line({
         x1: 0,
         y1: 0,
         x2: 100,
@@ -71,7 +71,7 @@ describe('line', () => {
         lineWidth: 5
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -83,14 +83,14 @@ describe('line', () => {
 
   describe('默认值', () => {
     it('描边颜色默认应该为黑色', async () => {
-      const mount = line({
+      const mountable = line({
         x1: 0,
         y1: 0,
         x2: 100,
         y2: 100
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -99,14 +99,14 @@ describe('line', () => {
     })
 
     it('线条宽度默认应该为 1', async () => {
-      const mount = line({
+      const mountable = line({
         x1: 0,
         y1: 0,
         x2: 100,
         y2: 100
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -117,12 +117,12 @@ describe('line', () => {
 
   describe('多点线条', () => {
     it('应该支持多个点的线条', async () => {
-      const mount = line({
+      const mountable = line({
         points: [0, 0, 50, 50, 100, 0],
         stroke: 'red'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -144,13 +144,13 @@ describe('line', () => {
     })
 
     it('应该支持闭合路径', async () => {
-      const mount = line({
+      const mountable = line({
         points: [10, 10, 50, 50, 90, 10],
         stroke: 'blue',
         closed: true
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -160,12 +160,12 @@ describe('line', () => {
     })
 
     it('应该支持曲线张力', async () => {
-      const mount = line({
+      const mountable = line({
         points: [0, 0, 50, 100, 100, 0, 150, 100],
         tension: 0.5,
         stroke: 'blue'
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -178,7 +178,7 @@ describe('line', () => {
 
   describe('虚线', () => {
     it('应该支持虚线模式', async () => {
-      const mount = line({
+      const mountable = line({
         x1: 0,
         y1: 0,
         x2: 100,
@@ -187,7 +187,7 @@ describe('line', () => {
         lineDash: [10, 5]
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -200,7 +200,7 @@ describe('line', () => {
     })
 
     it('应该支持虚线偏移', async () => {
-      const mount = line({
+      const mountable = line({
         x1: 0,
         y1: 0,
         x2: 100,
@@ -210,7 +210,7 @@ describe('line', () => {
         lineDashOffset: 5
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, fragment, each } from '@rasenjs/core'
+import { setReactiveRuntime, fragment, each, mount } from '@rasenjs/core'
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -35,13 +35,13 @@ describe('group', () => {
 
   describe('基础组合', () => {
     it('应该组合多个子组件', async () => {
-      const mount = group({
+      const mountable = group({
         children: [
           rect({ x: 10, y: 10, width: 20, height: 20, fill: 'red' }),
           circle({ x: 50, y: 50, radius: 15, fill: 'blue' })
         ]
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       // 验证两个形状都被绘制
@@ -50,7 +50,7 @@ describe('group', () => {
     })
 
     it('应该支持位置偏移', async () => {
-      const mount = group({
+      const mountable = group({
         x: 50,
         y: 50,
         children: [
@@ -58,7 +58,7 @@ describe('group', () => {
           rect({ x: 30, y: 0, width: 20, height: 20, fill: 'blue' })
         ]
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       // 验证translate被调用
@@ -70,13 +70,13 @@ describe('group', () => {
 
   describe('共享变换', () => {
     it('应该对所有子组件应用相同的旋转', async () => {
-      const mount = group({
+      const mountable = group({
         x: 100,
         y: 100,
         rotation: Math.PI / 4,
         children: [rect({ x: -25, y: -25, width: 50, height: 50, fill: 'red' })]
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       // 验证变换被应用
@@ -85,12 +85,12 @@ describe('group', () => {
     })
 
     it('应该对所有子组件应用相同的缩放', async () => {
-      const mount = group({
+      const mountable = group({
         scaleX: 2,
         scaleY: 0.5,
         children: [circle({ x: 50, y: 50, radius: 20, fill: 'blue' })]
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       // 验证缩放被应用
@@ -100,14 +100,14 @@ describe('group', () => {
 
   describe('共享效果', () => {
     it('应该对所有子组件应用相同的透明度', async () => {
-      const mount = group({
+      const mountable = group({
         opacity: 0.5,
         children: [
           rect({ x: 10, y: 10, width: 30, height: 30, fill: 'red' }),
           rect({ x: 50, y: 10, width: 30, height: 30, fill: 'blue' })
         ]
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       // 验证透明度被设置
@@ -115,11 +115,11 @@ describe('group', () => {
     })
 
     it('应该支持裁剪区域', async () => {
-      const mount = group({
+      const mountable = group({
         clip: { x: 20, y: 20, width: 60, height: 60 },
         children: [rect({ x: 0, y: 0, width: 100, height: 100, fill: 'red' })]
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       // 验证裁剪路径被创建
@@ -140,8 +140,8 @@ describe('group', () => {
         { id: 2, x: 40, y: 10, width: 20, height: 20, fill: 'blue' }
       ]
 
-      const mount = each(shapes, (shape) => rect(shape))
-      cleanupFns.push(mount(ctx))
+      const mountable = each(shapes, (shape) => rect(shape))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       // 验证两个矩形都被绘制
@@ -150,13 +150,13 @@ describe('group', () => {
     })
 
     it('应该使用fragment组合静态子组件', async () => {
-      const mount = fragment({
+      const mountable = fragment({
         children: [
           rect({ x: 10, y: 10, width: 20, height: 20, fill: 'red' }),
           circle({ x: 50, y: 50, radius: 15, fill: 'blue' })
         ]
       })
-      cleanupFns.push(mount(ctx))
+      cleanupFns.push(mount(mountable, ctx))
       await waitForAsync()
 
       // 验证两个形状都被绘制

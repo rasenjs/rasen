@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
 import { fragment } from './fragment'
-import type { MountFunction } from '../types'
+import { mountable, mount } from '../types'
 
 // ============================================
 // 测试辅助工具
@@ -73,18 +73,18 @@ describe('fragment', () => {
     it('应该挂载所有子组件', () => {
       const mountCalls: string[] = []
 
-      const child1: MountFunction<unknown> = () => {
+      const child1 = mountable(() => {
         mountCalls.push('child1')
         return () => {}
-      }
+      })
 
-      const child2: MountFunction<unknown> = () => {
+      const child2 = mountable(() => {
         mountCalls.push('child2')
         return () => {}
-      }
+      })
 
-      const mount = fragment({ children: [child1, child2] })
-      mount({})
+      const frag = fragment({ children: [child1, child2] })
+      mount(frag, {})
 
       expect(mountCalls).toEqual(['child1', 'child2'])
     })
@@ -92,26 +92,25 @@ describe('fragment', () => {
     it('应该按顺序挂载子组件', () => {
       const order: number[] = []
 
-      const children = [1, 2, 3, 4, 5].map(
-        (n): MountFunction<unknown> =>
-          () => {
-            order.push(n)
-            return () => {}
-          }
+      const children = [1, 2, 3, 4, 5].map((n) =>
+        mountable(() => {
+          order.push(n)
+          return () => {}
+        })
       )
 
-      const mount = fragment({ children })
-      mount({})
+      const frag = fragment({ children })
+      mount(frag, {})
 
       expect(order).toEqual([1, 2, 3, 4, 5])
     })
 
     it('应该支持空子组件列表', () => {
-      const mount = fragment({ children: [] })
-      const unmount = mount({})
+      const frag = fragment({ children: [] })
+      const cleanup = mount(frag, {})
 
-      expect(unmount).toBeDefined()
-      expect(() => unmount?.()).not.toThrow()
+      expect(cleanup).toBeDefined()
+      expect(() => cleanup?.()).not.toThrow()
     })
   })
 
@@ -120,13 +119,13 @@ describe('fragment', () => {
       const receivedHosts: unknown[] = []
       const testHost = { id: 'shared-host' }
 
-      const child: MountFunction<{ id: string }> = (host) => {
+      const child = mountable((host: { id: string }) => {
         receivedHosts.push(host)
         return () => {}
-      }
+      })
 
-      const mount = fragment({ children: [child, child, child] })
-      mount(testHost)
+      const frag = fragment({ children: [child, child, child] })
+      mount(frag, testHost)
 
       expect(receivedHosts).toEqual([testHost, testHost, testHost])
     })
@@ -143,13 +142,13 @@ describe('fragment', () => {
         context: new Map([['key', 'value']])
       }
 
-      const child: MountFunction<ComplexHost> = (host) => {
+      const child = mountable((host: ComplexHost) => {
         receivedHost.push(host)
         return () => {}
-      }
+      })
 
-      const mount = fragment({ children: [child] })
-      mount(testHost)
+      const frag = fragment({ children: [child] })
+      mount(frag, testHost)
 
       expect(receivedHost[0]).toBe(testHost)
     })
@@ -159,53 +158,52 @@ describe('fragment', () => {
     it('应该在 unmount 时清理所有子组件', () => {
       const unmountCalls: string[] = []
 
-      const child1: MountFunction<unknown> = () => {
+      const child1 = mountable(() => {
         return () => unmountCalls.push('child1')
-      }
+      })
 
-      const child2: MountFunction<unknown> = () => {
+      const child2 = mountable(() => {
         return () => unmountCalls.push('child2')
-      }
+      })
 
-      const mount = fragment({ children: [child1, child2] })
-      const unmount = mount({})
+      const frag = fragment({ children: [child1, child2] })
+      const cleanup = mount(frag, {})
 
       expect(unmountCalls).toEqual([])
 
-      unmount?.()
+      cleanup?.()
       expect(unmountCalls).toEqual(['child1', 'child2'])
     })
 
     it('应该按顺序调用 unmount', () => {
       const order: number[] = []
 
-      const children = [1, 2, 3].map(
-        (n): MountFunction<unknown> =>
-          () => {
-            return () => order.push(n)
-          }
+      const children = [1, 2, 3].map((n) =>
+        mountable(() => {
+          return () => order.push(n)
+        })
       )
 
-      const mount = fragment({ children })
-      const unmount = mount({})
+      const frag = fragment({ children })
+      const cleanup = mount(frag, {})
 
-      unmount?.()
+      cleanup?.()
       expect(order).toEqual([1, 2, 3])
     })
 
     it('应该处理子组件返回 undefined 的情况', () => {
-      const child1: MountFunction<unknown> = () => {
+      const child1 = mountable(() => {
         return undefined
-      }
+      })
 
-      const child2: MountFunction<unknown> = () => {
+      const child2 = mountable(() => {
         return () => {}
-      }
+      })
 
-      const mount = fragment({ children: [child1, child2] })
-      const unmount = mount({})
+      const frag = fragment({ children: [child1, child2] })
+      const cleanup = mount(frag, {})
 
-      expect(() => unmount?.()).not.toThrow()
+      expect(() => cleanup?.()).not.toThrow()
     })
   })
 
@@ -213,23 +211,23 @@ describe('fragment', () => {
     it('应该支持嵌套的 fragment', () => {
       const mountOrder: string[] = []
 
-      const innerChild: MountFunction<unknown> = () => {
+      const innerChild = mountable(() => {
         mountOrder.push('inner')
         return () => {}
-      }
+      })
 
       const innerFragment = fragment({ children: [innerChild, innerChild] })
 
-      const outerChild: MountFunction<unknown> = () => {
+      const outerChild = mountable(() => {
         mountOrder.push('outer')
         return () => {}
-      }
+      })
 
       const outerFragment = fragment({
         children: [outerChild, innerFragment, outerChild]
       })
 
-      outerFragment({})
+      mount(outerFragment, {})
 
       expect(mountOrder).toEqual(['outer', 'inner', 'inner', 'outer'])
     })

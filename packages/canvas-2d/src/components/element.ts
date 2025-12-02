@@ -10,8 +10,7 @@
  * 其他图形组件（circle, rect 等）可以基于此组件构建
  */
 
-import { getReactiveRuntime } from '@rasenjs/core'
-import type { SyncComponent } from '@rasenjs/core'
+import { getReactiveRuntime, mountable, type Mountable } from '@rasenjs/core'
 import {
   RenderContext,
   getRenderContext,
@@ -52,14 +51,14 @@ export interface ElementProps {
  * }
  * ```
  */
-export const element: SyncComponent<CanvasRenderingContext2D, ElementProps> = (
+export const element = (
   props: ElementProps
-) => {
+): Mountable<CanvasRenderingContext2D> => {
   // setup 周期：props 已经确定，可以解构
   const { getBounds, draw, deps } = props
 
   // mounted 周期
-  return (ctx: CanvasRenderingContext2D) => {
+  return mountable((ctx: CanvasRenderingContext2D) => {
     // 自动创建 RenderContext（如果不存在）
     if (!hasRenderContext(ctx)) {
       new RenderContext(ctx)
@@ -110,5 +109,5 @@ export const element: SyncComponent<CanvasRenderingContext2D, ElementProps> = (
         renderContext.unregister(componentId)
       }
     }
-  }
+  })
 }

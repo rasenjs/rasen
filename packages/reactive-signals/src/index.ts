@@ -109,8 +109,13 @@ export function createSignalsRuntime(): ReactiveRuntime {
       }
     },
 
-    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>): T => {
-      // 检查是否有 value 属性
+    unref: <T>(value: T | Ref<T> | ReadonlyRef<T> | (() => T)): T => {
+      // 检查是否是 getter 函数（但排除 Ref 对象，因为它们也有 value）
+      if (typeof value === 'function') {
+        // 执行 getter 函数
+        return (value as () => T)()
+      }
+      // 检查是否有 value 属性（Ref 或 ReadonlyRef）
       if (value && typeof value === 'object' && 'value' in value) {
         return (value as Ref<T>).value
       }

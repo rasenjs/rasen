@@ -2,7 +2,23 @@
  * JSX 类型声明
  */
 
-import type { MountFunction, PropValue, Ref, ReadonlyRef } from '@rasenjs/core'
+import type { Mountable, PropValue, Ref, ReadonlyRef, Getter } from '@rasenjs/core'
+
+/**
+ * 子元素单项类型
+ * 支持：静态值、响应式引用、getter 函数
+ */
+type ChildItem = 
+  | JSX.Element 
+  | string 
+  | number 
+  | boolean 
+  | null 
+  | undefined
+  | Ref<string | number>
+  | ReadonlyRef<string | number>
+  | Getter<string | number>
+  | Mountable<unknown>
 
 declare global {
   namespace JSX {
@@ -36,18 +52,8 @@ declare global {
       onMouseEnter?: (e: Event) => void
       onMouseLeave?: (e: Event) => void
       
-      // 子元素 - 支持文本、数字、布尔值、响应式 ref、JSX 元素
-      children?: 
-        | JSX.Element 
-        | JSX.Element[] 
-        | string 
-        | number 
-        | boolean 
-        | null 
-        | undefined
-        | Ref<string | number>
-        | ReadonlyRef<string | number>
-        | (JSX.Element | string | number | boolean | Ref<string | number> | ReadonlyRef<string | number> | null | undefined)[]
+      // 子元素 - 支持文本、数字、布尔值、响应式 ref、getter 函数、JSX 元素
+      children?: ChildItem | ChildItem[]
     }
 
     // Input 元素特殊属性
@@ -122,12 +128,21 @@ declare global {
       main: HTMLAttributes
       aside: HTMLAttributes
       
+      // 文本格式
+      code: HTMLAttributes
+      pre: HTMLAttributes
+      strong: HTMLAttributes
+      em: HTMLAttributes
+      small: HTMLAttributes
+      
       // 其他
       svg: HTMLAttributes
+      br: HTMLAttributes
+      hr: HTMLAttributes
     }
 
     // JSX 元素类型
-    type Element = MountFunction<HTMLElement>
+    type Element = Mountable<HTMLElement>
   }
 }
 

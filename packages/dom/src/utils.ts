@@ -1,10 +1,10 @@
-import type { ReadonlyRef, Ref } from '@rasenjs/core'
+import type { PropValue } from '@rasenjs/core'
 import { getReactiveRuntime, unrefValue } from '@rasenjs/core'
 
 /**
- * 解包 Ref 或 ReadonlyRef
+ * 解包 Ref、ReadonlyRef 或 Getter
  */
-export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
+export function unref<T>(value: PropValue<T>): T {
   return unrefValue(value)
 }
 
@@ -43,11 +43,13 @@ export function setStyle(
 
 /**
  * 设置响应式属性
+ * @param skipImmediate 是否跳过立即执行（用于 hydration 模式）
  */
 export function watchProp<T>(
   getter: () => T,
-  setter: (value: T) => void
+  setter: (value: T) => void,
+  skipImmediate = false
 ): () => void {
-  const stop = getReactiveRuntime().watch(getter, setter, { immediate: true })
+  const stop = getReactiveRuntime().watch(getter, setter, { immediate: !skipImmediate })
   return stop
 }

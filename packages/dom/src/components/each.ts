@@ -1,4 +1,4 @@
-import { eachImpl, repeatImpl, type MountFunction, type Ref } from '@rasenjs/core'
+import { eachImpl, repeatImpl, type Mountable, type Ref } from '@rasenjs/core'
 
 /**
  * DOM 优化版 each 组件
@@ -18,8 +18,8 @@ import { eachImpl, repeatImpl, type MountFunction, type Ref } from '@rasenjs/cor
  */
 export function each<T extends object>(
   items: T[] | Ref<T[]> | (() => T[]),
-  render: (item: T, index: number) => MountFunction<HTMLElement>
-): MountFunction<HTMLElement> {
+  render: (item: T, index: number) => Mountable<HTMLElement>
+): Mountable<HTMLElement> {
   // 判断是否为 Ref（有 value 属性）
   const isRef = (v: unknown): v is Ref<T[]> =>
     v !== null && typeof v === 'object' && 'value' in v
@@ -42,18 +42,18 @@ export function each<T extends object>(
  */
 export function repeat<T>(
   items: Ref<T[]> | (() => T[]),
-  render: (item: T, index: number) => MountFunction<HTMLElement>
-): MountFunction<HTMLElement>
+  render: (item: T, index: number) => Mountable<HTMLElement>
+): Mountable<HTMLElement>
 
 export function repeat(
   count: Ref<number> | (() => number),
-  render: (index: number) => MountFunction<HTMLElement>
-): MountFunction<HTMLElement>
+  render: (index: number) => Mountable<HTMLElement>
+): Mountable<HTMLElement>
 
 export function repeat<T>(
   itemsOrCount: Ref<T[]> | Ref<number> | (() => T[]) | (() => number),
-  render: ((item: T, index: number) => MountFunction<HTMLElement>) | ((index: number) => MountFunction<HTMLElement>)
-): MountFunction<HTMLElement> {
+  render: ((item: T, index: number) => Mountable<HTMLElement>) | ((index: number) => Mountable<HTMLElement>)
+): Mountable<HTMLElement> {
   return repeatImpl<T, HTMLElement, Node>({
     items: () => {
       const value = typeof itemsOrCount === 'function'
@@ -65,7 +65,7 @@ export function repeat<T>(
       }
       return value as T[]
     },
-    render: render as (item: T, index: number) => MountFunction<HTMLElement>,
+    render: render as (item: T, index: number) => Mountable<HTMLElement>,
     ...domHooksForRepeat
   })
 }

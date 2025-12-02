@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -38,7 +38,7 @@ describe('image', () => {
         height: 150
       } as CanvasImageSource
 
-      const mount = image({
+      const mountable = image({
         image: mockImage,
         x: 0,
         y: 0,
@@ -46,7 +46,7 @@ describe('image', () => {
         height: 100
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -70,7 +70,7 @@ describe('image', () => {
         height: 150
       } as CanvasImageSource
 
-      const mount = image({
+      const mountable = image({
         image: mockImage,
         x: 0,
         y: 0,
@@ -79,7 +79,7 @@ describe('image', () => {
         crop: { x: 10, y: 10, width: 80, height: 80 }
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

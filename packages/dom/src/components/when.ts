@@ -1,6 +1,6 @@
 import {
   when as coreWhen,
-  type MountFunction,
+  type Mountable,
   type PropValue
 } from '@rasenjs/core'
 
@@ -27,9 +27,9 @@ import {
  */
 export function when(config: {
   condition: PropValue<boolean>
-  then: () => MountFunction<HTMLElement>
-  else?: () => MountFunction<HTMLElement>
-}): MountFunction<HTMLElement> {
+  then: () => Mountable<HTMLElement>
+  else?: () => Mountable<HTMLElement>
+}): Mountable<HTMLElement> {
   return coreWhen<HTMLElement, Node>({
     ...config,
     ...domHooks

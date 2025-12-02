@@ -14,6 +14,9 @@ import {
   h1,
   h2,
   h3,
+  h4,
+  h5,
+  h6,
   ul,
   ol,
   li,
@@ -30,7 +33,14 @@ import {
   footer,
   nav,
   main,
-  aside
+  aside,
+  code,
+  pre,
+  strong,
+  em,
+  small,
+  br,
+  hr
 } from '@rasenjs/dom'
 
 // 自动配置默认 DOM 标签
@@ -47,6 +57,9 @@ configureTags({
     h1,
     h2,
     h3,
+    h4,
+    h5,
+    h6,
     ul,
     ol,
     li,
@@ -63,6 +76,13 @@ configureTags({
     footer,
     nav,
     main,
-    aside
+    aside,
+    code,
+    pre,
+    strong,
+    em,
+    small,
+    br,
+    hr
   }
 })

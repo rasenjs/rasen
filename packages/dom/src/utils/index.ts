@@ -21,6 +21,8 @@ export {
   down,
   left,
   right,
+  // 事件委托
+  delegated,
   // 插件导出
   preventPlugin,
   stopPlugin,

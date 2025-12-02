@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -33,7 +33,7 @@ describe('arrow', () => {
 
   describe('基础绘制', () => {
     it('应该绘制带箭头的线条', async () => {
-      const mount = arrow({
+      const mountable = arrow({
         points: [0, 0, 100, 100],
         pointerLength: 20,
         pointerWidth: 20,
@@ -42,7 +42,7 @@ describe('arrow', () => {
         lineWidth: 2
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -60,7 +60,7 @@ describe('arrow', () => {
     })
 
     it('应该支持双向箭头', async () => {
-      const mount = arrow({
+      const mountable = arrow({
         points: [0, 0, 100, 100],
         pointerLength: 15,
         pointerWidth: 15,
@@ -70,7 +70,7 @@ describe('arrow', () => {
         lineWidth: 2
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

@@ -1,6 +1,8 @@
 /**
- * Vue Composition API 适配器
+ * Vue Reactivity 适配器
  * 将 Vue 的响应式系统适配到 Rasen
+ * 
+ * 使用 @vue/reactivity 而非完整的 vue 包，减小包体积
  */
 
 import {
@@ -10,7 +12,7 @@ import {
   computed as vueComputed,
   unref as vueUnref,
   isRef
-} from 'vue'
+} from '@vue/reactivity'
 import type { ReactiveRuntime } from '@rasenjs/core'
 
 /**
@@ -35,7 +37,10 @@ export function createVueRuntime(): ReactiveRuntime {
     }) as any,
 
     unref: <T>(value: T | unknown): T => {
-      // Vue 提供了 isRef 来准确判断
+      // 检查是否是 getter 函数
+      if (typeof value === 'function') {
+        return (value as () => T)()
+      }
       return (isRef(value) ? vueUnref(value) : value) as T
     },
 

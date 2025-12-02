@@ -10,8 +10,8 @@
  * 4. 自动依赖追踪
  */
 
-import type { MountFunction } from '@rasenjs/core'
-import { getReactiveRuntime } from '@rasenjs/core'
+import type { Mountable } from '@rasenjs/core'
+import { getReactiveRuntime, fragment, isMountable, mountable } from '@rasenjs/core'
 import { watchProp } from '@rasenjs/dom'
 import { findTag } from './tag-config'
 
@@ -31,7 +31,7 @@ export {
 /**
  * 标签组件类型
  */
-type TagComponent = (props: Record<string, unknown>) => MountFunction<unknown>
+type TagComponent = (props: Record<string, unknown>) => Mountable<unknown>
 
 /**
  * JSX 元素类型
@@ -57,7 +57,7 @@ type JSXChild =
   | boolean
   | null
   | undefined
-  | MountFunction
+  | Mountable
   | JSXElement
 
 /**
@@ -69,15 +69,15 @@ interface JSXElement {
 }
 
 /**
- * 处理子元素，转换为 MountFunction 数组
+ * 处理子元素，转换为 Mountable 数组
  */
-function processChildren(children: JSXChild | JSXChild[]): MountFunction<unknown>[] {
+function processChildren(children: JSXChild | JSXChild[]): Mountable<unknown>[] {
   if (children === null || children === undefined) {
     return []
   }
 
   const childArray = Array.isArray(children) ? children : [children]
-  const result: MountFunction<unknown>[] = []
+  const result: Mountable<unknown>[] = []
 
   for (const child of childArray) {
     if (child === null || child === undefined || typeof child === 'boolean') {
@@ -87,7 +87,7 @@ function processChildren(children: JSXChild | JSXChild[]): MountFunction<unknown
     if (typeof child === 'string' || typeof child === 'number') {
       // 静态文本节点
       const text = String(child)
-      result.push((host: unknown) => {
+      result.push(mountable((host: unknown) => {
         if (host instanceof HTMLElement) {
           const textNode = document.createTextNode(text)
           host.appendChild(textNode)
@@ -96,11 +96,11 @@ function processChildren(children: JSXChild | JSXChild[]): MountFunction<unknown
           }
         }
         return undefined
-      })
+      }))
     } else if (getReactiveRuntime().isRef(child)) {
       // 响应式 ref - 创建响应式文本节点
       const refChild = child as unknown as { value: unknown }
-      result.push((host: unknown) => {
+      result.push(mountable((host: unknown) => {
         if (host instanceof HTMLElement) {
           const textNode = document.createTextNode(String(refChild.value))
           host.appendChild(textNode)
@@ -119,13 +119,37 @@ function processChildren(children: JSXChild | JSXChild[]): MountFunction<unknown
           }
         }
         return undefined
-      })
+      }))
     } else if (typeof child === 'function') {
-      // 已经是 MountFunction
-      result.push(child as MountFunction<unknown>)
+      // 检查是否是已标记的 Mountable
+      if (isMountable(child)) {
+        result.push(child)
+      } else {
+        // 未标记的函数当作 getter 处理 - 创建响应式文本节点
+        const getter = child as () => unknown
+        result.push(mountable((host: unknown) => {
+          if (host instanceof HTMLElement) {
+            const textNode = document.createTextNode(String(getter()))
+            host.appendChild(textNode)
+            
+            const stop = watchProp(
+              () => String(getter()),
+              (newText: string) => {
+                textNode.textContent = newText
+              }
+            )
+            
+            return () => {
+              stop()
+              textNode.remove()
+            }
+          }
+          return undefined
+        }))
+      }
     } else if (isJSXElement(child)) {
       // 嵌套的 JSX 元素，递归处理
-      const mountFn = createMountFunction(child)
+      const mountFn = mountableFromJSX(child)
       result.push(mountFn)
     }
   }
@@ -141,9 +165,9 @@ function isJSXElement(value: unknown): value is JSXElement {
 }
 
 /**
- * 从 JSX 元素创建 MountFunction
+ * 从 JSX 元素创建 Mountable
  */
-function createMountFunction(element: JSXElement): MountFunction<unknown> {
+function mountableFromJSX(element: JSXElement): Mountable<unknown> {
   const { type, props } = element
   const { children, ...restProps } = props
 
@@ -160,11 +184,11 @@ function createMountFunction(element: JSXElement): MountFunction<unknown> {
       )
     }
 
-    // 调用组件
+    // 调用组件 - 返回 Mountable
     return tagComponent({
       ...restProps,
       children: childMounts.length > 0 ? childMounts : undefined,
-    }) as MountFunction<unknown>
+    })
   } else {
     // 直接传入的组件函数
     const component = type as TagComponent
@@ -182,10 +206,10 @@ export function jsx(
   type: JSXElementType,
   props: JSXProps,
   key?: string
-): MountFunction<unknown> {
+): Mountable<unknown> {
   // 创建内部 JSX 元素表示
   const element: JSXElement = { type, props: { ...props, key } }
-  return createMountFunction(element)
+  return mountableFromJSX(element)
 }
 
 /**
@@ -195,21 +219,20 @@ export function jsxs(
   type: JSXElementType,
   props: JSXProps,
   key?: string
-): MountFunction<unknown> {
+): Mountable<unknown> {
   return jsx(type, props, key)
 }
 
 /**
- * Fragment 组件
+ * Fragment 组件 - 用于 JSX
+ * 
+ * JSX 用法: <>hello {count} world</>
+ * 
+ * 内部复用 @rasenjs/core 的 fragment 实现
  */
-export function Fragment(props: { children?: JSXChild | JSXChild[] }): MountFunction<unknown> {
+export function Fragment(props: { children?: JSXChild | JSXChild[] }): Mountable<unknown> {
+  // 先将 JSX 子元素转换为 Mountable[]
   const childMounts = processChildren(props.children)
-  
-  return (host: unknown) => {
-    const unmounts = childMounts.map(mount => mount(host)).filter(Boolean) as (() => void)[]
-    
-    return () => {
-      unmounts.forEach(unmount => unmount())
-    }
-  }
+  // 复用 core 的 fragment
+  return fragment({ children: childMounts })
 }
