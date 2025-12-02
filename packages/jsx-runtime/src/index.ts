@@ -169,10 +169,16 @@ function isJSXElement(value: unknown): value is JSXElement {
  */
 function mountableFromJSX(element: JSXElement): Mountable<unknown> {
   const { type, props } = element
-  const { children, ...restProps } = props
+  const { children, className, ...restProps } = props
 
   // 处理子元素
   const childMounts = processChildren(children)
+
+  // 转换 className -> class（JSX 风格到 HTML 风格）
+  const normalizedProps: Record<string, unknown> = { ...restProps }
+  if (className !== undefined) {
+    normalizedProps.class = className
+  }
 
   if (typeof type === 'string') {
     // HTML 标签或配置的自定义标签
@@ -186,14 +192,14 @@ function mountableFromJSX(element: JSXElement): Mountable<unknown> {
 
     // 调用组件 - 返回 Mountable
     return tagComponent({
-      ...restProps,
+      ...normalizedProps,
       children: childMounts.length > 0 ? childMounts : undefined,
     })
   } else {
     // 直接传入的组件函数
     const component = type as TagComponent
     return component({
-      ...restProps,
+      ...normalizedProps,
       children: childMounts.length > 0 ? childMounts : undefined,
     })
   }

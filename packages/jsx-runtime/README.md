@@ -111,7 +111,7 @@ const DivComponent = getTag('div')
 
 ## Reactive Props
 
-JSX props support reactive values:
+JSX props support reactive values. Both `class` and `className` are supported (they are equivalent):
 
 ```tsx
 const isActive = ref(false)
@@ -119,7 +119,7 @@ const count = ref(0)
 
 <div
   id="static-value"
-  className={computed(() => isActive.value ? 'active' : '')}
+  class={computed(() => isActive.value ? 'active' : '')}
   style={{ color: isActive.value ? 'red' : 'blue' }}
 >
   Count: {count}

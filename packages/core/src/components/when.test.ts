@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
 import { when } from './when'
+import { mount, mountable } from '../types'
 
 // ============================================
 // 测试辅助工具
@@ -101,19 +102,19 @@ describe('when', () => {
       const thenMounted = vi.fn()
       const elseMounted = vi.fn()
 
-      const mount = when({
+      const result = when({
         condition: true,
-        then: () => () => {
+        then: () => mountable(() => {
           thenMounted()
           return () => {}
-        },
-        else: () => () => {
+        }),
+        else: () => mountable(() => {
           elseMounted()
           return () => {}
-        }
+        })
       })
 
-      mount({})
+      mount(result, {})
 
       expect(thenMounted).toHaveBeenCalled()
       expect(elseMounted).not.toHaveBeenCalled()
@@ -123,19 +124,19 @@ describe('when', () => {
       const thenMounted = vi.fn()
       const elseMounted = vi.fn()
 
-      const mount = when({
+      const result = when({
         condition: false,
-        then: () => () => {
+        then: () => mountable(() => {
           thenMounted()
           return () => {}
-        },
-        else: () => () => {
+        }),
+        else: () => mountable(() => {
           elseMounted()
           return () => {}
-        }
+        })
       })
 
-      mount({})
+      mount(result, {})
 
       expect(thenMounted).not.toHaveBeenCalled()
       expect(elseMounted).toHaveBeenCalled()
@@ -144,15 +145,15 @@ describe('when', () => {
     it('没有 else 分支且条件为 false 时不应该渲染', () => {
       const thenMounted = vi.fn()
 
-      const mount = when({
+      const result = when({
         condition: false,
-        then: () => () => {
+        then: () => mountable(() => {
           thenMounted()
           return () => {}
-        }
+        })
       })
 
-      mount({})
+      mount(result, {})
 
       expect(thenMounted).not.toHaveBeenCalled()
     })
@@ -163,15 +164,15 @@ describe('when', () => {
       const condition = runtime.ref(true)
       const thenMounted = vi.fn()
 
-      const mount = when({
+      const result = when({
         condition,
-        then: () => () => {
+        then: () => mountable(() => {
           thenMounted()
           return () => {}
-        }
+        })
       })
 
-      mount({})
+      mount(result, {})
 
       expect(thenMounted).toHaveBeenCalled()
     })
@@ -181,15 +182,15 @@ describe('when', () => {
       const condition = runtime.computed(() => value.value > 5)
       const thenMounted = vi.fn()
 
-      const mount = when({
+      const result = when({
         condition,
-        then: () => () => {
+        then: () => mountable(() => {
           thenMounted()
           return () => {}
-        }
+        })
       })
 
-      mount({})
+      mount(result, {})
 
       expect(thenMounted).toHaveBeenCalled()
     })
@@ -199,14 +200,14 @@ describe('when', () => {
     it('unmount 时应该清理子组件', () => {
       const childUnmounted = vi.fn()
 
-      const mount = when({
+      const result = when({
         condition: true,
-        then: () => () => {
+        then: () => mountable(() => {
           return () => childUnmounted()
-        }
+        })
       })
 
-      const unmount = mount({})
+      const unmount = mount(result, {})
       expect(childUnmounted).not.toHaveBeenCalled()
 
       unmount?.()
@@ -214,14 +215,14 @@ describe('when', () => {
     })
 
     it('条件为 false 时 unmount 也应该正常工作', () => {
-      const mount = when({
+      const result = when({
         condition: false,
-        then: () => () => {
+        then: () => mountable(() => {
           return () => {}
-        }
+        })
       })
 
-      const unmount = mount({})
+      const unmount = mount(result, {})
       expect(() => unmount?.()).not.toThrow()
     })
   })
@@ -231,15 +232,15 @@ describe('when', () => {
       const receivedHost: unknown[] = []
       const testHost = { id: 'test' }
 
-      const mount = when({
+      const result = when({
         condition: true,
-        then: () => (host) => {
+        then: () => mountable((host: unknown) => {
           receivedHost.push(host)
           return () => {}
-        }
+        })
       })
 
-      mount(testHost)
+      mount(result, testHost)
 
       // when 可能会创建代理 host，所以我们只检查是否收到了 host
       expect(receivedHost.length).toBe(1)

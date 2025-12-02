@@ -1,29 +1,28 @@
-import type { SyncComponent, PropValue, Mountable, Ref } from '@rasenjs/core'
+import type { PropValue, Mountable, Ref, SyncComponent } from '@rasenjs/core'
 import { mountable } from '@rasenjs/core'
 import { element } from './element'
 
-console.log('🔥 elements.ts loaded - SOURCE CODE VERSION with event fix')
-
+/**
+ * 基础 Props 类型
+ * 扁平化设计：
+ * - ref, children: 框架特殊 props
+ * - on* 开头: 事件处理器
+ * - data*, aria* 开头: 自动转 kebab-case
+ * - 其余: HTML 属性
+ */
 interface BaseProps {
-  id?: PropValue<string>
   class?: PropValue<string>
-  className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  attrs?: PropValue<Record<string, string | number | boolean>>
-  /** Text content or child mount functions */
   children?: PropValue<string> | Array<Mountable<HTMLElement>>
-  on?: Record<string, (e: Event) => void>
-  onClick?: (e: Event) => void
-  onInput?: (e: Event) => void
-  onKeyPress?: (e: Event) => void
-  /** Element reference */
   ref?: Ref<HTMLElement | null>
+  // 允许任意其他属性（HTML 属性 + 事件）
+  [key: string]: unknown
 }
 
 /**
  * 规范化参数为标准 props 对象
  */
-function normalizeArgs(...args: any[]): BaseProps {
+function normalizeArgs(...args: unknown[]): BaseProps {
   // 没有参数
   if (args.length === 0) {
     return {}
@@ -38,64 +37,44 @@ function normalizeArgs(...args: any[]): BaseProps {
       return { children: first }
     }
     // 如果是函数，当作 child mount 函数
-    // （对于需要响应式 children 的情况，应该用 { children: () => ... } 的形式）
     if (typeof first === 'function') {
-      return { children: [first] }
+      return { children: [first as unknown as Mountable<HTMLElement>] }
     }
-    // 否则当作 props 对象，继续处理
-    // 注意：不能直接返回，需要继续处理 class 别名和事件简写
+    // 否则当作 props 对象
+    if (typeof first === 'object' && first !== null) {
+      return { ...first } as BaseProps
+    }
+    return {}
   }
 
-  // 多个参数或单个对象参数：提取 props 和 children
-  const props = typeof first === 'object' && first !== null ? { ...first } : {}
+  // 多个参数：第一个是 props，后续是 children
+  const props: BaseProps = typeof first === 'object' && first !== null ? { ...first } as BaseProps : {}
   const children: Mountable<HTMLElement>[] = []
 
-  // 处理后续参数作为 children（仅多个参数时）
-  if (args.length > 1) {
-    for (let i = 1; i < args.length; i++) {
-      const child = args[i]
-      if (child === null || child === undefined) continue
+  for (let i = 1; i < args.length; i++) {
+    const child = args[i]
+    if (child === null || child === undefined) continue
 
-      if (typeof child === 'function') {
-        children.push(child)
-      } else if (typeof child === 'string') {
-        // 字符串 child 转换为 text node 的 mount 函数
-        children.push(mountable((host: HTMLElement) => {
-          const textNode = document.createTextNode(child)
-          host.appendChild(textNode)
-          return () => textNode.remove()
-        }))
-      }
-    }
-
-    // 合并 children
-    if (children.length > 0) {
-      props.children = [...(props.children || []), ...children]
+    if (typeof child === 'function') {
+      children.push(child as unknown as Mountable<HTMLElement>)
+    } else if (typeof child === 'string') {
+      // 字符串 child 转换为 text node 的 mount 函数
+      children.push(mountable((host: HTMLElement) => {
+        const textNode = document.createTextNode(child)
+        host.appendChild(textNode)
+        return () => textNode.remove()
+      }))
     }
   }
 
-  // 处理 class 别名
-  if (props.class && !props.className) {
-    props.className = props.class
-    delete props.class
-  }
-
-  // 处理事件简写
-  const on = props.on || {}
-  if (props.onClick) {
-    on.click = props.onClick
-    delete props.onClick
-  }
-  if (props.onInput) {
-    on.input = props.onInput
-    delete props.onInput
-  }
-  if (props.onKeyPress) {
-    on.keypress = props.onKeyPress
-    delete props.onKeyPress
-  }
-  if (Object.keys(on).length > 0) {
-    props.on = on
+  // 合并 children
+  if (children.length > 0) {
+    const existingChildren = props.children
+    if (Array.isArray(existingChildren)) {
+      props.children = [...existingChildren, ...children]
+    } else {
+      props.children = children
+    }
   }
 
   return props
@@ -104,7 +83,7 @@ function normalizeArgs(...args: any[]): BaseProps {
 /**
  * div 组件
  */
-export function div(...args: any[]): Mountable<HTMLElement> {
+export function div(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'div', ...props })
 }
@@ -112,7 +91,7 @@ export function div(...args: any[]): Mountable<HTMLElement> {
 /**
  * span 组件
  */
-export function span(...args: any[]): Mountable<HTMLElement> {
+export function span(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'span', ...props })
 }
@@ -120,55 +99,32 @@ export function span(...args: any[]): Mountable<HTMLElement> {
 /**
  * button 组件
  */
-export function button(...args: any[]): Mountable<HTMLElement> {
+export function button(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'button', ...props })
 }
 
 /**
  * input 组件
+ * 
+ * 特殊属性由 element 统一处理：
+ * - value, checked, disabled 等作为 DOM property 设置
  */
 export function input(props: BaseProps & {
   type?: PropValue<string>
-  value?: PropValue<string | any>
+  value?: PropValue<string | number>
   placeholder?: PropValue<string>
   disabled?: PropValue<boolean>
+  name?: PropValue<string>
+  readOnly?: PropValue<boolean>
   /** checkbox/radio 的选中状态 */
   checked?: PropValue<boolean>
   /** change 事件处理器 */
   onChange?: (e: Event) => void
-}): Mountable<HTMLElement> {
-  const { type, value, placeholder, disabled, checked, attrs, ...restProps } = props as any
-  
-  // 提取所有 on* 事件处理器
-  const on: Record<string, (e: Event) => void> = {}
-  const cleanProps: any = {}
-  
-  for (const key in restProps) {
-    if (key.startsWith('on') && typeof restProps[key] === 'function') {
-      // onClick -> click, onInput -> input, onChange -> change
-      const eventName = key.slice(2).toLowerCase()
-      on[eventName] = restProps[key]
-    } else {
-      cleanProps[key] = restProps[key]
-    }
-  }
-  
-  const newAttrs = {
-    ...(attrs || {}),
-    ...(type !== undefined ? { type } : {}),
-    ...(placeholder !== undefined ? { placeholder } : {}),
-    ...(disabled !== undefined ? { disabled } : {})
-  }
-  
-  return element({ 
-    tag: 'input', 
-    ...cleanProps,
-    attrs: newAttrs as any,
-    ...(value !== undefined ? { value } : {}),
-    ...(checked !== undefined ? { checked } : {}),
-    ...(Object.keys(on).length > 0 ? { on } : {})
-  })
+  /** input 事件处理器 */
+  onInput?: (e: Event) => void
+}): Mountable<HTMLInputElement> {
+  return element({ tag: 'input', ...props }) as Mountable<HTMLInputElement>
 }
 
 /**
@@ -202,17 +158,15 @@ export const img: SyncComponent<
 /**
  * p 组件 (段落)
  */
-export const p: SyncComponent<
-  HTMLElement,
-  BaseProps
-> = (props) => {
+export function p(...args: unknown[]): Mountable<HTMLElement> {
+  const props = normalizeArgs(...args)
   return element({ tag: 'p', ...props })
 }
 
 /**
  * h1 组件
  */
-export function h1(...args: any[]): Mountable<HTMLElement> {
+export function h1(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'h1', ...props })
 }
@@ -220,7 +174,7 @@ export function h1(...args: any[]): Mountable<HTMLElement> {
 /**
  * h2 组件
  */
-export function h2(...args: any[]): Mountable<HTMLElement> {
+export function h2(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'h2', ...props })
 }
@@ -228,7 +182,7 @@ export function h2(...args: any[]): Mountable<HTMLElement> {
 /**
  * h3 组件
  */
-export function h3(...args: any[]): Mountable<HTMLElement> {
+export function h3(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'h3', ...props })
 }
@@ -236,7 +190,7 @@ export function h3(...args: any[]): Mountable<HTMLElement> {
 /**
  * h4 组件
  */
-export function h4(...args: any[]): Mountable<HTMLElement> {
+export function h4(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'h4', ...props })
 }
@@ -244,7 +198,7 @@ export function h4(...args: any[]): Mountable<HTMLElement> {
 /**
  * h5 组件
  */
-export function h5(...args: any[]): Mountable<HTMLElement> {
+export function h5(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'h5', ...props })
 }
@@ -252,7 +206,7 @@ export function h5(...args: any[]): Mountable<HTMLElement> {
 /**
  * h6 组件
  */
-export function h6(...args: any[]): Mountable<HTMLElement> {
+export function h6(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'h6', ...props })
 }
@@ -260,7 +214,7 @@ export function h6(...args: any[]): Mountable<HTMLElement> {
 /**
  * ul 组件 (无序列表)
  */
-export function ul(...args: any[]): Mountable<HTMLElement> {
+export function ul(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'ul', ...props })
 }
@@ -268,7 +222,7 @@ export function ul(...args: any[]): Mountable<HTMLElement> {
 /**
  * ol 组件 (有序列表)
  */
-export function ol(...args: any[]): Mountable<HTMLElement> {
+export function ol(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'ol', ...props })
 }
@@ -276,7 +230,7 @@ export function ol(...args: any[]): Mountable<HTMLElement> {
 /**
  * li 组件 (列表项)
  */
-export function li(...args: any[]): Mountable<HTMLElement> {
+export function li(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'li', ...props })
 }
@@ -407,7 +361,7 @@ export const aside: SyncComponent<HTMLElement, BaseProps> = (props) => {
 /**
  * code 组件 (代码)
  */
-export function code(...args: any[]): Mountable<HTMLElement> {
+export function code(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'code', ...props })
 }
@@ -415,7 +369,7 @@ export function code(...args: any[]): Mountable<HTMLElement> {
 /**
  * pre 组件 (预格式化文本)
  */
-export function pre(...args: any[]): Mountable<HTMLElement> {
+export function pre(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'pre', ...props })
 }
@@ -423,7 +377,7 @@ export function pre(...args: any[]): Mountable<HTMLElement> {
 /**
  * strong 组件 (强调)
  */
-export function strong(...args: any[]): Mountable<HTMLElement> {
+export function strong(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'strong', ...props })
 }
@@ -431,7 +385,7 @@ export function strong(...args: any[]): Mountable<HTMLElement> {
 /**
  * em 组件 (斜体强调)
  */
-export function em(...args: any[]): Mountable<HTMLElement> {
+export function em(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'em', ...props })
 }
@@ -439,7 +393,7 @@ export function em(...args: any[]): Mountable<HTMLElement> {
 /**
  * small 组件
  */
-export function small(...args: any[]): Mountable<HTMLElement> {
+export function small(...args: unknown[]): Mountable<HTMLElement> {
   const props = normalizeArgs(...args)
   return element({ tag: 'small', ...props })
 }

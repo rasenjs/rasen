@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   getCallArgs,
@@ -36,7 +36,7 @@ describe('arc', () => {
 
   describe('基础绘制', () => {
     it('应该使用正确的参数绘制圆弧', async () => {
-      const mount = arc({
+      const mountable = arc({
         x: 100,
         y: 100,
         radius: 50,
@@ -45,7 +45,7 @@ describe('arc', () => {
         stroke: '#ff0000'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -64,7 +64,7 @@ describe('arc', () => {
     })
 
     it('应该支持填充扇形', async () => {
-      const mount = arc({
+      const mountable = arc({
         x: 100,
         y: 100,
         radius: 50,
@@ -73,7 +73,7 @@ describe('arc', () => {
         fill: 'red'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -86,7 +86,7 @@ describe('arc', () => {
     })
 
     it('应该支持逆时针绘制', async () => {
-      const mount = arc({
+      const mountable = arc({
         x: 100,
         y: 100,
         radius: 50,
@@ -96,7 +96,7 @@ describe('arc', () => {
         stroke: 'blue'
       })
 
-      const cleanup = mount(ctx)
+      const cleanup = mount(mountable, ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

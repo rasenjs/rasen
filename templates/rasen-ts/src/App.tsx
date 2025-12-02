@@ -79,7 +79,7 @@ export const App = () => {
         <section class="demo-section">
           <h3 class="section-title">Interactive Examples</h3>
           <p class="section-desc">
-            Explore Rasen's reactive capabilities through these live demos
+            Explore Rasen's reactive capabilities through these live demos!!!
           </p>
 
           <Tabs tabs={tabs} activeTab={activeTab} />

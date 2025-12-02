@@ -4,28 +4,110 @@ import { unref, setAttribute, setStyle, watchProp } from '../utils'
 import { getHydrationContext } from '../hydration-context'
 
 /**
- * element 组件 - 通用 HTML 元素组件
+ * 将 camelCase 转换为 kebab-case
+ * dataUserId -> data-user-id
+ * ariaLabel -> aria-label
  */
-export const element: SyncComponent<
-  HTMLElement,
-  {
-    tag: string
-    id?: PropValue<string>
-    className?: PropValue<string>
-    style?: PropValue<Record<string, string | number>>
-    attrs?: PropValue<Record<string, string | number | boolean>>
-    /** Text content or child mount functions */
-    children?:
-      | PropValue<string>
-      | Array<Mountable<HTMLElement>>
-    value?: PropValue<string | number>
-    /** checkbox/radio 的选中状态 */
-    checked?: PropValue<boolean>
-    on?: Record<string, (e: Event) => void>
-    /** 元素引用 - 挂载后会设置为 DOM 元素 */
-    ref?: Ref<HTMLElement | null>
+function camelToKebab(str: string): string {
+  return str.replace(/([A-Z])/g, '-$1').toLowerCase()
+}
+
+/**
+ * 特殊 props 列表（框架层面处理）
+ */
+const SPECIAL_PROPS = new Set(['ref', 'children', 'tag', 'class', 'style'])
+
+/**
+ * 按标签划分的 DOM property（必须作为 property 设置，否则响应式更新无效）
+ * 这些属性的 attribute 和 property 行为不同
+ */
+const TAG_SPECIFIC_PROPERTIES: Record<string, Set<string>> = {
+  input: new Set(['value', 'checked', 'indeterminate']),
+  textarea: new Set(['value']),
+  select: new Set(['value', 'selectedIndex']),
+  option: new Set(['selected']),
+}
+
+/**
+ * 通用 DOM property（所有元素都可以用 property 设置）
+ * 这些属性用 property 或 attribute 效果一致，但 property 更直接
+ */
+const COMMON_DOM_PROPERTIES = new Set([
+  'disabled',   // 禁用状态
+  'readOnly',   // 只读状态
+  'multiple',   // select 多选
+  'hidden',     // 隐藏
+])
+
+/**
+ * 判断是否应该作为 DOM property 设置
+ */
+function isDOMProperty(tag: string, key: string): boolean {
+  // 先检查按标签划分的
+  const tagProps = TAG_SPECIFIC_PROPERTIES[tag.toLowerCase()]
+  if (tagProps?.has(key)) {
+    return true
   }
-> = (props) => {
+  // 再检查通用的
+  return COMMON_DOM_PROPERTIES.has(key)
+}
+
+/**
+ * 判断是否是事件处理器
+ * onClick, onMouseEnter 等
+ */
+function isEventProp(key: string): boolean {
+  return key.startsWith('on') && key.length > 2 && key[2] === key[2].toUpperCase()
+}
+
+/**
+ * 获取事件名称
+ * onClick -> click
+ * onMouseEnter -> mouseenter
+ */
+function getEventName(key: string): string {
+  return key.slice(2).toLowerCase()
+}
+
+/**
+ * 判断是否需要转换为 kebab-case 的属性
+ * data*, aria* 开头的属性需要转换
+ */
+function needsKebabConversion(key: string): boolean {
+  return key.startsWith('data') || key.startsWith('aria')
+}
+
+/**
+ * 获取 DOM 属性名
+ */
+function getDOMAttrName(key: string): string {
+  if (needsKebabConversion(key)) {
+    return camelToKebab(key)
+  }
+  return key
+}
+
+// Props 类型定义
+type ElementProps = {
+  tag: string
+  ref?: Ref<HTMLElement | null>
+  children?: PropValue<string> | Array<Mountable<HTMLElement>>
+  class?: PropValue<string>
+  style?: PropValue<Record<string, string | number>>
+  // 其他所有属性（HTML 属性 + 事件）
+  [key: string]: unknown
+}
+
+/**
+ * element 组件 - 通用 HTML 元素组件
+ * 
+ * 扁平化 API 设计：
+ * - ref, children: 框架特殊 props
+ * - on* 开头: 事件处理器 (onClick -> click)
+ * - data*, aria* 开头: 转换为 kebab-case (dataUserId -> data-user-id)
+ * - 其余: 直接作为 HTML 属性
+ */
+export const element: SyncComponent<HTMLElement, ElementProps> = (props) => {
   return mountable((host) => {
     const ctx = getHydrationContext()
     let el: HTMLElement
@@ -38,18 +120,15 @@ export const element: SyncComponent<
       if (existing && existing.nodeType === Node.ELEMENT_NODE) {
         const existingEl = existing as HTMLElement
         if (existingEl.tagName.toLowerCase() === props.tag.toLowerCase()) {
-          // 标签匹配，复用元素
           el = existingEl
           hydrated = true
         } else {
-          // 标签不匹配，警告并创建新元素
           console.warn(
             `[Rasen Hydration] Tag mismatch: expected <${props.tag}>, got <${existingEl.tagName.toLowerCase()}>`
           )
           el = document.createElement(props.tag)
         }
       } else {
-        // 没有可复用的元素节点
         if (existing) {
           console.warn(
             `[Rasen Hydration] Expected element <${props.tag}>, got ${existing.nodeType === Node.TEXT_NODE ? 'text node' : 'other node'}`
@@ -58,147 +137,117 @@ export const element: SyncComponent<
         el = document.createElement(props.tag)
       }
     } else {
-      // === 正常模式：创建新元素 ===
       el = document.createElement(props.tag)
     }
 
     const stops: Array<() => void> = []
     const childUnmounts: Array<(() => void) | undefined> = []
+    const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
-    // id - hydration 模式下跳过初始设置（已存在）
-    if (props.id !== undefined) {
+    // 处理 class
+    if (props.class !== undefined) {
       stops.push(
         watchProp(
-          () => unref(props.id),
-          (value) => {
-            if (value) el.id = value
-          },
-          hydrated // hydrated 时跳过 immediate
-        )
-      )
-    }
-
-    // className
-    if (props.className !== undefined) {
-      stops.push(
-        watchProp(
-          () => unref(props.className),
-          (value) => {
-            el.className = value || ''
+          () => unref(props.class),
+          (classValue) => {
+            el.className = classValue || ''
           },
           hydrated
         )
       )
     }
 
-    // style
+    // 处理 style
     if (props.style !== undefined) {
       stops.push(
         watchProp(
           () => unref(props.style),
-          (value) => {
-            if (value) setStyle(el, value)
+          (styleValue) => {
+            if (styleValue) setStyle(el, styleValue)
           },
           hydrated
         )
       )
     }
 
-    // attrs
-    if (props.attrs !== undefined) {
-      stops.push(
-        watchProp(
-          () => unref(props.attrs),
-          (value) => {
-            if (value) {
-              for (const [key, val] of Object.entries(value)) {
-                // 跳过无效的属性名（数字开头或纯数字）
-                if (/^\d/.test(key)) continue
-                setAttribute(el, key, val)
-              }
-            }
-          },
-          hydrated
-        )
-      )
-    }
-
-    // children (text content or mount functions)
+    // 处理 children
     if (props.children !== undefined) {
       const children = props.children
       if (
         typeof children === 'string' ||
-        (typeof children === 'object' && 'value' in (children as any))
+        (typeof children === 'object' && children !== null && 'value' in children)
       ) {
-        // String content (or ref to string) - set as textContent
+        // String content (or ref to string)
         stops.push(
           watchProp(
             () => {
-              const value = unref(children as PropValue<string>)
-              return String(value)
+              const v = unref(children as PropValue<string>)
+              return String(v)
             },
-            (value) => {
-              el.textContent = value || ''
+            (v) => {
+              el.textContent = v || ''
             },
             hydrated
           )
         )
       } else if (Array.isArray(children)) {
-        // Mount functions - 进入子节点
+        // Mount functions
         if (ctx?.isHydrating) {
           ctx.enterChildren(el)
         }
-        
         for (const child of children) {
           childUnmounts.push(mount(child, el))
         }
-        
         if (ctx?.isHydrating) {
           ctx.exitChildren()
         }
       }
     }
 
-    // value (for input, textarea, select)
-    if (props.value !== undefined) {
-      stops.push(
-        watchProp(
-          () => unref(props.value),
-          (value) => {
-            const inputEl = el as
-              | HTMLInputElement
-              | HTMLTextAreaElement
-              | HTMLSelectElement
-            if (inputEl.value !== String(value ?? '')) {
-              inputEl.value = String(value ?? '')
-            }
-          },
-          hydrated
-        )
-      )
-    }
+    // 遍历其他 props（事件和 HTML 属性）
+    for (const key of Object.keys(props)) {
+      // 跳过特殊 props
+      if (SPECIAL_PROPS.has(key)) continue
 
-    // checked (for checkbox, radio)
-    if (props.checked !== undefined) {
-      stops.push(
-        watchProp(
-          () => unref(props.checked),
-          (checked) => {
-            const inputEl = el as HTMLInputElement
-            if (inputEl.checked !== !!checked) {
-              inputEl.checked = !!checked
-            }
-          },
-          hydrated
-        )
-      )
-    }
+      const value = props[key]
+      if (value === undefined) continue
 
-    // event listeners - 总是需要绑定（SSR 不输出事件）
-    if (props.on) {
-      for (const [event, handler] of Object.entries(props.on)) {
-        el.addEventListener(event, handler)
+      // 事件处理器
+      if (isEventProp(key)) {
+        if (typeof value === 'function') {
+          const eventName = getEventName(key)
+          const handler = value as (e: Event) => void
+          el.addEventListener(eventName, handler)
+          eventListeners.push({ event: eventName, handler })
+        }
+        continue
       }
+
+      // DOM property（需要直接设置 el[name] = value）
+      if (isDOMProperty(props.tag, key)) {
+        stops.push(
+          watchProp(
+            () => unref(value as PropValue<string | number | boolean>),
+            (propValue) => {
+              ;(el as unknown as Record<string, unknown>)[key] = propValue
+            },
+            hydrated
+          )
+        )
+        continue
+      }
+
+      // 其他 HTML 属性
+      const attrName = getDOMAttrName(key)
+      stops.push(
+        watchProp(
+          () => unref(value as PropValue<string | number | boolean>),
+          (attrValue) => {
+            setAttribute(el, attrName, attrValue)
+          },
+          hydrated
+        )
+      )
     }
 
     // ref - 设置元素引用
@@ -218,11 +267,10 @@ export const element: SyncComponent<
         props.ref.value = null
       }
       stops.forEach((stop) => stop())
-      childUnmounts.forEach((unmount) => unmount?.())
-      if (props.on) {
-        for (const [event, handler] of Object.entries(props.on)) {
-          el.removeEventListener(event, handler)
-        }
+      childUnmounts.forEach((u) => u?.())
+      // 移除事件监听器
+      for (const { event, handler } of eventListeners) {
+        el.removeEventListener(event, handler)
       }
       el.remove()
     }

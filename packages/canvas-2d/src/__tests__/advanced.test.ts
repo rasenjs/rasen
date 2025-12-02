@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { mount, setReactiveRuntime } from '@rasenjs/core'
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -40,7 +40,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
   describe('变换 (Transform)', () => {
     describe('旋转', () => {
       it('应该支持弧度旋转', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 100,
           y: 100,
           width: 50,
@@ -49,7 +49,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'red'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -71,7 +71,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
 
     describe('缩放', () => {
       it('应该支持统一缩放', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -81,7 +81,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'blue'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -95,7 +95,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
       })
 
       it('应该支持非统一缩放', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -105,7 +105,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'green'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -117,7 +117,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
 
     describe('倾斜', () => {
       it('应该支持 X 轴倾斜', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -126,7 +126,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'blue'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -143,7 +143,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
       })
 
       it('应该支持 Y 轴倾斜', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -152,7 +152,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'green'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable,ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -171,7 +171,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
         const { rect } = await import('../components/rect')
 
         // 不带offset的旋转(默认绕矩形中心旋转)
-        const mount1 = rect({
+        const mountable1 = rect({
           x: 50,
           y: 50,
           width: 40,
@@ -179,7 +179,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'blue',
           rotation: Math.PI / 4 // 45度
         })
-        cleanupFns.push(mount1(ctx))
+        cleanupFns.push(mount(mountable1, ctx))
         await waitForAsync()
 
         const rotateCalls1 = (ctx.rotate as ReturnType<typeof vi.fn>).mock.calls
@@ -189,7 +189,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
         vi.clearAllMocks()
 
         // 带offset的旋转(绕偏移后的点旋转)
-        const mount2 = rect({
+        const mountable2 = rect({
           x: 50,
           y: 50,
           width: 40,
@@ -199,7 +199,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           offsetX: 20, // 向右偏移20
           offsetY: 10 // 向下偏移10
         })
-        cleanupFns.push(mount2(ctx))
+        cleanupFns.push(mount(mountable2, ctx))
         await waitForAsync()
 
         // 验证translate被调用,且参数受offset影响
@@ -222,7 +222,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
   describe('阴影 (Shadow)', () => {
     describe('基础阴影', () => {
       it('应该应用阴影颜色', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 50,
           y: 50,
           width: 100,
@@ -231,7 +231,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowColor: 'rgba(0, 0, 0, 0.5)'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -240,7 +240,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
       })
 
       it('应该应用阴影模糊', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 50,
           y: 50,
           width: 100,
@@ -250,7 +250,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowBlur: 10
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -259,7 +259,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
       })
 
       it('应该应用阴影偏移', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 50,
           y: 50,
           width: 100,
@@ -270,7 +270,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowOffsetY: 5
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -283,7 +283,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
     describe('阴影透明度', () => {
       it('应该支持单独设置阴影透明度', async () => {
         // 通过shadowColor的rgba值实现透明度控制
-        const mount = rect({
+        const mountable = rect({
           x: 50,
           y: 50,
           width: 100,
@@ -295,7 +295,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowOffsetY: 5
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -307,7 +307,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
     describe('阴影启用控制', () => {
       it('应该支持禁用阴影', async () => {
         // 不设置shadowColor即禁用阴影
-        const mount = rect({
+        const mountable = rect({
           x: 50,
           y: 50,
           width: 100,
@@ -316,7 +316,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           // 没有shadowColor,阴影被禁用
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -328,7 +328,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
       it('应该支持仅对描边启用阴影', async () => {
         // 这个功能需要分别绘制填充和描边,Canvas API限制
         // 我们通过测试验证可以设置阴影属性
-        const mount = rect({
+        const mountable = rect({
           x: 50,
           y: 50,
           width: 100,
@@ -339,7 +339,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowBlur: 5
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -523,7 +523,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           ]
         })
 
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -532,7 +532,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineWidth: 5
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -625,7 +625,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           repeat: 'repeat'
         })
 
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -634,7 +634,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           scaleY: 0.5
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -658,7 +658,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           repeat: 'repeat'
         })
 
-        const mount = rect({
+        const mountable = rect({
           x: 50,
           y: 50,
           width: 100,
@@ -666,7 +666,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           rotation: Math.PI / 4
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -690,7 +690,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           repeat: 'repeat'
         })
 
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -699,7 +699,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           translateY: 10
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -718,7 +718,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
   describe('透明度 (Opacity)', () => {
     describe('全局透明度', () => {
       it('应该应用全局透明度', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -727,7 +727,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           opacity: 0.5
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -739,7 +739,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
     describe('分离透明度', () => {
       it('应该支持填充透明度', async () => {
         // 填充透明度通过在fillStyle中使用rgba实现
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -747,7 +747,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'rgba(255, 0, 0, 0.5)' // 50%透明度的红色
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -758,7 +758,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
 
       it('应该支持描边透明度', async () => {
         // 描边透明度通过在strokeStyle中使用rgba实现
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -767,7 +767,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineWidth: 2
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -784,7 +784,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
   describe('虚线 (Dash)', () => {
     describe('虚线模式', () => {
       it('应该应用虚线模式', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -794,7 +794,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineDash: [10, 5]
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -807,7 +807,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
       })
 
       it('应该支持复杂虚线模式', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -817,7 +817,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineDash: [20, 5, 5, 5]
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -829,7 +829,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
 
     describe('虚线偏移', () => {
       it('应该应用虚线偏移', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -840,7 +840,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineDashOffset: 5
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -858,7 +858,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
     describe('线帽', () => {
       it('应该支持 butt 线帽', async () => {
         const { line } = await import('../components/line')
-        const mount = line({
+        const mountable = line({
           x1: 0,
           y1: 0,
           x2: 100,
@@ -868,7 +868,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineCap: 'butt'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -878,7 +878,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
 
       it('应该支持 round 线帽', async () => {
         const { line } = await import('../components/line')
-        const mount = line({
+        const mountable = line({
           x1: 0,
           y1: 0,
           x2: 100,
@@ -888,7 +888,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineCap: 'round'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -898,7 +898,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
 
       it('应该支持 square 线帽', async () => {
         const { line } = await import('../components/line')
-        const mount = line({
+        const mountable = line({
           x1: 0,
           y1: 0,
           x2: 100,
@@ -908,7 +908,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineCap: 'square'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -920,14 +920,14 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
     describe('连接样式', () => {
       it('应该支持 miter 连接', async () => {
         const { line } = await import('../components/line')
-        const mount = line({
+        const mountable = line({
           points: [0, 0, 50, 50, 100, 0],
           stroke: 'black',
           lineWidth: 10,
           lineJoin: 'miter'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -937,14 +937,14 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
 
       it('应该支持 round 连接', async () => {
         const { line } = await import('../components/line')
-        const mount = line({
+        const mountable = line({
           points: [0, 0, 50, 50, 100, 0],
           stroke: 'black',
           lineWidth: 10,
           lineJoin: 'round'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -954,14 +954,14 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
 
       it('应该支持 bevel 连接', async () => {
         const { line } = await import('../components/line')
-        const mount = line({
+        const mountable = line({
           points: [0, 0, 50, 50, 100, 0],
           stroke: 'black',
           lineWidth: 10,
           lineJoin: 'bevel'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -973,7 +973,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
     describe('斜接限制', () => {
       it('应该应用斜接限制', async () => {
         const { line } = await import('../components/line')
-        const mount = line({
+        const mountable = line({
           points: [0, 0, 50, 50, 100, 0],
           stroke: 'black',
           lineWidth: 10,
@@ -981,7 +981,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           miterLimit: 5
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -997,7 +997,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
   describe('合成操作 (Compositing)', () => {
     describe('混合模式', () => {
       it('应该支持 source-over 模式', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -1006,7 +1006,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           globalCompositeOperation: 'source-over'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -1015,7 +1015,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
       })
 
       it('应该支持 multiply 模式', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -1024,7 +1024,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           globalCompositeOperation: 'multiply'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -1033,7 +1033,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
       })
 
       it('应该支持 screen 模式', async () => {
-        const mount = rect({
+        const mountable = rect({
           x: 0,
           y: 0,
           width: 100,
@@ -1042,7 +1042,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           globalCompositeOperation: 'screen'
         })
 
-        const cleanup = mount(ctx)
+        const cleanup = mount(mountable, ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()

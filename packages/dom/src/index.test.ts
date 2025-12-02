@@ -97,8 +97,8 @@ describe('@rasenjs/dom', () => {
       unmount?.()
     })
 
-    it('should set className', () => {
-      const unmount = mount(div({ className: 'container' }), container)
+    it('should set class', () => {
+      const unmount = mount(div({ class: 'container' }), container)
       expect(container.querySelector('.container')).not.toBeNull()
       unmount?.()
     })
@@ -109,9 +109,9 @@ describe('@rasenjs/dom', () => {
       unmount?.()
     })
 
-    it('should update className reactively', async () => {
+    it('should update class reactively', async () => {
       const cls = ref('active')
-      const unmount = mount(div({ className: cls }), container)
+      const unmount = mount(div({ class: cls }), container)
       expect(container.querySelector('.active')).not.toBeNull()
 
       cls.value = 'inactive'
@@ -145,7 +145,7 @@ describe('@rasenjs/dom', () => {
 
     it('should set arbitrary attributes', () => {
       const unmount = mount(div({
-        attrs: { 'data-id': '123', 'aria-label': 'test' }
+        dataId: '123', ariaLabel: 'test'
       }), container)
       const el = container.firstElementChild as HTMLElement
       expect(el.getAttribute('data-id')).toBe('123')
@@ -154,14 +154,14 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should handle boolean attribute true', () => {
-      const unmount = mount(input({ attrs: { disabled: true } }), container)
+      const unmount = mount(input({ disabled: true }), container)
       const el = container.querySelector('input') as HTMLInputElement
       expect(el.hasAttribute('disabled')).toBe(true)
       unmount?.()
     })
 
     it('should handle boolean attribute false', () => {
-      const unmount = mount(input({ attrs: { disabled: false } }), container)
+      const unmount = mount(input({ disabled: false }), container)
       const el = container.querySelector('input') as HTMLInputElement
       expect(el.hasAttribute('disabled')).toBe(false)
       unmount?.()
@@ -205,10 +205,10 @@ describe('@rasenjs/dom', () => {
 
     it('should support nested components', () => {
       const unmount = mount(div({
-        className: 'outer',
+        class: 'outer',
         children: [
           div({
-            className: 'inner',
+            class: 'inner',
             children: [span({ children: 'Nested' })]
           })
         ]
@@ -322,17 +322,17 @@ describe('@rasenjs/dom', () => {
   })
 
   describe('events', () => {
-    it('should bind click event via on object', () => {
+    it('should bind click event via onClick', () => {
       const handler = vi.fn()
-      const unmount = mount(button({ on: { click: handler } }), container)
+      const unmount = mount(button({ onClick: handler }), container)
       container.querySelector('button')?.click()
       expect(handler).toHaveBeenCalledTimes(1)
       unmount?.()
     })
 
-    it('should bind input event via on object', () => {
+    it('should bind input event via onInput', () => {
       const handler = vi.fn()
-      const unmount = mount(input({ on: { input: handler } }), container)
+      const unmount = mount(input({ onInput: handler }), container)
       container.querySelector('input')?.dispatchEvent(new Event('input'))
       expect(handler).toHaveBeenCalledTimes(1)
       unmount?.()
@@ -398,8 +398,8 @@ describe('@rasenjs/dom', () => {
     it('should create select with options', () => {
       const unmount = mount(select({
         children: [
-          option({ attrs: { value: 'a' }, children: 'Option A' }),
-          option({ attrs: { value: 'b' }, children: 'Option B' })
+          option({ value: 'a', children: 'Option A' }),
+          option({ value: 'b', children: 'Option B' })
         ]
       }), container)
 
@@ -413,7 +413,7 @@ describe('@rasenjs/dom', () => {
   describe('specific elements', () => {
     it('should set link href', () => {
       const unmount = mount(a({
-        attrs: { href: 'https://example.com' },
+        href: 'https://example.com',
         children: 'Link'
       }), container)
       expect(container.querySelector('a')?.getAttribute('href')).toBe(
@@ -423,13 +423,13 @@ describe('@rasenjs/dom', () => {
     })
 
     it('should set link target', () => {
-      const unmount = mount(a({ attrs: { href: '#', target: '_blank' } }), container)
+      const unmount = mount(a({ href: '#', target: '_blank' }), container)
       expect(container.querySelector('a')?.target).toBe('_blank')
       unmount?.()
     })
 
     it('should set img src and alt', () => {
-      const unmount = mount(img({ attrs: { src: 'image.png', alt: 'An image' } }), container)
+      const unmount = mount(img({ src: 'image.png', alt: 'An image' }), container)
       const el = container.querySelector('img')!
       expect(el.src).toContain('image.png')
       expect(el.alt).toBe('An image')
@@ -487,7 +487,7 @@ describe('@rasenjs/dom', () => {
     it('should support component nesting', () => {
       const Card = (props: { title: string; content: string }) =>
         div({
-          className: 'card',
+          class: 'card',
           children: [
             h1({ children: props.title }),
             p({ children: props.content })
@@ -993,13 +993,13 @@ describe('@rasenjs/dom', () => {
 
       const unmount1 = mount(input({
         type: 'radio',
-        attrs: { name: 'gender', value: 'male' },
+        name: 'gender', value: 'male',
         checked: computed(() => gender.value === 'male')
       }), container)
 
       const unmount2 = mount(input({
         type: 'radio',
-        attrs: { name: 'gender', value: 'female' },
+        name: 'gender', value: 'female',
         checked: computed(() => gender.value === 'female')
       }), container)
 
@@ -1015,13 +1015,13 @@ describe('@rasenjs/dom', () => {
 
       const unmount1 = mount(input({
         type: 'radio',
-        attrs: { name: 'gender', value: 'male' },
+        name: 'gender', value: 'male',
         checked: computed(() => gender.value === 'male')
       }), container)
 
       const unmount2 = mount(input({
         type: 'radio',
-        attrs: { name: 'gender', value: 'female' },
+        name: 'gender', value: 'female',
         checked: computed(() => gender.value === 'female')
       }), container)
 
@@ -1371,8 +1371,8 @@ describe('@rasenjs/dom', () => {
 
       const unmount = hydrate(
         div({
-          className: 'outer',
-          children: [span({ className: 'inner', children: 'Nested' })]
+          class: 'outer',
+          children: [span({ class: 'inner', children: 'Nested' })]
         }),
         container
       )
