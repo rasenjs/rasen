@@ -7,9 +7,7 @@ export default defineConfig({
     'jsx-dev-runtime': 'src/jsx-dev-runtime.ts'
   },
   format: ['esm', 'cjs'],
-  dts: {
-    resolve: true
-  },
+  dts: true,
   clean: true,
   sourcemap: true,
   external: ['@rasenjs/core', '@rasenjs/dom'],
