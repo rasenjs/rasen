@@ -9,10 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@rasenjs/core": "^0.1.0-alpha",
-    "@rasenjs/dom": "^0.1.0-alpha",
-    "@rasenjs/jsx-runtime": "^0.1.0-alpha",
-    "@rasenjs/reactive-signals": "^0.1.0-alpha"
+    "@rasenjs/core": "^0.1.1-alpha",
+    "@rasenjs/dom": "^0.1.1-alpha",
+    "@rasenjs/jsx-runtime": "^0.1.1-alpha",
+    "@rasenjs/reactive-signals": "^0.1.1-alpha"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

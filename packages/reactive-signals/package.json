@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/reactive-signals",
-  "version": "0.1.0-alpha",
+  "version": "0.1.1-alpha",
   "description": "TC39 Signals adapter for Rasen",
   "type": "module",
   "main": "./dist/index.cjs",
