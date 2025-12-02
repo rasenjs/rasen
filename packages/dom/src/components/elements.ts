@@ -1,4 +1,4 @@
-import type { SyncComponent, PropValue, MountFunction } from '@rasenjs/core'
+import type { SyncComponent, PropValue, MountFunction, Ref } from '@rasenjs/core'
 import { element } from './element'
 
 console.log('🔥 elements.ts loaded - SOURCE CODE VERSION with event fix')
@@ -15,6 +15,8 @@ interface BaseProps {
   onClick?: (e: Event) => void
   onInput?: (e: Event) => void
   onKeyPress?: (e: Event) => void
+  /** Element reference */
+  ref?: Ref<HTMLElement | null>
 }
 
 /**

@@ -120,15 +120,15 @@ export const eventPlugins = [
 /**
  * 创建按键修饰器插件
  */
-function createKeyPlugin(
-  name: string,
+function createKeyPlugin<K extends string>(
+  name: K,
   keys: string[]
-): EventModifierPlugin<KeyboardEvent, string, boolean> {
+): EventModifierPlugin<Event, K, boolean> {
   return {
     name,
     apply: (options: object) => ({ ...options, [name]: true }),
-    filter: (event: KeyboardEvent, options: Record<string, unknown>) => {
-      if (options[name] && !keys.includes(event.key)) {
+    filter: (event: Event, options: Record<string, unknown>) => {
+      if (options[name] && !keys.includes((event as KeyboardEvent).key)) {
         return false
       }
       return true
@@ -179,6 +179,47 @@ export interface ModifiedHandler<E extends Event = Event> {
 }
 
 // ============================================
+// 事件修饰器链类型（专用于事件处理）
+// ============================================
+
+/** 事件处理函数类型 */
+type EventHandler = (event: Event) => void
+
+/** 所有可用的修饰器名称 */
+type ModifierName =
+  | 'prevent'
+  | 'stop'
+  | 'capture'
+  | 'once'
+  | 'self'
+  | 'enter'
+  | 'esc'
+  | 'tab'
+  | 'space'
+  | 'delete'
+  | 'up'
+  | 'down'
+  | 'left'
+  | 'right'
+
+/**
+ * 事件修饰器链类型
+ * 支持链式调用，且每个修饰器只能使用一次
+ */
+export type EventModifierChain<Used extends ModifierName = never> = {
+  /** 调用链终结：传入事件处理函数，返回修饰后的处理器 */
+  (handler: EventHandler): ModifiedHandler<Event>
+  /** 空调用：返回自身 */
+  (): EventModifierChain<Used>
+} & {
+  /** 链式属性：未使用的修饰器 */
+  [K in Exclude<ModifierName, Used>]: EventModifierChain<Used | K>
+} & {
+  /** 当前累积的选项 */
+  readonly options: object
+}
+
+// ============================================
 // 创建自定义 finalizer
 // ============================================
 
@@ -223,12 +264,15 @@ function eventFinalizer(
 // 创建链式 API
 // ============================================
 
-// 合并所有插件
-const allEventPlugins = [...eventPlugins, ...keyPlugins] as EventModifierPlugin<
-  Event,
-  string,
-  boolean
->[]
+// 合并所有插件（保留完整类型信息）
+const allEventPlugins = [...eventPlugins, ...keyPlugins] as const
+
+// 内部使用 createModifierChain 创建运行时实现
+const _mod = createModifierChain<
+  typeof allEventPlugins,
+  EventHandler,
+  ModifiedHandler<Event>
+>(allEventPlugins, eventFinalizer)
 
 /**
  * mod - 通用事件修饰器入口
@@ -237,7 +281,7 @@ const allEventPlugins = [...eventPlugins, ...keyPlugins] as EventModifierPlugin<
  * onClick: mod.prevent.stop(fn)
  * onKeydown: mod.enter.prevent(fn)
  */
-export const mod = createModifierChain(allEventPlugins, eventFinalizer)
+export const mod: EventModifierChain = _mod as unknown as EventModifierChain
 
 /**
  * prevent - 阻止默认行为
@@ -246,7 +290,8 @@ export const mod = createModifierChain(allEventPlugins, eventFinalizer)
  * onClick: prevent(handleClick)
  * onClick: prevent.stop(handleClick)
  */
-export const prevent = mod.prevent
+export const prevent: EventModifierChain<'prevent'> =
+  mod.prevent as EventModifierChain<'prevent'>
 
 /**
  * stop - 阻止事件冒泡
@@ -255,7 +300,8 @@ export const prevent = mod.prevent
  * onClick: stop(handleClick)
  * onClick: stop.prevent(handleClick)
  */
-export const stop = mod.stop
+export const stop: EventModifierChain<'stop'> =
+  mod.stop as EventModifierChain<'stop'>
 
 /**
  * capture - 使用捕获阶段
@@ -264,7 +310,8 @@ export const stop = mod.stop
  * onClick: capture(handleClick)
  * onClick: capture.once(handleClick)
  */
-export const capture = mod.capture
+export const capture: EventModifierChain<'capture'> =
+  mod.capture as EventModifierChain<'capture'>
 
 /**
  * once - 只执行一次
@@ -273,7 +320,8 @@ export const capture = mod.capture
  * onClick: once(handleClick)
  * onClick: once.prevent(handleClick)
  */
-export const once = mod.once
+export const once: EventModifierChain<'once'> =
+  mod.once as EventModifierChain<'once'>
 
 /**
  * self - 只在目标元素上触发
@@ -282,7 +330,8 @@ export const once = mod.once
  * onClick: self(handleClick)
  * onClick: self.stop(handleClick)
  */
-export const self = mod.self
+export const self: EventModifierChain<'self'> =
+  mod.self as EventModifierChain<'self'>
 
 // ============================================
 // 按键修饰器入口
@@ -297,27 +346,35 @@ export const self = mod.self
  * onKeydown: key.esc(handleCancel)
  */
 export const key = {
-  enter: mod.enter,
-  esc: mod.esc,
-  tab: mod.tab,
-  space: mod.space,
-  delete: mod.delete,
-  up: mod.up,
-  down: mod.down,
-  left: mod.left,
-  right: mod.right
+  enter: mod.enter as EventModifierChain<'enter'>,
+  esc: mod.esc as EventModifierChain<'esc'>,
+  tab: mod.tab as EventModifierChain<'tab'>,
+  space: mod.space as EventModifierChain<'space'>,
+  delete: mod.delete as EventModifierChain<'delete'>,
+  up: mod.up as EventModifierChain<'up'>,
+  down: mod.down as EventModifierChain<'down'>,
+  left: mod.left as EventModifierChain<'left'>,
+  right: mod.right as EventModifierChain<'right'>
 }
 
 // 单独导出按键修饰器，便于直接使用
-export const enter = mod.enter
-export const esc = mod.esc
-export const tab = mod.tab
-export const space = mod.space
-export const del = mod.delete // delete 是保留字
-export const up = mod.up
-export const down = mod.down
-export const left = mod.left
-export const right = mod.right
+export const enter: EventModifierChain<'enter'> =
+  mod.enter as EventModifierChain<'enter'>
+export const esc: EventModifierChain<'esc'> =
+  mod.esc as EventModifierChain<'esc'>
+export const tab: EventModifierChain<'tab'> =
+  mod.tab as EventModifierChain<'tab'>
+export const space: EventModifierChain<'space'> =
+  mod.space as EventModifierChain<'space'>
+export const del: EventModifierChain<'delete'> =
+  mod.delete as EventModifierChain<'delete'> // delete 是保留字
+export const up: EventModifierChain<'up'> = mod.up as EventModifierChain<'up'>
+export const down: EventModifierChain<'down'> =
+  mod.down as EventModifierChain<'down'>
+export const left: EventModifierChain<'left'> =
+  mod.left as EventModifierChain<'left'>
+export const right: EventModifierChain<'right'> =
+  mod.right as EventModifierChain<'right'>
 
 // ============================================
 // 底层 modifier 函数（兼容旧 API）

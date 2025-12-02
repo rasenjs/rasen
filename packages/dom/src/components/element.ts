@@ -142,7 +142,8 @@ export const element: SyncComponent<
 
     host.appendChild(element)
 
-    return () => {
+    // 创建带 node 属性的 unmount 函数
+    const unmount = () => {
       // 清理 ref
       if (props.ref) {
         props.ref.value = null
@@ -156,5 +157,10 @@ export const element: SyncComponent<
       }
       element.remove()
     }
+    
+    // 附加 node 引用，供 each 组件进行节点移动
+    ;(unmount as { node?: Node }).node = element
+    
+    return unmount
   }
 }

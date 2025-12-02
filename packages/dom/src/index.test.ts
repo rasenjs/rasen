@@ -37,6 +37,8 @@ import {
   aside,
   when,
   show,
+  each,
+  repeat,
   // Event modifiers
   modifier,
   mod,
@@ -996,6 +998,264 @@ describe('@rasenjs/dom', () => {
 
       expect(inputRef.value?.value).toBe('test')
       unmount?.()
+    })
+  })
+
+  describe('each', () => {
+    it('should render list of objects', () => {
+      const items = ref([
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' },
+        { id: 3, name: 'Charlie' }
+      ])
+
+      const unmount = each(items, (item) =>
+        div({ children: item.name })
+      )(container)
+
+      const divs = container.querySelectorAll('div')
+      expect(divs.length).toBe(3)
+      expect(divs[0].textContent).toBe('Alice')
+      expect(divs[1].textContent).toBe('Bob')
+      expect(divs[2].textContent).toBe('Charlie')
+
+      unmount?.()
+    })
+
+    it('should add new items', async () => {
+      const item1 = { id: 1, name: 'Alice' }
+      const items = ref([item1])
+
+      const unmount = each(items, (item) =>
+        div({ children: item.name })
+      )(container)
+
+      expect(container.querySelectorAll('div').length).toBe(1)
+
+      // Add new item while keeping old reference
+      items.value = [item1, { id: 2, name: 'Bob' }]
+      await Promise.resolve()
+
+      const divs = container.querySelectorAll('div')
+      expect(divs.length).toBe(2)
+      expect(divs[0].textContent).toBe('Alice')
+      expect(divs[1].textContent).toBe('Bob')
+
+      unmount?.()
+    })
+
+    it('should remove items', async () => {
+      const item1 = { id: 1, name: 'Alice' }
+      const item2 = { id: 2, name: 'Bob' }
+      const items = ref([item1, item2])
+
+      const unmount = each(items, (item) =>
+        div({ children: item.name })
+      )(container)
+
+      expect(container.querySelectorAll('div').length).toBe(2)
+
+      items.value = [item1] // Remove item2
+      await Promise.resolve()
+
+      const divs = container.querySelectorAll('div')
+      expect(divs.length).toBe(1)
+      expect(divs[0].textContent).toBe('Alice')
+
+      unmount?.()
+    })
+
+    it('should reuse DOM nodes for same object references (swap)', async () => {
+      const item1 = { id: 1, name: 'Alice' }
+      const item2 = { id: 2, name: 'Bob' }
+      const items = ref([item1, item2])
+
+      const unmount = each(items, (item) =>
+        div({ children: item.name })
+      )(container)
+
+      const divs = container.querySelectorAll('div')
+      const node1 = divs[0]
+      const node2 = divs[1]
+
+      // Swap items (same object references)
+      items.value = [item2, item1]
+      await Promise.resolve()
+
+      // Same DOM nodes should be reused, just reordered
+      const newDivs = container.querySelectorAll('div')
+      expect(newDivs[0]).toBe(node2)
+      expect(newDivs[1]).toBe(node1)
+      expect(newDivs[0].textContent).toBe('Bob')
+      expect(newDivs[1].textContent).toBe('Alice')
+
+      unmount?.()
+    })
+
+    it('should create new instances for new objects', async () => {
+      const item1 = { id: 1, name: 'Alice' }
+      const items = ref([item1])
+
+      const unmount = each(items, (item) =>
+        div({ children: item.name })
+      )(container)
+
+      const originalNode = container.querySelector('div')
+
+      // Replace with new object (same id but different reference)
+      items.value = [{ id: 1, name: 'Alice Updated' }]
+      await Promise.resolve()
+
+      // New object = new DOM node
+      const newNode = container.querySelector('div')
+      expect(newNode).not.toBe(originalNode)
+      expect(newNode?.textContent).toBe('Alice Updated')
+
+      unmount?.()
+    })
+
+    it('should work with getter function', async () => {
+      const items = ref([{ id: 1, name: 'Test' }])
+
+      const unmount = each(
+        () => items.value,
+        (item) => div({ children: item.name })
+      )(container)
+
+      expect(container.querySelectorAll('div').length).toBe(1)
+
+      unmount?.()
+    })
+
+    it('should clear all items', async () => {
+      const items = ref([
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' }
+      ])
+
+      const unmount = each(items, (item) =>
+        div({ children: item.name })
+      )(container)
+
+      expect(container.querySelectorAll('div').length).toBe(2)
+
+      items.value = []
+      await Promise.resolve()
+
+      expect(container.querySelectorAll('div').length).toBe(0)
+
+      unmount?.()
+    })
+
+    it('should cleanup on unmount', () => {
+      const items = ref([
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' }
+      ])
+
+      const unmount = each(items, (item) =>
+        div({ children: item.name })
+      )(container)
+
+      expect(container.querySelectorAll('div').length).toBe(2)
+
+      unmount?.()
+
+      expect(container.querySelectorAll('div').length).toBe(0)
+    })
+  })
+
+  describe('repeat', () => {
+    it('should render list of values', () => {
+      const tags = ref(['red', 'blue', 'green'])
+
+      const unmount = repeat(tags, (tag) =>
+        span({ children: tag })
+      )(container)
+
+      const spans = container.querySelectorAll('span')
+      expect(spans.length).toBe(3)
+      expect(spans[0].textContent).toBe('red')
+      expect(spans[1].textContent).toBe('blue')
+      expect(spans[2].textContent).toBe('green')
+
+      unmount?.()
+    })
+
+    it('should render by count', () => {
+      const count = ref(5)
+
+      const unmount = repeat(count, (index) =>
+        div({ children: String(index) })
+      )(container)
+
+      const divs = container.querySelectorAll('div')
+      expect(divs.length).toBe(5)
+      expect(divs[0].textContent).toBe('0')
+      expect(divs[4].textContent).toBe('4')
+
+      unmount?.()
+    })
+
+    it('should add items when count increases', async () => {
+      const count = ref(2)
+
+      const unmount = repeat(count, (index) =>
+        div({ children: String(index) })
+      )(container)
+
+      expect(container.querySelectorAll('div').length).toBe(2)
+
+      count.value = 4
+      await Promise.resolve()
+
+      expect(container.querySelectorAll('div').length).toBe(4)
+
+      unmount?.()
+    })
+
+    it('should remove items when count decreases', async () => {
+      const count = ref(4)
+
+      const unmount = repeat(count, (index) =>
+        div({ children: String(index) })
+      )(container)
+
+      expect(container.querySelectorAll('div').length).toBe(4)
+
+      count.value = 2
+      await Promise.resolve()
+
+      expect(container.querySelectorAll('div').length).toBe(2)
+
+      unmount?.()
+    })
+
+    it('should work with getter function', () => {
+      const count = ref(3)
+
+      const unmount = repeat(
+        () => count.value,
+        (index) => div({ children: String(index) })
+      )(container)
+
+      expect(container.querySelectorAll('div').length).toBe(3)
+
+      unmount?.()
+    })
+
+    it('should cleanup on unmount', () => {
+      const count = ref(3)
+
+      const unmount = repeat(count, (index) =>
+        div({ children: String(index) })
+      )(container)
+
+      expect(container.querySelectorAll('div').length).toBe(3)
+
+      unmount?.()
+
+      expect(container.querySelectorAll('div').length).toBe(0)
     })
   })
 })

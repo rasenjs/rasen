@@ -1,8 +1,9 @@
-import { eachImpl, type MountFunction } from '@rasenjs/core'
+import { eachImpl, repeatImpl, type MountFunction, type Ref } from '@rasenjs/core'
 
 /**
  * DOM 优化版 each 组件
  *
+ * 使用对象引用（WeakMap）追踪实例，适用于对象列表。
  * 在 core 的 each 基础上，提供 DOM 特定优化：
  * - 使用 Comment 节点作为标记
  * - 使用 DocumentFragment 批量插入
@@ -10,110 +11,83 @@ import { eachImpl, type MountFunction } from '@rasenjs/core'
  */
 
 /**
- * each 组件 - 简化版本
- * @param items 响应式数组或返回数组的函数
- * @param render 渲染函数，接收 item 和 index
+ * each - 对象列表渲染
+ *
+ * @param items 数组、响应式数组引用或 getter 函数
+ * @param render 渲染函数
  */
-export function each<T>(
-  items: (() => T[]) | { value: T[] } | T[],
+export function each<T extends object>(
+  items: T[] | Ref<T[]> | (() => T[]),
   render: (item: T, index: number) => MountFunction<HTMLElement>
-): MountFunction<HTMLElement>
-
-/**
- * each 组件 - 完整配置版本
- */
-export function each<T>(config: {
-  items: () => T[]
-  getKey?: (item: T, index: number) => string | number
-  render: (item: T, index: number) => MountFunction<HTMLElement>
-}): MountFunction<HTMLElement>
-
-export function each<T>(
-  configOrItems:
-    | {
-        items: () => T[]
-        getKey?: (item: T, index: number) => string | number
-        render: (item: T, index: number) => MountFunction<HTMLElement>
-      }
-    | (() => T[])
-    | { value: T[] }
-    | T[],
-  render?: (item: T, index: number) => MountFunction<HTMLElement>
 ): MountFunction<HTMLElement> {
-  // 简化版本
-  if (render) {
-    let itemsGetter: () => T[]
-
-    if (typeof configOrItems === 'function') {
-      itemsGetter = configOrItems
-    } else if (
-      typeof configOrItems === 'object' &&
-      configOrItems !== null &&
-      'value' in configOrItems
-    ) {
-      itemsGetter = () => (configOrItems as { value: T[] }).value
-    } else {
-      itemsGetter = () => configOrItems as T[]
-    }
-
-    return eachImpl<T, HTMLElement, Node>({
-      items: itemsGetter,
-      getKey: defaultGetKey,
-      render,
-      ...domHooks
-    })
-  }
-
-  // 完整配置版本
-  const config = configOrItems as {
-    items: () => T[]
-    getKey?: (item: T, index: number) => string | number
-    render: (item: T, index: number) => MountFunction<HTMLElement>
-  }
+  // 判断是否为 Ref（有 value 属性）
+  const isRef = (v: unknown): v is Ref<T[]> =>
+    v !== null && typeof v === 'object' && 'value' in v
 
   return eachImpl<T, HTMLElement, Node>({
-    items: config.items,
-    getKey: config.getKey ?? defaultGetKey,
-    render: config.render,
+    items: typeof items === 'function'
+      ? items
+      : isRef(items)
+        ? () => items.value
+        : () => items,  // 普通数组
+    render,
     ...domHooks
   })
 }
 
 /**
- * 默认 getKey 实现
+ * repeat - 值列表或数量渲染
+ *
+ * 使用索引追踪，适用于基本值列表或纯数量渲染。
  */
-function defaultGetKey<T>(item: T, _index: number): string | number {
-  if (item && typeof item === 'object') {
-    const obj = item as Record<string, unknown>
-    if ('id' in obj) return obj.id as string | number
-    if ('key' in obj) return obj.key as string | number
-  }
-  return String(item)
+export function repeat<T>(
+  items: Ref<T[]> | (() => T[]),
+  render: (item: T, index: number) => MountFunction<HTMLElement>
+): MountFunction<HTMLElement>
+
+export function repeat(
+  count: Ref<number> | (() => number),
+  render: (index: number) => MountFunction<HTMLElement>
+): MountFunction<HTMLElement>
+
+export function repeat<T>(
+  itemsOrCount: Ref<T[]> | Ref<number> | (() => T[]) | (() => number),
+  render: ((item: T, index: number) => MountFunction<HTMLElement>) | ((index: number) => MountFunction<HTMLElement>)
+): MountFunction<HTMLElement> {
+  return repeatImpl<T, HTMLElement, Node>({
+    items: () => {
+      const value = typeof itemsOrCount === 'function'
+        ? itemsOrCount()
+        : itemsOrCount.value
+
+      if (typeof value === 'number') {
+        return Array.from({ length: value }, (_, i) => i) as T[]
+      }
+      return value as T[]
+    },
+    render: render as (item: T, index: number) => MountFunction<HTMLElement>,
+    ...domHooksForRepeat
+  })
 }
 
 /**
- * DOM 宿主操作钩子
+ * DOM 宿主操作钩子 - for each (支持 insertBefore)
  */
 const domHooks = {
-  // 创建标记节点
   createMarker: () => document.createComment('') as Node,
 
-  // 将标记添加到宿主
   appendMarker: (host: HTMLElement, marker: Node) => {
     host.appendChild(marker)
   },
 
-  // 在指定位置之前插入节点
   insertBefore: (host: HTMLElement, node: Node, before: Node | null) => {
     host.insertBefore(node, before)
   },
 
-  // 移除节点
   removeNode: (node: Node) => {
     node.parentNode?.removeChild(node)
   },
 
-  // 创建 DocumentFragment 用于批量插入
   createFragment: () => {
     const fragment = document.createDocumentFragment()
     return {
@@ -124,28 +98,36 @@ const domHooks = {
     }
   },
 
-  // 移除标记节点
   removeMarker: (marker: Node) => {
     marker.parentNode?.removeChild(marker)
+  }
+}
+
+/**
+ * DOM 宿主操作钩子 - for repeat (不需要 insertBefore)
+ */
+const domHooksForRepeat = {
+  createMarker: () => document.createComment('') as Node,
+
+  appendMarker: (host: HTMLElement, marker: Node) => {
+    host.appendChild(marker)
   },
 
-  // 捕获节点
-  captureNode: (callback: (node: Node) => void): HTMLElement => {
-    let captured = false
+  removeNode: (node: Node) => {
+    node.parentNode?.removeChild(node)
+  },
+
+  createFragment: () => {
+    const fragment = document.createDocumentFragment()
     return {
-      appendChild: (node: Node) => {
-        if (!captured) {
-          callback(node)
-          captured = true
-        }
-        // 实际的 appendChild 由 fragment 或 host 处理
-      },
-      insertBefore: (node: Node, _ref: Node | null) => {
-        if (!captured) {
-          callback(node)
-          captured = true
-        }
+      host: fragment as unknown as HTMLElement,
+      flush: (host: HTMLElement, before: Node | null) => {
+        host.insertBefore(fragment, before)
       }
-    } as unknown as HTMLElement
+    }
+  },
+
+  removeMarker: (marker: Node) => {
+    marker.parentNode?.removeChild(marker)
   }
 }

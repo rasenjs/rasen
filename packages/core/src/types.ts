@@ -10,6 +10,9 @@
 
 import type { Ref, ReadonlyRef } from './reactive'
 
+// Re-export for convenience
+export type { Ref, ReadonlyRef }
+
 /**
  * Mount 函数类型
  * 接收 host，返回 unmount 函数
