@@ -10,16 +10,28 @@ export function unref<T>(value: PropValue<T>): T {
 
 /**
  * 设置 DOM 属性
+ * 对于 data-* 属性，布尔值转为 "true"/"false" 字符串
+ * 对于其他属性，true 设为空字符串，false 移除属性
  */
 export function setAttribute(
   element: HTMLElement,
   name: string,
   value: string | number | boolean | null | undefined
 ) {
-  if (value === null || value === undefined || value === false) {
+  if (value === null || value === undefined) {
     element.removeAttribute(name)
-  } else if (value === true) {
-    element.setAttribute(name, '')
+  } else if (typeof value === 'boolean') {
+    // data-* 属性使用 "true"/"false" 字符串
+    if (name.startsWith('data-')) {
+      element.setAttribute(name, String(value))
+    } else {
+      // 其他布尔属性：true 设为空字符串，false 移除
+      if (value) {
+        element.setAttribute(name, '')
+      } else {
+        element.removeAttribute(name)
+      }
+    }
   } else {
     element.setAttribute(name, String(value))
   }

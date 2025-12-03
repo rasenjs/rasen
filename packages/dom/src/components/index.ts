@@ -33,7 +33,7 @@ export {
   select,
   option,
   // canvas, // 使用 canvas-bridge 的 canvas 组件
-  svg,
+  // svg, // SVG 需要单独处理
   section,
   article,
   header,

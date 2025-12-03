@@ -105,7 +105,7 @@ type TagToElement<T extends HTMLTagName> = HTMLElementTagNameMap[T]
  */
 interface BaseElementProps {
   ref?: Ref<HTMLElement | null> | ((el: HTMLElement | null) => void)
-  children?: PropValue<string> | Array<Mountable<HTMLElement>>
+  children?: PropValue<string> | Array<Mountable<HTMLElement> | string>
 }
 
 /**
@@ -124,7 +124,7 @@ type ElementProps<T extends HTMLTagName> = {
 type AnyElementProps = {
   tag: string
   ref?: Ref<HTMLElement | null>
-  children?: PropValue<string> | Array<Mountable<HTMLElement>>
+  children?: PropValue<string> | Array<Mountable<HTMLElement> | string>
   class?: PropValue<string>
   style?: PropValue<string | Record<string, string | number>>
   [key: string]: unknown
@@ -144,17 +144,11 @@ type AnyElementProps = {
  * - data-* / aria-*: 自动转换为 kebab-case
  *
  * @example
- * // 完整类型检查
  * element({ tag: 'input', type: 'text', value: signal('hello'), onInput: (e) => {} })
  * element({ tag: 'button', onClick: () => {}, children: 'Click me' })
- *
- * // 类型错误会被捕获
- * element({ tag: 'inptu' })  // Error: 'inptu' 不是有效标签
- * element({ tag: 'div', href: '...' })  // Error: div 没有 href 属性
+ * element({ tag: 'div', class: 'box', children: [child1, child2] })
  */
-export function element<T extends HTMLTagName>(
-  props: ElementProps<T>
-): Mountable<HTMLElement>
+export function element<T extends HTMLTagName>(props: ElementProps<T>): Mountable<HTMLElement>
 
 // 重载：支持字符串标签（用于动态标签或自定义元素）
 export function element(props: AnyElementProps): Mountable<HTMLElement>
@@ -248,12 +242,19 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
           )
         )
       } else if (Array.isArray(children)) {
-        // Mount functions
+        // Mount functions (支持 string 和 Mountable 混合)
         if (ctx?.isHydrating) {
           ctx.enterChildren(el)
         }
         for (const child of children) {
-          childUnmounts.push(child(el))
+          if (typeof child === 'string') {
+            // 字符串直接创建 text node
+            const textNode = document.createTextNode(child)
+            el.appendChild(textNode)
+            childUnmounts.push(() => textNode.remove())
+          } else if (typeof child === 'function') {
+            childUnmounts.push((child as Mountable<HTMLElement>)(el))
+          }
         }
         if (ctx?.isHydrating) {
           ctx.exitChildren()

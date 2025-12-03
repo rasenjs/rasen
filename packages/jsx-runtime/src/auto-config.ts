@@ -26,7 +26,7 @@ import {
   select,
   option,
   canvas,
-  svg,
+  // svg, // SVG 需要单独处理
   section,
   article,
   header,
@@ -69,7 +69,7 @@ configureTags({
     select,
     option,
     canvas,
-    svg,
+    // svg,
     section,
     article,
     header,
