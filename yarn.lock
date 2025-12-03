@@ -2900,7 +2900,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/core@workspace:*, @rasenjs/core@workspace:packages/core":
+"@rasenjs/core@npm:^0.1.1-alpha, @rasenjs/core@workspace:*, @rasenjs/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@rasenjs/core@workspace:packages/core"
   dependencies:
@@ -2913,7 +2913,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/dom@workspace:*, @rasenjs/dom@workspace:packages/dom":
+"@rasenjs/dom@npm:^0.1.1-alpha, @rasenjs/dom@workspace:*, @rasenjs/dom@workspace:packages/dom":
   version: 0.0.0-use.local
   resolution: "@rasenjs/dom@workspace:packages/dom"
   dependencies:
@@ -3005,7 +3005,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/jsx-runtime@workspace:*, @rasenjs/jsx-runtime@workspace:packages/jsx-runtime":
+"@rasenjs/jsx-runtime@npm:^0.1.1-alpha, @rasenjs/jsx-runtime@workspace:*, @rasenjs/jsx-runtime@workspace:packages/jsx-runtime":
   version: 0.0.0-use.local
   resolution: "@rasenjs/jsx-runtime@workspace:packages/jsx-runtime"
   dependencies:
@@ -3013,6 +3013,27 @@ __metadata:
     "@rasenjs/dom": "workspace:*"
     tsup: "npm:^8.3.5"
     typescript: "npm:^5.7.2"
+  languageName: unknown
+  linkType: soft
+
+"@rasenjs/lvgl@workspace:*, @rasenjs/lvgl@workspace:packages/lvgl":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/lvgl@workspace:packages/lvgl"
+  dependencies:
+    "@rasenjs/core": "workspace:*"
+    "@types/node": "npm:^22.10.1"
+    tsup: "npm:^8.3.5"
+    typescript: "npm:^5.7.2"
+  peerDependencies:
+    "@rasenjs/reactive-signals": "workspace:*"
+    "@rasenjs/reactive-vue": "workspace:*"
+  peerDependenciesMeta:
+    "@rasenjs/reactive-signals":
+      optional: true
+    "@rasenjs/reactive-vue":
+      optional: true
+  bin:
+    rasen-lvgl: ./bin/rasen-lvgl.cjs
   languageName: unknown
   linkType: soft
 
@@ -3030,7 +3051,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/reactive-signals@workspace:*, @rasenjs/reactive-signals@workspace:packages/reactive-signals":
+"@rasenjs/reactive-signals@npm:^0.1.1-alpha, @rasenjs/reactive-signals@workspace:*, @rasenjs/reactive-signals@workspace:packages/reactive-signals":
   version: 0.0.0-use.local
   resolution: "@rasenjs/reactive-signals@workspace:packages/reactive-signals"
   dependencies:
@@ -3043,7 +3064,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/reactive-vue@workspace:*, @rasenjs/reactive-vue@workspace:packages/reactive-vue":
+"@rasenjs/reactive-vue@npm:^0.1.1-alpha, @rasenjs/reactive-vue@workspace:*, @rasenjs/reactive-vue@workspace:packages/reactive-vue":
   version: 0.0.0-use.local
   resolution: "@rasenjs/reactive-vue@workspace:packages/reactive-vue"
   dependencies:
@@ -6305,6 +6326,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"example-lvgl-app@workspace:examples/lvgl":
+  version: 0.0.0-use.local
+  resolution: "example-lvgl-app@workspace:examples/lvgl"
+  dependencies:
+    "@rasenjs/lvgl": "workspace:*"
+    "@rasenjs/reactive-signals": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
 "execa@npm:^5.0.0, execa@npm:^5.1.1":
   version: 5.1.1
   resolution: "execa@npm:5.1.1"
@@ -7334,9 +7364,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "js-framework-benchmark-rasen@workspace:examples/benchmark"
   dependencies:
-    "@rasenjs/core": "workspace:*"
-    "@rasenjs/dom": "workspace:*"
-    "@rasenjs/reactive-vue": "workspace:*"
+    "@rasenjs/core": "npm:^0.1.1-alpha"
+    "@rasenjs/dom": "npm:^0.1.1-alpha"
+    "@rasenjs/reactive-vue": "npm:^0.1.1-alpha"
     typescript: "npm:^5.3.0"
     vite: "npm:^5.0.0"
   languageName: unknown
@@ -9354,10 +9384,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "rasen-app@workspace:templates/rasen-ts"
   dependencies:
-    "@rasenjs/core": "workspace:*"
-    "@rasenjs/dom": "workspace:*"
-    "@rasenjs/jsx-runtime": "workspace:*"
-    "@rasenjs/reactive-signals": "workspace:*"
+    "@rasenjs/core": "npm:^0.1.1-alpha"
+    "@rasenjs/dom": "npm:^0.1.1-alpha"
+    "@rasenjs/jsx-runtime": "npm:^0.1.1-alpha"
+    "@rasenjs/reactive-signals": "npm:^0.1.1-alpha"
     typescript: "npm:^5.6.0"
     vite: "npm:^6.0.0"
   languageName: unknown

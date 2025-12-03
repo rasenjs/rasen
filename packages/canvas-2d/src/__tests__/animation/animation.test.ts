@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createCanvas } from '@napi-rs/canvas'
 import { ref } from 'vue'
-import { setReactiveRuntime, mount } from '@rasenjs/core'
+import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { rect, RenderContext } from '../../index'
 import {
@@ -43,7 +43,7 @@ describe('动画和脏区域检测', () => {
     const y = ref(50)
 
     // 绘制初始矩形
-    mount(rect({ x, y, width: 50, height: 50, fill: '#ff0000' }), ctx)
+    rect({ x, y, width: 50, height: 50, fill: '#ff0000' })(ctx)
     await waitForUpdate(renderContext)
 
     // 验证初始位置有内容
@@ -64,7 +64,7 @@ describe('动画和脏区域检测', () => {
     const y = ref(50)
 
     // 绘制带阴影的矩形
-    mount(rect({
+    rect({
       x,
       y,
       width: 50,
@@ -74,7 +74,7 @@ describe('动画和脏区域检测', () => {
       shadowBlur: 10,
       shadowOffsetX: 10,
       shadowOffsetY: 10
-    }), ctx)
+    })(ctx)
     await waitForUpdate(renderContext)
 
     // 验证初始位置和阴影区域都有内容
@@ -99,14 +99,14 @@ describe('动画和脏区域检测', () => {
     const y = ref(100)
 
     // 绘制旋转 45 度的矩形
-    mount(rect({
+    rect({
       x,
       y,
       width: 40,
       height: 40,
       fill: '#00ff00',
       rotation: (45 * Math.PI) / 180
-    }), ctx)
+    })(ctx)
     await waitForUpdate(renderContext)
 
     // 验证旋转后的区域有内容（45度旋转的正方形会占据更大的边界框）
@@ -129,7 +129,7 @@ describe('动画和脏区域检测', () => {
     const scaleY = ref(1)
 
     // 绘制初始矩形
-    mount(rect({
+    rect({
       x: 100,
       y: 100,
       width: 50,
@@ -137,7 +137,7 @@ describe('动画和脏区域检测', () => {
       fill: '#0000ff',
       scaleX,
       scaleY
-    }), ctx)
+    })(ctx)
     await waitForUpdate(renderContext)
 
     // 验证初始大小有内容
@@ -159,7 +159,7 @@ describe('动画和脏区域检测', () => {
   it('连续快速移动 - 所有中间位置都应被清除', async () => {
     const x = ref(50)
 
-    mount(rect({ x, y: 50, width: 30, height: 30, fill: '#ff00ff' }), ctx)
+    rect({ x, y: 50, width: 30, height: 30, fill: '#ff00ff' })(ctx)
     await waitForUpdate(renderContext)
 
     // 快速连续移动
@@ -181,10 +181,10 @@ describe('动画和脏区域检测', () => {
     const x = ref(50)
 
     // 静态矩形（蓝色）
-    mount(rect({ x: 150, y: 50, width: 50, height: 50, fill: '#0000ff' }), ctx)
+    rect({ x: 150, y: 50, width: 50, height: 50, fill: '#0000ff' })(ctx)
 
     // 移动矩形（红色）
-    mount(rect({ x, y: 50, width: 50, height: 50, fill: '#ff0000' }), ctx)
+    rect({ x, y: 50, width: 50, height: 50, fill: '#ff0000' })(ctx)
     await waitForUpdate(renderContext)
 
     // 验证两个矩形都存在
@@ -208,7 +208,7 @@ describe('动画和脏区域检测', () => {
   it('颜色变化 - 不应产生拖影', async () => {
     const fill = ref('#ff0000')
 
-    mount(rect({ x: 100, y: 100, width: 50, height: 50, fill }), ctx)
+    rect({ x: 100, y: 100, width: 50, height: 50, fill })(ctx)
     await waitForUpdate(renderContext)
 
     // 获取初始颜色的像素数�?

@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime } from '@rasenjs/core'
+
 import {
   createMockContext,
   getCallArgs,
@@ -43,7 +44,7 @@ describe('text', () => {
         fill: '#333333'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -66,7 +67,7 @@ describe('text', () => {
         fill: 'black'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -84,7 +85,7 @@ describe('text', () => {
         textAlign: 'center'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -100,7 +101,7 @@ describe('text', () => {
         textBaseline: 'middle'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -117,7 +118,7 @@ describe('text', () => {
         y: 0
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -132,7 +133,7 @@ describe('text', () => {
         y: 0
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -147,7 +148,7 @@ describe('text', () => {
         y: 0
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -175,7 +176,7 @@ describe('text', () => {
         y: 10,
         textDecoration: 'underline'
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       expect(ctx.fillText).toHaveBeenCalledWith('Underlined Text', 10, 10)
@@ -192,7 +193,7 @@ describe('text', () => {
         y: 10,
         letterSpacing: 5
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       // 有字间距时,文本会被拆分为单个字符绘制

@@ -1,5 +1,5 @@
 import { getReactiveRuntime } from '../reactive'
-import { type Mountable, type PropValue, mountable, mount } from '../types'
+import { type Mountable, type PropValue } from '../types'
 
 /**
  * 宿主操作钩子 - 全部可选，与 each 保持一致
@@ -69,7 +69,7 @@ export interface WhenConfig<Host, N = unknown> {
 export function when<Host = unknown, N = unknown>(
   config: WhenConfig<Host, N>
 ): Mountable<Host> {
-  return mountable((host: Host) => {
+  return (host: Host) => {
     const runtime = getReactiveRuntime()
 
     // 创建标记（可选）
@@ -113,7 +113,7 @@ export function when<Host = unknown, N = unknown>(
       }
 
       const mountableChild = factory()
-      currentUnmount = mount(mountableChild, targetHost)
+      currentUnmount = mountableChild(targetHost)
       currentBranch = branch
     }
 
@@ -154,5 +154,5 @@ export function when<Host = unknown, N = unknown>(
         config.removeMarker(marker)
       }
     }
-  })
+  }
 }

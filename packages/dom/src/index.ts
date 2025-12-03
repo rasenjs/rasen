@@ -52,7 +52,7 @@ export {
   type EventModifierPlugin
 } from './utils/index'
 
-import { mount, type Mountable } from '@rasenjs/core'
+import type { Mountable } from '@rasenjs/core'
 import {
   createHydrationContext,
   setHydrationContext,
@@ -63,8 +63,19 @@ import {
 // 导出 hydration 相关
 export { getHydrationContext, isHydrating }
 
-// 直接导出 core 的 mount
-export { mount } from '@rasenjs/core'
+/**
+ * 挂载组件到 DOM 元素
+ * 
+ * @param mountable - Mountable 函数
+ * @param container - 目标容器元素
+ * @returns unmount 函数
+ */
+export function mount<T extends Element>(
+  mountable: Mountable<T>,
+  container: T
+): (() => void) | undefined {
+  return mountable(container)
+}
 
 /**
  * 水合组件到已有 DOM 元素

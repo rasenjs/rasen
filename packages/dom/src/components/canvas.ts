@@ -1,5 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import { unrefValue, mount, mountable } from '@rasenjs/core'
+import { unrefValue } from '@rasenjs/core'
 
 /**
  * 获取 Canvas 渲染上下文的函数类型
@@ -121,7 +121,7 @@ export function canvas<Ctx>(props: {
   style?: PropValue<Record<string, string | number>>
   children: Array<Mountable<Ctx>>
 }): Mountable<HTMLElement> {
-  return mountable((domHost: HTMLElement) => {
+  return (domHost: HTMLElement) => {
     // 创建 canvas 元素
     const canvasEl = document.createElement('canvas')
 
@@ -186,12 +186,12 @@ export function canvas<Ctx>(props: {
     }
 
     // 挂载子组件到渲染上下文
-    const childUnmounts = props.children.map((child) => mount(child, ctx))
+    const childUnmounts = props.children.map((child) => child(ctx))
 
     // 返回 unmount 函数
     return () => {
       childUnmounts.forEach((unmount) => unmount?.())
       canvasEl.remove()
     }
-  })
+  }
 }

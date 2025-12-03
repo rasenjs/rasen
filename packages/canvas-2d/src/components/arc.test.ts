@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime } from '@rasenjs/core'
+
 import {
   createMockContext,
   getCallArgs,
@@ -45,7 +46,7 @@ describe('arc', () => {
         stroke: '#ff0000'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -73,7 +74,7 @@ describe('arc', () => {
         fill: 'red'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -96,7 +97,7 @@ describe('arc', () => {
         stroke: 'blue'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

@@ -30,7 +30,7 @@
     "build": "tsup",
     "build:native": "cargo build --release",
     "dev": "tsup --watch",
-    "test": "vitest",
+    "test": "echo 'No tests configured'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

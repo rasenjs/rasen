@@ -1,4 +1,4 @@
-import { mount, mountable, type Mountable } from '../types'
+import { type Mountable } from '../types'
 import { getReactiveRuntime } from '../reactive'
 
 /**
@@ -19,7 +19,7 @@ function processChild<Host>(child: FragmentChild<Host>): Mountable<Host> {
   if (typeof child === 'string' || typeof child === 'number') {
     // 静态文本 - 返回通用 Mountable，具体实现由 host 决定
     const text = String(child)
-    return mountable((host: Host) => {
+    return (host: Host) => {
       if (host instanceof HTMLElement) {
         const textNode = document.createTextNode(text)
         host.appendChild(textNode)
@@ -27,13 +27,13 @@ function processChild<Host>(child: FragmentChild<Host>): Mountable<Host> {
       }
       // 其他 host 类型可以扩展
       return undefined
-    })
+    }
   }
   
   if (runtime.isRef(child)) {
     // 响应式 ref
     const refChild = child as { value: unknown }
-    return mountable((host: Host) => {
+    return (host: Host) => {
       if (host instanceof HTMLElement) {
         const textNode = document.createTextNode(String(refChild.value))
         host.appendChild(textNode)
@@ -51,7 +51,7 @@ function processChild<Host>(child: FragmentChild<Host>): Mountable<Host> {
         }
       }
       return undefined
-    })
+    }
   }
   
   // 已经是 Mountable
@@ -102,18 +102,18 @@ export const fragment: FragmentFunction = <Host = unknown>(
     
     const mounts = children.map(child => processChild<Host>(child))
     
-    return mountable((host: Host) => {
-      const unmounts = mounts.map(m => mount(m, host))
+    return (host: Host) => {
+      const unmounts = mounts.map(m => m(host))
       return () => unmounts.forEach(unmount => unmount?.())
-    })
+    }
   }
   
   // 对象参数用法
   const config = configOrStrings as { children: Array<Mountable<Host>> }
-  return mountable((host: Host) => {
-    const unmounts = config.children.map((child) => mount(child, host))
+  return (host: Host) => {
+    const unmounts = config.children.map((child) => child(host))
     return () => unmounts.forEach((unmount) => unmount?.())
-  })
+  }
 }
 
 // 导出 f 作为别名

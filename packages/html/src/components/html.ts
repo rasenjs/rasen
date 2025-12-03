@@ -1,5 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import { unrefValue, mountable } from '@rasenjs/core'
+import { unrefValue } from '@rasenjs/core'
 import type { StringHost } from '../types'
 
 /**
@@ -21,12 +21,12 @@ export const html = (props: {
   /** 原始 HTML 内容 */
   content: PropValue<string>
 }): Mountable<StringHost> => {
-  return mountable((host: StringHost) => {
+  return (host: StringHost) => {
     const content = unrefValue(props.content) || ''
     // 直接输出 HTML 内容，不添加包裹元素
     host.append(content)
 
     // SSR 不需要 unmount
     return undefined
-  })
+  }
 }

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, mountable } from '@rasenjs/core'
+import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { ref, computed } from 'vue'
 import {
@@ -520,12 +520,12 @@ describe('@rasenjs/dom', () => {
       const mountSpy = vi.fn()
 
       const Component = () => {
-        return mountable((host: HTMLElement) => {
+        return (host: HTMLElement) => {
           mountSpy()
           const el = document.createElement('div')
           host.appendChild(el)
           return () => el.remove()
-        })
+        }
       }
 
       const comp = Component()
@@ -538,14 +538,14 @@ describe('@rasenjs/dom', () => {
       const unmountSpy = vi.fn()
 
       const Component = () => {
-        return mountable((host: HTMLElement) => {
+        return (host: HTMLElement) => {
           const el = document.createElement('div')
           host.appendChild(el)
           return () => {
             unmountSpy()
             el.remove()
           }
-        })
+        }
       }
 
       const unmount = mount(Component(), container)
@@ -699,7 +699,7 @@ describe('@rasenjs/dom', () => {
       const condition = ref(true)
 
       const ThenComponent = () => {
-        return mountable((host: HTMLElement) => {
+        return (host: HTMLElement) => {
           const el = document.createElement('div')
           el.textContent = 'Then'
           host.appendChild(el)
@@ -707,7 +707,7 @@ describe('@rasenjs/dom', () => {
             unmountSpy()
             el.remove()
           }
-        })
+        }
       }
 
       const unmount = mount(when({

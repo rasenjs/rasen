@@ -1,5 +1,4 @@
 import type { Mountable, PropValue } from '@rasenjs/core'
-import { mount, mountable } from '@rasenjs/core'
 import { unref, watchProp } from '../utils'
 
 /**
@@ -18,13 +17,13 @@ export function show(config: {
   when: PropValue<boolean>
   children: Mountable<HTMLElement>
 }): Mountable<HTMLElement> {
-  return mountable((host: HTMLElement) => {
+  return (host: HTMLElement) => {
     // 创建一个包装容器来控制显示
     const wrapper = document.createElement('div')
     wrapper.style.display = 'contents' // 不影响布局
 
     // 挂载子组件
-    const childUnmount = mount(config.children, wrapper)
+    const childUnmount = config.children(wrapper)
 
     // 获取实际的子元素（第一个元素子节点）
     const getTargetElement = (): HTMLElement | null => {
@@ -70,7 +69,7 @@ export function show(config: {
       childUnmount?.()
       wrapper.remove()
     }
-  })
+  }
 }
 
 /**
@@ -83,7 +82,7 @@ export function showDirect(config: {
   when: PropValue<boolean>
   element: HTMLElement
 }): Mountable<HTMLElement> {
-  return mountable((host: HTMLElement) => {
+  return (host: HTMLElement) => {
     const element = config.element
     const originalDisplay = element.style.display || ''
 
@@ -100,5 +99,5 @@ export function showDirect(config: {
       stopWatch()
       element.remove()
     }
-  })
+  }
 }

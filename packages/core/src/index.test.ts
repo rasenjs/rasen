@@ -11,8 +11,6 @@ import {
   each,
   repeat,
   when,
-  mountable,
-  mount,
   type ReactiveRuntime,
   type MountFunction,
   type Ref
@@ -164,18 +162,18 @@ describe('@rasenjs/core', () => {
       const mountCalls: string[] = []
       const unmountCalls: string[] = []
 
-      const child1 = mountable(() => {
+      const child1 = (() => {
         mountCalls.push('child1')
         return () => unmountCalls.push('child1')
       })
 
-      const child2 = mountable(() => {
+      const child2 = (() => {
         mountCalls.push('child2')
         return () => unmountCalls.push('child2')
       })
 
       const frag = fragment({ children: [child1, child2] })
-      const cleanup = mount(frag, {})
+      const cleanup = frag({})
 
       expect(mountCalls).toEqual(['child1', 'child2'])
       expect(unmountCalls).toEqual([])
@@ -186,7 +184,7 @@ describe('@rasenjs/core', () => {
 
     it('应该支持空子组件列表', () => {
       const frag = fragment({ children: [] })
-      const cleanup = mount(frag, {})
+      const cleanup = frag({})
       expect(cleanup).toBeDefined()
       cleanup?.()
     })
@@ -194,14 +192,14 @@ describe('@rasenjs/core', () => {
     it('应该传递正确的 host 给子组件', () => {
       const receivedHosts: unknown[] = []
 
-      const child = mountable((host: { id: string }) => {
+      const child = ((host: { id: string }) => {
         receivedHosts.push(host)
         return () => {}
       })
 
       const testHost = { id: 'test-host' }
       const frag = fragment({ children: [child, child] })
-      mount(frag, testHost)
+      frag(testHost)
 
       expect(receivedHosts).toEqual([testHost, testHost])
     })
@@ -218,17 +216,17 @@ describe('@rasenjs/core', () => {
 
       const whenMountable = when({
         condition: true,
-        then: () => mountable(() => {
+        then: () => (() => {
           thenMounted()
           return () => {}
         }),
-        else: () => mountable(() => {
+        else: () => (() => {
           elseMounted()
           return () => {}
         })
       })
 
-      mount(whenMountable, {})
+      whenMountable({})
 
       expect(thenMounted).toHaveBeenCalled()
       expect(elseMounted).not.toHaveBeenCalled()
@@ -240,17 +238,17 @@ describe('@rasenjs/core', () => {
 
       const whenMountable = when({
         condition: false,
-        then: () => mountable(() => {
+        then: () => (() => {
           thenMounted()
           return () => {}
         }),
-        else: () => mountable(() => {
+        else: () => (() => {
           elseMounted()
           return () => {}
         })
       })
 
-      mount(whenMountable, {})
+      whenMountable({})
 
       expect(thenMounted).not.toHaveBeenCalled()
       expect(elseMounted).toHaveBeenCalled()
@@ -261,13 +259,13 @@ describe('@rasenjs/core', () => {
 
       const whenMountable = when({
         condition: false,
-        then: () => mountable(() => {
+        then: () => (() => {
           thenMounted()
           return () => {}
         })
       })
 
-      mount(whenMountable, {})
+      whenMountable({})
 
       expect(thenMounted).not.toHaveBeenCalled()
     })
@@ -278,13 +276,13 @@ describe('@rasenjs/core', () => {
 
       const whenMountable = when({
         condition,
-        then: () => mountable(() => {
+        then: () => (() => {
           thenMounted()
           return () => {}
         })
       })
 
-      mount(whenMountable, {})
+      whenMountable({})
 
       expect(thenMounted).toHaveBeenCalled()
     })
@@ -294,12 +292,12 @@ describe('@rasenjs/core', () => {
 
       const whenMountable = when({
         condition: true,
-        then: () => mountable(() => {
+        then: () => (() => {
           return () => childUnmounted()
         })
       })
 
-      const unmount = mount(whenMountable, {})
+      const unmount = whenMountable({})
       expect(childUnmounted).not.toHaveBeenCalled()
 
       unmount?.()
@@ -317,13 +315,13 @@ describe('@rasenjs/core', () => {
       const mountedItems: number[] = []
 
       const eachMountable = each(items, (item) =>
-        mountable(() => {
+        (() => {
           mountedItems.push(item.id)
           return () => {}
         })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
 
       expect(mountedItems).toEqual([1, 2, 3])
     })
@@ -333,13 +331,13 @@ describe('@rasenjs/core', () => {
       const mountedItems: number[] = []
 
       const eachMountable = each(items, (item) =>
-        mountable(() => {
+        (() => {
           mountedItems.push(item.id)
           return () => {}
         })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
 
       expect(mountedItems).toEqual([1, 2])
     })
@@ -351,13 +349,13 @@ describe('@rasenjs/core', () => {
       const eachMountable = each(
         () => items,
         (item) =>
-          mountable(() => {
+          (() => {
             mountedItems.push(item.id)
             return () => {}
           })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
 
       expect(mountedItems).toEqual([1, 2])
     })
@@ -367,13 +365,13 @@ describe('@rasenjs/core', () => {
       const receivedIndices: number[] = []
 
       const eachMountable = each(items, (_, index) =>
-        mountable(() => {
+        (() => {
           receivedIndices.push(index)
           return () => {}
         })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
 
       expect(receivedIndices).toEqual([0, 1, 2])
     })
@@ -383,12 +381,12 @@ describe('@rasenjs/core', () => {
       const unmountedItems: number[] = []
 
       const eachMountable = each(items, (item) =>
-        mountable(() => {
+        (() => {
           return () => unmountedItems.push(item.id)
         })
       )
 
-      const cleanup = mount(eachMountable, {})
+      const cleanup = eachMountable({})
       expect(unmountedItems).toEqual([])
 
       cleanup?.()
@@ -400,13 +398,13 @@ describe('@rasenjs/core', () => {
       const mountedItems: number[] = []
 
       const eachMountable = each(items, (item) =>
-        mountable(() => {
+        (() => {
           mountedItems.push(item.id)
           return () => {}
         })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
 
       expect(mountedItems).toEqual([])
     })
@@ -422,13 +420,13 @@ describe('@rasenjs/core', () => {
       const mountedIndices: number[] = []
 
       const repeatMountable = repeat(count, (index) =>
-        mountable(() => {
+        (() => {
           mountedIndices.push(index)
           return () => {}
         })
       )
 
-      mount(repeatMountable, {})
+      repeatMountable({})
 
       expect(mountedIndices).toEqual([0, 1, 2])
     })
@@ -438,13 +436,13 @@ describe('@rasenjs/core', () => {
       const mountedItems: string[] = []
 
       const repeatMountable = repeat(items, (item) =>
-        mountable(() => {
+        (() => {
           mountedItems.push(item)
           return () => {}
         })
       )
 
-      mount(repeatMountable, {})
+      repeatMountable({})
 
       expect(mountedItems).toEqual(['a', 'b', 'c'])
     })
@@ -455,13 +453,13 @@ describe('@rasenjs/core', () => {
       const repeatMountable = repeat(
         () => 2,
         (index) =>
-          mountable(() => {
+          (() => {
             mountedIndices.push(index)
             return () => {}
           })
       )
 
-      mount(repeatMountable, {})
+      repeatMountable({})
 
       expect(mountedIndices).toEqual([0, 1])
     })
@@ -473,13 +471,13 @@ describe('@rasenjs/core', () => {
       const repeatMountable = repeat(
         () => items,
         (item) =>
-          mountable(() => {
+          (() => {
             mountedItems.push(item)
             return () => {}
           })
       )
 
-      mount(repeatMountable, {})
+      repeatMountable({})
 
       expect(mountedItems).toEqual(['x', 'y'])
     })
@@ -489,12 +487,12 @@ describe('@rasenjs/core', () => {
       const unmountedIndices: number[] = []
 
       const repeatMountable = repeat(count, (index) =>
-        mountable(() => {
+        (() => {
           return () => unmountedIndices.push(index)
         })
       )
 
-      const cleanup = mount(repeatMountable, {})
+      const cleanup = repeatMountable({})
       expect(unmountedIndices).toEqual([])
 
       cleanup?.()

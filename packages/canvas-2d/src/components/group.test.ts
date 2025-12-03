@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, fragment, each, mount } from '@rasenjs/core'
+import { setReactiveRuntime, fragment, each } from '@rasenjs/core'
+
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -41,7 +42,7 @@ describe('group', () => {
           circle({ x: 50, y: 50, radius: 15, fill: 'blue' })
         ]
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       // 验证两个形状都被绘制
@@ -58,7 +59,7 @@ describe('group', () => {
           rect({ x: 30, y: 0, width: 20, height: 20, fill: 'blue' })
         ]
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       // 验证translate被调用
@@ -76,7 +77,7 @@ describe('group', () => {
         rotation: Math.PI / 4,
         children: [rect({ x: -25, y: -25, width: 50, height: 50, fill: 'red' })]
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       // 验证变换被应用
@@ -90,7 +91,7 @@ describe('group', () => {
         scaleY: 0.5,
         children: [circle({ x: 50, y: 50, radius: 20, fill: 'blue' })]
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       // 验证缩放被应用
@@ -107,7 +108,7 @@ describe('group', () => {
           rect({ x: 50, y: 10, width: 30, height: 30, fill: 'blue' })
         ]
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       // 验证透明度被设置
@@ -119,7 +120,7 @@ describe('group', () => {
         clip: { x: 20, y: 20, width: 60, height: 60 },
         children: [rect({ x: 0, y: 0, width: 100, height: 100, fill: 'red' })]
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       // 验证裁剪路径被创建
@@ -141,7 +142,7 @@ describe('group', () => {
       ]
 
       const mountable = each(shapes, (shape) => rect(shape))
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       // 验证两个矩形都被绘制
@@ -156,7 +157,7 @@ describe('group', () => {
           circle({ x: 50, y: 50, radius: 15, fill: 'blue' })
         ]
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       // 验证两个形状都被绘制

@@ -1,7 +1,11 @@
-import type { SyncComponent, PropValue, Ref, Mountable } from '@rasenjs/core'
-import { mount, mountable } from '@rasenjs/core'
+import type { PropValue, Ref, Mountable } from '@rasenjs/core'
 import { unref, setAttribute, setStyle, watchProp } from '../utils'
 import { getHydrationContext } from '../hydration-context'
+import type { 
+  HTMLTagName, 
+  HTMLTagAttributes, 
+  ClassAttributes 
+} from '../types/dom'
 
 /**
  * 将 camelCase 转换为 kebab-case
@@ -87,28 +91,77 @@ function getDOMAttrName(key: string): string {
   return key
 }
 
-// Props 类型定义
-type ElementProps = {
+// ============================================================================
+// 类型定义 - 使用 Preact-style DOM 类型
+// ============================================================================
+
+/**
+ * 根据标签名获取元素类型
+ */
+type TagToElement<T extends HTMLTagName> = HTMLElementTagNameMap[T]
+
+/**
+ * 基础 Props（所有元素共享）
+ */
+interface BaseElementProps {
+  ref?: Ref<HTMLElement | null> | ((el: HTMLElement | null) => void)
+  children?: PropValue<string> | Array<Mountable<HTMLElement>>
+}
+
+/**
+ * 完整的元素 Props 类型
+ * 使用 Preact 的 DOM 类型定义，提供完整的自动补全支持
+ */
+type ElementProps<T extends HTMLTagName> = {
+  tag: T
+} & BaseElementProps &
+  HTMLTagAttributes<T> &
+  ClassAttributes<TagToElement<T>>
+
+/**
+ * 兼容旧版的非泛型 Props（内部使用）
+ */
+type AnyElementProps = {
   tag: string
   ref?: Ref<HTMLElement | null>
   children?: PropValue<string> | Array<Mountable<HTMLElement>>
   class?: PropValue<string>
-  style?: PropValue<Record<string, string | number>>
-  // 其他所有属性（HTML 属性 + 事件）
+  style?: PropValue<string | Record<string, string | number>>
   [key: string]: unknown
 }
 
+// ============================================================================
+// element 函数实现
+// ============================================================================
+
 /**
- * element 组件 - 通用 HTML 元素组件
- * 
- * 扁平化 API 设计：
- * - ref, children: 框架特殊 props
- * - on* 开头: 事件处理器 (onClick -> click)
- * - data*, aria* 开头: 转换为 kebab-case (dataUserId -> data-user-id)
- * - 其余: 直接作为 HTML 属性
+ * element 组件 - 类型安全的 HTML 元素组件
+ *
+ * 特性：
+ * - tag: 必须是有效的 HTML 标签名
+ * - 属性: 根据标签自动推断可用属性
+ * - 事件: on* 开头，自动转换为事件监听
+ * - data-* / aria-*: 自动转换为 kebab-case
+ *
+ * @example
+ * // 完整类型检查
+ * element({ tag: 'input', type: 'text', value: signal('hello'), onInput: (e) => {} })
+ * element({ tag: 'button', onClick: () => {}, children: 'Click me' })
+ *
+ * // 类型错误会被捕获
+ * element({ tag: 'inptu' })  // Error: 'inptu' 不是有效标签
+ * element({ tag: 'div', href: '...' })  // Error: div 没有 href 属性
  */
-export const element: SyncComponent<HTMLElement, ElementProps> = (props) => {
-  return mountable((host) => {
+export function element<T extends HTMLTagName>(
+  props: ElementProps<T>
+): Mountable<HTMLElement>
+
+// 重载：支持字符串标签（用于动态标签或自定义元素）
+export function element(props: AnyElementProps): Mountable<HTMLElement>
+
+// 实现
+export function element(props: AnyElementProps): Mountable<HTMLElement> {
+  return (host: HTMLElement) => {
     const ctx = getHydrationContext()
     let el: HTMLElement
     let hydrated = false
@@ -150,7 +203,7 @@ export const element: SyncComponent<HTMLElement, ElementProps> = (props) => {
         watchProp(
           () => unref(props.class),
           (classValue) => {
-            el.className = classValue || ''
+            el.className = String(classValue || '')
           },
           hydrated
         )
@@ -163,7 +216,11 @@ export const element: SyncComponent<HTMLElement, ElementProps> = (props) => {
         watchProp(
           () => unref(props.style),
           (styleValue) => {
-            if (styleValue) setStyle(el, styleValue)
+            if (typeof styleValue === 'string') {
+              el.style.cssText = styleValue
+            } else if (styleValue) {
+              setStyle(el, styleValue as Record<string, string | number>)
+            }
           },
           hydrated
         )
@@ -196,7 +253,7 @@ export const element: SyncComponent<HTMLElement, ElementProps> = (props) => {
           ctx.enterChildren(el)
         }
         for (const child of children) {
-          childUnmounts.push(mount(child, el))
+          childUnmounts.push(child(el))
         }
         if (ctx?.isHydrating) {
           ctx.exitChildren()
@@ -277,7 +334,14 @@ export const element: SyncComponent<HTMLElement, ElementProps> = (props) => {
     
     // 附加 node 引用，供 each 组件进行节点移动
     ;(unmount as { node?: Node }).node = el
-    
+
     return unmount
-  })
+  }
 }
+
+// ============================================================================
+// 导出类型
+// ============================================================================
+
+export type { HTMLTagName, ElementProps, BaseElementProps }
+

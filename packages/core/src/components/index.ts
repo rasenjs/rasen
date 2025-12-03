@@ -7,6 +7,7 @@ export {
   eachImpl,
   repeat,
   repeatImpl,
+  type EachProps,
   type EachImplConfig,
   type RepeatImplConfig
 } from './each'

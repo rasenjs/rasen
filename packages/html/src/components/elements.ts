@@ -1,5 +1,4 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import { mountable } from '@rasenjs/core'
 import type { StringHost } from '../types'
 import { element } from './element'
 import { escapeHtml } from '../utils'
@@ -56,10 +55,11 @@ function normalizeArgs(...args: any[]): BaseProps {
         children.push(child)
       } else if (typeof child === 'string') {
         // 字符串 child 转换为 text node 的 mount 函数
-        children.push(mountable((host: StringHost) => {
-          host.append(escapeHtml(child))
+        const text = child
+        children.push((host: StringHost) => {
+          host.append(escapeHtml(text))
           return undefined
-        }))
+        })
       }
     }
 

@@ -1,5 +1,4 @@
 import type { SyncComponent, PropValue } from '@rasenjs/core'
-import { mountable } from '@rasenjs/core'
 import { unref, watchProp } from '../utils'
 
 /**
@@ -28,7 +27,7 @@ export const html: SyncComponent<
     content: PropValue<string>
   }
 > = (props) => {
-  return mountable((host) => {
+  return (host) => {
     // 用于追踪当前插入的所有节点
     let currentNodes: Node[] = []
     // 用于定位插入位置的锚点注释节点
@@ -80,5 +79,5 @@ export const html: SyncComponent<
       removeCurrentNodes()
       anchor.remove()
     }
-  })
+  }
 }

@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime } from '@rasenjs/core'
+
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -49,7 +50,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'red'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -81,7 +82,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'blue'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -105,7 +106,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'green'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -126,7 +127,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'blue'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -152,7 +153,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'green'
         })
 
-        const cleanup = mount(mountable,ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -179,7 +180,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'blue',
           rotation: Math.PI / 4 // 45度
         })
-        cleanupFns.push(mount(mountable1, ctx))
+        cleanupFns.push(mountable1(ctx))
         await waitForAsync()
 
         const rotateCalls1 = (ctx.rotate as ReturnType<typeof vi.fn>).mock.calls
@@ -199,7 +200,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           offsetX: 20, // 向右偏移20
           offsetY: 10 // 向下偏移10
         })
-        cleanupFns.push(mount(mountable2, ctx))
+        cleanupFns.push(mountable2(ctx))
         await waitForAsync()
 
         // 验证translate被调用,且参数受offset影响
@@ -231,7 +232,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowColor: 'rgba(0, 0, 0, 0.5)'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -250,7 +251,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowBlur: 10
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -270,7 +271,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowOffsetY: 5
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -295,7 +296,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowOffsetY: 5
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -316,7 +317,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           // 没有shadowColor,阴影被禁用
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -339,7 +340,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           shadowBlur: 5
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -532,7 +533,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineWidth: 5
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -634,7 +635,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           scaleY: 0.5
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -666,7 +667,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           rotation: Math.PI / 4
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -699,7 +700,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           translateY: 10
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -727,7 +728,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           opacity: 0.5
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -747,7 +748,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           fill: 'rgba(255, 0, 0, 0.5)' // 50%透明度的红色
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -767,7 +768,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineWidth: 2
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -794,7 +795,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineDash: [10, 5]
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -817,7 +818,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineDash: [20, 5, 5, 5]
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -840,7 +841,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineDashOffset: 5
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -868,7 +869,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineCap: 'butt'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -888,7 +889,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineCap: 'round'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -908,7 +909,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineCap: 'square'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -927,7 +928,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineJoin: 'miter'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -944,7 +945,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineJoin: 'round'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -961,7 +962,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           lineJoin: 'bevel'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -981,7 +982,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           miterLimit: 5
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -1006,7 +1007,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           globalCompositeOperation: 'source-over'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -1024,7 +1025,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           globalCompositeOperation: 'multiply'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()
@@ -1042,7 +1043,7 @@ describe('@rasenjs/canvas-2d 高级功能', () => {
           globalCompositeOperation: 'screen'
         })
 
-        const cleanup = mount(mountable, ctx)
+        const cleanup = mountable(ctx)
         cleanupFns.push(cleanup)
 
         await waitForAsync()

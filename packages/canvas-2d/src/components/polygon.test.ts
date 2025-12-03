@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime } from '@rasenjs/core'
+
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -38,7 +39,7 @@ describe('polygon', () => {
         fill: 'red'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -67,7 +68,7 @@ describe('polygon', () => {
         closed: false
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -91,7 +92,7 @@ describe('polygon', () => {
         fill: 'blue'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -110,7 +111,7 @@ describe('polygon', () => {
         fill: 'green'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -130,7 +131,7 @@ describe('polygon', () => {
         fill: 'lightblue',
         stroke: 'darkblue'
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()

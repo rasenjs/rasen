@@ -1,5 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import { unrefValue, mountable, mount } from '@rasenjs/core'
+import { unrefValue } from '@rasenjs/core'
 import type { StringHost } from '../types'
 import {
   stringifyAttr,
@@ -25,7 +25,7 @@ export const element = (props: {
   // SSR 不需要事件处理，但保持 API 兼容
   on?: Record<string, (e: Event) => void>
 }): Mountable<StringHost> => {
-  return mountable((host: StringHost) => {
+  return (host: StringHost) => {
     const tag = props.tag
     const isVoid = isVoidElement(tag)
 
@@ -93,7 +93,7 @@ export const element = (props: {
         }
 
         for (const child of children) {
-          mount(child, childHost)
+          child(childHost)
         }
 
         html += childHost.toString()
@@ -107,5 +107,5 @@ export const element = (props: {
 
     // SSR 不需要 unmount
     return undefined
-  })
+  }
 }

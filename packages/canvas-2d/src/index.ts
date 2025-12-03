@@ -73,13 +73,11 @@ export type {
   GroupConfig
 } from './types'
 
-import { mount as coreMount } from '@rasenjs/core'
-
 type Canvas2DAppComponent = SyncComponent<CanvasRenderingContext2D, object>
 
 export function render(component: Canvas2DAppComponent, props: object, ctx: CanvasRenderingContext2D): () => void {
   const mountable = component(props)
-  const cleanup = coreMount(mountable, ctx)
+  const cleanup = mountable(ctx)
   return () => {
     cleanup?.()
   }

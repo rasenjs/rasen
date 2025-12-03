@@ -11,7 +11,6 @@
  */
 
 import type { SyncComponent, PropValue, Mountable, Ref } from '@rasenjs/core'
-import { mount, mountable } from '@rasenjs/core'
 
 // ============ LVGL Host Type ============
 
@@ -196,7 +195,7 @@ export const div: SyncComponent<LvglHost, DivProps> = (props) => {
   // === Setup Phase ===
 
   // === Return Mount Function ===
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     // === Mount Phase ===
     const childUnmounts: ((() => void) | undefined)[] = []
 
@@ -222,7 +221,7 @@ export const div: SyncComponent<LvglHost, DivProps> = (props) => {
     if (props.children) {
       const childHost = createChildHost(descriptor)
       for (const childMountable of props.children) {
-        childUnmounts.push(mount(childMountable, childHost))
+        childUnmounts.push(childMountable(childHost))
       }
     }
 
@@ -233,7 +232,7 @@ export const div: SyncComponent<LvglHost, DivProps> = (props) => {
       cleanups.forEach((cleanup) => cleanup())
       childUnmounts.forEach((unmount) => unmount?.())
     }
-  })
+  }
 }
 
 /**
@@ -243,7 +242,7 @@ export const label: SyncComponent<LvglHost, LabelProps> = (props) => {
   // === Setup Phase ===
 
   // === Return Mount Function ===
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     // === Mount Phase ===
     const descriptor: ElementDescriptor = {
       type: 'label',
@@ -257,7 +256,7 @@ export const label: SyncComponent<LvglHost, LabelProps> = (props) => {
     return () => {
       // cleanup
     }
-  })
+  }
 }
 
 /**
@@ -271,7 +270,7 @@ export const text: SyncComponent<LvglHost, TextProps> = (props) => {
  * button - Button component (lv_btn) following Rasen three-phase pattern
  */
 export const button: SyncComponent<LvglHost, ButtonProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const childUnmounts: ((() => void) | undefined)[] = []
 
     const descriptor: ElementDescriptor = {
@@ -296,7 +295,7 @@ export const button: SyncComponent<LvglHost, ButtonProps> = (props) => {
     if (props.children) {
       const childHost = createChildHost(descriptor)
       for (const childMountable of props.children) {
-        childUnmounts.push(mount(childMountable, childHost))
+        childUnmounts.push(childMountable(childHost))
       }
     }
 
@@ -306,14 +305,14 @@ export const button: SyncComponent<LvglHost, ButtonProps> = (props) => {
       cleanups.forEach((cleanup) => cleanup())
       childUnmounts.forEach((unmount) => unmount?.())
     }
-  })
+  }
 }
 
 /**
  * image - Image component (lv_img)
  */
 export const image: SyncComponent<LvglHost, ImageProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'img',
       class: unrefValue(props.class) || '',
@@ -333,14 +332,14 @@ export const image: SyncComponent<LvglHost, ImageProps> = (props) => {
     return () => {
       cleanups.forEach((cleanup) => cleanup())
     }
-  })
+  }
 }
 
 /**
  * slider - Slider component (lv_slider)
  */
 export const slider: SyncComponent<LvglHost, SliderProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'slider',
       class: unrefValue(props.class) || '',
@@ -363,14 +362,14 @@ export const slider: SyncComponent<LvglHost, SliderProps> = (props) => {
     return () => {
       cleanups.forEach((cleanup) => cleanup())
     }
-  })
+  }
 }
 
 /**
  * switch - Toggle switch component (lv_switch)
  */
 export const lvSwitch: SyncComponent<LvglHost, SwitchProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'switch',
       class: unrefValue(props.class) || '',
@@ -391,14 +390,14 @@ export const lvSwitch: SyncComponent<LvglHost, SwitchProps> = (props) => {
     return () => {
       cleanups.forEach((cleanup) => cleanup())
     }
-  })
+  }
 }
 
 /**
  * checkbox - Checkbox component (lv_checkbox)
  */
 export const checkbox: SyncComponent<LvglHost, CheckboxProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'checkbox',
       class: unrefValue(props.class) || '',
@@ -420,14 +419,14 @@ export const checkbox: SyncComponent<LvglHost, CheckboxProps> = (props) => {
     return () => {
       cleanups.forEach((cleanup) => cleanup())
     }
-  })
+  }
 }
 
 /**
  * textarea - Text input component (lv_textarea)
  */
 export const textarea: SyncComponent<LvglHost, TextAreaProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'textarea',
       class: unrefValue(props.class) || '',
@@ -448,14 +447,14 @@ export const textarea: SyncComponent<LvglHost, TextAreaProps> = (props) => {
     return () => {
       cleanups.forEach((cleanup) => cleanup())
     }
-  })
+  }
 }
 
 /**
  * arc - Arc/gauge component (lv_arc)
  */
 export const arc: SyncComponent<LvglHost, ArcProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'arc',
       class: unrefValue(props.class) || '',
@@ -478,14 +477,14 @@ export const arc: SyncComponent<LvglHost, ArcProps> = (props) => {
     return () => {
       cleanups.forEach((cleanup) => cleanup())
     }
-  })
+  }
 }
 
 /**
  * bar - Progress bar component (lv_bar)
  */
 export const bar: SyncComponent<LvglHost, BarProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'bar',
       class: unrefValue(props.class) || '',
@@ -497,14 +496,14 @@ export const bar: SyncComponent<LvglHost, BarProps> = (props) => {
     host.appendChild(descriptor)
 
     return () => {}
-  })
+  }
 }
 
 /**
  * spinner - Loading spinner component (lv_spinner)
  */
 export const spinner: SyncComponent<LvglHost, SpinnerProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'spinner',
       class: unrefValue(props.class) || ''
@@ -513,14 +512,14 @@ export const spinner: SyncComponent<LvglHost, SpinnerProps> = (props) => {
     host.appendChild(descriptor)
 
     return () => {}
-  })
+  }
 }
 
 /**
  * dropdown - Dropdown component (lv_dropdown)
  */
 export const dropdown: SyncComponent<LvglHost, DropdownProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'dropdown',
       class: unrefValue(props.class) || '',
@@ -542,14 +541,14 @@ export const dropdown: SyncComponent<LvglHost, DropdownProps> = (props) => {
     return () => {
       cleanups.forEach((cleanup) => cleanup())
     }
-  })
+  }
 }
 
 /**
  * roller - Roller picker component (lv_roller)
  */
 export const roller: SyncComponent<LvglHost, RollerProps> = (props) => {
-  return mountable((host: LvglHost) => {
+  return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'roller',
       class: unrefValue(props.class) || '',
@@ -571,7 +570,7 @@ export const roller: SyncComponent<LvglHost, RollerProps> = (props) => {
     return () => {
       cleanups.forEach((cleanup) => cleanup())
     }
-  })
+  }
 }
 
 // ============ App Runner ============
@@ -617,7 +616,7 @@ function __rerender(): ElementDescriptor | null {
 
   // Create fresh host and mount
   const rootHost = createHost()
-  const result = mount(__mountFn, rootHost)
+  const result = __mountFn(rootHost)
   __unmountFn = typeof result === 'function' ? result : null
 
   const elements = rootHost.getElements()

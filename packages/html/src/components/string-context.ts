@@ -2,7 +2,6 @@
  * htmlContext 组件 - 提供 HTML 渲染上下文
  */
 import type { Mountable } from '@rasenjs/core'
-import { mount, mountable } from '@rasenjs/core'
 import type { StringHost } from '../types'
 import { createStringHost } from '../types'
 
@@ -12,17 +11,17 @@ import { createStringHost } from '../types'
 export function stringContext(props: {
   children: Array<Mountable<StringHost>>
 }): Mountable<StringHost> {
-  return mountable((host: StringHost) => {
+  return (host: StringHost) => {
     const { children } = props
 
     // 挂载所有子组件
     for (const child of children) {
-      mount(child, host)
+      child(host)
     }
 
     // SSR 不需要 unmount
     return undefined
-  })
+  }
 }
 
 /**
@@ -32,7 +31,7 @@ export function stringContext(props: {
  */
 export function renderToString(component: Mountable<StringHost>): string {
   const host = createStringHost()
-  mount(component, host)
+  component(host)
   return host.toString()
 }
 
@@ -42,7 +41,7 @@ export function renderToString(component: Mountable<StringHost>): string {
 export function renderToStringMultiple(components: Mountable<StringHost>[]): string {
   const host = createStringHost()
   for (const component of components) {
-    mount(component, host)
+    component(host)
   }
   return host.toString()
 }

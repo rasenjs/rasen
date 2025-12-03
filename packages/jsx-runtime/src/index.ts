@@ -11,7 +11,7 @@
  */
 
 import type { Mountable } from '@rasenjs/core'
-import { getReactiveRuntime, fragment, isMountable, mountable } from '@rasenjs/core'
+import { getReactiveRuntime, fragment } from '@rasenjs/core'
 import { watchProp } from '@rasenjs/dom'
 import { findTag } from './tag-config'
 
@@ -87,7 +87,7 @@ function processChildren(children: JSXChild | JSXChild[]): Mountable<unknown>[] 
     if (typeof child === 'string' || typeof child === 'number') {
       // 静态文本节点
       const text = String(child)
-      result.push(mountable((host: unknown) => {
+      result.push((host: unknown) => {
         if (host instanceof HTMLElement) {
           const textNode = document.createTextNode(text)
           host.appendChild(textNode)
@@ -96,11 +96,11 @@ function processChildren(children: JSXChild | JSXChild[]): Mountable<unknown>[] 
           }
         }
         return undefined
-      }))
+      })
     } else if (getReactiveRuntime().isRef(child)) {
       // 响应式 ref - 创建响应式文本节点
       const refChild = child as unknown as { value: unknown }
-      result.push(mountable((host: unknown) => {
+      result.push((host: unknown) => {
         if (host instanceof HTMLElement) {
           const textNode = document.createTextNode(String(refChild.value))
           host.appendChild(textNode)
@@ -119,34 +119,17 @@ function processChildren(children: JSXChild | JSXChild[]): Mountable<unknown>[] 
           }
         }
         return undefined
-      }))
+      })
     } else if (typeof child === 'function') {
-      // 检查是否是已标记的 Mountable
-      if (isMountable(child)) {
-        result.push(child)
-      } else {
-        // 未标记的函数当作 getter 处理 - 创建响应式文本节点
-        const getter = child as () => unknown
-        result.push(mountable((host: unknown) => {
-          if (host instanceof HTMLElement) {
-            const textNode = document.createTextNode(String(getter()))
-            host.appendChild(textNode)
-            
-            const stop = watchProp(
-              () => String(getter()),
-              (newText: string) => {
-                textNode.textContent = newText
-              }
-            )
-            
-            return () => {
-              stop()
-              textNode.remove()
-            }
-          }
-          return undefined
-        }))
-      }
+      // 函数类型 - 现在所有函数都是 Mountable
+      // 区分：带参数的是 getter，不带参数且返回 unmount 的是 Mountable
+      // 但我们无法运行时区分，所以按 JSX 语义：
+      // - 如果是组件返回的函数（Mountable），直接使用
+      // - 如果是 () => value 形式的 getter，当作动态文本
+      // 
+      // 这里采用简化策略：直接当作 Mountable 使用
+      // 如果用户想用 getter，应该用 {() => expr} 形式，这会被解析为 JSX 表达式
+      result.push(child as Mountable<unknown>)
     } else if (isJSXElement(child)) {
       // 嵌套的 JSX 元素，递归处理
       const mountFn = mountableFromJSX(child)

@@ -1,4 +1,4 @@
-import { getReactiveRuntime, mountable, mount, type Mountable, type Unmount } from '@rasenjs/core'
+import { getReactiveRuntime, type Mountable, type Unmount } from '@rasenjs/core'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -47,7 +47,7 @@ export interface GroupProps
 export const group = (
   props: GroupProps
 ): Mountable<CanvasRenderingContext2D> => {
-  return mountable((ctx: CanvasRenderingContext2D) => {
+  return (ctx: CanvasRenderingContext2D) => {
     // 子组件的 unmount 函数列表
     const childUnmounts: (Unmount | undefined)[] = []
     let componentId: symbol | null = null
@@ -106,7 +106,7 @@ export const group = (
 
       // mount 所有子组件（在 group 上下文中）
       for (const child of props.children) {
-        const unmount = mount(child, ctx)
+        const unmount = child(ctx)
         childUnmounts.push(unmount)
       }
 
@@ -139,7 +139,7 @@ export const group = (
 
       // mount 所有子组件
       for (const child of props.children) {
-        const unmount = mount(child, ctx)
+        const unmount = child(ctx)
         childUnmounts.push(unmount)
       }
 
@@ -159,5 +159,5 @@ export const group = (
         getRenderContext(ctx).unregister(componentId)
       }
     }
-  })
+  }
 }

@@ -1,5 +1,4 @@
 import type { PropValue, Mountable, Ref, SyncComponent } from '@rasenjs/core'
-import { mountable } from '@rasenjs/core'
 import { element } from './element'
 
 /**
@@ -59,11 +58,12 @@ function normalizeArgs(...args: unknown[]): BaseProps {
       children.push(child as unknown as Mountable<HTMLElement>)
     } else if (typeof child === 'string') {
       // 字符串 child 转换为 text node 的 mount 函数
-      children.push(mountable((host: HTMLElement) => {
-        const textNode = document.createTextNode(child)
+      const text = child
+      children.push((host: HTMLElement) => {
+        const textNode = document.createTextNode(text)
         host.appendChild(textNode)
         return () => textNode.remove()
-      }))
+      })
     }
   }
 

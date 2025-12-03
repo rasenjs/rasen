@@ -20,7 +20,8 @@ export type {
   Component,
   SyncComponent,
   AsyncComponent,
-  MountFunction
+  Mountable,
+  Unmount
 } from './types'
 
 // 响应式系统

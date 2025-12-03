@@ -7,7 +7,11 @@ export default defineConfig({
     'jsx-dev-runtime': 'src/jsx-dev-runtime.ts'
   },
   format: ['esm', 'cjs'],
-  dts: true,
+  dts: {
+    compilerOptions: {
+      skipLibCheck: true
+    }
+  },
   clean: true,
   sourcemap: true,
   external: ['@rasenjs/core', '@rasenjs/dom'],

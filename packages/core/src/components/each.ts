@@ -1,5 +1,5 @@
 import { getReactiveRuntime } from '../reactive'
-import { mount, mountable, type Mountable, type Ref } from '../types'
+import { type Mountable, type Ref } from '../types'
 
 /**
  * each 组件 - 对象列表渲染
@@ -36,18 +36,60 @@ export interface EachHostHooks<Host = unknown, N = unknown> {
 }
 
 /**
+ * each 组件 Props
+ */
+export interface EachProps<T extends object, Host = unknown> {
+  of: T[] | Ref<T[]> | (() => T[])
+  children: (item: T, index: number) => Mountable<Host>
+}
+
+/**
  * each - 对象列表渲染
  *
- * @param items 数组、响应式数组引用或 getter 函数
- * @param render 渲染函数
+ * 支持两种调用形式：
+ * 1. 函数形式：each(items, render)
+ * 2. 组件形式：each({ of, children })
+ * 
+ * @example
+ * ```typescript
+ * // 函数形式
+ * each(users, user => UserRow(user))
+ * 
+ * // 组件/JSX 形式
+ * <each of={users}>
+ *   {(user) => <UserRow user={user} />}
+ * </each>
+ * ```
  */
+export function each<T extends object, Host = unknown>(
+  props: EachProps<T, Host>
+): Mountable<Host>
 export function each<T extends object, Host = unknown>(
   items: T[] | Ref<T[]> | (() => T[]),
   render: (item: T, index: number) => Mountable<Host>
+): Mountable<Host>
+export function each<T extends object, Host = unknown>(
+  itemsOrProps: T[] | Ref<T[]> | (() => T[]) | EachProps<T, Host>,
+  render?: (item: T, index: number) => Mountable<Host>
 ): Mountable<Host> {
+  // 判断是否为 Props 形式（对象且有 of 属性）
+  const isProps = (v: unknown): v is EachProps<T, Host> =>
+    v !== null && typeof v === 'object' && 'of' in v && 'children' in v
+
   // 判断是否为 Ref（有 value 属性）
   const isRef = (v: unknown): v is Ref<T[]> =>
     v !== null && typeof v === 'object' && 'value' in v
+
+  let items: T[] | Ref<T[]> | (() => T[])
+  let renderFn: (item: T, index: number) => Mountable<Host>
+
+  if (isProps(itemsOrProps)) {
+    items = itemsOrProps.of
+    renderFn = itemsOrProps.children
+  } else {
+    items = itemsOrProps
+    renderFn = render!
+  }
 
   return eachImpl({
     items: typeof items === 'function'
@@ -55,7 +97,7 @@ export function each<T extends object, Host = unknown>(
       : isRef(items)
         ? () => items.value
         : () => items,  // 普通数组
-    render
+    render: renderFn
   })
 }
 
@@ -85,7 +127,7 @@ interface EachImplConfig<T extends object, Host, N> {
 function eachImpl<T extends object, Host = unknown, N = unknown>(
   config: EachImplConfig<T, Host, N>
 ): Mountable<Host> {
-  return mountable((host: Host) => {
+  return (host: Host) => {
     const runtime = getReactiveRuntime()
 
     // 用 WeakMap 追踪对象引用 -> 实例
@@ -120,7 +162,7 @@ function eachImpl<T extends object, Host = unknown, N = unknown>(
       const instance: Instance<N> = {}
 
       const mountResult = config.render(item, index)
-      const unmount = mount(mountResult, targetHost)
+      const unmount = mountResult(targetHost)
       instance.unmount = unmount
       // 从 unmount 函数上获取节点引用
       if (unmount && typeof unmount === 'function' && 'node' in unmount) {
@@ -263,7 +305,7 @@ function eachImpl<T extends object, Host = unknown, N = unknown>(
         config.removeMarker(endMarker)
       }
     }
-  })
+  }
 }
 
 /**
@@ -335,7 +377,7 @@ interface RepeatImplConfig<T, Host, N> {
 function repeatImpl<T, Host = unknown, N = unknown>(
   config: RepeatImplConfig<T, Host, N>
 ): Mountable<Host> {
-  return mountable((host: Host) => {
+  return (host: Host) => {
     const runtime = getReactiveRuntime()
 
     // 按索引存储实例
@@ -375,7 +417,7 @@ function repeatImpl<T, Host = unknown, N = unknown>(
           for (let i = oldLength; i < newLength; i++) {
             const instance: Instance<N> = {}
             const mountResult = config.render(newItems[i], i)
-            const unmount = mount(mountResult, fragmentHost)
+            const unmount = mountResult(fragmentHost)
             instance.unmount = unmount
             if (unmount && typeof unmount === 'function' && 'node' in unmount) {
               instance.node = (unmount as { node?: N }).node
@@ -388,7 +430,7 @@ function repeatImpl<T, Host = unknown, N = unknown>(
           for (let i = oldLength; i < newLength; i++) {
             const instance: Instance<N> = {}
             const mountResult = config.render(newItems[i], i)
-            const unmount = mount(mountResult, host)
+            const unmount = mountResult(host)
             instance.unmount = unmount
             if (unmount && typeof unmount === 'function' && 'node' in unmount) {
               instance.node = (unmount as { node?: N }).node
@@ -419,7 +461,7 @@ function repeatImpl<T, Host = unknown, N = unknown>(
         config.removeMarker(endMarker)
       }
     }
-  })
+  }
 }
 
 // 导出供 DOM 等模块使用

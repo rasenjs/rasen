@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime } from '@rasenjs/core'
+
 import {
   createMockContext,
   getCallArgs,
@@ -44,7 +45,7 @@ describe('line', () => {
         stroke: '#000000'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -71,7 +72,7 @@ describe('line', () => {
         lineWidth: 5
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -90,7 +91,7 @@ describe('line', () => {
         y2: 100
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -106,7 +107,7 @@ describe('line', () => {
         y2: 100
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -122,7 +123,7 @@ describe('line', () => {
         stroke: 'red'
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -150,7 +151,7 @@ describe('line', () => {
         closed: true
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -165,7 +166,7 @@ describe('line', () => {
         tension: 0.5,
         stroke: 'blue'
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -187,7 +188,7 @@ describe('line', () => {
         lineDash: [10, 5]
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -210,7 +211,7 @@ describe('line', () => {
         lineDashOffset: 5
       })
 
-      const cleanup = mount(mountable, ctx)
+      const cleanup = mountable(ctx)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

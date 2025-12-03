@@ -5,7 +5,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
 import { each, repeat } from './each'
-import { mountable, mount } from '../types'
 
 // ============================================
 // 测试辅助工具
@@ -103,13 +102,13 @@ describe('each', () => {
       const mounted: number[] = []
 
       const eachMountable = each(items, (item) =>
-        mountable(() => {
+        (() => {
           mounted.push(item.id)
           return () => {}
         })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
       expect(mounted).toEqual([1, 2, 3])
     })
 
@@ -118,13 +117,13 @@ describe('each', () => {
       const indices: number[] = []
 
       const eachMountable = each(items, (_, index) =>
-        mountable(() => {
+        (() => {
           indices.push(index)
           return () => {}
         })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
       expect(indices).toEqual([0, 1])
     })
 
@@ -133,13 +132,13 @@ describe('each', () => {
       const mounted: number[] = []
 
       const eachMountable = each(items, (item) =>
-        mountable(() => {
+        (() => {
           mounted.push(item.id)
           return () => {}
         })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
       expect(mounted).toEqual([])
     })
   })
@@ -150,13 +149,13 @@ describe('each', () => {
       const mounted: number[] = []
 
       const eachMountable = each(items, (item) =>
-        mountable(() => {
+        (() => {
           mounted.push(item.id)
           return () => {}
         })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
       expect(mounted).toEqual([1, 2])
     })
 
@@ -167,13 +166,13 @@ describe('each', () => {
       const eachMountable = each(
         () => items,
         (item) =>
-          mountable(() => {
+          (() => {
             mounted.push(item.id)
             return () => {}
           })
       )
 
-      mount(eachMountable, {})
+      eachMountable({})
       expect(mounted).toEqual([1])
     })
   })
@@ -184,12 +183,12 @@ describe('each', () => {
       const unmounted: number[] = []
 
       const eachMountable = each(items, (item) =>
-        mountable(() => {
+        (() => {
           return () => unmounted.push(item.id)
         })
       )
 
-      const cleanup = mount(eachMountable, {})
+      const cleanup = eachMountable({})
       expect(unmounted).toEqual([])
 
       cleanup?.()
@@ -212,13 +211,13 @@ describe('repeat', () => {
       const mounted: number[] = []
 
       const repeatMountable = repeat(count, (index) =>
-        mountable(() => {
+        (() => {
           mounted.push(index)
           return () => {}
         })
       )
 
-      mount(repeatMountable, {})
+      repeatMountable({})
       expect(mounted).toEqual([0, 1, 2])
     })
 
@@ -228,13 +227,13 @@ describe('repeat', () => {
       const repeatMountable = repeat(
         () => 2,
         (index) =>
-          mountable(() => {
+          (() => {
             mounted.push(index)
             return () => {}
           })
       )
 
-      mount(repeatMountable, {})
+      repeatMountable({})
       expect(mounted).toEqual([0, 1])
     })
 
@@ -243,13 +242,13 @@ describe('repeat', () => {
       const mounted: number[] = []
 
       const repeatMountable = repeat(count, (index) =>
-        mountable(() => {
+        (() => {
           mounted.push(index)
           return () => {}
         })
       )
 
-      mount(repeatMountable, {})
+      repeatMountable({})
       expect(mounted).toEqual([])
     })
   })
@@ -260,13 +259,13 @@ describe('repeat', () => {
       const mounted: string[] = []
 
       const repeatMountable = repeat(items, (item) =>
-        mountable(() => {
+        (() => {
           mounted.push(item)
           return () => {}
         })
       )
 
-      mount(repeatMountable, {})
+      repeatMountable({})
       expect(mounted).toEqual(['a', 'b', 'c'])
     })
 
@@ -277,13 +276,13 @@ describe('repeat', () => {
       const repeatMountable = repeat(
         () => items,
         (item) =>
-          mountable(() => {
+          (() => {
             mounted.push(item)
             return () => {}
           })
       )
 
-      mount(repeatMountable, {})
+      repeatMountable({})
       expect(mounted).toEqual(['x', 'y'])
     })
   })
@@ -294,12 +293,12 @@ describe('repeat', () => {
       const unmounted: number[] = []
 
       const repeatMountable = repeat(count, (index) =>
-        mountable(() => {
+        (() => {
           return () => unmounted.push(index)
         })
       )
 
-      const cleanup = mount(repeatMountable, {})
+      const cleanup = repeatMountable({})
       expect(unmounted).toEqual([])
 
       cleanup?.()

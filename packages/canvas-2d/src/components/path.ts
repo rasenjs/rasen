@@ -1,5 +1,4 @@
 import type { Mountable } from '@rasenjs/core'
-import { mountable, mount } from '@rasenjs/core'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -60,13 +59,13 @@ let currentPathContext: PathContext | null = null
 export const point = (
   props: PathPoint
 ): Mountable<CanvasRenderingContext2D> => {
-  return mountable(() => {
+  return () => {
     // 将point添加到当前path上下文
     if (currentPathContext) {
       currentPathContext.points.push(props)
     }
     return undefined
-  })
+  }
 }
 
 /**
@@ -204,7 +203,7 @@ export const path = (
     // 注意：这里需要一个临时的 ctx，但 point 组件只是收集数据，不需要真正的 ctx
     for (const child of props.children) {
       // point 组件的 setup 返回 mount，mount 执行时收集点
-      mount(child, null as unknown as CanvasRenderingContext2D)
+      child(null as unknown as CanvasRenderingContext2D)
     }
     collectedChildPoints = pathContext.points
     currentPathContext = null

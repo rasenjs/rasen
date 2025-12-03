@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime } from '@rasenjs/core'
+
 import {
   createMockContext,
   createMockReactiveRuntime,
@@ -37,7 +38,7 @@ describe('path', () => {
         data: 'M 10 10 L 50 50 L 90 10 Z',
         fill: 'green'
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -53,7 +54,7 @@ describe('path', () => {
         data: 'M 10 80 Q 95 10 180 80',
         stroke: 'blue'
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -68,7 +69,7 @@ describe('path', () => {
         stroke: 'red',
         fill: 'pink'
       })
-      cleanupFns.push(mount(mountable, ctx))
+      cleanupFns.push(mountable(ctx))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
