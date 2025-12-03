@@ -59,7 +59,7 @@ export interface Route<
   readonly meta?: TMeta
   /** 内部标记 */
   readonly _isRoute: true
-  
+
   /** 解析路径，返回参数 */
   parse(path: string): TParams | null
   /** 格式化参数为路径 */
@@ -89,7 +89,7 @@ type IsRouteInput<T> = T extends RouteInput<any, any, any> ? true : false
 
 /**
  * 将嵌套的路由配置扁平化为路由表类型
- * 
+ *
  * @example
  * ```typescript
  * type Config = {
@@ -99,7 +99,7 @@ type IsRouteInput<T> = T extends RouteInput<any, any, any> ? true : false
  *     detail: RouteInput<{ id: string }>
  *   }
  * }
- * 
+ *
  * type Flat = FlattenRoutes<Config>
  * // = {
  * //   home: Route<{}>
@@ -108,7 +108,10 @@ type IsRouteInput<T> = T extends RouteInput<any, any, any> ? true : false
  * // }
  * ```
  */
-export type FlattenRoutes<T extends RoutesConfig, Prefix extends string = ''> = {
+export type FlattenRoutes<
+  T extends RoutesConfig,
+  Prefix extends string = ''
+> = {
   [K in keyof T & string]: IsRouteInput<T[K]> extends true
     ? T[K] extends RouteInput<infer P, infer Q, infer M>
       ? { [Key in `${Prefix}${K}`]: Route<P, Q, M> }
@@ -121,10 +124,11 @@ export type FlattenRoutes<T extends RoutesConfig, Prefix extends string = ''> = 
 /**
  * 合并联合类型为交叉类型
  */
-type UnionToIntersection<U> = 
-  (U extends unknown ? (k: U) => void : never) extends (k: infer I) => void 
-    ? I 
-    : never
+type UnionToIntersection<U> = (
+  U extends unknown ? (k: U) => void : never
+) extends (k: infer I) => void
+  ? I
+  : never
 
 /**
  * 简化交叉类型的显示
@@ -134,7 +138,9 @@ type Simplify<T> = { [K in keyof T]: T[K] }
 /**
  * 从嵌套配置推导出扁平路由表类型
  */
-export type InferRoutes<T extends RoutesConfig> = Simplify<UnionToIntersection<FlattenRoutes<T>>>
+export type InferRoutes<T extends RoutesConfig> = Simplify<
+  UnionToIntersection<FlattenRoutes<T>>
+>
 
 /**
  * 路由匹配结果
@@ -171,52 +177,167 @@ export interface HistoryAdapter {
 /**
  * 从 Route 提取参数类型
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export type RouteParams<T extends Route<any, any, any>> =
   T extends Route<infer P, any, any> ? P : never
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /**
  * 导航选项
  */
-export interface NavigateOptions<TQuery extends QuerySchema = Record<string, never>> {
+export interface NavigateOptions<
+  TQuery extends QuerySchema = Record<string, never>
+> {
   /** Query 参数 */
   query?: Partial<InferQueryParams<TQuery>>
 }
+
+// ============================================================================
+// 导航错误
+// ============================================================================
+
+/**
+ * 导航取消错误
+ *
+ * 用于表示导航被主动取消（不是真的出错）
+ *
+ * @example
+ * ```typescript
+ * router.beforeEach((to, from) => {
+ *   if (!confirm('确定离开？')) {
+ *     throw new NavigationAbortedError('用户取消')
+ *   }
+ * })
+ *
+ * // 或者返回 false / string，内部会自动包装
+ * router.beforeEach((to, from) => {
+ *   if (!confirm('确定离开？')) {
+ *     return false  // 等同于 throw new NavigationAbortedError()
+ *   }
+ *   return '用户取消'  // 等同于 throw new NavigationAbortedError('用户取消')
+ * })
+ * ```
+ */
+export class NavigationAbortedError extends Error {
+  constructor(message = 'Navigation aborted') {
+    super(message)
+    this.name = 'NavigationAbortedError'
+  }
+}
+
+// ============================================================================
+// 全局钩子类型
+// ============================================================================
+
+/**
+ * 导航守卫返回值
+ * - void / undefined / true: 允许导航
+ * - false: 取消导航 → 内部包装为 NavigationAbortedError
+ * - string: 取消导航，带消息 → 内部包装为 NavigationAbortedError(message)
+ * - Route: 重定向到另一个路由
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type NavigationGuardReturn =
+  | boolean
+  | Route<any, any, any>
+  | string
+  | void
+
+/**
+ * 导航守卫函数
+ */
+export type NavigationGuard = (
+  to: RouteMatch,
+  from: RouteMatch | null
+) => NavigationGuardReturn | Promise<NavigationGuardReturn>
+
+/**
+ * 离开守卫函数（用于 beforeLeave）
+ * 与 NavigationGuard 相同签名
+ */
+export type LeaveGuard = NavigationGuard
+
+/**
+ * 导航后置钩子
+ */
+export type AfterNavigationHook = (
+  to: RouteMatch,
+  from: RouteMatch | null
+) => void
+
+/**
+ * 导航错误处理器
+ */
+export type NavigationErrorHandler = (
+  error: Error,
+  to: RouteMatch | null,
+  from: RouteMatch | null
+) => void
+
+// ============================================================================
+// Router 接口
+// ============================================================================
 
 /**
  * Router 实例接口
  */
 export interface Router {
+  /** 路由配置 */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly routes: Record<string, any>
+
   /** 匹配路径 */
   match(path: string): RouteMatch | null
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   /** 生成 href */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  href<P extends Record<string, unknown>, Q extends QuerySchema = Record<string, never>>(
+  href<
+    P extends Record<string, unknown>,
+    Q extends QuerySchema = Record<string, never>
+  >(
     route: Route<P, Q, any>,
     params: P,
     options?: NavigateOptions<Q>
   ): string
 
   /** 导航 */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  push<P extends Record<string, unknown>, Q extends QuerySchema = Record<string, never>>(
+  push<
+    P extends Record<string, unknown>,
+    Q extends QuerySchema = Record<string, never>
+  >(
     route: Route<P, Q, any>,
     params: P,
     options?: NavigateOptions<Q>
-  ): void
+  ): Promise<void>
 
   /** 替换导航 */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  replace<P extends Record<string, unknown>, Q extends QuerySchema = Record<string, never>>(
+  replace<
+    P extends Record<string, unknown>,
+    Q extends QuerySchema = Record<string, never>
+  >(
     route: Route<P, Q, any>,
     params: P,
     options?: NavigateOptions<Q>
-  ): void
+  ): Promise<void>
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   /** 订阅路由变化 */
   subscribe(listener: (match: RouteMatch | null) => void): () => void
 
   /** 获取当前匹配 */
   readonly current: RouteMatch | null
+
+  // ========== 全局钩子 ==========
+
+  /** 注册前置守卫，返回取消函数 */
+  beforeEach(guard: NavigationGuard): () => void
+
+  /** 注册离开守卫，返回取消函数 */
+  beforeLeave(guard: LeaveGuard): () => void
+
+  /** 注册后置钩子，返回取消函数 */
+  afterEach(hook: AfterNavigationHook): () => void
+
+  /** 注册错误处理器，返回取消函数 */
+  onError(handler: NavigationErrorHandler): () => void
 }

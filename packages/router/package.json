@@ -29,6 +29,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@rasenjs/core": "workspace:*",
     "@rasenjs/shared": "workspace:*"
   },
   "peerDependencies": {

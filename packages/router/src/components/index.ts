@@ -1,15 +1,15 @@
 /**
  * @rasenjs/router/components
- * 
+ *
  * Platform-agnostic router components
- * 
+ *
  * 完全平台无关：可用于 DOM、React Native、Canvas 等任何渲染目标
  * 使用 data 属性（如 data-active）代替 class，更抽象
  * 使用 core 的 switch 组件实现 RouterView
  */
 
 import { switchCase, type SwitchHostHooks, type Mountable } from '@rasenjs/core'
-import type { Router, Route } from '../types'
+import type { Router, Route, RouteMatch } from '../types'
 
 // ============================================================================
 // 类型定义
@@ -29,12 +29,18 @@ export interface AnchorProps {
   /** 是否处于激活状态（响应式） */
   dataActive?: boolean | (() => boolean)
   /** 点击处理 */
-  onClick: (e: { preventDefault: () => void; metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean }) => void
+  onClick: (e: {
+    preventDefault: () => void
+    metaKey?: boolean
+    ctrlKey?: boolean
+    shiftKey?: boolean
+    altKey?: boolean
+  }) => void
 }
 
 /**
  * 锚点组件
- * 
+ *
  * 接受 (props, ...children) 或 (...args) 形式
  * 与 @rasenjs/dom 的 a 组件兼容
  */
@@ -59,36 +65,36 @@ export interface LinkPropsBase<P extends Record<string, unknown>> {
 /**
  * Link 组件 Props（带 children）
  */
-export interface LinkProps<P extends Record<string, unknown>, Host = unknown> extends LinkPropsBase<P> {
+export interface LinkProps<
+  P extends Record<string, unknown>,
+  Host = unknown
+> extends LinkPropsBase<P> {
   children?: Array<Child<Host>>
 }
 
 /**
  * 创建 Link 组件
- * 
+ *
  * @param router - 路由器实例
  * @param Anchor - 锚点组件（需要支持 data-active 属性）
- * 
+ *
  * @example
  * ```typescript
  * const routes = createRoutes({
  *   home: route(),
  *   user: route(tpl`/users/${{ id: z.string() }}`),
  * })
- * 
+ *
  * const Link = createRouterLink(router, a)
- * 
+ *
  * // 使用方式 1：children 属性
  * Link({ to: routes.home, params: {}, children: ['Home'] })
- * 
+ *
  * // 使用方式 2：rest 参数
  * Link({ to: routes.user, params: { id: '123' } }, 'User')
  * ```
  */
-export function createRouterLink<Host>(
-  router: Router,
-  Anchor: Anchor<Host>
-) {
+export function createRouterLink<Host>(router: Router, Anchor: Anchor<Host>) {
   return function Link<P extends Record<string, unknown>>(
     props: LinkProps<P, Host>,
     ...restChildren: Array<Child<Host>>
@@ -101,7 +107,13 @@ export function createRouterLink<Host>(
     const href = router.href(route, params)
 
     // 点击处理
-    const onClick = (e: { preventDefault: () => void; metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean }) => {
+    const onClick = (e: {
+      preventDefault: () => void
+      metaKey?: boolean
+      ctrlKey?: boolean
+      shiftKey?: boolean
+      altKey?: boolean
+    }) => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
         return
       }
@@ -132,11 +144,13 @@ export const layout = Symbol('router-layout')
  * Layout 组件类型
  * 接收 children（子路由视图）作为参数
  */
-export type LayoutComponent<Host> = (children: () => Mountable<Host>) => Mountable<Host>
+export type LayoutComponent<Host> = (
+  children: () => Mountable<Host>
+) => Mountable<Host>
 
 /**
  * 从 Route 结构生成 Views 配置类型
- * 
+ *
  * @example
  * ```typescript
  * const routes = createRoutes({
@@ -147,7 +161,7 @@ export type LayoutComponent<Host> = (children: () => Mountable<Host>) => Mountab
  *     detail: route(tpl`${{ id: z.coerce.number() }}`),
  *   }
  * })
- * 
+ *
  * // ViewsConfig 将是：
  * // {
  * //   home: () => Mountable<Host>
@@ -161,6 +175,7 @@ export type LayoutComponent<Host> = (children: () => Mountable<Host>) => Mountab
  * ```
  */
 export type ViewsConfig<TRoutes, Host> = {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   [K in keyof TRoutes]: TRoutes[K] extends Route<infer P, infer _Q, infer _M>
     ? keyof P extends never
       ? () => Mountable<Host>
@@ -172,20 +187,19 @@ export type ViewsConfig<TRoutes, Host> = {
 
 /**
  * 创建 RouterView 组件
- * 
+ *
  * 使用 core 的 switch 组件实现多分支渲染
  * 支持通过 [layout] Symbol 定义嵌套布局
- * 
- * @param router - 路由器实例
- * @param routes - 路由配置（来自 createRoutes）
+ *
+ * @param router - 路由器实例（包含 routes 配置）
  * @param views - 与 routes 结构匹配的视图配置
  * @param options.default - 默认视图（无匹配时）
  * @param options.hooks - 平台操作钩子
- * 
+ *
  * @example
  * ```typescript
  * import { layout } from '@rasenjs/router/components'
- * 
+ *
  * const routes = createRoutes({
  *   home: route(),
  *   dashboard: {
@@ -193,8 +207,10 @@ export type ViewsConfig<TRoutes, Host> = {
  *     settings: route(),
  *   }
  * })
- * 
- * const RouterView = createRouterView(router, routes, {
+ *
+ * const router = createRouter(routes, { history })
+ *
+ * const RouterView = createRouterView(router, {
  *   home: () => HomeView(),
  *   dashboard: {
  *     // 布局组件：包裹所有 dashboard 子路由
@@ -205,29 +221,38 @@ export type ViewsConfig<TRoutes, Host> = {
  * }, {
  *   default: () => NotFoundView(),
  * })
- * 
+ *
  * // 使用
  * div({}, RouterView())
  * ```
  */
-export function createRouterView<TRoutes extends object, Host, N = unknown>(
+export function createRouterView<Host, N = unknown>(
   router: Router,
-  routes: TRoutes,
-  views: ViewsConfig<TRoutes, Host>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  views: Record<string, any>,
   options: {
     default?: () => Mountable<Host>
-    hooks?: SwitchHostHooks<Host, N>
+    hostHooks?: SwitchHostHooks<Host, N>
   } = {}
 ) {
+  // 从 router 获取 routes 配置
+  const routes = router.routes
+
   // 收集所有 Route 到视图的映射
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const routeToView = new Map<Route<any, any, any>, (params: any) => Mountable<Host>>()
+  const routeToView = new Map<
+    Route<any, any, any>,
+    (params: any) => Mountable<Host>
+  >()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const routeToKey = new Map<Route<any, any, any>, string>()
   // 收集每个路由所在层级的布局
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const routeToLayouts = new Map<Route<any, any, any>, LayoutComponent<Host>[]>()
-  
+  const routeToLayouts = new Map<
+    Route<any, any, any>,
+    LayoutComponent<Host>[]
+  >()
+
   // 递归遍历 routes 和 views
   function collect(
     routeObj: object,
@@ -237,17 +262,21 @@ export function createRouterView<TRoutes extends object, Host, N = unknown>(
   ) {
     // 检查当前层级是否有 layout
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const currentLayout = (viewObj as any)[layout] as LayoutComponent<Host> | undefined
-    const layouts = currentLayout ? [...parentLayouts, currentLayout] : parentLayouts
-    
+    const currentLayout = (viewObj as any)[layout] as
+      | LayoutComponent<Host>
+      | undefined
+    const layouts = currentLayout
+      ? [...parentLayouts, currentLayout]
+      : parentLayouts
+
     for (const key of Object.keys(routeObj)) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const routeValue = (routeObj as any)[key]
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const viewValue = (viewObj as any)[key]
-      
+
       const fullKey = prefix ? `${prefix}.${key}` : key
-      
+
       if (routeValue && routeValue._isRoute === true) {
         // 这是一个 Route
         if (typeof viewValue === 'function') {
@@ -255,13 +284,18 @@ export function createRouterView<TRoutes extends object, Host, N = unknown>(
           routeToKey.set(routeValue, fullKey)
           routeToLayouts.set(routeValue, layouts)
         }
-      } else if (routeValue && typeof routeValue === 'object' && viewValue && typeof viewValue === 'object') {
+      } else if (
+        routeValue &&
+        typeof routeValue === 'object' &&
+        viewValue &&
+        typeof viewValue === 'object'
+      ) {
         // 嵌套对象
         collect(routeValue, viewValue, fullKey, layouts)
       }
     }
   }
-  
+
   collect(routes, views, '', [])
 
   // 包装视图，应用所有父级布局（从外到内）
@@ -272,7 +306,7 @@ export function createRouterView<TRoutes extends object, Host, N = unknown>(
     if (layouts.length === 0) {
       return viewFactory()
     }
-    
+
     // 从内到外包装
     let wrapped = viewFactory
     for (let i = layouts.length - 1; i >= 0; i--) {
@@ -280,18 +314,18 @@ export function createRouterView<TRoutes extends object, Host, N = unknown>(
       const inner = wrapped
       wrapped = () => layoutFn(inner)
     }
-    
+
     return wrapped()
   }
 
   return function RouterView(): Mountable<Host> {
     // 构建 switch 的 cases
     const cases: Record<string, () => Mountable<Host>> = {}
-    
+
     for (const [route, viewFactory] of routeToView) {
       const key = routeToKey.get(route)!
       const layouts = routeToLayouts.get(route) || []
-      
+
       cases[key] = () => {
         const match = router.current
         const params = match?.params ?? {}
@@ -307,7 +341,78 @@ export function createRouterView<TRoutes extends object, Host, N = unknown>(
       },
       cases,
       default: options.default,
-      ...options.hooks
+      ...options.hostHooks
     })
+  }
+}
+
+// ============================================================================
+// LeaveGuard 组件
+// ============================================================================
+
+/**
+ * LeaveGuard Props
+ */
+export interface LeaveGuardProps {
+  /**
+   * 守卫函数
+   * 返回 true 允许导航，返回 false 或 string 取消导航
+   */
+  guard: (
+    to: RouteMatch,
+    from: RouteMatch | null
+  ) => boolean | string | void | Promise<boolean | string | void>
+}
+
+/**
+ * 创建 leaveGuard 组件
+ *
+ * 在组件挂载时注册离开守卫，卸载时自动移除
+ * 守卫只在**离开当前页面**时触发，不会在进入时触发
+ *
+ * @param router - 路由器实例
+ *
+ * @example
+ * ```typescript
+ * const leaveGuard = createLeaveGuard(router)
+ *
+ * function SettingsView(): Mountable<HTMLElement> {
+ *   const formDirty = ref(false)
+ *
+ *   return div(
+ *     leaveGuard({
+ *       guard: (to, from) => {
+ *         if (formDirty.value) {
+ *           return confirm('有未保存的更改，确定离开？')
+ *         }
+ *         return true
+ *       }
+ *     }),
+ *     form(...)
+ *   )
+ * }
+ * ```
+ */
+export function createLeaveGuard(router: Router) {
+  return function leaveGuard(props: LeaveGuardProps): Mountable<unknown> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mountFn = (_host: any) => {
+      // 记录挂载时的路由（这是我们要保护的页面）
+      const mountedRoute = router.current?.route
+
+      // mount：注册到 beforeLeave
+      const unregister = router.beforeLeave((to, from) => {
+        // 只有当离开的是挂载时的路由时才触发守卫
+        if (from?.route === mountedRoute) {
+          return props.guard(to, from)
+        }
+        // 其他情况允许导航
+        return true
+      })
+
+      // unmount：取消注册
+      return unregister
+    }
+    return mountFn as unknown as Mountable<unknown>
   }
 }

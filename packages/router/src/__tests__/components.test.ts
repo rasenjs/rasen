@@ -1,13 +1,36 @@
 /**
  * @rasenjs/router/components 测试
- * 
+ *
  * 测试平台无关的 Link 和 RouterView 组件
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from 'vitest'
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  vi
+} from 'vitest'
 import { z } from 'zod'
-import { route, template, createRoutes, createRouter, createMemoryHistory } from '../index'
-import { createRouterLink, createRouterView, layout, type Anchor, type AnchorProps, type Child, type ViewsConfig } from '../components'
+import {
+  route,
+  template,
+  createRoutes,
+  createRouter,
+  createMemoryHistory,
+  NavigationAbortedError
+} from '../index'
+import {
+  createRouterLink,
+  createRouterView,
+  createLeaveGuard,
+  layout,
+  type Anchor,
+  type AnchorProps,
+  type Child
+} from '../components'
 import type { Mountable } from '@rasenjs/core'
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-signals'
@@ -23,7 +46,7 @@ function createTestRouter() {
     home: route(template`/`),
     about: route(template`/about`),
     user: route(template`/users/${{ id: z.string() }}`),
-    post: route(template`/posts/${{ id: z.coerce.number() }}`),
+    post: route(template`/posts/${{ id: z.coerce.number() }}`)
   })
 
   const history = createMemoryHistory()
@@ -33,16 +56,20 @@ function createTestRouter() {
 }
 
 // 简单的 anchor 组件（模拟平台的 anchor 实现）
-const TestAnchor: Anchor<HTMLElement> = (props: AnchorProps, ...children: Array<Child<HTMLElement>>) => {
+const TestAnchor: Anchor<HTMLElement> = (
+  props: AnchorProps,
+  ...children: Array<Child<HTMLElement>>
+) => {
   return (host: HTMLElement) => {
     const anchor = document.createElement('a')
     anchor.href = props.href
-    
+
     // 处理 dataActive（可能是静态值或 getter）
     const updateActive = () => {
-      const isActive = typeof props.dataActive === 'function' 
-        ? props.dataActive() 
-        : props.dataActive
+      const isActive =
+        typeof props.dataActive === 'function'
+          ? props.dataActive()
+          : props.dataActive
       if (isActive) {
         anchor.setAttribute('data-active', 'true')
       } else {
@@ -67,7 +94,7 @@ const TestAnchor: Anchor<HTMLElement> = (props: AnchorProps, ...children: Array<
 
     return () => {
       anchor.removeEventListener('click', props.onClick as EventListener)
-      childUnmounts.forEach(u => u?.())
+      childUnmounts.forEach((u) => u?.())
       anchor.remove()
     }
   }
@@ -124,7 +151,7 @@ describe('createRouterLink', () => {
   it('should set data-active when route matches', () => {
     const { router, routes, history } = createTestRouter()
     history.push('/about')
-    
+
     const Link = createRouterLink(router, TestAnchor)
     const mountFn = Link({ to: routes.about, params: {} }, 'About')
     const unmount = mountFn(container)
@@ -138,7 +165,7 @@ describe('createRouterLink', () => {
   it('should not set data-active when route does not match', () => {
     const { router, routes, history } = createTestRouter()
     history.push('/')
-    
+
     const Link = createRouterLink(router, TestAnchor)
     const mountFn = Link({ to: routes.about, params: {} }, 'About')
     const unmount = mountFn(container)
@@ -149,19 +176,22 @@ describe('createRouterLink', () => {
     unmount?.()
   })
 
-  it('should navigate on click', () => {
+  it('should navigate on click', async () => {
     const { router, routes, history } = createTestRouter()
     history.push('/')
-    
+
     const Link = createRouterLink(router, TestAnchor)
     const mountFn = Link({ to: routes.about, params: {} }, 'About')
     const unmount = mountFn(container)
 
     const anchor = container.querySelector('a')
-    
+
     // 模拟点击
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
     anchor?.dispatchEvent(event)
+
+    // 等待异步导航完成
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(history.getPath()).toBe('/about')
 
@@ -171,15 +201,19 @@ describe('createRouterLink', () => {
   it('should not navigate on click with modifier keys', () => {
     const { router, routes, history } = createTestRouter()
     history.push('/')
-    
+
     const Link = createRouterLink(router, TestAnchor)
     const mountFn = Link({ to: routes.about, params: {} }, 'About')
     const unmount = mountFn(container)
 
     const anchor = container.querySelector('a')
-    
+
     // 模拟 Ctrl+点击
-    const event = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true })
+    const event = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true
+    })
     anchor?.dispatchEvent(event)
 
     // 路径不应改变
@@ -238,7 +272,7 @@ describe('createRouterView', () => {
   })
 
   it('should create a RouterView component that returns Mountable', () => {
-    const { router, routes } = createTestRouter()
+    const { router } = createTestRouter()
     const views = {
       home: () => (host: HTMLElement) => {
         const div = document.createElement('div')
@@ -259,16 +293,16 @@ describe('createRouterView', () => {
         const div = document.createElement('div')
         host.appendChild(div)
         return () => div.remove()
-      },
+      }
     }
-    const RouterView = createRouterView(router, routes, views)
+    const RouterView = createRouterView(router, views)
 
     const mountFn = RouterView()
     expect(typeof mountFn).toBe('function')
   })
 
   it('should render the matched view', () => {
-    const { router, routes, history } = createTestRouter()
+    const { router, history } = createTestRouter()
     history.push('/')
 
     const views = {
@@ -293,9 +327,9 @@ describe('createRouterView', () => {
         const div = document.createElement('div')
         host.appendChild(div)
         return () => div.remove()
-      },
+      }
     }
-    const RouterView = createRouterView(router, routes, views)
+    const RouterView = createRouterView(router, views)
 
     const unmount = RouterView()(container)
 
@@ -305,7 +339,7 @@ describe('createRouterView', () => {
   })
 
   it('should render default when no route matches', () => {
-    const { router, routes, history } = createTestRouter()
+    const { router, history } = createTestRouter()
     history.push('/nonexistent')
 
     const views = {
@@ -329,16 +363,16 @@ describe('createRouterView', () => {
         const div = document.createElement('div')
         host.appendChild(div)
         return () => div.remove()
-      },
+      }
     }
-    const RouterView = createRouterView(router, routes, views, {
+    const RouterView = createRouterView(router, views, {
       default: () => (host: HTMLElement) => {
         const div = document.createElement('div')
         div.className = 'not-found'
         div.textContent = '404'
         host.appendChild(div)
         return () => div.remove()
-      },
+      }
     })
 
     const unmount = RouterView()(container)
@@ -349,7 +383,7 @@ describe('createRouterView', () => {
   })
 
   it('should pass params to view component', () => {
-    const { router, routes, history } = createTestRouter()
+    const { router, history } = createTestRouter()
     history.push('/users/alice')
 
     const views = {
@@ -363,30 +397,34 @@ describe('createRouterView', () => {
         host.appendChild(div)
         return () => div.remove()
       },
-      user: ({ id }: { id: string }) => (host: HTMLElement) => {
-        const div = document.createElement('div')
-        div.className = 'user-view'
-        div.textContent = `User: ${id}`
-        host.appendChild(div)
-        return () => div.remove()
-      },
+      user:
+        ({ id }: { id: string }) =>
+        (host: HTMLElement) => {
+          const div = document.createElement('div')
+          div.className = 'user-view'
+          div.textContent = `User: ${id}`
+          host.appendChild(div)
+          return () => div.remove()
+        },
       post: () => (host: HTMLElement) => {
         const div = document.createElement('div')
         host.appendChild(div)
         return () => div.remove()
-      },
+      }
     }
-    const RouterView = createRouterView(router, routes, views)
+    const RouterView = createRouterView(router, views)
 
     const unmount = RouterView()(container)
 
-    expect(container.querySelector('.user-view')?.textContent).toBe('User: alice')
+    expect(container.querySelector('.user-view')?.textContent).toBe(
+      'User: alice'
+    )
 
     unmount?.()
   })
 
   it('should cleanup on unmount', () => {
-    const { router, routes, history } = createTestRouter()
+    const { router, history } = createTestRouter()
     history.push('/')
 
     const viewUnmountSpy = vi.fn()
@@ -412,9 +450,9 @@ describe('createRouterView', () => {
         const div = document.createElement('div')
         host.appendChild(div)
         return () => {}
-      },
+      }
     }
-    const RouterView = createRouterView(router, routes, views)
+    const RouterView = createRouterView(router, views)
 
     const unmount = RouterView()(container)
 
@@ -430,14 +468,14 @@ describe('createRouterView', () => {
       home: route(template`/`),
       dashboard: {
         overview: route(),
-        settings: route(),
-      },
+        settings: route()
+      }
     })
     const history = createMemoryHistory('/')
     const router = createRouter(routes, { history })
 
     const layoutSpy = vi.fn()
-    
+
     const views = {
       home: () => (host: HTMLElement) => {
         const div = document.createElement('div')
@@ -446,17 +484,18 @@ describe('createRouterView', () => {
         return () => div.remove()
       },
       dashboard: {
-        [layout]: (children: () => Mountable<HTMLElement>) => (host: HTMLElement) => {
-          layoutSpy()
-          const wrapper = document.createElement('div')
-          wrapper.className = 'dashboard-layout'
-          host.appendChild(wrapper)
-          const unmountChild = children()(wrapper)
-          return () => {
-            unmountChild?.()
-            wrapper.remove()
-          }
-        },
+        [layout]:
+          (children: () => Mountable<HTMLElement>) => (host: HTMLElement) => {
+            layoutSpy()
+            const wrapper = document.createElement('div')
+            wrapper.className = 'dashboard-layout'
+            host.appendChild(wrapper)
+            const unmountChild = children()(wrapper)
+            return () => {
+              unmountChild?.()
+              wrapper.remove()
+            }
+          },
         overview: () => (host: HTMLElement) => {
           const div = document.createElement('div')
           div.className = 'overview'
@@ -468,22 +507,221 @@ describe('createRouterView', () => {
           div.className = 'settings'
           host.appendChild(div)
           return () => div.remove()
-        },
-      },
+        }
+      }
     }
 
-    const RouterView = createRouterView(router, routes, views)
-    
+    const RouterView = createRouterView(router, views)
+
     // 导航到 dashboard/overview
     history.push('/dashboard/overview')
-    
+
     const unmount = RouterView()(container)
-    
+
     // 应该调用了 layout
     expect(layoutSpy).toHaveBeenCalled()
     // 应该有 dashboard-layout 包裹 overview
-    expect(container.querySelector('.dashboard-layout .overview')).not.toBeNull()
-    
+    expect(
+      container.querySelector('.dashboard-layout .overview')
+    ).not.toBeNull()
+
+    unmount?.()
+  })
+})
+
+describe('createLeaveGuard', () => {
+  let container: HTMLElement
+
+  beforeEach(() => {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+  })
+
+  afterEach(() => {
+    container.remove()
+  })
+
+  it('should create a leaveGuard component that returns Mountable', () => {
+    const { router } = createTestRouter()
+    const leaveGuard = createLeaveGuard(router)
+
+    const mountFn = leaveGuard({ guard: () => true })
+    expect(typeof mountFn).toBe('function')
+  })
+
+  it('should register guard on mount', async () => {
+    const { router, routes, history } = createTestRouter()
+    history.push('/')
+
+    const leaveGuard = createLeaveGuard(router)
+    const guardSpy = vi.fn(() => true)
+
+    const mountFn = leaveGuard({ guard: guardSpy })
+    const unmount = mountFn(container)
+
+    await router.push(routes.about, {})
+
+    expect(guardSpy).toHaveBeenCalledTimes(1)
+
+    unmount?.()
+  })
+
+  it('should unregister guard on unmount', async () => {
+    const { router, routes, history } = createTestRouter()
+    history.push('/')
+
+    const leaveGuard = createLeaveGuard(router)
+    const guardSpy = vi.fn(() => true)
+
+    const mountFn = leaveGuard({ guard: guardSpy })
+    const unmount = mountFn(container)
+
+    await router.push(routes.about, {})
+    expect(guardSpy).toHaveBeenCalledTimes(1)
+
+    unmount?.()
+
+    await router.push(routes.user, { id: '123' })
+    expect(guardSpy).toHaveBeenCalledTimes(1) // still 1, not 2
+  })
+
+  it('should block navigation when guard returns false', async () => {
+    const { router, routes, history } = createTestRouter()
+    history.push('/')
+
+    const leaveGuard = createLeaveGuard(router)
+    const mountFn = leaveGuard({ guard: () => false })
+    const unmount = mountFn(container)
+
+    await expect(router.push(routes.about, {})).rejects.toThrow(
+      NavigationAbortedError
+    )
+    expect(router.current?.route).toBe(routes.home)
+
+    unmount?.()
+  })
+
+  it('should block navigation when guard returns string', async () => {
+    const { router, routes, history } = createTestRouter()
+    history.push('/')
+
+    const leaveGuard = createLeaveGuard(router)
+    const mountFn = leaveGuard({ guard: () => 'Unsaved changes' })
+    const unmount = mountFn(container)
+
+    await expect(router.push(routes.about, {})).rejects.toThrow(
+      'Unsaved changes'
+    )
+
+    unmount?.()
+  })
+
+  it('should allow navigation when guard returns true', async () => {
+    const { router, routes, history } = createTestRouter()
+    history.push('/')
+
+    const leaveGuard = createLeaveGuard(router)
+    const mountFn = leaveGuard({ guard: () => true })
+    const unmount = mountFn(container)
+
+    await router.push(routes.about, {})
+    expect(router.current?.route).toBe(routes.about)
+
+    unmount?.()
+  })
+
+  it('should support async guard', async () => {
+    const { router, routes, history } = createTestRouter()
+    history.push('/')
+
+    const leaveGuard = createLeaveGuard(router)
+    const mountFn = leaveGuard({
+      guard: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        return true
+      }
+    })
+    const unmount = mountFn(container)
+
+    await router.push(routes.about, {})
+    expect(router.current?.route).toBe(routes.about)
+
+    unmount?.()
+  })
+
+  it('should receive to and from route matches', async () => {
+    const { router, routes, history } = createTestRouter()
+    history.push('/')
+
+    const leaveGuard = createLeaveGuard(router)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let capturedTo: any = null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let capturedFrom: any = null
+
+    const mountFn = leaveGuard({
+      guard: (to, from) => {
+        capturedTo = to
+        capturedFrom = from
+        return true
+      }
+    })
+    const unmount = mountFn(container)
+
+    await router.push(routes.about, {})
+
+    expect(capturedTo?.route).toBe(routes.about)
+    expect(capturedFrom?.route).toBe(routes.home)
+
+    unmount?.()
+  })
+
+  it('should only trigger when leaving the mounted route, not when entering', async () => {
+    const { router, routes, history } = createTestRouter()
+    // 从首页开始
+    history.push('/')
+
+    const leaveGuard = createLeaveGuard(router)
+    const guardSpy = vi.fn(() => true)
+
+    // 先导航到 about 页面
+    await router.push(routes.about, {})
+
+    // 然后在 about 页面挂载 leaveGuard
+    const mountFn = leaveGuard({ guard: guardSpy })
+    const unmount = mountFn(container)
+
+    // 此时从 about 导航到 user 应该触发守卫
+    await router.push(routes.user, { id: '123' })
+    expect(guardSpy).toHaveBeenCalledTimes(1)
+
+    // 继续从 user 导航到 home 不应该触发守卫（因为 leaveGuard 是在 about 页面挂载的）
+    await router.push(routes.home, {})
+    expect(guardSpy).toHaveBeenCalledTimes(1) // still 1
+
+    unmount?.()
+  })
+
+  it('should not trigger guard when navigating between other routes', async () => {
+    const { router, routes, history } = createTestRouter()
+    history.push('/')
+
+    const leaveGuard = createLeaveGuard(router)
+    const guardSpy = vi.fn(() => true)
+
+    // 在首页挂载 leaveGuard
+    const mountFn = leaveGuard({ guard: guardSpy })
+    const unmount = mountFn(container)
+
+    // 离开首页到 about - 应该触发
+    await router.push(routes.about, {})
+    expect(guardSpy).toHaveBeenCalledTimes(1)
+
+    // 从 about 到 user - 不应该触发（我们保护的是首页）
+    await router.push(routes.user, { id: '123' })
+    expect(guardSpy).toHaveBeenCalledTimes(1) // still 1
+
     unmount?.()
   })
 })

@@ -1,4 +1,5 @@
 import { eachImpl, repeatImpl, type Mountable, type Ref } from '@rasenjs/core'
+import { hostHooks } from '../host-hooks'
 
 /**
  * DOM 优化版 each 组件
@@ -25,13 +26,14 @@ export function each<T extends object>(
     v !== null && typeof v === 'object' && 'value' in v
 
   return eachImpl<T, HTMLElement, Node>({
-    items: typeof items === 'function'
-      ? items
-      : isRef(items)
-        ? () => items.value
-        : () => items,  // 普通数组
+    items:
+      typeof items === 'function'
+        ? items
+        : isRef(items)
+          ? () => items.value
+          : () => items, // 普通数组
     render,
-    ...domHooks
+    ...hostHooks
   })
 }
 
@@ -52,13 +54,14 @@ export function repeat(
 
 export function repeat<T>(
   itemsOrCount: Ref<T[]> | Ref<number> | (() => T[]) | (() => number),
-  render: ((item: T, index: number) => Mountable<HTMLElement>) | ((index: number) => Mountable<HTMLElement>)
+  render:
+    | ((item: T, index: number) => Mountable<HTMLElement>)
+    | ((index: number) => Mountable<HTMLElement>)
 ): Mountable<HTMLElement> {
   return repeatImpl<T, HTMLElement, Node>({
     items: () => {
-      const value = typeof itemsOrCount === 'function'
-        ? itemsOrCount()
-        : itemsOrCount.value
+      const value =
+        typeof itemsOrCount === 'function' ? itemsOrCount() : itemsOrCount.value
 
       if (typeof value === 'number') {
         return Array.from({ length: value }, (_, i) => i) as T[]
@@ -66,68 +69,6 @@ export function repeat<T>(
       return value as T[]
     },
     render: render as (item: T, index: number) => Mountable<HTMLElement>,
-    ...domHooksForRepeat
+    ...hostHooks
   })
-}
-
-/**
- * DOM 宿主操作钩子 - for each (支持 insertBefore)
- */
-const domHooks = {
-  createMarker: () => document.createComment('') as Node,
-
-  appendMarker: (host: HTMLElement, marker: Node) => {
-    host.appendChild(marker)
-  },
-
-  insertBefore: (host: HTMLElement, node: Node, before: Node | null) => {
-    host.insertBefore(node, before)
-  },
-
-  removeNode: (node: Node) => {
-    node.parentNode?.removeChild(node)
-  },
-
-  createFragment: () => {
-    const fragment = document.createDocumentFragment()
-    return {
-      host: fragment as unknown as HTMLElement,
-      flush: (host: HTMLElement, before: Node | null) => {
-        host.insertBefore(fragment, before)
-      }
-    }
-  },
-
-  removeMarker: (marker: Node) => {
-    marker.parentNode?.removeChild(marker)
-  }
-}
-
-/**
- * DOM 宿主操作钩子 - for repeat (不需要 insertBefore)
- */
-const domHooksForRepeat = {
-  createMarker: () => document.createComment('') as Node,
-
-  appendMarker: (host: HTMLElement, marker: Node) => {
-    host.appendChild(marker)
-  },
-
-  removeNode: (node: Node) => {
-    node.parentNode?.removeChild(node)
-  },
-
-  createFragment: () => {
-    const fragment = document.createDocumentFragment()
-    return {
-      host: fragment as unknown as HTMLElement,
-      flush: (host: HTMLElement, before: Node | null) => {
-        host.insertBefore(fragment, before)
-      }
-    }
-  },
-
-  removeMarker: (marker: Node) => {
-    marker.parentNode?.removeChild(marker)
-  }
 }

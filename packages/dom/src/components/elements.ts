@@ -17,18 +17,24 @@ type Child = Mountable<HTMLElement> | string
  * 最终统一转成 element({ tag, children, ... }) 的形式
  */
 function createElement<T extends HTMLTagName>(tag: T) {
-  return (propsOrChild?: Props<T> | Child, ...restChildren: Child[]): Mountable<HTMLElement> => {
+  return (
+    propsOrChild?: Props<T> | Child,
+    ...restChildren: Child[]
+  ): Mountable<HTMLElement> => {
     // 没有参数
     if (propsOrChild === undefined) {
       return element({ tag } as unknown as ElementProps<T>)
     }
-    
+
     // 第一个参数是 string 或 function (Mountable)，当作 child
-    if (typeof propsOrChild === 'string' || typeof propsOrChild === 'function') {
+    if (
+      typeof propsOrChild === 'string' ||
+      typeof propsOrChild === 'function'
+    ) {
       const children = [propsOrChild, ...restChildren]
       return element({ tag, children } as unknown as ElementProps<T>)
     }
-    
+
     // 第一个参数是 props 对象
     const props = propsOrChild as Props<T>
     if (restChildren.length > 0) {
@@ -41,7 +47,7 @@ function createElement<T extends HTMLTagName>(tag: T) {
           : restChildren
       return element({ tag, ...props, children } as unknown as ElementProps<T>)
     }
-    
+
     return element({ tag, ...props } as unknown as ElementProps<T>)
   }
 }
@@ -77,7 +83,10 @@ export const footer = createElement('footer')
 export const main = createElement('main')
 export const aside = createElement('aside')
 export const form = createElement('form')
-export const input = createElement('input') as (propsOrChild?: Props<'input'> | Child, ...children: Child[]) => Mountable<HTMLInputElement>
+export const input = createElement('input') as (
+  propsOrChild?: Props<'input'> | Child,
+  ...children: Child[]
+) => Mountable<HTMLInputElement>
 export const img = createElement('img')
 export const label = createElement('label')
 export const textarea = createElement('textarea')

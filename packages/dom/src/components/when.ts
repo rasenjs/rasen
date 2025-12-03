@@ -1,8 +1,5 @@
-import {
-  when as coreWhen,
-  type Mountable,
-  type PropValue
-} from '@rasenjs/core'
+import { when as coreWhen, type Mountable, type PropValue } from '@rasenjs/core'
+import { hostHooks } from '../host-hooks'
 
 /**
  * when 组件 - 条件渲染（DOM 优化版）
@@ -32,29 +29,6 @@ export function when(config: {
 }): Mountable<HTMLElement> {
   return coreWhen<HTMLElement, Node>({
     ...config,
-    ...domHooks
+    ...hostHooks
   })
-}
-
-/**
- * DOM 宿主操作钩子
- */
-const domHooks = {
-  // 创建标记节点
-  createMarker: () => document.createComment('when') as Node,
-
-  // 将标记添加到宿主
-  appendMarker: (host: HTMLElement, marker: Node) => {
-    host.appendChild(marker)
-  },
-
-  // 在指定位置之前插入节点
-  insertBefore: (host: HTMLElement, node: Node, before: Node | null) => {
-    host.insertBefore(node, before)
-  },
-
-  // 移除标记节点
-  removeMarker: (marker: Node) => {
-    marker.parentNode?.removeChild(marker)
-  }
 }

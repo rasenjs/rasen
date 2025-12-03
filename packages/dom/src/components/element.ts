@@ -1,10 +1,11 @@
 import type { PropValue, Ref, Mountable } from '@rasenjs/core'
 import { unref, setAttribute, setStyle, watchProp } from '../utils'
+import { warnInvalidEventCase } from '../utils/dev-warnings'
 import { getHydrationContext } from '../hydration-context'
-import type { 
-  HTMLTagName, 
-  HTMLTagAttributes, 
-  ClassAttributes 
+import type {
+  HTMLTagName,
+  HTMLTagAttributes,
+  ClassAttributes
 } from '../types/dom'
 
 /**
@@ -29,7 +30,7 @@ const TAG_SPECIFIC_PROPERTIES: Record<string, Set<string>> = {
   input: new Set(['value', 'checked', 'indeterminate']),
   textarea: new Set(['value']),
   select: new Set(['value', 'selectedIndex']),
-  option: new Set(['selected']),
+  option: new Set(['selected'])
 }
 
 /**
@@ -37,10 +38,10 @@ const TAG_SPECIFIC_PROPERTIES: Record<string, Set<string>> = {
  * 这些属性用 property 或 attribute 效果一致，但 property 更直接
  */
 const COMMON_DOM_PROPERTIES = new Set([
-  'disabled',   // 禁用状态
-  'readOnly',   // 只读状态
-  'multiple',   // select 多选
-  'hidden',     // 隐藏
+  'disabled', // 禁用状态
+  'readOnly', // 只读状态
+  'multiple', // select 多选
+  'hidden' // 隐藏
 ])
 
 /**
@@ -61,7 +62,9 @@ function isDOMProperty(tag: string, key: string): boolean {
  * onClick, onMouseEnter 等
  */
 function isEventProp(key: string): boolean {
-  return key.startsWith('on') && key.length > 2 && key[2] === key[2].toUpperCase()
+  return (
+    key.startsWith('on') && key.length > 2 && key[2] === key[2].toUpperCase()
+  )
 }
 
 /**
@@ -148,7 +151,9 @@ type AnyElementProps = {
  * element({ tag: 'button', onClick: () => {}, children: 'Click me' })
  * element({ tag: 'div', class: 'box', children: [child1, child2] })
  */
-export function element<T extends HTMLTagName>(props: ElementProps<T>): Mountable<HTMLElement>
+export function element<T extends HTMLTagName>(
+  props: ElementProps<T>
+): Mountable<HTMLElement>
 
 // 重载：支持字符串标签（用于动态标签或自定义元素）
 export function element(props: AnyElementProps): Mountable<HTMLElement>
@@ -163,7 +168,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
     if (ctx?.isHydrating) {
       // === Hydration 模式：复用已有 DOM ===
       const existing = ctx.claim()
-      
+
       if (existing && existing.nodeType === Node.ELEMENT_NODE) {
         const existingEl = existing as HTMLElement
         if (existingEl.tagName.toLowerCase() === props.tag.toLowerCase()) {
@@ -189,7 +194,10 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 
     const stops: Array<() => void> = []
     const childUnmounts: Array<(() => void) | undefined> = []
-    const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
+    const eventListeners: Array<{
+      event: string
+      handler: (e: Event) => void
+    }> = []
 
     // 处理 class
     if (props.class !== undefined) {
@@ -226,7 +234,9 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
       const children = props.children
       if (
         typeof children === 'string' ||
-        (typeof children === 'object' && children !== null && 'value' in children)
+        (typeof children === 'object' &&
+          children !== null &&
+          'value' in children)
       ) {
         // String content (or ref to string)
         stops.push(
@@ -269,6 +279,9 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 
       const value = props[key]
       if (value === undefined) continue
+
+      // 开发环境下检查事件大小写错误
+      warnInvalidEventCase(key, value)
 
       // 事件处理器
       if (isEventProp(key)) {
@@ -332,7 +345,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
       }
       el.remove()
     }
-    
+
     // 附加 node 引用，供 each 组件进行节点移动
     ;(unmount as { node?: Node }).node = el
 
@@ -345,4 +358,3 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 // ============================================================================
 
 export type { HTMLTagName, ElementProps, BaseElementProps }
-

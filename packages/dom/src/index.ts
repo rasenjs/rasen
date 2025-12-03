@@ -4,6 +4,7 @@
 
 export * from './components'
 export { watchProp } from './utils'
+export { hostHooks, type HostHooks } from './host-hooks'
 
 // 事件修饰器
 export {
@@ -65,7 +66,7 @@ export { getHydrationContext, isHydrating }
 
 /**
  * 挂载组件到 DOM 元素
- * 
+ *
  * @param mountable - Mountable 函数
  * @param container - 目标容器元素
  * @returns unmount 函数

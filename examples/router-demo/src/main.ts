@@ -1,16 +1,43 @@
 /**
  * Router Demo - @rasenjs/router
- * 
+ *
  * 演示路由的基本使用
  * 遵循 Rasen 组件架构：setup => mount => unmount
  */
 
 import { z } from 'zod'
-import { setReactiveRuntime, type Mountable } from '@rasenjs/core'
+import { ref, setReactiveRuntime, type Mountable } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-signals'
-import { div, a, h1, h2, p, span, ul, li, code, nav, mount } from '@rasenjs/dom'
-import { route, tpl, createRoutes, createRouter, createBrowserHistory } from '@rasenjs/router'
-import { createRouterLink, createRouterView, layout, type ViewsConfig } from '@rasenjs/router/components'
+import {
+  div,
+  a,
+  h1,
+  h2,
+  p,
+  span,
+  ul,
+  li,
+  code,
+  nav,
+  mount,
+  input,
+  button,
+  form
+} from '@rasenjs/dom'
+import {
+  route,
+  tpl,
+  createRoutes,
+  createRouter,
+  createBrowserHistory,
+  NavigationAbortedError
+} from '@rasenjs/router'
+import {
+  createRouterLink,
+  createRouterView,
+  createLeaveGuard,
+  layout
+} from '@rasenjs/router/components'
 
 // ============================================
 // 初始化响应式运行时
@@ -25,19 +52,19 @@ const routes = createRoutes({
   // 绝对路径（以 / 开头）- 纯字符串
   home: route('/'),
   about: route('/about'),
-  
+
   // 带参数的路由 - 需要 tpl
   user: route(tpl`/users/${{ id: z.string() }}`),
-  
+
   // 带数字参数（自动转换）
   post: route(tpl`/posts/${{ id: z.coerce.number() }}`),
-  
+
   // 嵌套路由（相对路径）
   settings: {
-    profile: route(),                                  // → /settings/profile
-    account: route(),                                  // → /settings/account
-    security: route('password'),                       // → /settings/security/password
-  },
+    profile: route(), // → /settings/profile
+    account: route(), // → /settings/account
+    security: route('password') // → /settings/security/password
+  }
 })
 
 // ============================================
@@ -45,15 +72,46 @@ const routes = createRoutes({
 // ============================================
 
 const router = createRouter(routes, {
-  history: createBrowserHistory(),
+  history: createBrowserHistory()
 })
 
 // ============================================
-// 3. 创建 Link 组件
+// 2.1 全局钩子
+// ============================================
+
+// 前置守卫：页面标题 & 日志
+router.beforeEach((to, from) => {
+  console.log(`[Router] ${from?.path ?? '(initial)'} → ${to.path}`)
+  return true
+})
+
+// 后置钩子：更新页面标题
+router.afterEach((to) => {
+  const titles: Record<string, string> = {
+    '/': 'Home - Router Demo',
+    '/about': 'About - Router Demo'
+  }
+  document.title = titles[to.path] ?? 'Router Demo'
+})
+
+// 错误处理
+router.onError((error) => {
+  if (error instanceof NavigationAbortedError) {
+    console.log('[Router] Navigation aborted:', error.message)
+  } else {
+    console.error('[Router] Navigation error:', error)
+  }
+})
+
+// ============================================
+// 3. 创建 Link 和 LeaveGuard 组件
 // ============================================
 
 // 直接使用 @rasenjs/dom 的 a 组件
 const Link = createRouterLink(router, a)
+
+// 创建 leaveGuard 组件
+const leaveGuard = createLeaveGuard(router)
 
 // ============================================
 // 4. 定义视图组件（Rasen 组件模式）
@@ -89,9 +147,18 @@ function AboutView(): Mountable<HTMLElement> {
     p({ style: { marginTop: '10px' } }, '设计原则：'),
     ul(
       { style: { margin: '15px 0 0 20px', color: '#666' } },
-      li(span({ style: { fontWeight: 'bold' } }, 'Headless'), ' - 核心逻辑与视图分离'),
-      li(span({ style: { fontWeight: 'bold' } }, 'Type-safe'), ' - 完整的 TypeScript 类型推断'),
-      li(span({ style: { fontWeight: 'bold' } }, 'Platform-agnostic'), ' - 适配任何渲染目标')
+      li(
+        span({ style: { fontWeight: 'bold' } }, 'Headless'),
+        ' - 核心逻辑与视图分离'
+      ),
+      li(
+        span({ style: { fontWeight: 'bold' } }, 'Type-safe'),
+        ' - 完整的 TypeScript 类型推断'
+      ),
+      li(
+        span({ style: { fontWeight: 'bold' } }, 'Platform-agnostic'),
+        ' - 适配任何渲染目标'
+      )
     )
   )
 }
@@ -107,7 +174,10 @@ function UserView(params: { id: string }): Mountable<HTMLElement> {
       { class: 'user-card' },
       div({ class: 'card-title' }, `User ID: ${params.id}`),
       p('这是用户 ', code(params.id), ' 的详情页面。'),
-      p({ style: { marginTop: '10px', color: '#888' } }, '参数类型：string（原样保留）')
+      p(
+        { style: { marginTop: '10px', color: '#888' } },
+        '参数类型：string（原样保留）'
+      )
     )
   )
 }
@@ -123,21 +193,77 @@ function PostView(params: { id: number }): Mountable<HTMLElement> {
       { class: 'post-card' },
       div({ class: 'card-title' }, `Post ID: ${params.id}`),
       p('这是文章 ', code(String(params.id)), ' 的详情页面。'),
-      p({ style: { marginTop: '10px', color: '#888' } }, '参数类型：number（使用 z.coerce.number() 自动转换）'),
-      p({ style: { marginTop: '5px', color: '#888' } }, `typeof id = ${typeof params.id}`)
+      p(
+        { style: { marginTop: '10px', color: '#888' } },
+        '参数类型：number（使用 z.coerce.number() 自动转换）'
+      ),
+      p(
+        { style: { marginTop: '5px', color: '#888' } },
+        `typeof id = ${typeof params.id}`
+      )
     )
   )
 }
 
 /**
- * 设置 - 个人资料视图
+ * 设置 - 个人资料视图（带 leaveGuard 示例）
  */
 function SettingsProfileView(): Mountable<HTMLElement> {
+  // 表单脏状态
+  const formDirty = ref(false)
+
   return div(
     { class: 'view' },
     h2('⚙️ 设置 - 个人资料'),
     p('这是嵌套路由示例：', code('/settings/profile')),
-    p({ style: { marginTop: '10px', color: '#666' } }, '路由定义使用相对路径，自动添加父级前缀。')
+    p(
+      { style: { marginTop: '10px', color: '#666' } },
+      '路由定义使用相对路径，自动添加父级前缀。'
+    ),
+
+    // leaveGuard：离开前确认
+    leaveGuard({
+      guard: () => {
+        if (formDirty.value) {
+          return confirm('有未保存的更改，确定离开吗？')
+        }
+        return true
+      }
+    }),
+
+    // 模拟表单
+    div(
+      {
+        style: {
+          marginTop: '20px',
+          padding: '15px',
+          background: '#f5f5f5',
+          borderRadius: '8px'
+        }
+      },
+      p(
+        { style: { marginBottom: '10px', fontWeight: 'bold' } },
+        '📝 编辑个人资料（leaveGuard 示例）'
+      ),
+      input({
+        type: 'text',
+        placeholder: '输入内容后尝试离开此页面...',
+        style: { padding: '8px', width: '300px', marginRight: '10px' },
+        onInput: () => {
+          formDirty.value = true
+        }
+      }),
+      button(
+        {
+          style: { padding: '8px 16px' },
+          onClick: () => {
+            formDirty.value = false
+            alert('已保存！')
+          }
+        },
+        '保存'
+      )
+    )
   )
 }
 
@@ -167,18 +293,16 @@ function SettingsSecurityView(): Mountable<HTMLElement> {
  * 404 视图
  */
 function NotFoundView(): Mountable<HTMLElement> {
-  return div(
-    { class: 'view' },
-    h2('❌ 404 Not Found'),
-    p('页面不存在')
-  )
+  return div({ class: 'view' }, h2('❌ 404 Not Found'), p('页面不存在'))
 }
 
 /**
  * Settings 布局组件
  * children 是一个返回 Mountable 的函数，需要在布局内部挂载
  */
-function SettingsLayout(children: () => Mountable<HTMLElement>): Mountable<HTMLElement> {
+function SettingsLayout(
+  children: () => Mountable<HTMLElement>
+): Mountable<HTMLElement> {
   return div(
     { class: 'settings-layout' },
     div(
@@ -199,21 +323,26 @@ function SettingsLayout(children: () => Mountable<HTMLElement>): Mountable<HTMLE
 // 5. 创建 RouterView（使用对象结构）
 // ============================================
 
-const RouterView = createRouterView(router, routes, {
-  home: () => HomeView(),
-  about: () => AboutView(),
-  user: ({ id }) => UserView({ id }),
-  post: ({ id }) => PostView({ id }),
-  settings: {
-    // 使用 layout Symbol 定义布局
-    [layout]: SettingsLayout,
-    profile: () => SettingsProfileView(),
-    account: () => SettingsAccountView(),
-    security: () => SettingsSecurityView(),
+// 简化：不再需要传 routes，从 router.routes 获取
+const RouterView = createRouterView(
+  router,
+  {
+    home: () => HomeView(),
+    about: () => AboutView(),
+    user: ({ id }) => UserView({ id }),
+    post: ({ id }) => PostView({ id }),
+    settings: {
+      // 使用 layout Symbol 定义布局
+      [layout]: SettingsLayout,
+      profile: () => SettingsProfileView(),
+      account: () => SettingsAccountView(),
+      security: () => SettingsSecurityView()
+    }
   },
-}, {
-  default: () => NotFoundView(),
-})
+  {
+    default: () => NotFoundView()
+  }
+)
 
 // ============================================
 // 6. Debug 组件
@@ -224,7 +353,7 @@ function DebugInfo(): Mountable<HTMLElement> {
   return (host: HTMLElement) => {
     const container = document.createElement('div')
     container.className = 'debug'
-    
+
     const render = () => {
       const current = router.current
       container.innerHTML = `
@@ -233,15 +362,15 @@ function DebugInfo(): Mountable<HTMLElement> {
         <div>match: ${current ? JSON.stringify(current, null, 2) : 'null'}</div>
       `
     }
-    
+
     // 初始渲染
     render()
-    
+
     // 订阅路由变化
     const unsubscribe = router.subscribe(render)
-    
+
     host.appendChild(container)
-    
+
     // unmount 时清理
     return () => {
       unsubscribe()
@@ -270,14 +399,15 @@ function App(): Mountable<HTMLElement> {
         Link({ to: routes.user, params: { id: 'bob' } }, 'User: bob'),
         Link({ to: routes.post, params: { id: 42 } }, 'Post: 42'),
         // 也可以使用 children 属性
-        Link({ to: routes.settings.profile, params: {}, children: ['Settings'] })
+        Link({
+          to: routes.settings.profile,
+          params: {},
+          children: ['Settings']
+        })
       )
     ),
     // Main content
-    div(
-      { class: 'main' },
-      RouterView()
-    ),
+    div({ class: 'main' }, RouterView()),
     // Debug info
     DebugInfo(),
     // Footer
