@@ -29,8 +29,8 @@ import { route, tpl, createRoutes, createRouter, createBrowserHistory } from '@r
 
 // 1. Define routes using template literals
 const routes = createRoutes({
-  home: route(tpl`/`),
-  about: route(tpl`/about`),
+  home: route('/'),
+  about: route('/about'),
   user: route(tpl`/users/${{ id: z.string() }}`),
   post: route(tpl`/posts/${{ id: z.coerce.number() }}`),
 })
@@ -68,20 +68,21 @@ import { route, tpl } from '@rasenjs/router'
 // Empty route (uses key as path segment)
 route()
 
-// Simple route
-route(tpl\`/\`)
+// Simple route (string path)
+route('/')
+route('/about')
 
 // Route with string parameter
-route(tpl\`/users/\${{ id: z.string() }}\`)
+route(tpl`/users/${{ id: z.string() }}`)
 
 // Route with number parameter (auto-coerced)
-route(tpl\`/posts/\${{ id: z.coerce.number() }}\`)
+route(tpl`/posts/${{ id: z.coerce.number() }}`)
 
 // Route with multiple parameters
-route(tpl\`/users/\${{ userId: z.string() }}/posts/\${{ postId: z.coerce.number() }}\`)
+route(tpl`/users/${{ userId: z.string() }}/posts/${{ postId: z.coerce.number() }}`)
 
 // Route with query and meta
-route(tpl\`/search\`, {
+route(tpl`/search`, {
   query: { q: z.string(), page: z.coerce.number().optional() },
   meta: { title: 'Search' }
 })
@@ -98,20 +99,20 @@ Creates a nested route structure from configuration. Returns Route objects that 
 
 ```typescript
 const routes = createRoutes({
-  // Absolute paths
-  home: route(tpl`/`),                        // → /
-  about: route(tpl`/about`),                  // → /about
+  // Absolute paths (string syntax for routes without params)
+  home: route('/'),                             // → /
+  about: route('/about'),                       // → /about
   
   // Empty route() uses key as path
   settings: {
     profile: route(),                           // → /settings/profile
     account: route(),                           // → /settings/account
-    security: route(tpl`password`),           // → /settings/security/password
+    security: route('password'),                // → /settings/security/password
   },
   
   // Mixed: absolute path escapes hierarchy
   api: {
-    health: route(tpl`/health`),              // → /health (not /api/health)
+    health: route('/health'),                   // → /health (not /api/health)
     users: route(),                             // → /api/users
   },
 })
@@ -268,9 +269,9 @@ import { createRouterLink, createRouterView, layout } from '@rasenjs/router/comp
 // Initialize reactive runtime
 setReactiveRuntime(createReactiveRuntime())
 
-// Define routes with template literals
+// Define routes with template literals (use strings for routes without params)
 const routes = createRoutes({
-  home: route(tpl`/`),
+  home: route('/'),
   user: route(tpl`/users/${{ id: z.string() }}`),
   dashboard: {
     overview: route(),

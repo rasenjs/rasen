@@ -22,11 +22,11 @@ setReactiveRuntime(createReactiveRuntime())
 // ============================================
 
 const routes = createRoutes({
-  // 绝对路径（以 / 开头）
-  home: route(tpl`/`),
-  about: route(tpl`/about`),
+  // 绝对路径（以 / 开头）- 纯字符串
+  home: route('/'),
+  about: route('/about'),
   
-  // 带参数的路由
+  // 带参数的路由 - 需要 tpl
   user: route(tpl`/users/${{ id: z.string() }}`),
   
   // 带数字参数（自动转换）
@@ -36,7 +36,7 @@ const routes = createRoutes({
   settings: {
     profile: route(),                                  // → /settings/profile
     account: route(),                                  // → /settings/account
-    security: route(tpl`password`),                    // → /settings/security/password
+    security: route('password'),                       // → /settings/security/password
   },
 })
 
