@@ -1,0 +1,55 @@
+{
+  "name": "@rasenjs/shared",
+  "version": "0.1.0-alpha",
+  "description": "Shared utilities for Rasen packages",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "build": "../../node_modules/.bin/tsup",
+    "test": "../../node_modules/.bin/vitest",
+    "typecheck": "../../node_modules/.bin/tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "rasen",
+    "utilities",
+    "template",
+    "shared"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/shared"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/shared",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT",
+  "peerDependencies": {
+    "zod": "^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "zod": "^3.22.0"
+  },
+  "sideEffects": false
+}
