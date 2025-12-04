@@ -92,7 +92,7 @@ function drawRoundedRect(
 /**
  * rect 组件 - 绘制矩形
  */
-export const rect: SyncComponent<CanvasRenderingContext2D, RectProps> = (
+export const rect: SyncComponent<CanvasRenderingContext2D, [RectProps]> = (
   props: RectProps
 ) => {
   return element({

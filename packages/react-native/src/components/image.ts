@@ -5,13 +5,13 @@
  * 使用 component() 工厂函数创建，支持响应式更新
  */
 
-import { component, type ImageProps, type RNMountFunction } from './component'
+import { component, type ImageProps, type RNMountable } from './component'
 
 /**
  * Image 组件 - 图片显示
  *
  * @param props - Image 属性
- * @returns RNMountFunction
+ * @returns RNMountable
  *
  * @example
  * ```ts
@@ -22,7 +22,7 @@ import { component, type ImageProps, type RNMountFunction } from './component'
  * })
  * ```
  */
-export function image(props: ImageProps): RNMountFunction {
+export function image(props: ImageProps): RNMountable {
   return component('Image', props)
 }
 

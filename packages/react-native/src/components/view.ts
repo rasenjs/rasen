@@ -2,11 +2,11 @@
  * View 组件
  */
 
-import { component, type ViewProps, type RNMountFunction } from './component'
+import { component, type ViewProps, type RNMountable } from './component'
 
 /**
  * View 组件 - 基础容器
- * 
+ *
  * @example
  * ```ts
  * // 定义组件
@@ -16,12 +16,12 @@ import { component, type ViewProps, type RNMountFunction } from './component'
  *     text({ children: 'Hello' })
  *   ]
  * })
- * 
+ *
  * // 挂载
  * mount(hostConfig, rootTag, App)
  * ```
  */
-export function view(props: ViewProps = {}): RNMountFunction {
+export function view(props: ViewProps = {}): RNMountable {
   return component('View', props)
 }
 

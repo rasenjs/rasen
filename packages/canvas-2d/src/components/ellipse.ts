@@ -30,9 +30,10 @@ export interface EllipseProps
 /**
  * ellipse 组件 - 绘制椭圆
  */
-export const ellipse: SyncComponent<CanvasRenderingContext2D, EllipseProps> = (
-  props: EllipseProps
-) => {
+export const ellipse: SyncComponent<
+  CanvasRenderingContext2D,
+  [EllipseProps]
+> = (props: EllipseProps) => {
   return element({
     getBounds: () => {
       const x = unref(props.x) as number

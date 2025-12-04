@@ -10,7 +10,7 @@
  * 其他图形组件（circle, rect 等）可以基于此组件构建
  */
 
-import { getReactiveRuntime, type Mountable } from '@rasenjs/core'
+import { com, getReactiveRuntime, type Mountable } from '@rasenjs/core'
 import {
   RenderContext,
   getRenderContext,
@@ -51,63 +51,62 @@ export interface ElementProps {
  * }
  * ```
  */
-export const element = (
-  props: ElementProps
-): Mountable<CanvasRenderingContext2D> => {
-  // setup 周期：props 已经确定，可以解构
-  const { getBounds, draw, deps } = props
+export const element = com(
+  (props: ElementProps): Mountable<CanvasRenderingContext2D> => {
+    // setup 周期：props 已经确定，可以解构
+    const { getBounds, draw, deps } = props
 
-  // mounted 周期
-  return (ctx: CanvasRenderingContext2D) => {
-    // 自动创建 RenderContext（如果不存在）
-    if (!hasRenderContext(ctx)) {
-      new RenderContext(ctx)
-    }
-
-    let currentBounds: Bounds | null = null
-    let componentId: symbol | undefined
-
-    const drawFn = () => draw(ctx)
-
-    const update = () => {
-      const newBounds = getBounds(ctx)
-      const renderContext = getRenderContext(ctx)
-
-      if (currentBounds) {
-        renderContext.markDirty(currentBounds)
+    // mounted 周期
+    return (ctx: CanvasRenderingContext2D) => {
+      // 自动创建 RenderContext（如果不存在）
+      if (!hasRenderContext(ctx)) {
+        new RenderContext(ctx)
       }
-      renderContext.markDirty(newBounds)
-      currentBounds = newBounds
-    }
 
-    // 注册到 RenderContext 或 group
-    const groupContext = getCurrentGroupContext(ctx)
+      let currentBounds: Bounds | null = null
+      let componentId: symbol | undefined
 
-    if (groupContext) {
-      // 在 group 上下文中，将 draw 函数添加到 group
-      groupContext.childDrawFunctions.push(drawFn)
-    } else {
-      // 不在 group 中，直接注册到 RenderContext
-      const renderContext = getRenderContext(ctx)
-      componentId = renderContext.register({
-        bounds: () => currentBounds,
-        draw: drawFn
-      })
-    }
+      const drawFn = () => draw(ctx)
 
-    // 监听响应式依赖
-    const stop = getReactiveRuntime().watch(deps, update, { immediate: true })
-
-    // unmount 周期
-    return () => {
-      stop()
-      if (componentId) {
+      const update = () => {
+        const newBounds = getBounds(ctx)
         const renderContext = getRenderContext(ctx)
+
         if (currentBounds) {
           renderContext.markDirty(currentBounds)
         }
-        renderContext.unregister(componentId)
+        renderContext.markDirty(newBounds)
+        currentBounds = newBounds
+      }
+
+      // 注册到 RenderContext 或 group
+      const groupContext = getCurrentGroupContext(ctx)
+
+      if (groupContext) {
+        // 在 group 上下文中，将 draw 函数添加到 group
+        groupContext.childDrawFunctions.push(drawFn)
+      } else {
+        // 不在 group 中，直接注册到 RenderContext
+        const renderContext = getRenderContext(ctx)
+        componentId = renderContext.register({
+          bounds: () => currentBounds,
+          draw: drawFn
+        })
+      }
+
+      // 监听响应式依赖
+      getReactiveRuntime().watch(deps, update, { immediate: true })
+
+      // unmount 周期
+      return () => {
+        if (componentId) {
+          const renderContext = getRenderContext(ctx)
+          if (currentBounds) {
+            renderContext.markDirty(currentBounds)
+          }
+          renderContext.unregister(componentId)
+        }
       }
     }
   }
-}
+)

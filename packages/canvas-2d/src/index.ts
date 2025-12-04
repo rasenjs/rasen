@@ -73,9 +73,16 @@ export type {
   GroupConfig
 } from './types'
 
-type Canvas2DAppComponent = SyncComponent<CanvasRenderingContext2D, object>
+type Canvas2DAppComponent = SyncComponent<
+  CanvasRenderingContext2D,
+  [props: object]
+>
 
-export function render(component: Canvas2DAppComponent, props: object, ctx: CanvasRenderingContext2D): () => void {
+export function render(
+  component: Canvas2DAppComponent,
+  props: object,
+  ctx: CanvasRenderingContext2D
+): () => void {
   const mountable = component(props)
   const cleanup = mountable(ctx)
   return () => {

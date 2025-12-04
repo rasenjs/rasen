@@ -29,7 +29,7 @@ export interface WedgeProps
  * wedge 组件 - 绘制楔形（扇形）
  * 类似于 arc，但从中心点开始绘制完整的扇形
  */
-export const wedge: SyncComponent<CanvasRenderingContext2D, WedgeProps> = (
+export const wedge: SyncComponent<CanvasRenderingContext2D, [WedgeProps]> = (
   props: WedgeProps
 ) => {
   return element({

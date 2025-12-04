@@ -51,7 +51,7 @@ export {
   getInstanceMap,
   registerInstance,
   unregisterInstance,
-  getParentTag,
+  getParentTag
 } from './render-context'
 
 // 导出组件
@@ -61,8 +61,14 @@ export * from './components'
 export * from './utils'
 
 import type { HostConfig } from './render-context'
-import type { RNComponent, RNMountFunction } from './components'
-import { createRenderContext, createChildSet, appendChildToSet, completeRoot, initEventSystem } from './render-context'
+import type { RNMountable } from './components'
+import {
+  createRenderContext,
+  createChildSet,
+  appendChildToSet,
+  completeRoot,
+  initEventSystem
+} from './render-context'
 
 // React Native 依赖 - 使用静态 import
 import { AppRegistry } from 'react-native'
@@ -78,9 +84,9 @@ import 'react-native/Libraries/Components/View/ViewNativeComponent'
 
 /**
  * 应用组件类型
- * 返回一个挂载函数（即 `RNMountFunction`）。该函数在内部接收 `RenderContext` 并执行渲染/提交操作。
+ * 返回一个挂载函数（即 `RNMountable`）。该函数在内部接收 `RenderContext` 并执行渲染/提交操作。
  */
-export type AppComponent = () => RNMountFunction
+export type AppComponent = () => RNMountable
 
 /**
  * 挂载应用并返回可手动触发的重新渲染函数。
@@ -92,7 +98,7 @@ export type AppComponent = () => RNMountFunction
  *   - 调用传入的 `component`，拿到要挂载的实例（可以是单个实例或数组），将它们收集到 `ChildSet` 并通过 `completeRoot` 提交到原生层。
  * - 挂载通过 `AppRegistry` 注册的 runnable 执行首次渲染和后续内部渲染，但不会向外部返回可调用的 `rerender` 函数。
  *
- * @param component - 应用组件（应返回一个挂载函数，见 `RNComponent`）
+ * @param component - 应用组件（应返回一个 `RNMountable`）
  *
  * @example
  * ```ts
@@ -107,41 +113,42 @@ export type AppComponent = () => RNMountFunction
  * mount(App);
  * ```
  */
-export function mount(
-  component: RNComponent,
-): void {
+export function mount(component: AppComponent): void {
   // 初始化事件系统
   initEventSystem()
-  
-  let rerenderFn: (() => void) | null = null
-  
-  // 使用顶部导入的 AppRegistry
-  AppRegistry.registerRunnable('RasenReactNativeApp', ({ rootTag }: { rootTag: number }) => {
-    // 使用顶部导入的 ReactNativePrivateInterface 作为 hostConfig
-    const hostConfig = ReactNativePrivateInterface as HostConfig
-    const ctx = createRenderContext(hostConfig, rootTag)
 
-    // 创建重新渲染函数
-    rerenderFn = () => {
+  let rerenderFn: (() => void) | null = null
+
+  // 使用顶部导入的 AppRegistry
+  AppRegistry.registerRunnable(
+    'RasenReactNativeApp',
+    ({ rootTag }: { rootTag: number }) => {
+      // 使用顶部导入的 ReactNativePrivateInterface 作为 hostConfig
+      const hostConfig = ReactNativePrivateInterface as HostConfig
+      const ctx = createRenderContext(hostConfig, rootTag)
+
+      // 创建重新渲染函数
+      rerenderFn = () => {
         // 创建根 RenderContext
 
-      // 渲染组件
-      const result = component()(ctx)
+        // 渲染组件
+        const result = component()(ctx)
 
-      // 收集实例
-      const instances = Array.isArray(result) ? result : [result]
+        // 收集实例
+        const instances = Array.isArray(result) ? result : [result]
 
-      // 提交到原生层
-      const childSet = createChildSet(rootTag)
-      for (const instance of instances) {
-        appendChildToSet(childSet, instance)
+        // 提交到原生层
+        const childSet = createChildSet(rootTag)
+        for (const instance of instances) {
+          appendChildToSet(childSet, instance)
+        }
+        completeRoot(rootTag, childSet)
       }
-      completeRoot(rootTag, childSet)
+
+      // 首次渲染
+      rerenderFn()
     }
-    
-    // 首次渲染
-    rerenderFn()
-  })
-  
+  )
+
   // 不对外返回 rerender，渲染由 AppRegistry 注册的 runnable 内部触发
 }

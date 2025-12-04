@@ -29,7 +29,7 @@ export interface CircleProps
 /**
  * circle 组件 - 绘制圆形
  */
-export const circle: SyncComponent<CanvasRenderingContext2D, CircleProps> = (
+export const circle: SyncComponent<CanvasRenderingContext2D, [CircleProps]> = (
   props: CircleProps
 ) => {
   // setup 周期：基于 element 组件构建

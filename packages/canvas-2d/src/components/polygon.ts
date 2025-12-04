@@ -79,9 +79,10 @@ function calculatePoints(props: PolygonProps): {
  * polygon 组件 - 绘制多边形
  * 支持自定义多边形（通过points）和正多边形（通过sides和radius）
  */
-export const polygon: SyncComponent<CanvasRenderingContext2D, PolygonProps> = (
-  props: PolygonProps
-) => {
+export const polygon: SyncComponent<
+  CanvasRenderingContext2D,
+  [PolygonProps]
+> = (props: PolygonProps) => {
   return element({
     getBounds: () => {
       const { points } = calculatePoints(props)

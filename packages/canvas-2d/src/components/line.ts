@@ -25,7 +25,7 @@ export interface LineProps
 /**
  * line 组件 - 绘制线条
  */
-export const line: SyncComponent<CanvasRenderingContext2D, LineProps> = (
+export const line: SyncComponent<CanvasRenderingContext2D, [LineProps]> = (
   props: LineProps
 ) => {
   return element({

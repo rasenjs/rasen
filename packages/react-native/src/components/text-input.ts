@@ -5,13 +5,13 @@
  * 使用 component() 工厂函数创建，支持响应式更新
  */
 
-import { component, type TextInputProps, type RNMountFunction } from './component'
+import { component, type TextInputProps, type RNMountable } from './component'
 
 /**
  * TextInput 组件 - 文本输入
  *
  * @param props - TextInput 属性
- * @returns RNMountFunction
+ * @returns RNMountable
  *
  * @example
  * ```ts
@@ -25,13 +25,13 @@ import { component, type TextInputProps, type RNMountFunction } from './componen
  * })
  * ```
  */
-export function textInput(props: TextInputProps = {}): RNMountFunction {
+export function textInput(props: TextInputProps = {}): RNMountable {
   const { value, ...restProps } = props
 
   // TextInput 使用 'text' 属性而不是 'value'
   const textInputProps: Record<string, unknown> = {
     ...restProps,
-    ...(value !== undefined && { text: value }),
+    ...(value !== undefined && { text: value })
   }
 
   return component('TextInput', textInputProps)

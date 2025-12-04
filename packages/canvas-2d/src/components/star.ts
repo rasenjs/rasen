@@ -29,7 +29,7 @@ export interface StarProps
  * star 组件 - 绘制星形
  * 根据角数、内外半径生成星形路径
  */
-export const star: SyncComponent<CanvasRenderingContext2D, StarProps> = (
+export const star: SyncComponent<CanvasRenderingContext2D, [StarProps]> = (
   props: StarProps
 ) => {
   return element({

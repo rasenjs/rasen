@@ -35,13 +35,13 @@ export interface Instance {
     internalInstanceHandle: object
     publicInstance: unknown
   }
-  parentTag?: number  // 父节点的 nativeTag，用于事件冒泡
+  parentTag?: number // 父节点的 nativeTag，用于事件冒泡
 }
 
 export interface TextInstance {
   node: Node
   publicInstance?: unknown
-  parentTag?: number  // 父节点的 nativeTag
+  parentTag?: number // 父节点的 nativeTag
 }
 
 export interface HostContext {
@@ -88,13 +88,25 @@ export interface RenderContext {
 // ============================================================================
 
 interface FabricUIManager {
-  createNode: (reactTag: number, viewName: string, rootTag: number, props: Props, instanceHandle: object) => Node
+  createNode: (
+    reactTag: number,
+    viewName: string,
+    rootTag: number,
+    props: Props,
+    instanceHandle: object
+  ) => Node
   cloneNodeWithNewProps: (node: Node, newProps: Props) => Node
   createChildSet: (rootTag: number) => ChildSet
   appendChild: (parentNode: Node, child: Node) => Node
   appendChildToSet: (childSet: ChildSet, child: Node) => void
   completeRoot: (rootTag: number, childSet: ChildSet) => void
-  registerEventHandler?: (dispatchEvent: (instanceHandle: object, type: string, payload: Record<string, unknown>) => void) => void
+  registerEventHandler?: (
+    dispatchEvent: (
+      instanceHandle: object,
+      type: string,
+      payload: Record<string, unknown>
+    ) => void
+  ) => void
 }
 
 function getFabricUIManager(): FabricUIManager {
@@ -139,13 +151,15 @@ export function unregisterInstance(tag: number): void {
 /**
  * 获取 instance 的父节点 tag
  */
-export function getParentTag(instance: Instance | TextInstance): number | undefined {
+export function getParentTag(
+  instance: Instance | TextInstance
+): number | undefined {
   return instance.parentTag
 }
 
 /**
  * 事件分发函数 - 实现事件冒泡
- * 
+ *
  * 类似 React Fiber 的 traverseTwoPhase，但只实现 bubble 阶段
  */
 function dispatchEventWithBubble(
@@ -162,7 +176,7 @@ function dispatchEventWithBubble(
   // 向上冒泡查找事件处理器（类似 React 的 traverseTwoPhase）
   while (currentTag !== undefined) {
     const instance = instanceMap.get(currentTag)
-    
+
     if (!instance) break
 
     const props = instance.canonical?.currentProps
@@ -176,7 +190,7 @@ function dispatchEventWithBubble(
         return // 事件已处理，停止冒泡
       }
     }
-    
+
     // 继续向上冒泡
     currentTag = instance.parentTag
   }
@@ -184,19 +198,19 @@ function dispatchEventWithBubble(
 
 /**
  * 初始化事件系统
- * 
+ *
  * 调用 nativeFabricUIManager.registerEventHandler 注册事件处理器
  */
 export function initEventSystem(): void {
   const g = globalThis as Record<string, unknown>
-  
+
   // 严格检查 - 如果已经注册过，直接返回
   if (g[RASEN_EVENT_HANDLER_KEY] === true) {
     return
   }
 
   const fabricUIManager = getFabricUIManager()
-  
+
   if (fabricUIManager.registerEventHandler) {
     fabricUIManager.registerEventHandler(dispatchEventWithBubble)
     g[RASEN_EVENT_HANDLER_KEY] = true
@@ -232,18 +246,24 @@ export function resetTagCounter(): void {
 // Context Helpers
 // ============================================================================
 
-export function createRenderContext(hostConfig: HostConfig, rootTag: Container): RenderContext {
+export function createRenderContext(
+  hostConfig: HostConfig,
+  rootTag: Container
+): RenderContext {
   // 初始化事件监听
   initEventListener(hostConfig)
-  
+
   return {
     hostConfig,
     rootTag,
-    hostContext: { isInAParentText: false },
+    hostContext: { isInAParentText: false }
   }
 }
 
-export function getChildContext(ctx: RenderContext, type: string): RenderContext {
+export function getChildContext(
+  ctx: RenderContext,
+  type: string
+): RenderContext {
   const isInAParentText =
     type === 'AndroidTextInput' ||
     type === 'RCTMultilineTextInputView' ||
@@ -261,13 +281,20 @@ export function getChildContext(ctx: RenderContext, type: string): RenderContext
 // HostConfig Methods
 // ============================================================================
 
-export function createInstance(ctx: RenderContext, type: string, props: Props): Instance {
+export function createInstance(
+  ctx: RenderContext,
+  type: string,
+  props: Props
+): Instance {
   const { hostConfig, rootTag } = ctx
   const fabricUIManager = getFabricUIManager()
 
   const tag = allocateTag()
   const viewConfig = hostConfig.ReactNativeViewConfigRegistry.get(type)
-  const updatePayload = hostConfig.createAttributePayload(props, viewConfig.validAttributes)
+  const updatePayload = hostConfig.createAttributePayload(
+    props,
+    viewConfig.validAttributes
+  )
 
   const instanceHandle = { tag: 5, stateNode: null as unknown }
 
@@ -279,7 +306,11 @@ export function createInstance(ctx: RenderContext, type: string, props: Props): 
     instanceHandle
   )
 
-  const publicInstance = hostConfig.createPublicInstance(tag, viewConfig, instanceHandle)
+  const publicInstance = hostConfig.createPublicInstance(
+    tag,
+    viewConfig,
+    instanceHandle
+  )
 
   const instance: Instance = {
     node,
@@ -288,8 +319,8 @@ export function createInstance(ctx: RenderContext, type: string, props: Props): 
       viewConfig,
       currentProps: props,
       internalInstanceHandle: instanceHandle,
-      publicInstance,
-    },
+      publicInstance
+    }
   }
 
   // 注册 instance 到全局映射，用于事件分发
@@ -299,59 +330,110 @@ export function createInstance(ctx: RenderContext, type: string, props: Props): 
   return instance
 }
 
-export function createTextInstance(ctx: RenderContext, text: string): TextInstance {
+export function createTextInstance(
+  ctx: RenderContext,
+  text: string
+): TextInstance {
   const { rootTag, hostContext } = ctx
   const fabricUIManager = getFabricUIManager()
 
   if (!hostContext.isInAParentText) {
-    console.warn('[Rasen] Text strings must be rendered within a <Text> component.')
+    console.warn(
+      '[Rasen] Text strings must be rendered within a <Text> component.'
+    )
   }
 
   const tag = allocateTag()
   const instanceHandle = { tag: 6, stateNode: null as unknown }
 
-  const node = fabricUIManager.createNode(tag, 'RCTRawText', rootTag, { text }, instanceHandle)
+  const node = fabricUIManager.createNode(
+    tag,
+    'RCTRawText',
+    rootTag,
+    { text },
+    instanceHandle
+  )
 
   const textInstance: TextInstance = { node }
   instanceHandle.stateNode = textInstance
   return textInstance
 }
 
-export function appendChild(parent: Instance, child: Instance | TextInstance): void {
+export function appendChild(
+  parent: Instance,
+  child: Instance | TextInstance
+): void {
   // 设置父子关系，用于事件冒泡
   child.parentTag = parent.canonical.nativeTag
   getFabricUIManager().appendChild(parent.node, child.node)
 }
 
-export function commitUpdate(instance: Instance, updatePayload: UpdatePayload, newProps: Props): void {
+export function removeChild(
+  parent: Instance,
+  child: Instance | TextInstance
+): void {
+  // 如果有 removeChild 方法，调用它
+  const uiManager = getFabricUIManager() as unknown as Record<string, unknown>
+  if (typeof uiManager['removeChild'] === 'function') {
+    ;(uiManager['removeChild'] as (parentNode: Node, child: Node) => void)(
+      parent.node,
+      child.node
+    )
+  }
+
+  // 从事件映射中移除
+  if ('canonical' in child) {
+    unregisterInstance((child as Instance).canonical.nativeTag)
+  }
+
+  // 清除父子关系
+  child.parentTag = undefined
+}
+
+export function commitUpdate(
+  instance: Instance,
+  updatePayload: UpdatePayload,
+  newProps: Props
+): void {
   if (!updatePayload) return
-  
+
   const uiManager = getFabricUIManager()
   const mgr = uiManager as unknown as Record<string, unknown>
-  
+
   // 使用 setNativeProps 直接更新（Fabric）
   if (typeof mgr['setNativeProps'] === 'function') {
-    const setNativeProps = mgr['setNativeProps'] as (node: Node, props: Props) => void
+    const setNativeProps = mgr['setNativeProps'] as (
+      node: Node,
+      props: Props
+    ) => void
     setNativeProps(instance.node, updatePayload)
   }
-  
+
   // 更新内部状态
   instance.node = uiManager.cloneNodeWithNewProps(instance.node, updatePayload)
   instance.canonical.currentProps = newProps
 }
 
-export function commitTextUpdate(textInstance: TextInstance, newText: string): void {
+export function commitTextUpdate(
+  textInstance: TextInstance,
+  newText: string
+): void {
   const uiManager = getFabricUIManager()
   const mgr = uiManager as unknown as Record<string, unknown>
-  
+
   // 使用 setNativeProps 直接更新文本（Fabric）
   if (typeof mgr['setNativeProps'] === 'function') {
-    const setNativeProps = mgr['setNativeProps'] as (node: Node, props: Props) => void
+    const setNativeProps = mgr['setNativeProps'] as (
+      node: Node,
+      props: Props
+    ) => void
     setNativeProps(textInstance.node, { text: newText })
   }
-  
+
   // 更新内部状态
-  textInstance.node = uiManager.cloneNodeWithNewProps(textInstance.node, { text: newText })
+  textInstance.node = uiManager.cloneNodeWithNewProps(textInstance.node, {
+    text: newText
+  })
 }
 
 // ============================================================================
@@ -362,7 +444,10 @@ export function createChildSet(rootTag: Container): ChildSet {
   return getFabricUIManager().createChildSet(rootTag)
 }
 
-export function appendChildToSet(childSet: ChildSet, child: Instance | TextInstance): void {
+export function appendChildToSet(
+  childSet: ChildSet,
+  child: Instance | TextInstance
+): void {
   getFabricUIManager().appendChildToSet(childSet, child.node)
 }
 
@@ -370,7 +455,10 @@ export function completeRoot(rootTag: Container, childSet: ChildSet): void {
   getFabricUIManager().completeRoot(rootTag, childSet)
 }
 
-export function mountToContainer(rootTag: Container, ...instances: (Instance | TextInstance)[]): void {
+export function mountToContainer(
+  rootTag: Container,
+  ...instances: (Instance | TextInstance)[]
+): void {
   const childSet = createChildSet(rootTag)
   for (const instance of instances) {
     appendChildToSet(childSet, instance)

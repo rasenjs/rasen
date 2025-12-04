@@ -27,7 +27,7 @@ export interface TextProps {
 /**
  * text 组件 - 绘制文本
  */
-export const text: SyncComponent<CanvasRenderingContext2D, TextProps> = (
+export const text: SyncComponent<CanvasRenderingContext2D, [TextProps]> = (
   props
 ) => {
   return element({

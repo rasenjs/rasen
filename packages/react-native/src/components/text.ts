@@ -2,11 +2,11 @@
  * Text 组件
  */
 
-import { component, type TextProps, type RNMountFunction } from './component'
+import { component, type TextProps, type RNMountable } from './component'
 
 /**
  * Text 组件 - 文本显示
- * 
+ *
  * @example
  * ```ts
  * text({
@@ -15,7 +15,7 @@ import { component, type TextProps, type RNMountFunction } from './component'
  * })
  * ```
  */
-export function text(props: TextProps = {}): RNMountFunction {
+export function text(props: TextProps = {}): RNMountable {
   return component('Text', props)
 }
 

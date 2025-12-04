@@ -1,4 +1,5 @@
 import { getReactiveRuntime, unrefValue } from '../reactive'
+import { com } from '../com'
 import { type Mountable, type PropValue } from '../types'
 
 /**
@@ -66,86 +67,87 @@ export interface WhenConfig<Host, N = unknown> {
  *   then: () => DetailsPanel()
  * })
  */
-export function when<Host = unknown, N = unknown>(
-  config: WhenConfig<Host, N>
-): Mountable<Host> {
-  return (host: Host) => {
-    const runtime = getReactiveRuntime()
+export const when = com(
+  <Host = unknown, N = unknown>(
+    config: WhenConfig<Host, N>
+  ): Mountable<Host> => {
+    return (host: Host) => {
+      const runtime = getReactiveRuntime()
 
-    // 创建标记（可选）
-    const marker = config.createMarker?.()
-    if (marker && config.appendMarker) {
-      config.appendMarker(host, marker)
-    }
-
-    let currentUnmount: (() => void) | undefined
-    let currentBranch: 'then' | 'else' | null = null
-
-    // 清理当前分支
-    const cleanup = () => {
-      if (currentUnmount) {
-        currentUnmount()
-        currentUnmount = undefined
-      }
-      currentBranch = null
-    }
-
-    // 挂载分支
-    const mountBranch = (branch: 'then' | 'else') => {
-      const factory = branch === 'then' ? config.then : config.else
-      if (!factory) return
-
-      let targetHost = host
-
-      // 如果有 marker 和 insertBefore，创建代理 host
-      // 让子组件的 appendChild 变成 insertBefore(node, marker)
-      if (marker && config.insertBefore) {
-        targetHost = {
-          appendChild: (node: N) => {
-            config.insertBefore!(host, node, marker)
-            return node
-          },
-          insertBefore: (node: N, ref: N | null) => {
-            config.insertBefore!(host, node, ref || marker)
-            return node
-          }
-        } as unknown as Host
+      // 创建标记（可选）
+      const marker = config.createMarker?.()
+      if (marker && config.appendMarker) {
+        config.appendMarker(host, marker)
       }
 
-      const mountableChild = factory()
-      if (!mountableChild) return
-      currentUnmount = mountableChild(targetHost)
-      currentBranch = branch
-    }
+      let currentUnmount: (() => void) | undefined
+      let currentBranch: 'then' | 'else' | null = null
 
-    // 监听条件变化
-    const stopWatch = runtime.watch(
-      () => unrefValue(config.condition),
-      (value) => {
-        const targetBranch = value ? 'then' : 'else'
+      // 清理当前分支
+      const cleanup = () => {
+        if (currentUnmount) {
+          currentUnmount()
+          currentUnmount = undefined
+        }
+        currentBranch = null
+      }
 
-        // 如果分支没变，不需要做任何事
-        if (currentBranch === targetBranch) return
+      // 挂载分支
+      const mountBranch = (branch: 'then' | 'else') => {
+        const factory = branch === 'then' ? config.then : config.else
+        if (!factory) return
 
-        // 如果目标分支不存在（比如没有 else），清理即可
-        if (targetBranch === 'else' && !config.else) {
-          cleanup()
-          return
+        let targetHost = host
+
+        // 如果有 marker 和 insertBefore，创建代理 host
+        // 让子组件的 appendChild 变成 insertBefore(node, marker)
+        if (marker && config.insertBefore) {
+          targetHost = {
+            appendChild: (node: N) => {
+              config.insertBefore!(host, node, marker)
+              return node
+            },
+            insertBefore: (node: N, ref: N | null) => {
+              config.insertBefore!(host, node, ref || marker)
+              return node
+            }
+          } as unknown as Host
         }
 
-        // 清理旧分支，挂载新分支
-        cleanup()
-        mountBranch(targetBranch)
-      },
-      { immediate: true }
-    )
+        const mountableChild = factory()
+        if (!mountableChild) return
+        currentUnmount = mountableChild(targetHost)
+        currentBranch = branch
+      }
 
-    return () => {
-      stopWatch()
-      cleanup()
-      if (marker && config.removeMarker) {
-        config.removeMarker(marker)
+      // 监听条件变化（由 com 自动清理）
+      runtime.watch(
+        () => unrefValue(config.condition),
+        (value) => {
+          const targetBranch = value ? 'then' : 'else'
+
+          // 如果分支没变，不需要做任何事
+          if (currentBranch === targetBranch) return
+
+          // 如果目标分支不存在（比如没有 else），清理即可
+          if (targetBranch === 'else' && !config.else) {
+            cleanup()
+            return
+          }
+
+          // 清理旧分支，挂载新分支
+          cleanup()
+          mountBranch(targetBranch)
+        },
+        { immediate: true }
+      )
+
+      return () => {
+        cleanup()
+        if (marker && config.removeMarker) {
+          config.removeMarker(marker)
+        }
       }
     }
   }
-}
+)

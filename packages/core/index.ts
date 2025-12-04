@@ -16,6 +16,7 @@
 
 // 核心组件
 export { each, fragment } from './components'
+export { com } from './src/com'
 export type {
   Component,
   SyncComponent,

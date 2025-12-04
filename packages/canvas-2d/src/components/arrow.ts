@@ -28,7 +28,7 @@ export interface ArrowProps
 /**
  * arrow 组件 - 绘制带箭头的线条
  */
-export const arrow: SyncComponent<CanvasRenderingContext2D, ArrowProps> = (
+export const arrow: SyncComponent<CanvasRenderingContext2D, [ArrowProps]> = (
   props: ArrowProps
 ) => {
   return element({

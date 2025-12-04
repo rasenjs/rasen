@@ -37,7 +37,7 @@ export interface ImageProps extends CommonDrawProps, TransformProps {
 /**
  * image 组件 - 绘制图片
  */
-export const image: SyncComponent<CanvasRenderingContext2D, ImageProps> = (
+export const image: SyncComponent<CanvasRenderingContext2D, [ImageProps]> = (
   props: ImageProps
 ) => {
   return element({

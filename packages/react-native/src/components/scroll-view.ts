@@ -9,13 +9,13 @@
  * 完整的 ScrollView 实现需要额外处理 contentContainerStyle。
  */
 
-import { component, type ScrollViewProps, type RNMountFunction } from './component'
+import { component, type ScrollViewProps, type RNMountable } from './component'
 
 /**
  * ScrollView 组件 - 滚动容器
  *
  * @param props - ScrollView 属性
- * @returns RNMountFunction
+ * @returns RNMountable
  *
  * @example
  * ```ts
@@ -29,7 +29,7 @@ import { component, type ScrollViewProps, type RNMountFunction } from './compone
  * })
  * ```
  */
-export function scrollView(props: ScrollViewProps = {}): RNMountFunction {
+export function scrollView(props: ScrollViewProps = {}): RNMountable {
   // 提取 contentContainerStyle，其他属性传递给 ScrollView
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { contentContainerStyle, ...restProps } = props
@@ -41,7 +41,7 @@ export function scrollView(props: ScrollViewProps = {}): RNMountFunction {
   return component('ScrollView', {
     ...restProps,
     // ScrollView 默认属性
-    scrollEventThrottle: 16,
+    scrollEventThrottle: 16
   })
 }
 

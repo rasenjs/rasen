@@ -28,7 +28,7 @@ export interface RingProps
  * ring 组件 - 绘制圆环
  * 使用内外两个圆形成空心圆环
  */
-export const ring: SyncComponent<CanvasRenderingContext2D, RingProps> = (
+export const ring: SyncComponent<CanvasRenderingContext2D, [RingProps]> = (
   props: RingProps
 ) => {
   return element({

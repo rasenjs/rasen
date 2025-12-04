@@ -30,7 +30,7 @@ export interface ArcProps
  * arc 组件 - 绘制圆弧段
  * 与 circle 不同，arc 只绘制圆弧部分，不会自动闭合路径
  */
-export const arc: SyncComponent<CanvasRenderingContext2D, ArcProps> = (
+export const arc: SyncComponent<CanvasRenderingContext2D, [ArcProps]> = (
   props: ArcProps
 ) => {
   return element({
