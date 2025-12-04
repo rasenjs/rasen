@@ -11,7 +11,6 @@ export {
   isRouteInput,
   createRoute
 } from './route'
-export { createRoutes, type TransformRoutes } from './routes'
 export { createRouter } from './router'
 export {
   createBrowserHistory,
@@ -22,6 +21,7 @@ export {
 export type {
   Route,
   RouteInput,
+  RouteConfig,
   RouteMatch,
   RouteOptions,
   RoutesConfig,
@@ -31,11 +31,11 @@ export type {
   RouteParams,
   InferQueryParams,
   // 钩子类型
-  NavigationGuard,
+  BeforeEachCallback,
   NavigationGuardReturn,
-  LeaveGuard,
-  AfterNavigationHook,
-  NavigationErrorHandler
+  BeforeLeaveCallback,
+  AfterEachCallback,
+  OnErrorCallback
 } from './types'
 
 // 导出错误类
@@ -43,3 +43,4 @@ export { NavigationAbortedError } from './types'
 
 // Re-export Template type from shared
 export type { Template } from '@rasenjs/shared'
+

@@ -56,8 +56,12 @@ import { hostHooks } from '@rasenjs/dom'
 import type { Mountable } from '@rasenjs/core'
 import type { Router } from '@rasenjs/router'
 
-// Re-export component types
+// Import scroll restoration
+import { useScrollRestoration, type ScrollPosition } from './scroll-restoration'
+
+// Re-export component types and scroll restoration types
 export { layout, type ViewsConfig, type LayoutComponent, type LinkProps }
+export { useScrollRestoration, type ScrollPosition }
 
 /**
  * 创建 RouterView 组件（DOM 版）

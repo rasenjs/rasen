@@ -86,7 +86,7 @@ export const form = createElement('form')
 export const input = createElement('input') as (
   propsOrChild?: Props<'input'> | Child,
   ...children: Child[]
-) => Mountable<HTMLInputElement>
+) => Mountable<HTMLElement>
 export const img = createElement('img')
 export const label = createElement('label')
 export const textarea = createElement('textarea')

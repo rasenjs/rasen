@@ -3,6 +3,9 @@
  */
 
 import { getReactiveRuntime } from '@rasenjs/core'
+import type { Ref } from '@rasenjs/core'
+import { template, isTemplate } from '@rasenjs/shared'
+import type { Template } from '@rasenjs/shared'
 import type {
   Route,
   RouteMatch,
@@ -10,11 +13,15 @@ import type {
   Router,
   NavigateOptions,
   QuerySchema,
-  NavigationGuard,
-  AfterNavigationHook,
-  NavigationErrorHandler
+  BeforeEachCallback,
+  AfterEachCallback,
+  OnErrorCallback,
+  RoutesConfig,
+  TransformRoutes,
+  RouteConfig
 } from './types'
 import { NavigationAbortedError } from './types'
+import { isRouteInput, createRoute } from './route'
 
 /**
  * 将 query 对象序列化为 URL query string
@@ -65,6 +72,172 @@ function parseQuery(queryString: string): Record<string, string | string[]> {
 }
 
 /**
+ * 将配置值归一化为 RouteConfig 对象
+ */
+function normalizeConfig(value: unknown): { config: RouteConfig; isNested: false } | { config: RoutesConfig; isNested: true } | null {
+  // 字符串路径
+  if (typeof value === 'string') {
+    return { 
+      config: { 
+        path: template([value] as unknown as TemplateStringsArray)
+      } as RouteConfig,
+      isNested: false 
+    }
+  }
+  
+  // Template 对象
+  if (isTemplate(value)) {
+    return { 
+      config: { path: value } as RouteConfig,
+      isNested: false 
+    }
+  }
+  
+  // RouteInput（已经是标准格式）
+  if (isRouteInput(value)) {
+    return { 
+      config: { 
+        path: value.path, 
+        query: value.query, 
+        meta: value.meta, 
+        beforeEnter: value.beforeEnter 
+      } as RouteConfig,
+      isNested: false
+    }
+  }
+  
+  // 对象 - 判断是 RouteConfig、RouteAliasConfig 还是嵌套配置
+  if (typeof value === 'object' && value !== null) {
+    const obj = value as Record<string, unknown>
+    const keys = Object.keys(obj)
+    
+    // 检查是否为 RouteAliasConfig: { alias: RouteConfig, path: Template | string }
+    if ('alias' in obj && 'path' in obj) {
+      const aliasConfig = obj.alias as RouteConfig
+      const aliasPath = obj.path
+      
+      // 将别名路径转换为 Template
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let pathTemplate: Template<any>
+      if (typeof aliasPath === 'string') {
+        pathTemplate = template([aliasPath] as unknown as TemplateStringsArray)
+      } else if (isTemplate(aliasPath)) {
+        pathTemplate = aliasPath
+      } else {
+        return null
+      }
+      
+      // 使用别名路径，但保留 alias 中的配置
+      return {
+        config: {
+          path: pathTemplate,
+          query: aliasConfig.query,
+          meta: aliasConfig.meta,
+          beforeEnter: aliasConfig.beforeEnter
+        } as RouteConfig,
+        isNested: false
+      }
+    }
+    
+    const allowedKeys = new Set(['path', 'query', 'meta', 'beforeEnter'])
+    
+    // 空对象 {} 或所有键都在允许列表中，则是 RouteConfig
+    if (keys.length === 0 || keys.every(k => allowedKeys.has(k))) {
+      return { 
+        config: obj as RouteConfig,
+        isNested: false 
+      }
+    }
+    
+    // 否则是嵌套配置
+    return { 
+      config: obj as RoutesConfig,
+      isNested: true 
+    }
+  }
+  
+  return null
+}
+
+/**
+ * 递归处理嵌套路由配置，返回保留嵌套结构的路由表
+ */
+function processRoutes(
+  config: RoutesConfig,
+  pathPrefix: string = '',
+  parentMeta: unknown = undefined
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Record<string, Route<any, any, any> | Record<string, any>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result: Record<string, Route<any, any, any> | Record<string, any>> = {}
+
+  for (const [key, value] of Object.entries(config)) {
+    // 检查空 key
+    if (key === '') {
+      throw new Error('Empty key is not allowed in route configuration. Use a meaningful name like "index" or use absolute path in template.')
+    }
+
+    const normalized = normalizeConfig(value)
+    if (!normalized) continue
+
+    if (!normalized.isNested) {
+      // 是路由配置
+      const routeConfig = normalized.config as RouteConfig
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let tpl: Template<any>
+      const configPath = routeConfig.path
+      
+      // 处理 path 字段（可能是 Template 或 string）
+      if (!configPath) {
+        tpl = template``
+      } else if (typeof configPath === 'string') {
+        tpl = template([configPath] as unknown as TemplateStringsArray)
+      } else {
+        tpl = configPath
+      }
+      
+      const templatePattern = tpl.pattern
+
+      // 计算完整路径
+      let fullPath: string
+      if (templatePattern.startsWith('/')) {
+        fullPath = templatePattern
+      } else {
+        const currentPathPrefix = pathPrefix ? `${pathPrefix}/${key}` : `/${key}`
+        fullPath = templatePattern
+          ? `${currentPathPrefix}/${templatePattern}`
+          : currentPathPrefix
+      }
+
+      // 规范化路径
+      fullPath = ('/' + fullPath.replace(/\/+/g, '/').replace(/^\/+/, '').replace(/\/+$/, '')) || '/'
+
+      // 合并父级 meta
+      const mergedMeta = parentMeta && routeConfig.meta
+        ? { ...(parentMeta as object), ...(routeConfig.meta as object) }
+        : routeConfig.meta ?? parentMeta
+
+      const routeInput = {
+        path: tpl,
+        query: routeConfig.query,
+        meta: mergedMeta,
+        beforeEnter: routeConfig.beforeEnter,
+        _isRouteInput: true as const
+      }
+
+      result[key] = createRoute(routeInput, fullPath)
+    } else {
+      // 是嵌套配置
+      const nestedConfig = normalized.config as unknown as RoutesConfig
+      const newPathPrefix = pathPrefix ? `${pathPrefix}/${key}` : `/${key}`
+      result[key] = processRoutes(nestedConfig, newPathPrefix, parentMeta)
+    }
+  }
+
+  return result
+}
+
+/**
  * 判断是否为 Route 对象
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,16 +274,14 @@ function collectRoutes(obj: Record<string, any>): Route<any, any, any>[] {
  *
  * @example
  * ```typescript
- * const routes = createRoutes({
+ * const router = createRouter({
  *   home: route(),
  *   user: route(template`/users/${{ id: z.string() }}`),
  *   posts: {
  *     list: route(),
  *     detail: route(template`${{ id: z.coerce.number() }}`),
  *   }
- * })
- *
- * const router = createRouter(routes, {
+ * }, {
  *   history: createBrowserHistory(),
  * })
  *
@@ -118,31 +289,38 @@ function collectRoutes(obj: Record<string, any>): Route<any, any, any>[] {
  * router.match('/users/123')
  *
  * // 生成链接（强类型）
- * router.href(routes.user, { id: '123' })  // '/users/123'
+ * router.href(routes.user, { params: { id: '123' } })  // '/users/123'
  *
  * // 导航（强类型）
- * router.push(routes.user, { id: '123' })
- * router.push(routes.posts.detail, { id: 42 })
+ * router.push(routes.user, { params: { id: '123' } })
+ * router.push(routes.posts.detail, { params: { id: 42 } })
  *
- * // 订阅变化
- * router.subscribe((match) => console.log(match))
+ * // 使用钩子响应路由变化
+ * router.afterEach((to, from) => console.log(to.path))
  * ```
  */
-export function createRouter(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  routesConfig: Record<string, any>,
+export function createRouter<TConfig extends RoutesConfig>(
+  config: TConfig,
   options: {
     history?: HistoryAdapter
+    /**
+     * 重定向深度限制。用于防止无限重定向循环：
+     * - 数字：开发环境容忍度（默认 10）。超过此次数会报错并调用 onError
+     * - false：生产环境无限制，直到真正的无限循环导致崩溃
+     * - undefined：默认为 10（开发默认值）
+     */
+    redirectDepthLimit?: number | false
   } = {}
-): Router {
-  const { history } = options
-  const listeners = new Set<(match: RouteMatch | null) => void>()
+): Router<TransformRoutes<TConfig>> {
+  // 处理嵌套配置，生成保留结构的路由表
+  const routesConfig = processRoutes(config)
+  const { history, redirectDepthLimit = 10 } = options
 
   // 全局钩子
-  const beforeGuards = new Set<NavigationGuard>()
-  const leaveGuards = new Set<NavigationGuard>()
-  const afterHooks = new Set<AfterNavigationHook>()
-  const errorHandlers = new Set<NavigationErrorHandler>()
+  const beforeGuards = new Set<BeforeEachCallback>()
+  const leaveGuards = new Set<BeforeEachCallback>()
+  const afterHooks = new Set<AfterEachCallback>()
+  const errorHandlers = new Set<OnErrorCallback>()
 
   // 收集所有路由，按路径长度排序，优先匹配更具体的路由
   const allRoutes = collectRoutes(routesConfig).sort((a, b) => {
@@ -151,7 +329,16 @@ export function createRouter(
 
   // 使用响应式 ref 存储当前匹配（如果响应式运行时可用）
   const runtime = getReactiveRuntime()
-  const currentMatchRef = runtime?.ref<RouteMatch | null>(null)
+  const scope = runtime?.effectScope()
+  let currentMatchRef: Ref<RouteMatch | null> | null = null
+  let isNavigatingRef: Ref<boolean> | null = null
+
+  if (scope && runtime) {
+    scope.run(() => {
+      currentMatchRef = runtime.ref<RouteMatch | null>(null)
+      isNavigatingRef = runtime.ref<boolean>(false)
+    })
+  }
 
   /**
    * 获取当前匹配
@@ -173,6 +360,45 @@ export function createRouter(
   }
 
   /**
+   * 获取导航状态
+   */
+  function getIsNavigating(): boolean {
+    if (isNavigatingRef) {
+      return isNavigatingRef.value
+    }
+    return false
+  }
+
+  /**
+   * 设置导航状态
+   */
+  function setIsNavigating(value: boolean) {
+    if (isNavigatingRef) {
+      isNavigatingRef.value = value
+    }
+  }
+
+  /**
+   * 通过路由键获取 Route 对象
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function getRouteByKey(key: string): Route<any, any, any> | null {
+    const keys = key.split('.')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let current: any = routesConfig
+    
+    for (const k of keys) {
+      if (current && typeof current === 'object' && k in current) {
+        current = current[k]
+      } else {
+        return null
+      }
+    }
+    
+    return isRoute(current) ? current : null
+  }
+
+  /**
    * 匹配路径
    */
   function match(fullPath: string): RouteMatch | null {
@@ -187,6 +413,7 @@ export function createRouter(
           route,
           params,
           query,
+          meta: route.meta,
           path
         }
       }
@@ -202,24 +429,29 @@ export function createRouter(
     Q extends QuerySchema = Record<string, never>
   >(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    route: Route<P, Q, any>,
-    params: P,
-    options?: NavigateOptions<Q>
+    routeOrKey: Route<P, Q, any> | string,
+    options?: NavigateOptions<P, Q>
   ): string {
-    if (!isRoute(route)) {
-      throw new Error('Invalid route object')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let route: Route<P, Q, any>
+    
+    if (typeof routeOrKey === 'string') {
+      const foundRoute = getRouteByKey(routeOrKey)
+      if (!foundRoute) {
+        throw new Error(`Route not found for key: ${routeOrKey}`)
+      }
+      route = foundRoute
+    } else {
+      if (!isRoute(routeOrKey)) {
+        throw new Error('Invalid route object')
+      }
+      route = routeOrKey
     }
+    
+    const params = (options?.params ?? {}) as P
     const path = route.format(params)
     const queryString = options?.query ? serializeQuery(options.query) : ''
     return path + queryString
-  }
-
-  /**
-   * 通知监听器
-   */
-  function notifyListeners(newMatch: RouteMatch | null) {
-    setCurrentMatch(newMatch)
-    listeners.forEach((listener) => listener(newMatch))
   }
 
   /**
@@ -318,11 +550,27 @@ export function createRouter(
 
   /**
    * 内部导航实现
+   * @param redirectDepth 当前重定向深度，用于检测循环重定向
    */
   async function navigate(
     path: string,
-    mode: 'push' | 'replace'
+    mode: 'push' | 'replace',
+    redirectDepth = 0
   ): Promise<void> {
+    // 检查重定向深度限制
+    if (redirectDepthLimit !== false && redirectDepth > redirectDepthLimit) {
+      const error = new Error(
+        `Potential infinite redirect loop detected: path "${path}" redirected ${redirectDepth} times ` +
+        `(limit: ${redirectDepthLimit}). Check your beforeEach/beforeLeave/beforeEnter guards.`
+      )
+      const to = match(path)
+      const from = getCurrentMatch()
+      setIsNavigating(false)
+      runErrorHandlers(error, to, from)
+      // 抛出错误，让调用者可以 catch
+      throw error
+    }
+
     const to = match(path)
     const from = getCurrentMatch()
 
@@ -331,7 +579,8 @@ export function createRouter(
       if (history) {
         mode === 'push' ? history.push(path) : history.replace(path)
       }
-      notifyListeners(null)
+      setCurrentMatch(null)
+      setIsNavigating(false)
       return
     }
 
@@ -340,31 +589,68 @@ export function createRouter(
       const leaveRedirect = await runLeaveGuards(to, from)
       if (leaveRedirect) {
         const redirectPath = leaveRedirect.format({})
-        await navigate(redirectPath, mode)
-        return
+        
+        // 防止无限循环：如果重定向到相同路径，则不再重定向
+        if (redirectPath !== to.path) {
+          await navigate(redirectPath, mode, redirectDepth + 1)
+          return
+        }
       }
 
-      // 执行前置守卫
+      // 执行全局前置守卫
       const redirect = await runBeforeGuards(to, from)
 
       if (redirect) {
-        // 重定向：递归调用 navigate
+        // 获取重定向目标路径
         const redirectPath = redirect.format({})
-        await navigate(redirectPath, mode)
-        return
+        
+        // 防止无限循环：如果重定向到相同路径，则不再重定向
+        if (redirectPath !== to.path) {
+          await navigate(redirectPath, mode, redirectDepth + 1)
+          return
+        }
       }
+
+      // 执行单路由前置守卫
+      if (to.route.beforeEnter) {
+        const beforeEnterResult = await to.route.beforeEnter(to, from)
+
+        // false → 包装成 NavigationAbortedError
+        if (beforeEnterResult === false) {
+          throw new NavigationAbortedError()
+        }
+
+        // string → 包装成 NavigationAbortedError(message)
+        if (typeof beforeEnterResult === 'string' && !isRoute(beforeEnterResult)) {
+          throw new NavigationAbortedError(beforeEnterResult)
+        }
+
+        // Route → 重定向
+        if (isRoute(beforeEnterResult)) {
+          const redirectPath = beforeEnterResult.format({})
+          await navigate(redirectPath, mode, redirectDepth + 1)
+          return
+        }
+
+        // true / void → 继续
+      }
+
+      // 更新当前匹配（不论是否有 history）
+      setCurrentMatch(to)
 
       // 执行导航
       if (history) {
         mode === 'push' ? history.push(path) : history.replace(path)
-      } else {
-        notifyListeners(to)
       }
+
+      // 在执行后置钩子前设置为 false
+      setIsNavigating(false)
 
       // 执行后置钩子
       runAfterHooks(to, from)
     } catch (error) {
       // 执行错误处理器
+      setIsNavigating(false)
       runErrorHandlers(error as Error, to, from)
       // 重新抛出错误，让调用者可以 catch
       throw error
@@ -379,11 +665,11 @@ export function createRouter(
     Q extends QuerySchema = Record<string, never>
   >(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    route: Route<P, Q, any>,
-    params: P,
-    options?: NavigateOptions<Q>
+    routeOrKey: Route<P, Q, any> | string,
+    options?: NavigateOptions<P, Q>
   ): Promise<void> {
-    const path = href(route, params, options)
+    setIsNavigating(true)
+    const path = href(routeOrKey, options)
     await navigate(path, 'push')
   }
 
@@ -395,78 +681,118 @@ export function createRouter(
     Q extends QuerySchema = Record<string, never>
   >(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    route: Route<P, Q, any>,
-    params: P,
-    options?: NavigateOptions<Q>
+    routeOrKey: Route<P, Q, any> | string,
+    options?: NavigateOptions<P, Q>
   ): Promise<void> {
-    const path = href(route, params, options)
+    setIsNavigating(true)
+    const path = href(routeOrKey, options)
     await navigate(path, 'replace')
   }
 
   /**
    * 订阅路由变化
    */
-  function subscribe(listener: (match: RouteMatch | null) => void): () => void {
-    listeners.add(listener)
-    return () => {
-      listeners.delete(listener)
-    }
-  }
-
   /**
    * 注册前置守卫
    */
-  function beforeEach(guard: NavigationGuard): () => void {
-    beforeGuards.add(guard)
-    return () => beforeGuards.delete(guard)
+  function beforeEach(callback: BeforeEachCallback): () => void {
+    beforeGuards.add(callback)
+    return () => beforeGuards.delete(callback)
   }
 
   /**
    * 注册离开守卫
    */
-  function beforeLeave(guard: NavigationGuard): () => void {
-    leaveGuards.add(guard)
-    return () => leaveGuards.delete(guard)
+  function beforeLeave(callback: BeforeEachCallback): () => void {
+    leaveGuards.add(callback)
+    return () => leaveGuards.delete(callback)
   }
 
   /**
    * 注册后置钩子
    */
-  function afterEach(hook: AfterNavigationHook): () => void {
-    afterHooks.add(hook)
-    return () => afterHooks.delete(hook)
+  function afterEach(callback: AfterEachCallback): () => void {
+    afterHooks.add(callback)
+    return () => afterHooks.delete(callback)
   }
 
   /**
    * 注册错误处理器
    */
-  function onError(handler: NavigationErrorHandler): () => void {
-    errorHandlers.add(handler)
-    return () => errorHandlers.delete(handler)
+  function onError(callback: OnErrorCallback): () => void {
+    errorHandlers.add(callback)
+    return () => errorHandlers.delete(callback)
+  }
+
+  /**
+   * 在历史中前进或后退 n 步
+   */
+  function go(n: number): void {
+    if (history) {
+      history.go(n)
+    }
+  }
+
+  /**
+   * 后退一步
+   */
+  function back(): void {
+    go(-1)
+  }
+
+  /**
+   * 前进一步
+   */
+  function forward(): void {
+    go(1)
   }
 
   // 监听 history 变化
+  let unsubscribe: (() => void) | null = null
   if (history) {
-    history.subscribe((path) => {
-      notifyListeners(match(path))
+    unsubscribe = history.subscribe((path) => {
+      setCurrentMatch(match(path))
     })
     // 初始化当前匹配
     setCurrentMatch(match(history.getPath()))
   }
 
+  /**
+   * 销毁路由，清理资源（如 history 订阅和响应式 ref）
+   */
+  function destroy(): void {
+    if (unsubscribe) {
+      unsubscribe()
+    }
+    beforeGuards.clear()
+    leaveGuards.clear()
+    afterHooks.clear()
+    errorHandlers.clear()
+    // 清理所有响应式 ref
+    if (scope) {
+      scope.stop()
+    }
+  }
+
   return {
-    routes: routesConfig,
+    routes: routesConfig as TransformRoutes<TConfig>,
     match,
     href,
     push,
     replace,
-    subscribe,
+    go,
+    back,
+    forward,
     beforeEach,
     beforeLeave,
     afterEach,
     onError,
+    destroy,
     get current() {
       return getCurrentMatch()
+    },
+    get isNavigating() {
+      return getIsNavigating()
     }
   }
 }

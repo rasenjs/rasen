@@ -13,6 +13,7 @@ import {
   a,
   h1,
   h2,
+  h3,
   p,
   span,
   ul,
@@ -22,12 +23,10 @@ import {
   mount,
   input,
   button,
-  form
+  when,
 } from '@rasenjs/dom'
 import {
-  route,
   tpl,
-  createRoutes,
   createRouter,
   createBrowserHistory,
   NavigationAbortedError
@@ -48,30 +47,41 @@ setReactiveRuntime(createReactiveRuntime())
 // 1. 定义路由（使用模板字面量）
 // ============================================
 
-const routes = createRoutes({
-  // 绝对路径（以 / 开头）- 纯字符串
-  home: route('/'),
-  about: route('/about'),
+// 简单的登录状态管理
+const isLoggedIn = ref(false)
 
-  // 带参数的路由 - 需要 tpl
-  user: route(tpl`/users/${{ id: z.string() }}`),
+const router = createRouter({
+  // 绝对路径（以 / 开头）- 纯字符串
+  home: '/',
+  about: '/about',
+  scroll: '/scroll', // 滚动演示页面
+  login: '/login', // 登录页面
+
+  // 带参数的路由 - 使用 tpl
+  user: tpl`/users/${{ id: z.string() }}`,
 
   // 带数字参数（自动转换）
-  post: route(tpl`/posts/${{ id: z.coerce.number() }}`),
+  post: tpl`/posts/${{ id: z.coerce.number() }}`,
+
+  // 受保护的路由 - 需要登录才能访问
+  protected: {
+    path: '/protected',
+    beforeEnter: () => {
+      if (!isLoggedIn.value) {
+        alert('请先登录！')
+        return false
+      }
+      return true
+    }
+  },
 
   // 嵌套路由（相对路径）
   settings: {
-    profile: route(), // → /settings/profile
-    account: route(), // → /settings/account
-    security: route('password') // → /settings/security/password
+    profile: {}, // → /settings/profile
+    account: {}, // → /settings/account
+    security: 'password' // → /settings/security/password
   }
-})
-
-// ============================================
-// 2. 创建路由器
-// ============================================
-
-const router = createRouter(routes, {
+}, {
   history: createBrowserHistory()
 })
 
@@ -206,6 +216,121 @@ function PostView(params: { id: number }): Mountable<HTMLElement> {
 }
 
 /**
+ * 滚动恢复演示视图
+ */
+function ScrollView(): Mountable<HTMLElement> {
+  return div(
+    { class: 'view' },
+    h2('↕️ 滚动恢复演示'),
+    p('这个页面有大量内容，用于演示滚动位置的保存和恢复。'),
+    p(
+      { style: { marginTop: '10px', color: '#666', fontStyle: 'italic' } },
+      '功能说明：向下滚动此页面，然后点击导航链接去其他页面，再返回。你会发现滚动位置被自动恢复了！'
+    ),
+    p({ style: { marginTop: '20px', fontWeight: 'bold' } }, '这利用了 useScrollRestoration 钩子的功能：'),
+    ul(
+      { style: { margin: '10px 0 0 20px' } },
+      li('导航离开时自动保存滚动位置'),
+      li('返回时自动恢复保存的位置'),
+      li('新导航时自动滚动到顶部')
+    ),
+
+    // 添加大量内容以实现可滚动效果
+    ...Array.from({ length: 20 }, (_, i) => {
+      return div(
+        { style: { marginTop: '30px', padding: '15px', background: '#f0f0f0', borderRadius: '4px' } },
+        h3(`Section ${i + 1}`),
+        p(
+          `这是第 ${i + 1} 个内容区块。Lorem ipsum dolor sit amet, consectetur adipiscing elit. `
+        ),
+        p(
+          `Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.`
+        ),
+        p(
+          { style: { color: '#888', fontSize: '12px' } },
+          `Current scroll position: Y = ${Math.round(window.scrollY)}`
+        )
+      )
+    })
+  )
+}
+
+/**
+ * 登录视图
+ */
+function LoginView(): Mountable<HTMLElement> {
+  return div(
+    { class: 'view' },
+    h2('🔐 登录'),
+    p('点击下方按钮登录后，即可访问受保护的页面。'),
+    div(
+      { style: { marginTop: '20px' } },
+      button(
+        {
+          style: {
+            padding: '10px 20px',
+            fontSize: '16px',
+            background: isLoggedIn.value ? '#95de64' : '#1890ff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          },
+          onClick: () => {
+            isLoggedIn.value = !isLoggedIn.value
+            alert(isLoggedIn.value ? '登录成功！' : '已退出登录')
+          },
+          children: () => (isLoggedIn.value ? '退出登录' : '登录')
+        }
+      ),
+    ),
+    p(
+      { style: { marginTop: '15px', color: '#888' } },
+      '当前状态：',
+      when({
+        condition: isLoggedIn,
+        then: () => span(
+          { style: { fontWeight: 'bold', color: '#52c41a' } },
+          '已登录'
+        ),
+        else: () => span(
+          { style: { fontWeight: 'bold', color: '#f5222d' } },
+          '未登录'
+        )
+      })
+    )
+  )
+}
+
+/**
+ * 受保护的视图
+ */
+function ProtectedView(): Mountable<HTMLElement> {
+  return div(
+    { class: 'view' },
+    h2('🔒 受保护的页面'),
+    p('恭喜！你已经登录，可以看到这个受保护的页面了。'),
+    p(
+      { style: { marginTop: '10px', color: '#666', fontStyle: 'italic' } },
+      '这个页面使用了 beforeEnter 守卫，只有登录后才能访问。'
+    ),
+    div(
+      {
+        style: {
+          marginTop: '20px',
+          padding: '15px',
+          background: '#f6ffed',
+          border: '1px solid #b7eb8f',
+          borderRadius: '4px'
+        }
+      },
+      p({ style: { fontWeight: 'bold', color: '#52c41a' } }, '✓ 权限验证通过'),
+      p({ style: { marginTop: '10px', fontSize: '14px' } }, '这演示了如何使用单路由守卫来保护特定页面。')
+    )
+  )
+}
+
+/**
  * 设置 - 个人资料视图（带 leaveGuard 示例）
  */
 function SettingsProfileView(): Mountable<HTMLElement> {
@@ -307,9 +432,9 @@ function SettingsLayout(
     { class: 'settings-layout' },
     div(
       { class: 'settings-nav' },
-      Link({ to: routes.settings.profile, params: {}, children: ['个人资料'] }),
-      Link({ to: routes.settings.account, params: {}, children: ['账户'] }),
-      Link({ to: routes.settings.security, params: {}, children: ['安全'] })
+      Link({ to: router.routes.settings.profile, params: {} }, '个人资料'),
+      Link({ to: router.routes.settings.account, params: {} }, '账户'),
+      Link({ to: router.routes.settings.security }, '安全')
     ),
     div(
       { class: 'settings-content' },
@@ -329,6 +454,9 @@ const RouterView = createRouterView(
   {
     home: () => HomeView(),
     about: () => AboutView(),
+    scroll: () => ScrollView(),
+    login: () => LoginView(),
+    protected: () => ProtectedView(),
     user: ({ id }) => UserView({ id }),
     post: ({ id }) => PostView({ id }),
     settings: {
@@ -367,13 +495,13 @@ function DebugInfo(): Mountable<HTMLElement> {
     render()
 
     // 订阅路由变化
-    const unsubscribe = router.subscribe(render)
+    const unregister = router.afterEach(render)
 
     host.appendChild(container)
 
     // unmount 时清理
     return () => {
-      unsubscribe()
+      unregister()
       container.remove()
     }
   }
@@ -393,17 +521,15 @@ function App(): Mountable<HTMLElement> {
       nav(
         { class: 'nav' },
         // 使用 Route 对象（类型安全）
-        Link({ to: routes.home, params: {} }, 'Home'),
-        Link({ to: routes.about, params: {} }, 'About'),
-        Link({ to: routes.user, params: { id: 'alice' } }, 'User: alice'),
-        Link({ to: routes.user, params: { id: 'bob' } }, 'User: bob'),
-        Link({ to: routes.post, params: { id: 42 } }, 'Post: 42'),
-        // 也可以使用 children 属性
-        Link({
-          to: routes.settings.profile,
-          params: {},
-          children: ['Settings']
-        })
+        Link({ to: router.routes.home }, 'Home'),
+        Link({ to: router.routes.about }, 'About'),
+        Link({ to: router.routes.scroll }, 'Scroll Demo'),
+        Link({ to: router.routes.login }, 'Login'),
+        Link({ to: router.routes.protected }, 'Protected'),
+        Link({ to: router.routes.user, params: { id: 'alice' } }, 'User: alice'),
+        Link({ to: router.routes.user, params: { id: 'bob' } }, 'User: bob'),
+        Link({ to: router.routes.post, params: { id: 42 } }, 'Post: 42'),
+        Link({ to: router.routes.settings.profile, params: {} }, 'Settings')
       )
     ),
     // Main content
@@ -417,3 +543,42 @@ function App(): Mountable<HTMLElement> {
 
 // Mount
 mount(App(), document.getElementById('app')!)
+
+// ============================================
+// 8. 演示滚动恢复功能
+// ============================================
+// 这是一个简单的滚动位置保存和恢复演示
+// 在实际应用中，应该使用 @rasenjs/router-dom 的 useScrollRestoration 钩子
+
+const scrollPositions = new Map<string, { x: number; y: number }>()
+let currentPath = router.current?.path || null
+
+// 导航前保存位置
+router.beforeEach((_to, from) => {
+  if (from && currentPath) {
+    scrollPositions.set(currentPath, {
+      x: window.scrollX || 0,
+      y: window.scrollY || 0
+    })
+  }
+})
+
+// 导航后处理滚动
+router.afterEach((to) => {
+  currentPath = to.path
+  
+  requestAnimationFrame(() => {
+    const saved = scrollPositions.get(to.path)
+    if (saved) {
+      // 返回到之前访问过的页面，恢复位置
+      window.scrollTo(saved.x, saved.y)
+      console.log(`✓ 滚动位置已恢复: (${saved.x}, ${saved.y})`)
+    } else {
+      // 首次访问，滚动到顶部
+      window.scrollTo(0, 0)
+      console.log('✓ 新页面已加载，滚动到顶部')
+    }
+  })
+})
+
+console.log('✓ 滚动恢复演示已启用')

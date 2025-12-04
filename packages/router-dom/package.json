@@ -22,10 +22,11 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "yarn clean && tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@rasenjs/core": "workspace:*",

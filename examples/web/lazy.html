@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lazy Loading Examples - Rasen</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import { setReactiveRuntime } from '@rasenjs/core';
+    import { createReactiveRuntime } from '@rasenjs/reactive-signals';
+    import { mount } from '@rasenjs/dom';
+    import { LazyExamples } from './src/lazy-example';
+
+    // 设置 Reactive Runtime
+    setReactiveRuntime(createReactiveRuntime());
+
+    // 挂载主组件
+    mount(LazyExamples(), document.getElementById('app'));
+  </script>
+</body>
+</html>

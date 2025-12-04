@@ -31,7 +31,7 @@
     "jsx.d.ts"
   ],
   "scripts": {
-    "build": "../../node_modules/.bin/tsup",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
     "dev": "../../node_modules/.bin/tsup --watch",
     "clean": "rm -rf dist"
   },

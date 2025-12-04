@@ -18,8 +18,8 @@
   ],
   "scripts": {
     "dev": "../../node_modules/.bin/tsup --watch",
-    "build": "../../node_modules/.bin/tsup",
-    "test": "../../node_modules/.bin/vitest",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "test": "../../node_modules/.bin/vitest --run",
     "test:visual": "../../node_modules/.bin/vitest run --dir src/__tests__/visual",
     "test:visual:update": "../../node_modules/.bin/cross-env UPDATE_SNAPSHOTS=true ../../node_modules/.bin/vitest run --dir src/__tests__/visual",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",

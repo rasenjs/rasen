@@ -1,4 +1,4 @@
-import { getReactiveRuntime } from '../reactive'
+import { getReactiveRuntime, unrefValue } from '../reactive'
 import { type Mountable, type PropValue } from '../types'
 
 /**
@@ -113,21 +113,14 @@ export function when<Host = unknown, N = unknown>(
       }
 
       const mountableChild = factory()
+      if (!mountableChild) return
       currentUnmount = mountableChild(targetHost)
       currentBranch = branch
     }
 
-    // 解包 PropValue
-    const unref = <T>(value: PropValue<T>): T => {
-      if (value && typeof value === 'object' && 'value' in value) {
-        return (value as { value: T }).value
-      }
-      return value as T
-    }
-
     // 监听条件变化
     const stopWatch = runtime.watch(
-      () => unref(config.condition),
+      () => unrefValue(config.condition),
       (value) => {
         const targetBranch = value ? 'then' : 'else'
 

@@ -13,6 +13,7 @@
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/reactive-signals": "workspace:*",
     "@rasenjs/router": "workspace:*",
+    "@rasenjs/router-dom": "workspace:*",
     "zod": "^3.24.0"
   },
   "devDependencies": {

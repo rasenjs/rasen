@@ -1412,4 +1412,134 @@ describe('@rasenjs/dom', () => {
       expect(() => hydrate(div({}), null)).toThrow()
     })
   })
+
+  describe('lazy', () => {
+    it('should load component from async loader', async () => {
+      const { lazy, div } = await import('./index')
+      
+      // 模拟异步模块加载
+      const loader = async () => {
+        await new Promise(resolve => setTimeout(resolve, 10))
+        return (host: HTMLElement) => {
+          const el = document.createElement('span')
+          el.textContent = 'Loaded'
+          host.appendChild(el)
+          return () => el.remove()
+        }
+      }
+
+      const component = lazy({
+        loader,
+        loading: () => (host: HTMLElement) => {
+          host.textContent = 'Loading...'
+          return () => { host.textContent = '' }
+        }
+      })
+
+      const unmount = mount(component, container)
+      
+      // 初始显示 loading
+      expect(container.textContent).toBe('Loading...')
+      
+      // 等待加载完成
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      expect(container.textContent).toContain('Loaded')
+      unmount?.()
+    })
+
+    it('should handle error state', async () => {
+      const { lazy } = await import('./index')
+      
+      const failedLoader = () => {
+        return Promise.reject(new Error('Load failed'))
+      }
+
+      const component = lazy({
+        loader: failedLoader,
+        loading: () => (host: HTMLElement) => {
+          host.textContent = 'Loading...'
+          return () => { host.textContent = '' }
+        },
+        error: (err) => (host: HTMLElement) => {
+          host.textContent = `Error: ${err.message}`
+          return () => { host.textContent = '' }
+        }
+      })
+
+      const unmount = mount(component, container)
+      
+      // 等待错误处理
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      expect(container.textContent).toContain('Error: Load failed')
+      unmount?.()
+    })
+
+    it('should support minDelay to avoid flashing', async () => {
+      const { lazy } = await import('./index')
+      
+      const Component = async () => {
+        // 非常快速的加载
+        return (host: HTMLElement) => {
+          host.textContent = 'Loaded'
+        }
+      }
+
+      const component = lazy({
+        loader: Component,
+        loading: () => (host: HTMLElement) => {
+          host.textContent = 'Loading...'
+        },
+        minDelay: 100  // 最小延迟 100ms
+      })
+
+      const startTime = Date.now()
+      const unmount = mount(component, container)
+      
+      // 立即检查应该显示 loading
+      expect(container.textContent).toBe('Loading...')
+      
+      // 只等待 30ms - 应该还在 loading
+      await new Promise(resolve => setTimeout(resolve, 30))
+      expect(container.textContent).toBe('Loading...')
+      
+      // 等待足够长时间后才显示内容
+      await new Promise(resolve => setTimeout(resolve, 80))
+      expect(container.textContent).toBe('Loaded')
+      
+      const elapsed = Date.now() - startTime
+      expect(elapsed).toBeGreaterThanOrEqual(100)
+      
+      unmount?.()
+    })
+
+    it('should support createLazy factory', async () => {
+      const { createLazy } = await import('./index')
+      
+      const loader = async () => {
+        await new Promise(resolve => setTimeout(resolve, 10))
+        return (host: HTMLElement) => {
+          host.textContent = 'Factory Component'
+          return () => { host.textContent = '' }
+        }
+      }
+
+      const LazyComponent = createLazy(loader, {
+        loading: () => (host: HTMLElement) => {
+          host.textContent = 'Loading...'
+          return () => { host.textContent = '' }
+        }
+      })
+
+      const unmount = mount(LazyComponent(), container)
+      
+      expect(container.textContent).toBe('Loading...')
+      
+      await new Promise(resolve => setTimeout(resolve, 50))
+      expect(container.textContent).toBe('Factory Component')
+      
+      unmount?.()
+    })
+  })
 })

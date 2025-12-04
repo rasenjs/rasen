@@ -14,3 +14,4 @@ export {
 export { when, type WhenConfig, type WhenHostHooks } from './when'
 export { switchCase, match, type SwitchConfig, type SwitchHostHooks } from './switch'
 export { fragment, f } from './fragment'
+export { lazy, createLazy, type LazyConfig, type CreateLazy } from './lazy'

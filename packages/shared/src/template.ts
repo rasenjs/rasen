@@ -39,7 +39,7 @@ export type TemplateParam = Record<string, ZodType> | Template<Record<string, un
 /**
  * 判断是否为 Template 实例
  */
-function isTemplate(value: unknown): value is Template<Record<string, unknown>> {
+export function isTemplate(value: unknown): value is Template<Record<string, unknown>> {
   return (
     value !== null &&
     typeof value === 'object' &&

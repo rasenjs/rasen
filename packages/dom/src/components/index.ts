@@ -11,6 +11,8 @@ export { switchCase } from './switch'
 export { show } from './show'
 export { canvas, contextGetters } from './canvas'
 export type { ContextGetter } from './canvas'
+export { lazy, createLazy } from './lazy'
+export type { LazyConfig, CreateLazy } from './lazy'
 export {
   div,
   span,

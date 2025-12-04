@@ -11,8 +11,8 @@ const app = div(
   { style: { textAlign: 'center' } },
   h1('Simple Counter'),
   div(
-    { class: 'counter' },
-    span({ textContent: count })
+    { class: 'counter', style: { fontSize: '48px' } },
+    span({ children: () => `${count.value}` })
   ),
   div(
     button(

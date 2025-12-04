@@ -16,6 +16,9 @@ const emptyTemplate = template``
  * // 无参数（使用 key 作为路径）
  * route()
  * 
+ * // 仅 options（使用 key 作为路径）
+ * route({ meta: { title: 'Home' } })
+ * 
  * // 纯字符串路径（无参数）
  * route('/about')
  * route('/users/list')
@@ -35,6 +38,13 @@ const emptyTemplate = template``
  */
 // 无参数
 export function route(): RouteInput<Record<string, never>, Record<string, never>, unknown>
+// 仅 options（用于只设置 meta/query/beforeEnter 等，使用 key 作为路径）
+export function route<
+  TQuery extends QuerySchema = Record<string, never>,
+  TMeta = unknown
+>(
+  options: RouteOptions<TQuery, TMeta>
+): RouteInput<Record<string, never>, TQuery, TMeta>
 // 纯字符串路径
 export function route<
   TQuery extends QuerySchema = Record<string, never>,
@@ -58,24 +68,39 @@ export function route<
   TQuery extends QuerySchema = Record<string, never>,
   TMeta = unknown
 >(
-  tplOrPath?: Template<TParams> | string,
+  tplOrPathOrOptions?: Template<TParams> | string | RouteOptions<TQuery, TMeta>,
   options?: RouteOptions<TQuery, TMeta>
 ): RouteInput<TParams, TQuery, TMeta> {
   let tpl: Template<TParams>
+  let finalOptions: RouteOptions<TQuery, TMeta> | undefined
   
-  if (tplOrPath === undefined) {
+  // 判断第一个参数是 options 对象还是路径
+  if (
+    tplOrPathOrOptions !== undefined &&
+    typeof tplOrPathOrOptions === 'object' &&
+    !('pattern' in tplOrPathOrOptions) // 不是 Template 对象
+  ) {
+    // 第一个参数是 options
     tpl = emptyTemplate as Template<TParams>
-  } else if (typeof tplOrPath === 'string') {
-    // 纯字符串转成 Template
-    tpl = template([tplOrPath] as unknown as TemplateStringsArray) as Template<TParams>
+    finalOptions = tplOrPathOrOptions as RouteOptions<TQuery, TMeta>
   } else {
-    tpl = tplOrPath
+    // 第一个参数是路径或 undefined
+    if (tplOrPathOrOptions === undefined) {
+      tpl = emptyTemplate as Template<TParams>
+    } else if (typeof tplOrPathOrOptions === 'string') {
+      // 纯字符串转成 Template
+      tpl = template([tplOrPathOrOptions] as unknown as TemplateStringsArray) as Template<TParams>
+    } else {
+      tpl = tplOrPathOrOptions as Template<TParams>
+    }
+    finalOptions = options
   }
   
   return {
-    template: tpl,
-    query: options?.query,
-    meta: options?.meta,
+    path: tpl,
+    query: finalOptions?.query,
+    meta: finalOptions?.meta,
+    beforeEnter: finalOptions?.beforeEnter,
     _isRouteInput: true as const
   }
 }
@@ -107,7 +132,7 @@ export function createRoute<
   input: RouteInput<TParams, TQuery, TMeta>,
   fullPath: string
 ): Route<TParams, TQuery, TMeta> {
-  const tpl = input.template
+  const tpl = input.path
   const templatePattern = tpl.pattern
   
   // 判断是否需要添加前缀
@@ -149,6 +174,7 @@ export function createRoute<
     paramNames: effectiveTpl.paramNames,
     query: input.query,
     meta: input.meta,
+    beforeEnter: input.beforeEnter,
     _isRoute: true as const,
 
     parse(pathStr: string): TParams | null {

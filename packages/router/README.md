@@ -25,30 +25,50 @@ pnpm add @rasenjs/router zod
 
 ```typescript
 import { z } from 'zod'
-import { route, tpl, createRoutes, createRouter, createBrowserHistory } from '@rasenjs/router'
+import { template as tpl, createRouter, createBrowserHistory } from '@rasenjs/router'
 
-// 1. Define routes using template literals
-const routes = createRoutes({
-  home: route('/'),
-  about: route('/about'),
-  user: route(tpl`/users/${{ id: z.string() }}`),
-  post: route(tpl`/posts/${{ id: z.coerce.number() }}`),
-})
-
-// 2. Create router
-const router = createRouter(routes, {
+// Create router with declarative routes configuration
+const router = createRouter({
+  // String paths (simplest form)
+  home: '/',
+  about: '/about',
+  
+  // Empty object (uses key as path)
+  contact: {},
+  
+  // Template literals with parameters
+  user: tpl`/users/${{ id: z.string() }}`,
+  post: tpl`/posts/${{ id: z.coerce.number() }}`,
+  
+  // Nested routes
+  settings: {
+    profile: {},
+    account: tpl`${{ section: z.string() }}`,
+  }
+}, {
   history: createBrowserHistory(),
 })
 
-// 3. Use the router with Route objects (type-safe!)
+// Extract routes object for type-safe access
+const { routes } = router
+
+// Navigate by Route object (fully type-safe!)
+router.push(routes.user, { params: { id: 'alice' } })
+// → navigates to '/users/alice'
+
+router.href(routes.post, { params: { id: 42 } })
+// → '/posts/42'
+
+// Or navigate by route key string (also type-safe!)
+router.push('user', { params: { id: 'bob' } })
+// → navigates to '/users/bob'
+
+router.href('post', { params: { id: 123 } })
+// → '/posts/123'
+
+// Match URL paths
 router.match('/users/alice')
 // → { route: routes.user, params: { id: 'alice' }, path: '/users/alice' }
-
-router.href(routes.user, { id: 'bob' })
-// → '/users/bob'
-
-router.push(routes.post, { id: 42 })
-// → navigates to '/posts/42'
 
 router.subscribe((match) => {
   console.log('Route changed:', match?.route, match?.params)
@@ -57,103 +77,145 @@ router.subscribe((match) => {
 
 ## API Reference
 
-### \`route(template?, options?)\`
+### Route Configuration Formats
 
-Creates a route definition using template literals.
+Routes can be defined in multiple ways:
 
 ```typescript
 import { z } from 'zod'
-import { route, tpl } from '@rasenjs/router'
+import { template as tpl, createRouter } from '@rasenjs/router'
 
-// Empty route (uses key as path segment)
-route()
-
-// Simple route (string path)
-route('/')
-route('/about')
-
-// Route with string parameter
-route(tpl`/users/${{ id: z.string() }}`)
-
-// Route with number parameter (auto-coerced)
-route(tpl`/posts/${{ id: z.coerce.number() }}`)
-
-// Route with multiple parameters
-route(tpl`/users/${{ userId: z.string() }}/posts/${{ postId: z.coerce.number() }}`)
-
-// Route with query and meta
-route(tpl`/search`, {
-  query: { q: z.string(), page: z.coerce.number().optional() },
-  meta: { title: 'Search' }
+const router = createRouter({
+  // String paths (simplest, no parameters)
+  home: '/',
+  about: '/about',
+  docs: '/documentation',
+  
+  // Empty object (uses key as path segment)
+  contact: {},  // → /contact
+  
+  // Template literals with parameters
+  user: tpl`/users/${{ id: z.string() }}`,
+  post: tpl`/posts/${{ id: z.coerce.number() }}`,
+  
+  // Multiple parameters
+  userPost: tpl`/users/${{ userId: z.string() }}/posts/${{ postId: z.coerce.number() }}`,
+  
+  // Route configuration object (for advanced options)
+  search: {
+    path: tpl`/search`,
+    query: { q: z.string(), page: z.coerce.number().optional() },
+    meta: { title: 'Search Results' }
+  },
+  
+  // Nested routes (auto-creates path hierarchy)
+  admin: {
+    dashboard: {},        // → /admin/dashboard
+    users: {},           // → /admin/users
+    settings: tpl`${{ section: z.string() }}`,  // → /admin/settings/:section
+  }
 })
 ```
 
-### \`createRoutes(config)\`
 
-Creates a nested route structure from configuration. Returns Route objects that can be used directly with router methods.
+### \`createRouter(config, options)\`
 
-#### Path Convention
+Creates a router instance with a declarative routes configuration.
 
-- **Absolute path** (starts with \`/\`): Ignores parent key hierarchy
-- **Relative path** (no \`/\` prefix or empty): Parent keys become path segments
+#### Configuration Format
+
+Routes are defined declaratively using simple values:
 
 ```typescript
-const routes = createRoutes({
-  // Absolute paths (string syntax for routes without params)
-  home: route('/'),                             // → /
-  about: route('/about'),                       // → /about
+const router = createRouter({
+  // String path (no parameters)
+  home: '/',
   
-  // Empty route() uses key as path
+  // Empty object (uses key as path)
+  about: {},
+  
+  // Template literal with parameters
+  user: tpl`/users/${{ id: z.string() }}`,
+  
+  // Configuration object (for advanced options)
+  search: {
+    path: tpl`/search`,
+    query: { q: z.string() },
+    meta: { title: 'Search' }
+  },
+  
+  // Nested routes
   settings: {
-    profile: route(),                           // → /settings/profile
-    account: route(),                           // → /settings/account
-    security: route('password'),                // → /settings/security/password
-  },
-  
-  // Mixed: absolute path escapes hierarchy
-  api: {
-    health: route('/health'),                   // → /health (not /api/health)
-    users: route(),                             // → /api/users
-  },
-})
-
-// Access routes directly
-routes.home           // Route object for /
-routes.settings.profile  // Route object for /settings/profile
-```
-
-### \`createRouter(routes, options)\`
-
-Creates a router instance.
-
-```typescript
-const router = createRouter(routes, {
-  history: createBrowserHistory(), // or createHashHistory() or createMemoryHistory()
+    profile: {},
+    account: tpl`${{ type: z.string() }}`,
+  }
+}, {
+  history: createBrowserHistory(),
 })
 ```
 
 #### Router Instance
 
 ```typescript
-interface Router {
+interface Router<TRoutes> {
+  // Routes config with preserved structure
+  readonly routes: TRoutes
+  
   // Current matched route (reactive)
   readonly current: RouteMatch | null
   
   // Match a path
   match(path: string): RouteMatch | null
   
-  // Generate href for a route (type-safe)
-  href<P>(route: Route<P>, params: P): string
+  // Generate href - supports both Route objects and string keys
+  // For routes without params, options is optional
+  href<P>(route: Route<P>, options?: { params?: P, query?: Q }): string
+  href(key: 'user' | 'settings.profile' | ..., options?: any): string
   
-  // Navigate to a route (type-safe)
-  push<P>(route: Route<P>, params: P): void
+  // Navigate - supports both Route objects and string keys
+  // For routes without params, options is optional
+  push<P>(route: Route<P>, options?: { params?: P, query?: Q }): Promise<void>
+  push(key: 'user' | 'settings.profile' | ..., options?: any): Promise<void>
   
-  // Replace current route (type-safe)
-  replace<P>(route: Route<P>, params: P): void
+  // Replace - same as push
+  replace<P>(route: Route<P>, options?: { params?: P, query?: Q }): Promise<void>
+  replace(key: 'user' | 'settings.profile' | ..., options?: any): Promise<void>
   
   // Subscribe to route changes
-  subscribe(listener: (match: RouteMatch | null) => void): () => void
+  beforeEach(listener: (to: RouteMatch, from: RouteMatch | null) => boolean | void): () => void
+  beforeLeave(listener: (to: RouteMatch, from: RouteMatch | null) => boolean | void): () => void
+  afterEach(listener: (to: RouteMatch, from: RouteMatch | null) => void): () => void
+  onError(listener: (error: Error, to: RouteMatch | null, from: RouteMatch | null) => void): () => void
+  
+  // Navigation state
+  readonly isNavigating: boolean
+  
+  // Cleanup
+  destroy(): void
 }
+```
+
+#### Navigation
+
+Both Route objects and string keys are fully type-safe:
+
+```typescript
+const router = createRouter({
+  user: tpl`/users/${{ id: z.string() }}`,
+  settings: {
+    profile: {},
+  }
+})
+
+const { routes } = router
+
+// Route object - type-safe params
+router.push(routes.user, { params: { id: 'alice' } })
+router.push(routes.settings.profile)  // params optional (no params needed)
+
+// String key - type-safe params
+router.push('user', { params: { id: 'bob' } })
+router.push('settings.profile')  // params optional
 ```
 
 ### History Adapters
@@ -185,28 +247,45 @@ import { a } from '@rasenjs/dom'
 const Link = createRouterLink(router, a)
 
 // Usage - children as rest parameters
-Link({ to: routes.home, params: {} }, 'Home')
+Link({ to: routes.home }, 'Home')  // params optional for no-param routes
 Link({ to: routes.user, params: { id: 'alice' } }, 'Alice')
 
 // Usage - children as prop
-Link({ to: routes.home, params: {}, children: ['Home'] })
+Link({ to: routes.home, children: ['Home'] })
+Link({ to: routes.user, params: { id: 'alice' }, children: ['Alice'] })
+
+// Usage - string key navigation
+Link({ to: 'home' }, 'Home')
+Link({ to: 'user', params: { id: 'bob' } }, 'Bob')
 ```
 
 #### Link Props
 
-| Prop | Type | Description |
-|------|------|-------------|
-| \`to\` | \`Route<P>\` | The Route object to navigate to |
-| \`params\` | \`P\` | Parameters for the route (type-safe) |
-| \`children\` | \`Child[]\` | Optional children (can also use rest params) |
+```typescript
+interface LinkProps<P, Q> {
+  // Target route - either Route object or string key
+  to: Route<P, Q> | string
+  
+  // Parameters (optional if route has no params)
+  params?: P
+  
+  // Query parameters (optional)
+  query?: Partial<InferQueryParams<Q>>
+  
+  // Children elements
+  children?: Array<Mountable<Host> | string>
+}
+```
 
 #### Anchor Props (passed to your Anchor component)
 
-| Prop | Type | Description |
-|------|------|-------------|
-| \`href\` | \`string\` | The URL for the link |
-| \`dataActive\` | \`boolean \\| (() => boolean)\` | Reactive active state |
-| \`onClick\` | \`(e) => void\` | Click handler with navigation |
+```typescript
+interface AnchorProps {
+  href: string                        // The URL for the link
+  dataActive?: boolean | (() => boolean)  // Reactive active state
+  onClick: (e: ClickEvent) => void    // Click handler with navigation
+}
+```
 
 ### \`createRouterView(router, routes, views, options)\`
 
@@ -263,26 +342,26 @@ import { z } from 'zod'
 import { setReactiveRuntime, type Mountable } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-signals'
 import { div, a, h1, nav, mount } from '@rasenjs/dom'
-import { route, tpl, createRoutes, createRouter, createBrowserHistory } from '@rasenjs/router'
+import { template as tpl, createRouter, createBrowserHistory } from '@rasenjs/router'
 import { createRouterLink, createRouterView, layout } from '@rasenjs/router/components'
 
 // Initialize reactive runtime
 setReactiveRuntime(createReactiveRuntime())
 
-// Define routes with template literals (use strings for routes without params)
-const routes = createRoutes({
-  home: route('/'),
-  user: route(tpl`/users/${{ id: z.string() }}`),
+// Create router with declarative routes configuration
+const router = createRouter({
+  home: '/',
+  user: tpl`/users/${{ id: z.string() }}`,
   dashboard: {
-    overview: route(),
-    settings: route(),
+    overview: {},
+    settings: {},
   }
-})
-
-// Create router
-const router = createRouter(routes, {
+}, {
   history: createBrowserHistory(),
 })
+
+// Extract routes for type-safe access
+const { routes } = router
 
 // Create Link component with @rasenjs/dom's anchor
 const Link = createRouterLink(router, a)
@@ -292,8 +371,8 @@ function DashboardLayout(children: () => Mountable<HTMLElement>) {
   return div(
     { class: 'dashboard' },
     nav(
-      Link({ to: routes.dashboard.overview, params: {} }, 'Overview'),
-      Link({ to: routes.dashboard.settings, params: {} }, 'Settings')
+      Link({ to: routes.dashboard.overview }, 'Overview'),
+      Link({ to: routes.dashboard.settings }, 'Settings')
     ),
     div({ class: 'content' }, children())
   )
@@ -318,11 +397,11 @@ function App(): Mountable<HTMLElement> {
     { class: 'app' },
     nav(
       { class: 'nav' },
-      // children as rest parameters
-      Link({ to: routes.home, params: {} }, 'Home'),
+      // No-param routes don't need params
+      Link({ to: routes.home }, 'Home'),
+      // Routes with params require params
       Link({ to: routes.user, params: { id: 'alice' } }, 'Alice'),
-      // children as prop
-      Link({ to: routes.dashboard.overview, params: {}, children: ['Dashboard'] }),
+      Link({ to: routes.dashboard.overview }, 'Dashboard'),
     ),
     div(
       { class: 'main' },
@@ -351,24 +430,31 @@ a[data-active="true"] {
 The router provides full type inference for route parameters:
 
 ```typescript
-const routes = createRoutes({
-  user: route(tpl`/users/${{ id: z.string() }}`),
-  post: route(tpl`/posts/${{ id: z.coerce.number() }}`),
-})
+const router = createRouter({
+  user: tpl`/users/${{ id: z.string() }}`,
+  post: tpl`/posts/${{ id: z.coerce.number() }}`,
+  home: '/',  // no parameters
+}, { history: createBrowserHistory() })
 
-const router = createRouter(routes, { history: createBrowserHistory() })
+const { routes } = router
 
 // ✅ Type-safe - params.id is string
-router.push(routes.user, { id: 'alice' })
+router.push(routes.user, { params: { id: 'alice' } })
 
 // ✅ Type-safe - params.id is number
-router.push(routes.post, { id: 42 })
+router.push(routes.post, { params: { id: 42 } })
+
+// ✅ Type-safe - no params required for home
+router.push(routes.home)
 
 // ❌ Type error - missing 'id'
-router.push(routes.user, {})
+router.push(routes.user, { params: {} })
 
 // ❌ Type error - wrong type
-router.push(routes.post, { id: 'not-a-number' })
+router.push(routes.post, { params: { id: 'not-a-number' } })
+
+// ❌ Type error - params not allowed
+router.push(routes.home, { params: { id: '123' } })
 ```
 
 ## Architecture

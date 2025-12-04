@@ -10,14 +10,11 @@ import {
   expect,
   beforeEach,
   afterEach,
-  beforeAll,
   vi
 } from 'vitest'
 import { z } from 'zod'
 import {
-  route,
   template,
-  createRoutes,
   createRouter,
   createMemoryHistory,
   NavigationAbortedError
@@ -35,24 +32,22 @@ import type { Mountable } from '@rasenjs/core'
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-signals'
 
-// 设置 reactive runtime
-beforeAll(() => {
+// 为每个测试重新创建响应式运行时，防止内存积累
+beforeEach(() => {
   setReactiveRuntime(createReactiveRuntime())
 })
 
 // 创建测试用的路由
 function createTestRouter() {
-  const routes = createRoutes({
-    home: route(template`/`),
-    about: route(template`/about`),
-    user: route(template`/users/${{ id: z.string() }}`),
-    post: route(template`/posts/${{ id: z.coerce.number() }}`)
-  })
+  const history = createMemoryHistory('/')
+  const router = createRouter({
+    home: template`/`,
+    about: template`/about`,
+    user: template`/users/${{ id: z.string() }}`,
+    post: template`/posts/${{ id: z.coerce.number() }}`
+  }, { history })
 
-  const history = createMemoryHistory()
-  const router = createRouter(routes, { history })
-
-  return { routes, router, history }
+  return { routes: router.routes, router, history }
 }
 
 // 简单的 anchor 组件（模拟平台的 anchor 实现）
@@ -116,7 +111,7 @@ describe('createRouterLink', () => {
     const { router, routes } = createTestRouter()
     const Link = createRouterLink(router, TestAnchor)
 
-    const mountFn = Link({ to: routes.home, params: {} }, 'Home')
+    const mountFn = Link({ to: routes.home }, 'Home')
     expect(typeof mountFn).toBe('function')
   })
 
@@ -124,7 +119,7 @@ describe('createRouterLink', () => {
     const { router, routes } = createTestRouter()
     const Link = createRouterLink(router, TestAnchor)
 
-    const mountFn = Link({ to: routes.home, params: {} }, 'Home')
+    const mountFn = Link({ to: routes.home }, 'Home')
     const unmount = mountFn(container)
 
     const anchor = container.querySelector('a')
@@ -153,7 +148,7 @@ describe('createRouterLink', () => {
     history.push('/about')
 
     const Link = createRouterLink(router, TestAnchor)
-    const mountFn = Link({ to: routes.about, params: {} }, 'About')
+    const mountFn = Link({ to: routes.about }, 'About')
     const unmount = mountFn(container)
 
     const anchor = container.querySelector('a')
@@ -167,7 +162,7 @@ describe('createRouterLink', () => {
     history.push('/')
 
     const Link = createRouterLink(router, TestAnchor)
-    const mountFn = Link({ to: routes.about, params: {} }, 'About')
+    const mountFn = Link({ to: routes.about }, 'About')
     const unmount = mountFn(container)
 
     const anchor = container.querySelector('a')
@@ -181,7 +176,7 @@ describe('createRouterLink', () => {
     history.push('/')
 
     const Link = createRouterLink(router, TestAnchor)
-    const mountFn = Link({ to: routes.about, params: {} }, 'About')
+    const mountFn = Link({ to: routes.about }, 'About')
     const unmount = mountFn(container)
 
     const anchor = container.querySelector('a')
@@ -203,7 +198,7 @@ describe('createRouterLink', () => {
     history.push('/')
 
     const Link = createRouterLink(router, TestAnchor)
-    const mountFn = Link({ to: routes.about, params: {} }, 'About')
+    const mountFn = Link({ to: routes.about }, 'About')
     const unmount = mountFn(container)
 
     const anchor = container.querySelector('a')
@@ -226,7 +221,7 @@ describe('createRouterLink', () => {
     const { router, routes } = createTestRouter()
     const Link = createRouterLink(router, TestAnchor)
 
-    const mountFn = Link({ to: routes.home, params: {} }, 'Home')
+    const mountFn = Link({ to: routes.home }, 'Home')
     const unmount = mountFn(container)
 
     expect(container.querySelector('a')).not.toBeNull()
@@ -248,7 +243,7 @@ describe('createRouterLink', () => {
       return () => span.remove()
     }
 
-    const mountFn = Link({ to: routes.home, params: {} }, icon, ' Home')
+    const mountFn = Link({ to: routes.home }, icon, ' Home')
     const unmount = mountFn(container)
 
     const anchor = container.querySelector('a')
@@ -295,7 +290,7 @@ describe('createRouterView', () => {
         return () => div.remove()
       }
     }
-    const RouterView = createRouterView(router, views)
+    const RouterView = createRouterView<typeof router.routes, HTMLElement>(router, views)
 
     const mountFn = RouterView()
     expect(typeof mountFn).toBe('function')
@@ -329,7 +324,7 @@ describe('createRouterView', () => {
         return () => div.remove()
       }
     }
-    const RouterView = createRouterView(router, views)
+    const RouterView = createRouterView<typeof router.routes, HTMLElement>(router, views)
 
     const unmount = RouterView()(container)
 
@@ -412,7 +407,7 @@ describe('createRouterView', () => {
         return () => div.remove()
       }
     }
-    const RouterView = createRouterView(router, views)
+    const RouterView = createRouterView<typeof router.routes, HTMLElement>(router, views)
 
     const unmount = RouterView()(container)
 
@@ -452,7 +447,7 @@ describe('createRouterView', () => {
         return () => {}
       }
     }
-    const RouterView = createRouterView(router, views)
+    const RouterView = createRouterView<typeof router.routes, HTMLElement>(router, views)
 
     const unmount = RouterView()(container)
 
@@ -464,16 +459,15 @@ describe('createRouterView', () => {
   })
 
   it('should support layout with nested routes', () => {
-    const routes = createRoutes({
-      home: route(template`/`),
-      dashboard: {
-        overview: route(),
-        settings: route()
-      }
-    })
     const history = createMemoryHistory('/')
-    const router = createRouter(routes, { history })
-
+    const router = createRouter({
+      home: template`/`,
+      dashboard: {
+        overview: {},
+        settings: {}
+      }
+    }, { history })
+    
     const layoutSpy = vi.fn()
 
     const views = {
@@ -511,7 +505,7 @@ describe('createRouterView', () => {
       }
     }
 
-    const RouterView = createRouterView(router, views)
+    const RouterView = createRouterView<typeof router.routes, HTMLElement>(router, views)
 
     // 导航到 dashboard/overview
     history.push('/dashboard/overview')
@@ -559,7 +553,7 @@ describe('createLeaveGuard', () => {
     const mountFn = leaveGuard({ guard: guardSpy })
     const unmount = mountFn(container)
 
-    await router.push(routes.about, {})
+    await router.push(routes.about)
 
     expect(guardSpy).toHaveBeenCalledTimes(1)
 
@@ -576,12 +570,12 @@ describe('createLeaveGuard', () => {
     const mountFn = leaveGuard({ guard: guardSpy })
     const unmount = mountFn(container)
 
-    await router.push(routes.about, {})
+    await router.push(routes.about)
     expect(guardSpy).toHaveBeenCalledTimes(1)
 
     unmount?.()
 
-    await router.push(routes.user, { id: '123' })
+    await router.push(routes.user, { params: { id: '123' } })
     expect(guardSpy).toHaveBeenCalledTimes(1) // still 1, not 2
   })
 
@@ -593,7 +587,7 @@ describe('createLeaveGuard', () => {
     const mountFn = leaveGuard({ guard: () => false })
     const unmount = mountFn(container)
 
-    await expect(router.push(routes.about, {})).rejects.toThrow(
+    await expect(router.push(routes.about)).rejects.toThrow(
       NavigationAbortedError
     )
     expect(router.current?.route).toBe(routes.home)
@@ -609,7 +603,7 @@ describe('createLeaveGuard', () => {
     const mountFn = leaveGuard({ guard: () => 'Unsaved changes' })
     const unmount = mountFn(container)
 
-    await expect(router.push(routes.about, {})).rejects.toThrow(
+    await expect(router.push(routes.about)).rejects.toThrow(
       'Unsaved changes'
     )
 
@@ -624,7 +618,7 @@ describe('createLeaveGuard', () => {
     const mountFn = leaveGuard({ guard: () => true })
     const unmount = mountFn(container)
 
-    await router.push(routes.about, {})
+    await router.push(routes.about)
     expect(router.current?.route).toBe(routes.about)
 
     unmount?.()
@@ -643,7 +637,7 @@ describe('createLeaveGuard', () => {
     })
     const unmount = mountFn(container)
 
-    await router.push(routes.about, {})
+    await router.push(routes.about)
     expect(router.current?.route).toBe(routes.about)
 
     unmount?.()
@@ -669,7 +663,7 @@ describe('createLeaveGuard', () => {
     })
     const unmount = mountFn(container)
 
-    await router.push(routes.about, {})
+    await router.push(routes.about)
 
     expect(capturedTo?.route).toBe(routes.about)
     expect(capturedFrom?.route).toBe(routes.home)
@@ -686,18 +680,18 @@ describe('createLeaveGuard', () => {
     const guardSpy = vi.fn(() => true)
 
     // 先导航到 about 页面
-    await router.push(routes.about, {})
+    await router.push(routes.about)
 
     // 然后在 about 页面挂载 leaveGuard
     const mountFn = leaveGuard({ guard: guardSpy })
     const unmount = mountFn(container)
 
     // 此时从 about 导航到 user 应该触发守卫
-    await router.push(routes.user, { id: '123' })
+    await router.push(routes.user, { params: { id: '123' } })
     expect(guardSpy).toHaveBeenCalledTimes(1)
 
     // 继续从 user 导航到 home 不应该触发守卫（因为 leaveGuard 是在 about 页面挂载的）
-    await router.push(routes.home, {})
+    await router.push(routes.home)
     expect(guardSpy).toHaveBeenCalledTimes(1) // still 1
 
     unmount?.()
@@ -715,11 +709,11 @@ describe('createLeaveGuard', () => {
     const unmount = mountFn(container)
 
     // 离开首页到 about - 应该触发
-    await router.push(routes.about, {})
+    await router.push(routes.about)
     expect(guardSpy).toHaveBeenCalledTimes(1)
 
     // 从 about 到 user - 不应该触发（我们保护的是首页）
-    await router.push(routes.user, { id: '123' })
+    await router.push(routes.user, { params: { id: '123' } })
     expect(guardSpy).toHaveBeenCalledTimes(1) // still 1
 
     unmount?.()

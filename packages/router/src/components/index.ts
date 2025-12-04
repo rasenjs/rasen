@@ -8,8 +8,62 @@
  * 使用 core 的 switch 组件实现 RouterView
  */
 
-import { switchCase, type SwitchHostHooks, type Mountable } from '@rasenjs/core'
-import type { Router, Route, RouteMatch } from '../types'
+import { switchCase, getReactiveRuntime, type SwitchHostHooks, type Mountable } from '@rasenjs/core'
+import type { 
+  Router, 
+  Route, 
+  RouteMatch,
+  QuerySchema,
+  InferQueryParams
+} from '../types'
+
+// ============================================================================
+// 响应式包装
+// ============================================================================
+
+/**
+ * 为路由创建响应式包装（可选）
+ * 
+ * 如果存在响应式运行时，会创建一个 ref 来存储当前匹配，
+ * 这样 RouterView 可以自动响应路由变化。
+ * 
+ * @example
+ * ```typescript
+ * const router = createRouter(routes, { history })
+ * const reactiveRouter = makeRouterReactive(router)
+ * 
+ * const RouterView = createRouterView(reactiveRouter, views)
+ * ```
+ */
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export function makeRouterReactive<TRoutes extends Record<string, any>>(
+  router: Router<TRoutes>
+): Router<TRoutes> {
+  const runtime = getReactiveRuntime()
+  if (!runtime) {
+    // 没有响应式运行时，直接返回原路由
+    return router
+  }
+
+  // 创建响应式的当前匹配
+  const currentMatchRef = runtime.ref<RouteMatch | null>(null)
+  
+  // 初始化
+  currentMatchRef.value = router.current
+
+  // 监听所有路由变化
+  router.afterEach((to) => {
+    currentMatchRef.value = to
+  })
+
+  // 返回一个代理对象，让 current 返回响应式值
+  return {
+    ...router,
+    get current() {
+      return currentMatchRef.value
+    }
+  }
+}
 
 // ============================================================================
 // 类型定义
@@ -54,21 +108,39 @@ export type Anchor<Host> = (
 // ============================================================================
 
 /**
- * Link 组件 Props（基础版）
+ * Link 组件 Props
+ * 
+ * 支持两种导航方式，具有完整的类型推断：
+ * 1. 通过 Route 对象（类型安全）- params 根据 Route 的参数类型自动可选/必需
+ * 2. 通过字符串路由键（类型安全）- params 根据实际传入自动可选/必需
  */
-export interface LinkPropsBase<P extends Record<string, unknown>> {
+
+/** Link Props - 通过 Route 对象（无参数或自动判断） */
+export interface LinkPropsRoute<
+  P extends Record<string, unknown> = Record<string, never>,
+  Q extends QuerySchema = Record<string, never>,
+  Host = unknown
+> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  to: Route<P, any, any>
-  params: P
+  to: Route<P, Q, any>
+  params?: P extends Record<string, never> ? never : P
+  query?: Partial<InferQueryParams<Q>>
+  children?: Array<Child<Host>>
 }
 
-/**
- * Link 组件 Props（带 children）
- */
-export interface LinkProps<
-  P extends Record<string, unknown>,
-  Host = unknown
-> extends LinkPropsBase<P> {
+/** Link Props - 通过字符串键（无参数） */
+export interface LinkPropsKey<Host = unknown> {
+  to: string
+  params?: never
+  query?: Record<string, unknown>
+  children?: Array<Child<Host>>
+}
+
+/** Link Props - 通过字符串键（有参数） */
+export interface LinkPropsKeyWithParams<Host = unknown> {
+  to: string
+  params: Record<string, unknown>
+  query?: Record<string, unknown>
   children?: Array<Child<Host>>
 }
 
@@ -80,31 +152,68 @@ export interface LinkProps<
  *
  * @example
  * ```typescript
- * const routes = createRoutes({
- *   home: route(),
- *   user: route(tpl`/users/${{ id: z.string() }}`),
+ * const router = createRouter({
+ *   home: '/',
+ *   user: tpl`/users/${{ id: z.string() }}`,
  * })
  *
  * const Link = createRouterLink(router, a)
  *
- * // 使用方式 1：children 属性
- * Link({ to: routes.home, params: {}, children: ['Home'] })
+ * // 通过 Route 对象：无参数时 params 可选
+ * Link({ to: routes.home, children: ['Home'] })
  *
- * // 使用方式 2：rest 参数
+ * // 通过 Route 对象：有参数时 params 必需
  * Link({ to: routes.user, params: { id: '123' } }, 'User')
+ *
+ * // 通过字符串键
+ * Link({ to: 'home', children: ['Home'] })
+ * Link({ to: 'user', params: { id: '123' } }, 'User')
  * ```
  */
-export function createRouterLink<Host>(router: Router, Anchor: Anchor<Host>) {
-  return function Link<P extends Record<string, unknown>>(
-    props: LinkProps<P, Host>,
+export function createRouterLink<TRoutes extends Record<string, unknown>, Host>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  router: Router<TRoutes>,
+  Anchor: Anchor<Host>
+) {
+  // 重载签名 - 顺序很重要，更具体的重载应该在前面
+  
+  function Link(
+    props: LinkPropsKeyWithParams<Host>,
+    ...restChildren: Array<Child<Host>>
+  ): Mountable<Host>
+
+  function Link(
+    props: LinkPropsKey<Host>,
+    ...restChildren: Array<Child<Host>>
+  ): Mountable<Host>
+
+  function Link<
+    P extends Record<string, unknown>,
+    Q extends QuerySchema = Record<string, never>
+  >(
+    props: LinkPropsRoute<P, Q, Host>,
+    ...restChildren: Array<Child<Host>>
+  ): Mountable<Host>
+
+  // 实现
+  function Link(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    props: any,
     ...restChildren: Array<Child<Host>>
   ): Mountable<Host> {
-    const { to: route, params, children: propsChildren } = props
+    const { to, params, query, children: propsChildren } = props
 
     // 支持两种方式：props.children 或 rest 参数
     const children = propsChildren ?? restChildren
 
-    const href = router.href(route, params)
+    // 构建 options
+    const options = params !== undefined || query !== undefined
+      ? { params, query }
+      : undefined
+
+    // 生成 href
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const href = (router.href as any)(to, options)
 
     // 点击处理
     const onClick = (e: {
@@ -118,14 +227,24 @@ export function createRouterLink<Host>(router: Router, Anchor: Anchor<Host>) {
         return
       }
       e.preventDefault()
-      router.push(route, params)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(router.push as any)(to, options)
     }
 
     // 响应式的 isActive
-    const isActive = () => router.current?.route === route
+    const isActive = () => {
+      if (!router.current) return false
+      if (typeof to === 'string') {
+        // 字符串键暂不支持精确匹配判断，后续可改进
+        return false
+      }
+      return router.current.route === to
+    }
 
     return Anchor({ href, dataActive: isActive, onClick }, ...children)
   }
+
+  return Link
 }
 
 // Alias for backward compatibility
@@ -226,32 +345,32 @@ export type ViewsConfig<TRoutes, Host> = {
  * div({}, RouterView())
  * ```
  */
-export function createRouterView<Host, N = unknown>(
-  router: Router,
+export function createRouterView<TRoutes extends Record<string, unknown>, Host = unknown, N = unknown>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  views: Record<string, any>,
-  options: {
+  router: Router<TRoutes>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  views: ViewsConfig<TRoutes, Host> & Record<string, any>,
+  options?: {
     default?: () => Mountable<Host>
     hostHooks?: SwitchHostHooks<Host, N>
-  } = {}
-) {
+  }
+): () => Mountable<Host> {
   // 从 router 获取 routes 配置
   const routes = router.routes
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   // 收集所有 Route 到视图的映射
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const routeToView = new Map<
     Route<any, any, any>,
     (params: any) => Mountable<Host>
   >()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const routeToKey = new Map<Route<any, any, any>, string>()
   // 收集每个路由所在层级的布局
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const routeToLayouts = new Map<
     Route<any, any, any>,
     LayoutComponent<Host>[]
   >()
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   // 递归遍历 routes 和 views
   function collect(
@@ -340,8 +459,8 @@ export function createRouterView<Host, N = unknown>(
         return routeToKey.get(currentRoute)
       },
       cases,
-      default: options.default,
-      ...options.hostHooks
+      default: options?.default,
+      ...options?.hostHooks
     })
   }
 }
@@ -393,7 +512,10 @@ export interface LeaveGuardProps {
  * }
  * ```
  */
-export function createLeaveGuard(router: Router) {
+export function createLeaveGuard<TRoutes extends Record<string, unknown>>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  router: Router<TRoutes>
+): (props: LeaveGuardProps) => Mountable<unknown> {
   return function leaveGuard(props: LeaveGuardProps): Mountable<unknown> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mountFn = (_host: any) => {

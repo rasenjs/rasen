@@ -27,11 +27,12 @@
     "rasen-gpui": "./bin/rasen-gpui.cjs"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "yarn clean && tsup",
     "build:native": "cargo build --release",
     "dev": "tsup --watch",
     "test": "echo 'No tests configured'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@rasenjs/core": "workspace:*"

@@ -27,12 +27,13 @@
     "rasen-lvgl": "./bin/rasen-lvgl.cjs"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "yarn clean && tsup",
     "setup": "npx tsx native/scripts/setup-deps.ts",
     "build:simulator": "cd native/simulator/build && cmake --build . --config Release --target rasen_simulator",
     "dev": "tsup --watch",
     "test": "echo 'No tests configured'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@rasenjs/core": "workspace:*"

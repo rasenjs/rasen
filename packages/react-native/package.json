@@ -18,7 +18,7 @@
   ],
   "scripts": {
     "dev": "../../node_modules/.bin/tsup --watch",
-    "build": "../../node_modules/.bin/tsup",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
     "test": "echo 'No tests configured'",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
     "clean": "rm -rf dist"

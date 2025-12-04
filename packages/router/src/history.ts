@@ -33,6 +33,10 @@ export function createBrowserHistory(): HistoryAdapter {
       listeners.forEach(listener => listener(path))
     },
 
+    go(n: number) {
+      window.history.go(n)
+    },
+
     subscribe(listener: (path: string) => void) {
       listeners.add(listener)
       return () => {
@@ -72,6 +76,10 @@ export function createHashHistory(): HistoryAdapter {
       window.location.replace(`${url}#${path}`)
     },
 
+    go(n: number) {
+      window.history.go(n)
+    },
+
     subscribe(listener: (path: string) => void) {
       listeners.add(listener)
       return () => {
@@ -86,21 +94,34 @@ export function createHashHistory(): HistoryAdapter {
  */
 export function createMemoryHistory(initialPath: string = '/'): HistoryAdapter {
   const listeners = new Set<(path: string) => void>()
-  let currentPath = initialPath
+  let currentIndex = 0
+  const historyStack = [initialPath]
 
   return {
     getPath() {
-      return currentPath
+      return historyStack[currentIndex]
     },
 
     push(path: string) {
-      currentPath = path
+      // 移除当前位置之后的历史
+      historyStack.splice(currentIndex + 1)
+      historyStack.push(path)
+      currentIndex++
       listeners.forEach(listener => listener(path))
     },
 
     replace(path: string) {
-      currentPath = path
+      historyStack[currentIndex] = path
       listeners.forEach(listener => listener(path))
+    },
+
+    go(n: number) {
+      const newIndex = currentIndex + n
+      if (newIndex >= 0 && newIndex < historyStack.length) {
+        currentIndex = newIndex
+        const path = historyStack[currentIndex]
+        listeners.forEach(listener => listener(path))
+      }
     },
 
     subscribe(listener: (path: string) => void) {
