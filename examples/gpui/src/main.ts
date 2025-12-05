@@ -1,8 +1,9 @@
 import { div, text, button, run } from '@rasenjs/gpui'
 import { ref } from '@rasenjs/reactive-signals'
+import { com } from '@rasenjs/core'
 
 // Rasen GPUI Demo - Following three-phase pattern
-const App = () => {
+const App = com(() => {
   // === Setup Phase ===
   const count = ref(0)
   
@@ -75,6 +76,6 @@ const App = () => {
       }),
     ],
   })
-}
+})
 
 run(App)

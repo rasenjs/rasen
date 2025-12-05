@@ -46,8 +46,7 @@ import {
   createLeaveGuard as createLeaveGuardFactory,
   layout,
   type ViewsConfig,
-  type LayoutComponent,
-  type LinkProps
+  type LayoutComponent
 } from '@rasenjs/router/components'
 
 // Import DOM-specific things
@@ -60,7 +59,7 @@ import type { Router } from '@rasenjs/router'
 import { useScrollRestoration, type ScrollPosition } from './scroll-restoration'
 
 // Re-export component types and scroll restoration types
-export { layout, type ViewsConfig, type LayoutComponent, type LinkProps }
+export { layout, type ViewsConfig, type LayoutComponent }
 export { useScrollRestoration, type ScrollPosition }
 
 /**
@@ -75,7 +74,8 @@ export function createRouterView<TRoutes extends object>(
     default?: () => Mountable<HTMLElement>
   } = {}
 ) {
-  return createRouterViewFactory<HTMLElement, Node>(router, views, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return createRouterViewFactory<any, HTMLElement, Node>(router as any, views, {
     ...options,
     hostHooks
   })
@@ -87,7 +87,8 @@ export function createRouterView<TRoutes extends object>(
  * 使用 <a> 元素作为锚点，自动处理 data-active 属性
  */
 export function createLink(router: Router) {
-  return createRouterLinkFactory<HTMLElement>(router, a)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return createRouterLinkFactory<any, HTMLElement>(router as any, a)
 }
 
 // Alias for compatibility

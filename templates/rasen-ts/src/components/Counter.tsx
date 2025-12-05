@@ -1,8 +1,9 @@
 /// <reference types="@rasenjs/jsx-runtime/jsx" />
 
+import { com } from '@rasenjs/core'
 import { ref, computed } from '@rasenjs/reactive-signals'
 
-export const Counter = () => {
+export const Counter = com(() => {
   const count = ref(0)
   const double = computed(() => count.value * 2)
   const isEven = computed(() => count.value % 2 === 0)
@@ -55,4 +56,4 @@ export const Counter = () => {
       </p>
     </div>
   )
-}
+})

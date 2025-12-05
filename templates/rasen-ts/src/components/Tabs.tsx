@@ -1,5 +1,6 @@
 /// <reference types="@rasenjs/jsx-runtime/jsx" />
 
+import { com } from '@rasenjs/core'
 import { computed } from '@rasenjs/reactive-signals'
 import type { Ref } from '@rasenjs/core'
 import { each } from '@rasenjs/core'
@@ -14,7 +15,7 @@ interface TabsProps {
   activeTab: Ref<string>
 }
 
-export const Tabs = (props: TabsProps) => {
+export const Tabs = com((props: TabsProps) => {
   const { tabs, activeTab } = props
 
   return (
@@ -29,4 +30,4 @@ export const Tabs = (props: TabsProps) => {
       ))}
     </div>
   )
-}
+})

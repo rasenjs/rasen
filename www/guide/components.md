@@ -18,6 +18,38 @@ const MyComponent = () => {
 }
 ```
 
+## With Reactive Effects
+
+When using `watch` or other reactive effects, wrap components with `com`:
+
+```typescript
+import { com, getReactiveRuntime } from '@rasenjs/core'
+import { div, span, button } from '@rasenjs/dom'
+
+const Counter = com(() => {
+  const runtime = getReactiveRuntime()
+  const count = runtime.ref(0)
+  
+  // Effects are automatically tracked and cleaned up
+  runtime.watch(
+    () => count.value,
+    (value) => {
+      // Update UI using reactive values
+    }
+  )
+  
+  return div({
+    children: [
+      span({ textContent: () => `Count: ${count.value}` }),
+      button({ 
+        textContent: 'Increment',
+        on: { click: () => count.value++ }
+      })
+    ]
+  })
+})
+```
+
 ## With Props
 
 Components can accept props:
@@ -144,23 +176,22 @@ const Layout = (props: LayoutProps) => {
 Each component instance has its own state:
 
 ```typescript
-const Counter = (props: { initial?: number }) => {
-  // Each Counter instance gets its own count
-  const count = ref(props.initial ?? 0)
+const Counter = com(() => {
+  const count = ref(0)
   
   return div({
     children: [
-      span({ textContent: () => `${count.value}` }),
+      span({ textContent: () => `Count: ${count.value}` }),
       button({ textContent: '+', on: { click: () => count.value++ } })
     ]
   })
-}
+})
 
-// Two independent counters
+// Two independent counters - each has its own state
 div({
   children: [
-    Counter({ initial: 0 }),
-    Counter({ initial: 100 })
+    Counter(),
+    Counter()
   ]
 })
 ```
@@ -203,7 +234,7 @@ const useToggle = (initial = false) => {
 }
 
 // Usage in components
-const Dropdown = (props: { label: string; children: MountFunction[] }) => {
+const Dropdown = com((props: { label: string; children: MountFunction[] }) => {
   const { value: isOpen, toggle } = useToggle()
   
   return div({
@@ -217,7 +248,7 @@ const Dropdown = (props: { label: string; children: MountFunction[] }) => {
       })
     ]
   })
-}
+})
 ```
 
 ## Lists with `each`
@@ -225,9 +256,10 @@ const Dropdown = (props: { label: string; children: MountFunction[] }) => {
 For rendering lists, use the `each` component:
 
 ```typescript
-import { each } from '@rasenjs/core'
+import { each, com } from '@rasenjs/core'
+import { div, span, button } from '@rasenjs/dom'
 
-const TodoList = () => {
+const TodoList = com(() => {
   const todos = ref([
     { id: 1, text: 'Learn Rasen', done: false },
     { id: 2, text: 'Build something', done: false }
@@ -250,7 +282,7 @@ const TodoList = () => {
       )
     ]
   })
-}
+})
 ```
 
 ## Async Components
@@ -353,6 +385,25 @@ const useForm = <T>(initial: T) => {
   
   return { values, errors, isValid, validate, reset }
 }
+
+// Usage in component
+const MyForm = com(() => {
+  const form = useForm({ username: '', email: '' })
+  
+  return (host: HTMLElement) => {
+    return div({
+      children: [
+        input({ attrs: { placeholder: 'Username', value: form.values.username } }),
+        input({ attrs: { placeholder: 'Email', value: form.values.email } }),
+        button({ 
+          textContent: 'Submit',
+          attrs: { disabled: !form.isValid.value },
+          on: { click: () => form.validate() }
+        })
+      ]
+    })(host)
+  }
+})
 ```
 
 ## Next Steps

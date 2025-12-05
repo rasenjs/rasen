@@ -1,5 +1,6 @@
 import { div, label, button, bar, lvSwitch, run } from '@rasenjs/lvgl'
 import { ref } from '@rasenjs/reactive-signals'
+import { com } from '@rasenjs/core'
 
 /**
  * Example LVGL Application
@@ -9,7 +10,7 @@ import { ref } from '@rasenjs/reactive-signals'
  * - Mount Phase: Build the UI tree
  * - Unmount Phase: Cleanup
  */
-const App = () => {
+const App = com(() => {
   // === Setup Phase ===
   const count = ref(0)
   const progress = ref(50)
@@ -133,6 +134,6 @@ const App = () => {
       })
     ]
   })
-}
+})
 
 run(App)

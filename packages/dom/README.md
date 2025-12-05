@@ -148,6 +148,104 @@ div({
   // Computed - reactive
   class: computed(() => isActive.value ? 'active' : 'inactive'),
   
+  // Getter function
+  title: () => `Current count: ${count.value}`
+})
+```
+
+## Building Components with `com`
+
+Use the `com` wrapper for automatic effect scope management and memory safety:
+
+```typescript
+import { com, getReactiveRuntime } from '@rasenjs/core'
+import { div, button } from '@rasenjs/dom'
+
+const Counter = com(() => {
+  const runtime = getReactiveRuntime()
+  const count = runtime.ref(0)
+  
+  return (host: HTMLElement) => {
+    // All watchers are automatically collected by the component's scope
+    const textDiv = div({
+      textContent: computed(() => `Count: ${count.value}`)
+    })
+    
+    const incrementBtn = button({
+      textContent: 'Increment',
+      on: {
+        click: () => count.value++
+      }
+    })
+    
+    // Mount children
+    textDiv(host)
+    incrementBtn(host)
+    
+    // Cleanup is automatic - scope stops all watchers
+    return () => {
+      // Any additional cleanup
+    }
+  }
+})
+
+mount(Counter(), document.getElementById('app'))
+```
+
+#### Why use `com`?
+
+- **Memory Safety**: All watchers are cleaned up on unmount
+- **Prevents Leaks**: Critical for long-lived apps and SPAs
+- **Works with Nested Components**: Proper cleanup order
+- **No Manual Scope Management**: Automatic scope lifecycle
+
+## Example: Todo App
+
+```typescript
+import { com, getReactiveRuntime } from '@rasenjs/core'
+import { div, input, button, ul, li, mount } from '@rasenjs/dom'
+
+const TodoApp = com(() => {
+  const runtime = getReactiveRuntime()
+  const todos = runtime.ref([])
+  const inputValue = runtime.ref('')
+  
+  return (host: HTMLElement) => {
+    const addTodo = () => {
+      if (inputValue.value.trim()) {
+        todos.value = [...todos.value, inputValue.value]
+        inputValue.value = ''
+      }
+    }
+    
+    // UI setup with automatic watcher management
+    div({
+      children: [
+        input({
+          placeholder: 'Add a todo...',
+          value: inputValue,
+          on: { change: addTodo }
+        }),
+        button({
+          textContent: 'Add',
+          on: { click: addTodo }
+        }),
+        ul({
+          children: computed(() =>
+            todos.value.map(todo =>
+              li({ textContent: todo })
+            )
+          )
+        })
+      ]
+    })(host)
+    
+    return () => {} // Cleanup automatic
+  }
+})
+
+mount(TodoApp(), document.getElementById('app'))
+```
   // Getter function - reactive
   style: () => ({ opacity: isActive.value ? 1 : 0.5 })
 })
@@ -277,18 +375,13 @@ Watch a prop value and react to changes:
 import { watchProp } from '@rasenjs/dom'
 
 const MyComponent = (props: { value: PropValue<string> }) => {
-  return (host: HTMLElement) => {
-    const stop = watchProp(
-      props.value,
-      (value) => {
-        host.textContent = value
-      },
-      { immediate: true }
-    )
-    
-    return stop
-  }
-}
+  return div({
+    textContent: props.value,
+    children: [
+      p({ textContent: () => `Current: ${unref(props.value)}` })
+    ]
+  })
+}```
 ```
 
 ## License

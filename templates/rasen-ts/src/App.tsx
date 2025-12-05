@@ -1,6 +1,7 @@
 /// <reference types="@rasenjs/jsx-runtime/jsx" />
 
 import { ref, computed } from '@rasenjs/reactive-signals'
+import { com } from '@rasenjs/core'
 
 // 导入组件
 import { Counter } from './components/Counter'
@@ -12,7 +13,7 @@ import { Tabs } from './components/Tabs'
 // 全局主题状态
 export const isDark = ref(true)
 
-export const App = () => {
+export const App = com(() => {
   const activeTab = ref('counter')
 
   const tabs = [
@@ -167,4 +168,4 @@ export const Counter = () => {
       </footer>
     </div>
   )
-}
+})

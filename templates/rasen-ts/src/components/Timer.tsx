@@ -1,9 +1,10 @@
 /// <reference types="@rasenjs/jsx-runtime/jsx" />
 
+import { com } from '@rasenjs/core'
 import { ref, computed } from '@rasenjs/reactive-signals'
 import { f } from '@rasenjs/core'
 
-export const Timer = () => {
+export const Timer = com(() => {
   const seconds = ref(0)
   const isRunning = ref(false)
   const intervalRef = ref<number | null>(null)
@@ -100,4 +101,4 @@ export const Timer = () => {
       </p>
     </div>
   )
-}
+})

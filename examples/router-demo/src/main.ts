@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod'
-import { ref, setReactiveRuntime, type Mountable } from '@rasenjs/core'
+import { ref, setReactiveRuntime, type Mountable, com } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-signals'
 import {
   div,
@@ -130,7 +130,7 @@ const leaveGuard = createLeaveGuard(router)
 /**
  * 首页视图
  */
-function HomeView(): Mountable<HTMLElement> {
+const HomeView = com((): Mountable<HTMLElement> => {
   return div(
     { class: 'view' },
     h2('🏠 首页'),
@@ -144,12 +144,12 @@ function HomeView(): Mountable<HTMLElement> {
       li('框架无关的设计')
     )
   )
-}
+})
 
 /**
  * 关于页视图
  */
-function AboutView(): Mountable<HTMLElement> {
+const AboutView = com((): Mountable<HTMLElement> => {
   return div(
     { class: 'view' },
     h2('📖 关于'),
@@ -171,12 +171,12 @@ function AboutView(): Mountable<HTMLElement> {
       )
     )
   )
-}
+})
 
 /**
  * 用户详情视图
  */
-function UserView(params: { id: string }): Mountable<HTMLElement> {
+const UserView = com((params: { id: string }): Mountable<HTMLElement> => {
   return div(
     { class: 'view' },
     h2('👤 用户详情'),
@@ -190,12 +190,12 @@ function UserView(params: { id: string }): Mountable<HTMLElement> {
       )
     )
   )
-}
+})
 
 /**
  * 文章详情视图
  */
-function PostView(params: { id: number }): Mountable<HTMLElement> {
+const PostView = com((params: { id: number }): Mountable<HTMLElement> => {
   return div(
     { class: 'view' },
     h2('📝 文章详情'),
@@ -213,12 +213,12 @@ function PostView(params: { id: number }): Mountable<HTMLElement> {
       )
     )
   )
-}
+})
 
 /**
  * 滚动恢复演示视图
  */
-function ScrollView(): Mountable<HTMLElement> {
+const ScrollView = com((): Mountable<HTMLElement> => {
   return div(
     { class: 'view' },
     h2('↕️ 滚动恢复演示'),
@@ -253,12 +253,12 @@ function ScrollView(): Mountable<HTMLElement> {
       )
     })
   )
-}
+})
 
 /**
  * 登录视图
  */
-function LoginView(): Mountable<HTMLElement> {
+const LoginView = com((): Mountable<HTMLElement> => {
   return div(
     { class: 'view' },
     h2('🔐 登录'),
@@ -300,12 +300,12 @@ function LoginView(): Mountable<HTMLElement> {
       })
     )
   )
-}
+})
 
 /**
  * 受保护的视图
  */
-function ProtectedView(): Mountable<HTMLElement> {
+const ProtectedView = com((): Mountable<HTMLElement> => {
   return div(
     { class: 'view' },
     h2('🔒 受保护的页面'),
@@ -328,12 +328,12 @@ function ProtectedView(): Mountable<HTMLElement> {
       p({ style: { marginTop: '10px', fontSize: '14px' } }, '这演示了如何使用单路由守卫来保护特定页面。')
     )
   )
-}
+})
 
 /**
  * 设置 - 个人资料视图（带 leaveGuard 示例）
  */
-function SettingsProfileView(): Mountable<HTMLElement> {
+const SettingsProfileView = com((): Mountable<HTMLElement> => {
   // 表单脏状态
   const formDirty = ref(false)
 
@@ -390,36 +390,36 @@ function SettingsProfileView(): Mountable<HTMLElement> {
       )
     )
   )
-}
+})
 
 /**
  * 设置 - 账户视图
  */
-function SettingsAccountView(): Mountable<HTMLElement> {
+const SettingsAccountView = com((): Mountable<HTMLElement> => {
   return div(
     { class: 'view' },
     h2('⚙️ 设置 - 账户'),
     p('这是嵌套路由示例：', code('/settings/account'))
   )
-}
+})
 
 /**
  * 设置 - 安全视图
  */
-function SettingsSecurityView(): Mountable<HTMLElement> {
+const SettingsSecurityView = com((): Mountable<HTMLElement> => {
   return div(
     { class: 'view' },
     h2('⚙️ 设置 - 安全 - 密码'),
     p('深层嵌套路由：', code('/settings/security/password'))
   )
-}
+})
 
 /**
  * 404 视图
  */
-function NotFoundView(): Mountable<HTMLElement> {
+const NotFoundView = com((): Mountable<HTMLElement> => {
   return div({ class: 'view' }, h2('❌ 404 Not Found'), p('页面不存在'))
-}
+})
 
 /**
  * Settings 布局组件
@@ -476,7 +476,7 @@ const RouterView = createRouterView(
 // 6. Debug 组件
 // ============================================
 
-function DebugInfo(): Mountable<HTMLElement> {
+const DebugInfo = com((): Mountable<HTMLElement> => {
   // mount 阶段处理
   return (host: HTMLElement) => {
     const container = document.createElement('div')
@@ -505,13 +505,13 @@ function DebugInfo(): Mountable<HTMLElement> {
       container.remove()
     }
   }
-}
+})
 
 // ============================================
 // 7. 渲染应用
 // ============================================
 
-function App(): Mountable<HTMLElement> {
+const App = com((): Mountable<HTMLElement> => {
   return div(
     { class: 'app' },
     // Header
@@ -539,7 +539,7 @@ function App(): Mountable<HTMLElement> {
     // Footer
     div({ class: 'footer' }, 'Built with @rasenjs/router')
   )
-}
+})
 
 // Mount
 mount(App(), document.getElementById('app')!)

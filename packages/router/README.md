@@ -230,13 +230,57 @@ import {
 
 ## Platform-Agnostic Components
 
-The \`/components\` subpath provides platform-agnostic router components that work with any rendering target.
+The `/components` subpath provides platform-agnostic router components that work with any rendering target.
 
 ```typescript
 import { createRouterLink, createRouterView, type ViewsMap } from '@rasenjs/router/components'
 ```
 
-### \`createRouterLink(router, Anchor)\`
+### Building Route Views with `com`
+
+For route views with reactive logic and side effects, wrap with `com`:
+
+```typescript
+import { com, getReactiveRuntime } from '@rasenjs/core'
+import { div, h1, mount } from '@rasenjs/dom'
+
+// Simple route view
+const UserView = ({ id }) => div(
+  h1(`User: ${id}`)
+)
+
+// Route view with reactive logic - use com
+const PostDetailView = com(({ id }: { id: string }) => {
+  const runtime = getReactiveRuntime()
+  const post = runtime.ref<any>(null)
+  const loading = runtime.ref(true)
+  
+  runtime.watch(
+    () => id,
+    async (newId) => {
+      loading.value = true
+      const data = await fetchPost(newId)
+      post.value = data
+      loading.value = false
+    },
+    { immediate: true }
+  )
+  
+  return div(
+    {
+      children: [
+        () => loading.value 
+          ? p({ textContent: 'Loading...' })
+          : post.value
+            ? h1({ textContent: post.value.title })
+            : p({ textContent: 'Not found' })
+      ]
+    }
+  )
+})
+```
+
+### `createRouterLink(router, Anchor)`
 
 Creates a Link component. You provide your platform's anchor component.
 

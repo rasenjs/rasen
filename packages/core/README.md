@@ -49,6 +49,46 @@ type Component<Host, Props> = SyncComponent<Host, Props> | AsyncComponent<Host, 
 type MountFunction<Host> = (host: Host) => (() => void) | undefined
 ```
 
+### The `com` Wrapper Function
+
+The `com` function wraps your setup logic with automatic effect scope management. It ensures that all reactive watchers created during component setup are properly cleaned up on unmount, preventing memory leaks.
+
+```typescript
+import { com, getReactiveRuntime } from '@rasenjs/core'
+
+// Usage: com(setupFunction)
+// - setupFunction: returns a mount function
+// - Automatically manages an effectScope for the component
+// - All watchers created in setup are auto-cleaned on unmount
+
+const MyComponent = com(() => {
+  const runtime = getReactiveRuntime()
+  const count = runtime.ref(0)
+  
+  // Mount function - return MountFunction directly
+  return div({
+    children: [
+      span({ textContent: () => `Count: ${count.value}` }),
+      button({
+        textContent: 'Increment',
+        on: { click: () => count.value++ }
+      })
+    ]
+  })
+})
+
+// Use the component
+const cleanup = MyComponent()({} as HTMLElement)
+cleanup?.() // All watchers are cleaned up
+```
+
+#### Benefits of `com`:
+
+- **Memory Safety**: Automatic cleanup of all effects in the scope
+- **Simplified Code**: No need to manually manage effectScope lifecycle
+- **Leak Prevention**: Watchers are guaranteed to be disposed on unmount
+- **Works with Nested Components**: Proper cleanup order for component trees
+
 ### Component Lifecycle
 
 1. **Setup Phase** - Component function is called, reactive state is initialized
@@ -68,23 +108,15 @@ const Counter = (props: { initial: number }) => {
   const count = runtime.ref(props.initial)
   
   // Return mount function
-  return (host: HTMLElement) => {
-    const scope = runtime.effectScope()
-    
-    scope.run(() => {
-      // Watch and update
-      runtime.watch(
-        () => count.value,
-        (value) => {
-          host.textContent = \`Count: \${value}\`
-        },
-        { immediate: true }
-      )
-    })
-    
-    // Return cleanup function
-    return () => scope.stop()
-  }
+  return div({
+    children: [
+      span({ textContent: () => `Count: ${count.value}` }),
+      button({
+        textContent: 'Increment',
+        on: { click: () => count.value++ }
+      })
+    ]
+  })
 }
 ```
 

@@ -5,7 +5,7 @@
  * Fabric architecture, bypassing React's reconciler.
  */
 
-import { setReactiveRuntime } from '@rasenjs/core';
+import { setReactiveRuntime, com } from '@rasenjs/core';
 import { createReactiveRuntime } from '@rasenjs/reactive-vue';
 import { ref, type Ref } from 'vue';
 import {
@@ -31,7 +31,7 @@ interface TodoItem {
 /**
  * Counter Example Component
  */
-function CounterExample(): RNMountFunction {
+const CounterExample = com((): RNMountFunction => {
   const count: Ref<number> = ref(0);
 
   return view({
@@ -97,12 +97,12 @@ function CounterExample(): RNMountFunction {
       }),
     ],
   });
-}
+});
 
 /**
  * Todo List Example Component
  */
-function TodoExample(): RNMountFunction {
+const TodoExample = com((): RNMountFunction => {
   const todos: Ref<TodoItem[]> = ref([
     { id: 1, text: 'Learn Rasen', done: false },
     { id: 2, text: 'Build an app', done: false },
@@ -232,12 +232,12 @@ function TodoExample(): RNMountFunction {
       }),
     ],
   });
-}
+});
 
 /**
  * Main App Component
  */
-function App(): RNMountFunction {
+const App = com((): RNMountFunction => {
   return scrollView({
     style: { flex: 1, backgroundColor: '#fff' },
     contentContainerStyle: { padding: 20 },
@@ -306,7 +306,7 @@ function App(): RNMountFunction {
       }),
     ],
   });
-}
+});
 
 /**
  * Entry point - mount the app to React Native root

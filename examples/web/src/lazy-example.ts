@@ -7,6 +7,7 @@
 import { lazy, createLazy, div, h1, h2, p, span, button, a, when } from '@rasenjs/dom'
 import { ref, computed } from '@rasenjs/reactive-signals'
 import type { Mountable } from '@rasenjs/core'
+import { com } from '@rasenjs/core'
 
 /**
  * 异步加载的重组件（模拟网络请求）
@@ -98,11 +99,11 @@ export function LazyFactory() {
 /**
  * 示例卡片组件
  */
-function ExampleCard(props: {
+const ExampleCard = com((props: {
   title: string
   description: string
   loader: () => Mountable<HTMLElement>
-}) {
+}) => {
   const showContent = ref(false)
   
   return div({
@@ -141,12 +142,12 @@ function ExampleCard(props: {
       })
     ]
   })
-}
+})
 
 /**
  * 主 Lazy 示例组件
  */
-export function LazyExamples() {
+export const LazyExamples = com(() => {
   return div({
     style: `
       font-family: system-ui, -apple-system, sans-serif;
@@ -193,4 +194,4 @@ export function LazyExamples() {
       })
     ]
   })
-}
+})

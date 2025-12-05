@@ -1,4 +1,4 @@
-import { setReactiveRuntime, each } from '@rasenjs/core'
+import { setReactiveRuntime, each, com } from '@rasenjs/core'
 import { createReactiveRuntime, ref } from '@rasenjs/reactive-signals'
 import { div, h1, input, button, ul, li, span, mount } from '@rasenjs/dom'
 
@@ -27,7 +27,7 @@ function removeTodo(id: number) {
   todos.value = todos.value.filter(todo => todo.id !== id)
 }
 
-function createApp() {
+const createApp = com(() => {
   return div(
     h1('📝 Todo List'),
     div(
@@ -69,7 +69,7 @@ function createApp() {
       )
     )
   )
-}
+})
 
 // 挂载到 DOM
 const app = createApp()

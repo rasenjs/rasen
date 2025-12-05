@@ -84,7 +84,7 @@ function createChildHost(parentDescriptor: ElementDescriptor): GpuiHost {
 /**
  * div - Container component following Rasen three-phase pattern
  */
-export const div: SyncComponent<GpuiHost, DivProps> = (props) => {
+export const div: SyncComponent<GpuiHost, [DivProps]> = (props) => {
   // === Setup Phase ===
   
   // === Return Mount Function ===
@@ -137,7 +137,7 @@ export const div: SyncComponent<GpuiHost, DivProps> = (props) => {
  * 
  * Usage: text({ children: "Hello" }) or text({ children: count })
  */
-export const text: SyncComponent<GpuiHost, TextProps> = (props) => {
+export const text: SyncComponent<GpuiHost, [TextProps]> = (props) => {
   // === Setup Phase ===
   
   // === Return Mount Function ===
@@ -161,7 +161,7 @@ export const text: SyncComponent<GpuiHost, TextProps> = (props) => {
 /**
  * button - Interactive button component
  */
-export const button: SyncComponent<GpuiHost, DivProps & { label?: PropValue<string> }> = (props) => {
+export const button: SyncComponent<GpuiHost, [DivProps & { label?: PropValue<string> }]> = (props) => {
   return (host: GpuiHost) => {
     const childUnmounts: ((() => void) | undefined)[] = []
     

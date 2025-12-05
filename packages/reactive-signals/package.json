@@ -19,7 +19,8 @@
   "scripts": {
     "build": "yarn clean && ../../node_modules/.bin/tsup",
     "dev": "../../node_modules/.bin/tsup --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "../../node_modules/.bin/vitest run"
   },
   "keywords": [
     "rasen",

@@ -77,20 +77,25 @@ const doubled = computed(() => count.value * 2)
 
 ### 3. Build Components
 
-Components are functions that return mount functions:
+Components are functions that return mount functions. Use `com` to wrap components with reactive effects:
 
 ```typescript
+import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, span } from '@rasenjs/dom'
 
-const Counter = () => div({
-  children: [
+const Counter = com(() => {
+  const runtime = getReactiveRuntime()
+  const count = runtime.ref(0)
+  
+  return div(
+    { style: { padding: '20px' } },
     span({ textContent: () => `Count: ${count.value}` }),
-    span({ textContent: () => `Doubled: ${doubled.value}` }),
     button({
-      textContent: 'Increment',
+      textContent: '+',
+      style: { marginLeft: '10px' },
       on: { click: () => count.value++ }
     })
-  ]
+  )
 })
 ```
 
@@ -105,48 +110,47 @@ mount(Counter(), document.getElementById('app'))
 ## Complete Example
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
+import { com, setReactiveRuntime, getReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, span, mount } from '@rasenjs/dom'
-import { ref, computed } from 'vue'
 
 // 1. Setup reactive runtime
 setReactiveRuntime(createReactiveRuntime())
 
-// 2. Create reactive state
-const count = ref(0)
-const doubled = computed(() => count.value * 2)
-
-// 3. Define component
-const Counter = () => div({
-  style: { padding: '20px', textAlign: 'center' },
-  children: [
-    div({
-      style: { fontSize: '24px', marginBottom: '10px' },
-      textContent: () => `Count: ${count.value}`
-    }),
-    div({
-      style: { fontSize: '18px', color: '#666', marginBottom: '20px' },
-      textContent: () => `Doubled: ${doubled.value}`
-    }),
-    div({
-      children: [
-        button({
-          textContent: '-',
-          style: { padding: '10px 20px', marginRight: '10px' },
-          on: { click: () => count.value-- }
-        }),
-        button({
-          textContent: '+',
-          style: { padding: '10px 20px' },
-          on: { click: () => count.value++ }
-        })
-      ]
-    })
-  ]
+// 2. Define component with com
+const Counter = com(() => {
+  const runtime = getReactiveRuntime()
+  const count = runtime.ref(0)
+  const doubled = runtime.computed(() => count.value * 2)
+  
+  return () => div(
+    { style: { padding: '20px', textAlign: 'center' } },
+    div(
+      { style: { fontSize: '24px', marginBottom: '10px' } },
+      'Count: ',
+      span({ textContent: () => count.value.toString() })
+    ),
+    div(
+      { style: { fontSize: '18px', color: '#666', marginBottom: '20px' } },
+      'Doubled: ',
+      span({ textContent: () => doubled.value.toString() })
+    ),
+    div(
+      button({
+        textContent: '-',
+        style: { padding: '10px 20px', marginRight: '10px' },
+        on: { click: () => count.value-- }
+      }),
+      button({
+        textContent: '+',
+        style: { padding: '10px 20px' },
+        on: { click: () => count.value++ }
+      })
+    )
+  )
 })
 
-// 4. Mount to DOM
+// 3. Mount to DOM
 mount(Counter(), document.getElementById('app'))
 ```
 
@@ -166,10 +170,12 @@ If you prefer JSX syntax, configure your `tsconfig.json`:
 Then you can write components using JSX:
 
 ```tsx
+import { com, getReactiveRuntime } from '@rasenjs/core'
 import { ref } from 'vue'
 
-const Counter = () => {
-  const count = ref(0)
+const Counter = com(() => {
+  const runtime = getReactiveRuntime()
+  const count = runtime.ref(0)
   
   return (
     <div style={{ padding: '20px' }}>
@@ -177,7 +183,7 @@ const Counter = () => {
       <button onClick={() => count.value++}>+</button>
     </div>
   )
-}
+})
 ```
 
 ## Next Steps

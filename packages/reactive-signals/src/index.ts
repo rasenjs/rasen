@@ -9,6 +9,9 @@ import type { ReactiveRuntime, Ref, ReadonlyRef } from '@rasenjs/core'
 // 创建单例运行时（延迟初始化）
 let runtime: ReactiveRuntime | undefined
 
+// 当前活跃的 scope (用于收集 watch)
+let currentScope: { addCleanup: (cleanup: () => void) => void } | null = null
+
 /**
  * 创建 Signals 响应式运行时
  */
@@ -64,28 +67,52 @@ export function createReactiveRuntime(): ReactiveRuntime {
       watcher.watch(effect)
 
       // 返回停止函数
-      return () => {
+      const stopFn = () => {
         stopped = true
         watcher.unwatch(effect)
       }
+      
+      // 如果在 scope 内，注册清理函数
+      if (currentScope) {
+        currentScope.addCleanup(stopFn)
+      }
+      
+      return stopFn
     },
 
     effectScope: () => {
-      // Signals 没有 effectScope 概念，创建一个简单的容器
+      // 创建 scope 容器，收集内部创建的所有 watch
       const cleanups: (() => void)[] = []
       let isActive = true
 
-      return {
+      const scope = {
+        addCleanup: (cleanup: () => void) => {
+          if (isActive) {
+            cleanups.push(cleanup)
+          }
+        },
         run: <T>(fn: () => T): T | undefined => {
           if (!isActive) return undefined
-          return fn()
+          
+          // 设置当前 scope
+          const prevScope = currentScope
+          currentScope = scope
+          try {
+            return fn()
+          } finally {
+            currentScope = prevScope
+          }
         },
         stop: () => {
+          if (!isActive) return
           isActive = false
+          // 清理所有收集的副作用
           cleanups.forEach(cleanup => cleanup())
           cleanups.length = 0
         }
       }
+
+      return scope
     },
 
     ref: <T>(value: T): Ref<T> => {

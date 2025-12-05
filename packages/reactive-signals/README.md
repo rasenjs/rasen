@@ -105,6 +105,62 @@ watch(source, callback, {
 })
 ```
 
+### `effectScope()`
+
+Creates an effect scope to manage multiple reactive effects and watchers as a group. All watchers created within the scope are automatically cleaned up when `stop()` is called.
+
+```typescript
+import { ref, effectScope } from '@rasenjs/reactive-signals'
+
+const count = ref(0)
+const scope = effectScope()
+
+scope.run(() => {
+  // All watchers created here are collected by the scope
+  watch(() => count.value, (val) => console.log('Watch 1:', val))
+  watch(() => count.value * 2, (val) => console.log('Watch 2:', val))
+})
+
+count.value = 1 // Logs both watchers
+
+// Clean up all watchers in the scope at once
+scope.stop()
+
+count.value = 2 // No logs - watchers are cleaned up
+```
+
+#### Key Features:
+
+- **Automatic Collection**: All watchers created in `scope.run()` are automatically tracked
+- **Batch Cleanup**: `scope.stop()` cleans up all watchers together
+- **Memory Safe**: Prevents memory leaks in long-lived applications
+- **Composable**: Scopes can be nested
+
+#### Use with Components:
+
+The `com` wrapper from `@rasenjs/core` automatically manages a scope for you:
+
+```typescript
+import { com, getReactiveRuntime } from '@rasenjs/core'
+import { div, span, button } from '@rasenjs/dom'
+
+const MyComponent = com(() => {
+  const runtime = getReactiveRuntime()
+  const count = runtime.ref(0)
+  
+  // All watchers are automatically collected
+  return div({
+    children: [
+      span({ textContent: () => `Count: ${count.value}` }),
+      button({
+        textContent: 'Increment',
+        on: { click: () => count.value++ }
+      })
+    ]
+  })
+})
+```
+
 ## With Rasen Components
 
 ```typescript

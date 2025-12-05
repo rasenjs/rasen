@@ -1,9 +1,10 @@
 /// <reference types="@rasenjs/jsx-runtime/jsx" />
 
+import { com } from '@rasenjs/core'
 import { computed } from '@rasenjs/reactive-signals'
 import { isDark } from '../App'
 
-export const ThemeToggle = () => {
+export const ThemeToggle = com(() => {
   const toggle = () => {
     isDark.value = !isDark.value
     document.documentElement.classList.toggle('light', !isDark.value)
@@ -16,4 +17,4 @@ export const ThemeToggle = () => {
       </span>
     </button>
   )
-}
+})

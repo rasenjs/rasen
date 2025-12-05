@@ -69,8 +69,9 @@ function wrapMount(mount: MountFn, scope: Scope) {
     })
 
     const wrappedUnmount = () => {
-      scope.stop()
+      // 先调用用户的 unmount,再清理 scope
       unmount?.()
+      scope.stop()
     }
 
     // 保留 node 属性

@@ -160,10 +160,71 @@ view({
     touchableOpacity({
       onPress: () => count.value++,
       children: text({ children: '+' })
-    })
-  ]
+    ]
+  })
 })
 ```
+
+## Component Composition with `com`
+
+For more complex components, use the `com` wrapper for automatic memory management and effect scope handling:
+
+```typescript
+import { com, getReactiveRuntime } from '@rasenjs/core'
+import { div, button, input, ul, li, mount } from '@rasenjs/dom'
+
+const TodoApp = com(() => {
+  const runtime = getReactiveRuntime()
+  const todos = runtime.ref([])
+  const inputValue = runtime.ref('')
+  
+  return (host: HTMLElement) => {
+    const addTodo = () => {
+      if (inputValue.value.trim()) {
+        todos.value = [...todos.value, inputValue.value]
+        inputValue.value = ''
+      }
+    }
+    
+    // All watchers created here are automatically collected and cleaned up
+    div({
+      children: [
+        input({
+          placeholder: 'Enter task...',
+          value: inputValue,
+          on: { keypress: (e: KeyboardEvent) => e.key === 'Enter' && addTodo() }
+        }),
+        button({
+          textContent: 'Add',
+          on: { click: addTodo }
+        }),
+        ul({
+          children: runtime.computed(() =>
+            todos.value.map(todo =>
+              li({
+                textContent: todo,
+                style: { padding: '8px', borderBottom: '1px solid #ddd' }
+              })
+            )
+          )
+        })
+      ]
+    })(host)
+    
+    // Cleanup is automatic - no memory leaks!
+    return () => {}
+  }
+})
+
+mount(TodoApp(), document.getElementById('app'))
+```
+
+### Benefits of `com`:
+
+- **Memory Safety** - All effects are cleaned up automatically
+- **Leak Prevention** - Critical for SPAs and mobile apps
+- **Nested Components** - Proper cleanup order with parent/child relationships
+- **Works Across Platforms** - Same component logic for DOM, Canvas, React Native, etc.
 
 ### 🖥️ Native Desktop (GPUI)
 

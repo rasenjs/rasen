@@ -153,6 +153,64 @@ const Counter = () => div({
 })
 ```
 
+### The `com` Wrapper: Automatic EffectScope Management
+
+Due to the reactive scope implementation, components with watchers or other effects require **an extra nesting layer** to automatically manage the effect scope lifecycle. Rasen provides the `com` wrapper to automate this pattern.
+
+**The Problem:**
+
+```typescript
+// Without com: manual effectScope management required
+const Counter = (props) => {
+  const runtime = getReactiveRuntime()
+  const count = runtime.ref(0)
+  const scope = runtime.effectScope()  // ← Extra layer needed
+  
+  return (host: HTMLElement) => {
+    return scope.run(() => {
+      // All watchers must be registered in this scope
+      runtime.watch(() => count.value, (val) => {
+        // Update rendering based on watched value
+      }, { immediate: true })
+      
+      return () => scope.stop()  // ← Must manually stop
+    })
+  }
+}
+```
+
+**The Solution:**
+
+```typescript
+// With com: automatic scope management
+const Counter = com(() => {
+  const runtime = getReactiveRuntime()
+  const count = runtime.ref(0)
+  
+  // Return MountFunction directly - scope is automatically managed
+  return div({
+    children: [
+      span({ textContent: () => `Count: ${count.value}` }),
+      button({
+        textContent: 'Increment',
+        on: { click: () => count.value++ }
+      })
+    ]
+  })
+  
+  // Scope is automatically stopped when component unmounts
+})
+```
+
+**Why `com` Matters:**
+
+1. **Eliminates Boilerplate** — No need for `effectScope()` and `scope.run()`
+2. **Guaranteed Cleanup** — Effects are automatically stopped on unmount, preventing memory leaks
+3. **Correct Lifecycle** — User cleanup runs before scope stops, ensuring proper resource release
+4. **Clearer Intent** — Using `com` signals "this component has reactive side effects"
+
+For any component using `watch`, `effect`, or similar lifecycle-dependent reactive APIs, **`com` is not optional—it's the idiomatic pattern**. While technically you could manage scopes manually, doing so is error-prone and defeats the clarity of Rasen's design.
+
 ### Unified Components
 
 In Rasen, **business components and primitive components have no fundamental difference**. `div`, `view`, `circle` — these "tags" are also component functions; they just encapsulate host operations.
@@ -161,6 +219,7 @@ Benefits:
 - No distinction between "native components" and "custom components"
 - Primitive component implementation is transparent, freely extensible
 - Business components appear as single-layer functions (primitives encapsulate mount logic)
+- `com` wrapper enables idiomatic business component definition
 
 ---
 

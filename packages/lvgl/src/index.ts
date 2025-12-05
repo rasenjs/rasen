@@ -191,7 +191,7 @@ function createChildHost(parentDescriptor: ElementDescriptor): LvglHost {
 /**
  * div - Container component (lv_obj) following Rasen three-phase pattern
  */
-export const div: SyncComponent<LvglHost, DivProps> = (props) => {
+export const div: SyncComponent<LvglHost, [DivProps]> = (props) => {
   // === Setup Phase ===
 
   // === Return Mount Function ===
@@ -238,7 +238,7 @@ export const div: SyncComponent<LvglHost, DivProps> = (props) => {
 /**
  * label - Label component (lv_label) following Rasen three-phase pattern
  */
-export const label: SyncComponent<LvglHost, LabelProps> = (props) => {
+export const label: SyncComponent<LvglHost, [LabelProps]> = (props) => {
   // === Setup Phase ===
 
   // === Return Mount Function ===
@@ -262,14 +262,14 @@ export const label: SyncComponent<LvglHost, LabelProps> = (props) => {
 /**
  * text - Text component (alias for label)
  */
-export const text: SyncComponent<LvglHost, TextProps> = (props) => {
+export const text: SyncComponent<LvglHost, [TextProps]> = (props) => {
   return label(props as LabelProps)
 }
 
 /**
  * button - Button component (lv_btn) following Rasen three-phase pattern
  */
-export const button: SyncComponent<LvglHost, ButtonProps> = (props) => {
+export const button: SyncComponent<LvglHost, [ButtonProps]> = (props) => {
   return (host: LvglHost) => {
     const childUnmounts: ((() => void) | undefined)[] = []
 
@@ -311,7 +311,7 @@ export const button: SyncComponent<LvglHost, ButtonProps> = (props) => {
 /**
  * image - Image component (lv_img)
  */
-export const image: SyncComponent<LvglHost, ImageProps> = (props) => {
+export const image: SyncComponent<LvglHost, [ImageProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'img',
@@ -338,7 +338,7 @@ export const image: SyncComponent<LvglHost, ImageProps> = (props) => {
 /**
  * slider - Slider component (lv_slider)
  */
-export const slider: SyncComponent<LvglHost, SliderProps> = (props) => {
+export const slider: SyncComponent<LvglHost, [SliderProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'slider',
@@ -368,7 +368,7 @@ export const slider: SyncComponent<LvglHost, SliderProps> = (props) => {
 /**
  * switch - Toggle switch component (lv_switch)
  */
-export const lvSwitch: SyncComponent<LvglHost, SwitchProps> = (props) => {
+export const lvSwitch: SyncComponent<LvglHost, [SwitchProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'switch',
@@ -396,7 +396,7 @@ export const lvSwitch: SyncComponent<LvglHost, SwitchProps> = (props) => {
 /**
  * checkbox - Checkbox component (lv_checkbox)
  */
-export const checkbox: SyncComponent<LvglHost, CheckboxProps> = (props) => {
+export const checkbox: SyncComponent<LvglHost, [CheckboxProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'checkbox',
@@ -425,7 +425,7 @@ export const checkbox: SyncComponent<LvglHost, CheckboxProps> = (props) => {
 /**
  * textarea - Text input component (lv_textarea)
  */
-export const textarea: SyncComponent<LvglHost, TextAreaProps> = (props) => {
+export const textarea: SyncComponent<LvglHost, [TextAreaProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'textarea',
@@ -453,7 +453,7 @@ export const textarea: SyncComponent<LvglHost, TextAreaProps> = (props) => {
 /**
  * arc - Arc/gauge component (lv_arc)
  */
-export const arc: SyncComponent<LvglHost, ArcProps> = (props) => {
+export const arc: SyncComponent<LvglHost, [ArcProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'arc',
@@ -483,7 +483,7 @@ export const arc: SyncComponent<LvglHost, ArcProps> = (props) => {
 /**
  * bar - Progress bar component (lv_bar)
  */
-export const bar: SyncComponent<LvglHost, BarProps> = (props) => {
+export const bar: SyncComponent<LvglHost, [BarProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'bar',
@@ -502,7 +502,7 @@ export const bar: SyncComponent<LvglHost, BarProps> = (props) => {
 /**
  * spinner - Loading spinner component (lv_spinner)
  */
-export const spinner: SyncComponent<LvglHost, SpinnerProps> = (props) => {
+export const spinner: SyncComponent<LvglHost, [SpinnerProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'spinner',
@@ -518,7 +518,7 @@ export const spinner: SyncComponent<LvglHost, SpinnerProps> = (props) => {
 /**
  * dropdown - Dropdown component (lv_dropdown)
  */
-export const dropdown: SyncComponent<LvglHost, DropdownProps> = (props) => {
+export const dropdown: SyncComponent<LvglHost, [DropdownProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'dropdown',
@@ -547,7 +547,7 @@ export const dropdown: SyncComponent<LvglHost, DropdownProps> = (props) => {
 /**
  * roller - Roller picker component (lv_roller)
  */
-export const roller: SyncComponent<LvglHost, RollerProps> = (props) => {
+export const roller: SyncComponent<LvglHost, [RollerProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'roller',

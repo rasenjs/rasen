@@ -1,5 +1,6 @@
 /// <reference types="@rasenjs/jsx-runtime/jsx" />
 
+import { com } from '@rasenjs/core'
 import { ref, computed } from '@rasenjs/reactive-signals'
 import { each, f } from '@rasenjs/core'
 
@@ -9,7 +10,7 @@ interface Todo {
   completed: boolean
 }
 
-export const TodoList = () => {
+export const TodoList = com(() => {
   const todos = ref<Todo[]>([
     { id: 1, text: 'Learn Rasen basics', completed: true },
     { id: 2, text: 'Build a reactive app', completed: false },
@@ -153,4 +154,4 @@ export const TodoList = () => {
       </p>
     </div>
   )
-}
+})
