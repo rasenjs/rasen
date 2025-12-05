@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/reactive-signals",
-  "version": "0.1.1-alpha",
+  "version": "0.1.2-alpha",
   "description": "TC39 Signals adapter for Rasen",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -31,6 +31,10 @@
   ],
   "author": "Rasen Team",
   "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "dependencies": {
     "@rasenjs/core": "workspace:*",
     "signal-polyfill": "^0.1.2"

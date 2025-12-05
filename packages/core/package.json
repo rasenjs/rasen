@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/core",
-  "version": "0.1.1-alpha",
+  "version": "0.1.2-alpha",
   "description": "Rasen core - Framework-agnostic reactive rendering",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -46,6 +46,10 @@
   "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/core",
   "bugs": {
     "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "author": "Rasen Contributors",
   "license": "MIT",

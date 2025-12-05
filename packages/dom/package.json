@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/dom",
-  "version": "0.1.1-alpha",
+  "version": "0.1.2-alpha",
   "description": "Rasen DOM renderer",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -35,6 +35,10 @@
   "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/dom",
   "bugs": {
     "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "author": "Rasen Contributors",
   "license": "MIT",
