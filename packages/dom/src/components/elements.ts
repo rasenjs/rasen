@@ -56,41 +56,97 @@ function createElement<T extends HTMLTagName>(tag: T) {
 // 通用元素组件
 // ============================================================================
 
+// 结构性元素
 export const div = createElement('div')
 export const span = createElement('span')
-export const button = createElement('button')
-export const a = createElement('a')
 export const p = createElement('p')
+export const br = createElement('br')
+export const hr = createElement('hr')
+
+// 标题
 export const h1 = createElement('h1')
 export const h2 = createElement('h2')
 export const h3 = createElement('h3')
 export const h4 = createElement('h4')
 export const h5 = createElement('h5')
 export const h6 = createElement('h6')
-export const ul = createElement('ul')
-export const ol = createElement('ol')
-export const li = createElement('li')
-export const code = createElement('code')
-export const pre = createElement('pre')
+
+// 文本格式
 export const strong = createElement('strong')
 export const em = createElement('em')
 export const small = createElement('small')
-export const nav = createElement('nav')
-export const section = createElement('section')
-export const article = createElement('article')
-export const header = createElement('header')
-export const footer = createElement('footer')
-export const main = createElement('main')
-export const aside = createElement('aside')
+export const code = createElement('code')
+export const pre = createElement('pre')
+export const mark = createElement('mark')
+export const del = createElement('del')
+export const ins = createElement('ins')
+export const sub = createElement('sub')
+export const sup = createElement('sup')
+export const b = createElement('b')
+export const i = createElement('i')
+export const u = createElement('u')
+
+// 列表
+export const ul = createElement('ul')
+export const ol = createElement('ol')
+export const li = createElement('li')
+export const dl = createElement('dl')
+export const dt = createElement('dt')
+export const dd = createElement('dd')
+
+// 链接和媒体
+export const a = createElement('a')
+export const img = createElement('img')
+export const picture = createElement('picture')
+export const source = createElement('source')
+export const audio = createElement('audio')
+export const video = createElement('video')
+export const track = createElement('track')
+
+// 表单
 export const form = createElement('form')
 export const input = createElement('input') as (
   propsOrChild?: Props<'input'> | Child,
   ...children: Child[]
 ) => Mountable<HTMLElement>
-export const img = createElement('img')
 export const label = createElement('label')
+export const button = createElement('button')
 export const textarea = createElement('textarea')
 export const select = createElement('select')
 export const option = createElement('option')
-export const br = createElement('br')
-export const hr = createElement('hr')
+export const optgroup = createElement('optgroup')
+export const fieldset = createElement('fieldset')
+export const legend = createElement('legend')
+export const datalist = createElement('datalist')
+export const output = createElement('output')
+
+// 表格
+export const table = createElement('table')
+export const thead = createElement('thead')
+export const tbody = createElement('tbody')
+export const tfoot = createElement('tfoot')
+export const tr = createElement('tr')
+export const td = createElement('td')
+export const th = createElement('th')
+export const caption = createElement('caption')
+export const colgroup = createElement('colgroup')
+export const col = createElement('col')
+
+// 语义化元素
+export const section = createElement('section')
+export const article = createElement('article')
+export const header = createElement('header')
+export const footer = createElement('footer')
+export const nav = createElement('nav')
+export const main = createElement('main')
+export const aside = createElement('aside')
+export const details = createElement('details')
+export const summary = createElement('summary')
+export const dialog = createElement('dialog')
+
+// 其他元素
+export const blockquote = createElement('blockquote')
+export const figure = createElement('figure')
+export const figcaption = createElement('figcaption')
+export const address = createElement('address')
+export const time = createElement('time')

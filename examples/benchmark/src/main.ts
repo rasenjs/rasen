@@ -3,10 +3,10 @@
  * https://github.com/krausest/js-framework-benchmark
  */
 
-import { setReactiveRuntime, each } from '@rasenjs/core'
+import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref, shallowRef, watch } from 'vue'
-import { mount } from '@rasenjs/dom'
+import { ref, shallowRef } from 'vue'
+import { mount, tr, td, th, each } from '@rasenjs/dom'
 
 // Initialize reactive runtime
 const runtime = createReactiveRuntime()
@@ -124,64 +124,33 @@ document.getElementById('clear')!.onclick = clear
 document.getElementById('swaprows')!.onclick = swapRows
 
 // ============================================================================
-// Row Component
+// Row Component using @rasenjs/dom
 // ============================================================================
 
-function Row(item: RowData, _index: number) {
-  // Setup phase
-  const row = document.createElement('tr')
-  
-  // Mount phase
-  return (host: HTMLElement) => {
-    // Create static structure
-    const td1 = document.createElement('td')
-    td1.className = 'col-md-1'
-    td1.textContent = String(item.id)
-    
-    const td2 = document.createElement('td')
-    td2.className = 'col-md-4'
-    const a = document.createElement('a')
-    a.className = 'lbl'
-    a.textContent = item.label
-    a.onclick = () => select(item.id)
-    td2.appendChild(a)
-    
-    const td3 = document.createElement('td')
-    td3.className = 'col-md-1'
-    const aDelete = document.createElement('a')
-    aDelete.className = 'remove'
-    const span = document.createElement('span')
-    span.className = 'remove glyphicon glyphicon-remove'
-    span.setAttribute('aria-hidden', 'true')
-    aDelete.appendChild(span)
-    aDelete.onclick = () => remove(item.id)
-    td3.appendChild(aDelete)
-    
-    const td4 = document.createElement('td')
-    td4.className = 'col-md-6'
-    
-    row.appendChild(td1)
-    row.appendChild(td2)
-    row.appendChild(td3)
-    row.appendChild(td4)
-    
-    // Watch for selection changes
-    const updateClass = () => {
-      row.className = selected.value === item.id ? 'danger' : ''
-    }
-    updateClass()
-    
-    // Create a reactive effect for selection
-    const stopWatch = watch(() => selected.value, updateClass)
-    
-    host.appendChild(row)
-    
-    // Unmount
-    return () => {
-      stopWatch()
-      row.remove()
-    }
-  }
+function Row(item: RowData) {
+  return element('tr', {
+    class: () => selected.value === item.id ? 'danger' : '',
+  }, [
+    element('td', { class: 'col-md-1' }, String(item.id)),
+    element('td', { class: 'col-md-4' },
+      element('a', {
+        class: 'lbl',
+        onClick: () => select(item.id)
+      }, item.label)
+    ),
+    element('td', { class: 'col-md-1' },
+      element('a', {
+        class: 'remove',
+        onClick: () => remove(item.id)
+      },
+        element('span', {
+          class: 'remove glyphicon glyphicon-remove',
+          ariaHidden: 'true'
+        })
+      )
+    ),
+    element('td', { class: 'col-md-6' })
+  ])
 }
 
 // ============================================================================
@@ -191,6 +160,6 @@ function Row(item: RowData, _index: number) {
 const tbody = document.getElementById('tbody')!
 
 mount(
-  each(() => data.value, Row),
+  element('', {}, each(() => data.value, Row)),
   tbody
 )
