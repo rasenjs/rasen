@@ -4,11 +4,10 @@
  */
 
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref, shallowRef } from 'vue'
-import { mount, tr, td, th, each } from '@rasenjs/dom'
+import { createReactiveRuntime, ref } from '@rasenjs/reactive-signals'
+import { mount, tr, td, a, span, each } from '@rasenjs/dom'
 
-// Initialize reactive runtime
+// Initialize reactive runtime with signals
 const runtime = createReactiveRuntime()
 setReactiveRuntime(runtime)
 
@@ -59,7 +58,7 @@ function buildData(count: number): RowData[] {
 // State
 // ============================================================================
 
-const data = shallowRef<RowData[]>([])
+const data = ref<RowData[]>([])
 const selected = ref<number>(0)
 
 // ============================================================================
@@ -77,16 +76,16 @@ function runLots() {
 }
 
 function add() {
-  data.value = [...data.value, ...buildData(1000)]
+  // 直接修改原数组而不创建新数组
+  data.value.push(...buildData(1000))
 }
 
 function update() {
   const d = data.value
   for (let i = 0; i < d.length; i += 10) {
-    d[i].label += ' !!!'
+    // 创建新对象以触发 each 的更新检测
+    d[i] = { ...d[i], label: d[i].label + ' !!!' }
   }
-  // Trigger update by reassigning
-  data.value = [...d]
 }
 
 function clear() {
@@ -100,6 +99,7 @@ function swapRows() {
     const tmp = d[1]
     d[1] = d[998]
     d[998] = tmp
+    // 修改后需要重新赋值以触发反应性
     data.value = [...d]
   }
 }
@@ -109,7 +109,7 @@ function select(id: number) {
 }
 
 function remove(id: number) {
-  data.value = data.value.filter(d => d.id !== id)
+  data.value = data.value.filter((d: RowData) => d.id !== id)
 }
 
 // ============================================================================
@@ -128,29 +128,36 @@ document.getElementById('swaprows')!.onclick = swapRows
 // ============================================================================
 
 function Row(item: RowData) {
-  return element('tr', {
-    class: () => selected.value === item.id ? 'danger' : '',
-  }, [
-    element('td', { class: 'col-md-1' }, String(item.id)),
-    element('td', { class: 'col-md-4' },
-      element('a', {
-        class: 'lbl',
-        onClick: () => select(item.id)
-      }, item.label)
+  return tr(
+    {
+      class: () => selected.value === item.id ? 'danger' : '',
+    },
+    td({ class: 'col-md-1' }, String(item.id)),
+    td(
+      { class: 'col-md-4' },
+      a(
+        {
+          class: 'lbl',
+          onClick: () => select(item.id)
+        },
+        item.label
+      )
     ),
-    element('td', { class: 'col-md-1' },
-      element('a', {
-        class: 'remove',
-        onClick: () => remove(item.id)
-      },
-        element('span', {
+    td(
+      { class: 'col-md-1' },
+      a(
+        {
+          class: 'remove',
+          onClick: () => remove(item.id)
+        },
+        span({
           class: 'remove glyphicon glyphicon-remove',
-          ariaHidden: 'true'
+          'aria-hidden': 'true'
         })
       )
     ),
-    element('td', { class: 'col-md-6' })
-  ])
+    td({ class: 'col-md-6' })
+  )
 }
 
 // ============================================================================
@@ -160,6 +167,6 @@ function Row(item: RowData) {
 const tbody = document.getElementById('tbody')!
 
 mount(
-  element('', {}, each(() => data.value, Row)),
+  each(() => data.value, Row),
   tbody
 )

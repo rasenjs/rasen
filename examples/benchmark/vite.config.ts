@@ -2,6 +2,15 @@ import { defineConfig } from 'vite'
 import { resolve } from 'path'
 
 export default defineConfig({
+  base: './',  // 使用相对路径，适配 js-framework-benchmark
+  server: {
+    port: 5174,
+    strictPort: true
+  },
+  preview: {
+    port: 5174,
+    strictPort: true
+  },
   build: {
     outDir: 'dist',
     rollupOptions: {
