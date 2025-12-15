@@ -8,14 +8,14 @@ setReactiveRuntime(createReactiveRuntime())
 const backLink = a({
   href: './index.html',
   class: 'back-link',
-  textContent: '← Back to Examples'
+  children: ['← Back to Examples']
 })
 
 const pageHeader = div({
   class: 'page-header',
   children: [
-    h1({ textContent: '✏️ Paths & Lines' }),
-    p({ textContent: 'Lines, arrows, curves, and SVG paths' })
+    h1({ children: ['✏️ Paths & Lines'] }),
+    p({ children: ['Lines, arrows, curves, and SVG paths'] })
   ]
 })
 
@@ -29,13 +29,13 @@ function createExample(
   return div({
     class: 'example-card',
     children: [
-      h1({ textContent: title }),
+      h1({ children: [title] }),
       canvas({
         width,
         height,
         children
       }),
-      p({ class: 'example-description', textContent: description })
+      p({ class: 'example-description', children: [description] })
     ]
   })
 }

@@ -13,14 +13,14 @@ const direction = ref(1)
 const backLink = a({
   href: './index.html',
   class: 'back-link',
-  textContent: '← Back to Examples'
+  children: ['← Back to Examples']
 })
 
 const pageHeader = div({
   class: 'page-header',
   children: [
-    h1({ textContent: '🚀 Advanced Features' }),
-    p({ textContent: 'Groups, animations, and interactions' })
+    h1({ children: ['🚀 Advanced Features'] }),
+    p({ children: ['Groups, animations, and interactions'] })
   ]
 })
 
@@ -34,13 +34,13 @@ function createExample(
   return div({
     class: 'example-card',
     children: [
-      h1({ textContent: title }),
+      h1({ children: [title] }),
       canvas({
         width,
         height,
         children
       }),
-      p({ class: 'example-description', textContent: description })
+      p({ class: 'example-description', children: [description] })
     ]
   })
 }
@@ -106,7 +106,7 @@ const controls = div({
   class: 'controls',
   children: [
     button({
-      textContent: 'Rotate Group',
+      children: ['Rotate Group'],
       onClick: () => {
         groupRotation.value =
           (groupRotation.value + Math.PI / 4) % (Math.PI * 2)

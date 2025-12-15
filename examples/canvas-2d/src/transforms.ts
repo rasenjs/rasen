@@ -13,14 +13,14 @@ const opacity = ref(1)
 const backLink = a({
   href: './index.html',
   class: 'back-link',
-  textContent: '← Back to Examples'
+  children: ['← Back to Examples']
 })
 
 const pageHeader = div({
   class: 'page-header',
   children: [
-    h1({ textContent: '🔄 Transforms & Effects' }),
-    p({ textContent: 'Rotation, scaling, opacity, and shadows' })
+    h1({ children: ['🔄 Transforms & Effects'] }),
+    p({ children: ['Rotation, scaling, opacity, and shadows'] })
   ]
 })
 
@@ -34,13 +34,13 @@ function createExample(
   return div({
     class: 'example-card',
     children: [
-      h1({ textContent: title }),
+      h1({ children: [title] }),
       canvas({
         width,
         height,
         children
       }),
-      p({ class: 'example-description', textContent: description })
+      p({ class: 'example-description', children: [description] })
     ]
   })
 }
@@ -95,31 +95,31 @@ const controls = div({
   class: 'controls',
   children: [
     button({
-      textContent: 'Rotate',
+      children: ['Rotate'],
       onClick: () => {
         rotation.value = (rotation.value + Math.PI / 6) % (Math.PI * 2)
       }
     }),
     button({
-      textContent: 'Scale +',
+      children: ['Scale +'],
       onClick: () => {
         scale.value = Math.min(scale.value + 0.2, 2)
       }
     }),
     button({
-      textContent: 'Scale -',
+      children: ['Scale -'],
       onClick: () => {
         scale.value = Math.max(scale.value - 0.2, 0.5)
       }
     }),
     button({
-      textContent: 'Opacity +',
+      children: ['Opacity +'],
       onClick: () => {
         opacity.value = Math.min(opacity.value + 0.1, 1)
       }
     }),
     button({
-      textContent: 'Opacity -',
+      children: ['Opacity -'],
       onClick: () => {
         opacity.value = Math.max(opacity.value - 0.1, 0.1)
       }

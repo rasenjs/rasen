@@ -9,7 +9,8 @@ import {
   star,
   polygon,
   ring,
-  wedge
+  wedge,
+  text
 } from '@rasenjs/canvas-2d'
 
 setReactiveRuntime(createReactiveRuntime())
@@ -265,14 +266,14 @@ function createShapeComponent(shape: ShapeData) {
 const backLink = a({
   href: './index.html',
   class: 'back-link',
-  textContent: '← Back to Examples'
+  children: ['← Back to Examples']
 })
 
 const pageHeader = div({
   class: 'page-header',
   children: [
-    h1({ textContent: '⚡ Performance Test' }),
-    p({ textContent: 'Stress test with thousands of animated shapes' })
+    h1({ children: ['⚡ Performance Test'] }),
+    p({ children: ['Stress test with thousands of animated shapes'] })
   ]
 })
 
@@ -282,17 +283,17 @@ const fpsDisplay = div({
     div({
       class: 'fps-main',
       children: [
-        span({ class: 'fps-value', textContent: fps }),
-        span({ class: 'fps-label', textContent: ' FPS' })
+        span({ class: 'fps-value', children: [fps] }),
+        span({ class: 'fps-label', children: [' FPS'] })
       ]
     }),
     div({
       class: 'fps-detail',
       children: [
-        span({ textContent: 'Frame time: ' }),
-        span({ textContent: frameTime }),
-        span({ textContent: 'ms | Shapes: ' }),
-        span({ textContent: shapeCount })
+        span({ children: ['Frame time: '] }),
+        span({ children: [frameTime] }),
+        span({ children: ['ms | Shapes: '] }),
+        span({ children: [shapeCount] })
       ]
     })
   ]
@@ -303,30 +304,30 @@ const controls = div({
   children: [
     div({
       class: 'control-group',
-      children: [span({ textContent: 'Presets: ' })]
+      children: [span({ children: ['Presets: '] })]
     }),
     button({
-      textContent: '100',
+      children: ['100'],
       onClick: () => initShapes(100)
     }),
     button({
-      textContent: '500',
+      children: ['500'],
       onClick: () => initShapes(500)
     }),
     button({
-      textContent: '1000',
+      children: ['1000'],
       onClick: () => initShapes(1000)
     }),
     button({
-      textContent: '2000',
+      children: ['2000'],
       onClick: () => initShapes(2000)
     }),
     button({
-      textContent: '5000',
+      children: ['5000'],
       onClick: () => initShapes(5000)
     }),
     button({
-      textContent: '+ 100',
+      children: ['+ 100'],
       onClick: () => {
         for (let i = 0; i < 100; i++) {
           shapes.value.push(createRandomShape())
@@ -336,7 +337,7 @@ const controls = div({
       }
     }),
     button({
-      textContent: '- 100',
+      children: ['- 100'],
       onClick: () => {
         if (shapes.value.length > 100) {
           shapes.value = shapes.value.slice(0, -100)
@@ -364,16 +365,16 @@ const legend = div({
   class: 'legend',
   children: [
     p({
-      textContent:
-        '🔷 Shape Types: Rectangle, Circle, Ellipse, Star, Polygon, Ring, Wedge'
+      children:
+        ['🔷 Shape Types: Rectangle, Circle, Ellipse, Star, Polygon, Ring, Wedge']
     }),
     p({
-      textContent:
-        '🎯 All shapes have random velocities, rotation speeds, and bounce off walls'
+      children:
+        ['🎯 All shapes have random velocities, rotation speeds, and bounce off walls']
     }),
     p({
-      textContent:
-        '💡 Tip: Use preset buttons to change shape count and test performance'
+      children:
+        ['💡 Tip: Use preset buttons to change shape count and test performance']
     })
   ]
 })

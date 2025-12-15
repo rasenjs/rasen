@@ -27,13 +27,13 @@ function createExample(
   return div({
     class: 'example-card',
     children: [
-      h1({ textContent: title }),
+      h1({ children: [title] }),
       canvas({
         width,
         height,
         children: Array.isArray(content) ? content : [content]
       }),
-      p({ class: 'example-description', textContent: description })
+      p({ class: 'example-description', children: [description] })
     ]
   })
 }
@@ -41,14 +41,14 @@ function createExample(
 const backLink = a({
   href: './index.html',
   class: 'back-link',
-  textContent: '← Back to Examples'
+  children: ['← Back to Examples']
 })
 
 const pageHeader = div({
   class: 'page-header',
   children: [
-    h1({ textContent: '🔷 Basic Shapes' }),
-    p({ textContent: 'Explore different shapes available in Canvas 2D' })
+    h1({ children: ['🔷 Basic Shapes'] }),
+    p({ children: ['Explore different shapes available in Canvas 2D'] })
   ]
 })
 
