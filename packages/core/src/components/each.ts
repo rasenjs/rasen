@@ -1,4 +1,4 @@
-import { getReactiveRuntime } from '../reactive'
+ import { getReactiveRuntime } from '../reactive'
 import { com } from '../com'
 import { type Mountable, type Ref } from '../types'
 

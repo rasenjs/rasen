@@ -201,11 +201,19 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 
     // 处理 class
     if (props.class !== undefined) {
+      // 优化：缓存当前 class 值，减少不必要的 DOM 操作
+      let currentClass = ''
+      
       stops.push(
         watchProp(
           () => unref(props.class),
           (classValue) => {
-            el.className = String(classValue || '')
+            const newClass = String(classValue || '')
+            // 只有 class 真正改变时才更新 DOM
+            if (currentClass !== newClass) {
+              el.className = newClass
+              currentClass = newClass
+            }
           },
           hydrated
         )
