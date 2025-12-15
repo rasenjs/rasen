@@ -14,7 +14,8 @@ export default defineConfig({
       '@rasenjs/reactive-signals': path.resolve(
         __dirname,
         'packages/reactive-signals/src/index.ts'
-      )
+      ),
+      '@rasenjs/webgl': path.resolve(__dirname, 'packages/webgl/src/index.ts')
     }
   },
   test: {

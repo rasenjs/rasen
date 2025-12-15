@@ -141,6 +141,10 @@ export function canvas<Ctx>(props: {
     // CSS 样式使用逻辑像素
     canvasEl.style.width = `${width}px`
     canvasEl.style.height = `${height}px`
+    
+    // Store logical dimensions for WebGL projection matrix
+    canvasEl.dataset.logicalWidth = String(width)
+    canvasEl.dataset.logicalHeight = String(height)
 
     // 设置样式
     if (props.className) {

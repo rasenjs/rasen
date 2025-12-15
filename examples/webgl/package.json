@@ -1,0 +1,20 @@
+{
+  "name": "@rasenjs/examples-webgl",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/reactive-vue": "workspace:*",
+    "@rasenjs/webgl": "workspace:*",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "vite": "^6.0.3"
+  }
+}

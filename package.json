@@ -24,6 +24,9 @@
     "examples:canvas:dev": "yarn workspace @rasenjs/examples-canvas-2d dev",
     "examples:canvas:build": "yarn workspace @rasenjs/examples-canvas-2d build",
     "examples:canvas:preview": "yarn workspace @rasenjs/examples-canvas-2d preview",
+    "examples:webgl:dev": "yarn workspace @rasenjs/examples-webgl dev",
+    "examples:webgl:build": "yarn workspace @rasenjs/examples-webgl build",
+    "examples:webgl:preview": "yarn workspace @rasenjs/examples-webgl preview",
     "www:dev": "yarn workspace @rasenjs/www dev",
     "www:build": "yarn workspace @rasenjs/www build",
     "www:preview": "yarn workspace @rasenjs/www preview"

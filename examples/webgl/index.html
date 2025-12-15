@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebGL Examples - Rasen</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        min-height: 100vh;
+        padding: 2rem;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      header {
+        text-align: center;
+        color: white;
+        margin-bottom: 3rem;
+      }
+      h1 {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+      }
+      .subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+      }
+      .badge {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+      }
+      .examples {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+      }
+      .card {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        transition: transform 0.2s;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+      }
+      .card:hover {
+        transform: translateY(-8px);
+      }
+      .card h2 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        color: #11998e;
+      }
+      .card .emoji {
+        font-size: 3rem;
+        display: block;
+        margin-bottom: 1rem;
+      }
+      .card p {
+        color: #666;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>⚡ WebGL Examples</h1>
+        <p class="subtitle">GPU-accelerated 2D rendering with @rasenjs/webgl</p>
+        <span class="badge">🚀 Hardware Accelerated</span>
+      </header>
+
+      <div class="examples">
+        <a href="./shapes.html" class="card">
+          <span class="emoji">🔷</span>
+          <h2>Basic Shapes</h2>
+          <p>
+            Rectangles, circles, ellipses, arcs, rings, stars, polygons, and
+            wedges rendered with WebGL.
+          </p>
+        </a>
+
+        <a href="./paths.html" class="card">
+          <span class="emoji">✏️</span>
+          <h2>Lines & Polygons</h2>
+          <p>Lines, arrows, and complex polygons with GPU acceleration.</p>
+        </a>
+
+        <a href="./transforms.html" class="card">
+          <span class="emoji">🔄</span>
+          <h2>Transforms & Effects</h2>
+          <p>Rotation, scaling, and opacity with WebGL transforms.</p>
+        </a>
+
+        <a href="./advanced.html" class="card">
+          <span class="emoji">🚀</span>
+          <h2>Advanced</h2>
+          <p>Animations, interactions, and reactive updates on GPU.</p>
+        </a>
+
+        <a href="./performance.html" class="card">
+          <span class="emoji">⚡</span>
+          <h2>Performance Test</h2>
+          <p>Stress test with thousands of GPU-accelerated animated shapes.</p>
+        </a>
+      </div>
+    </div>
+  </body>
+</html>
