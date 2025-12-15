@@ -28,6 +28,8 @@ export interface PathPoint {
     | { x: number; y: number }
     | Ref<{ x: number; y: number }>
     | ReadonlyRef<{ x: number; y: number }>
+  // 曲线类型标记（用于区分二次贝塞尔曲线）
+  curveType?: 'quadratic'
 }
 
 export interface PathProps
@@ -165,15 +167,36 @@ function calculatePathBounds(points: PathPoint[]): {
   let minY = firstY,
     maxY = firstY
 
-  for (let i = 1; i < points.length; i++) {
-    const px =
-      typeof points[i].x === 'number' ? points[i].x : unref(points[i].x)
-    const py =
-      typeof points[i].y === 'number' ? points[i].y : unref(points[i].y)
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i]
+    const px = typeof point.x === 'number' ? point.x : unref(point.x)
+    const py = typeof point.y === 'number' ? point.y : unref(point.y)
+    
     minX = Math.min(minX, px as number)
     maxX = Math.max(maxX, px as number)
     minY = Math.min(minY, py as number)
     maxY = Math.max(maxY, py as number)
+
+    // 包含控制点（handleOut 和 handleIn）
+    if (point.handleOut) {
+      const handleOut = unref(point.handleOut)
+      const cpx = (px as number) + handleOut.x
+      const cpy = (py as number) + handleOut.y
+      minX = Math.min(minX, cpx)
+      maxX = Math.max(maxX, cpx)
+      minY = Math.min(minY, cpy)
+      maxY = Math.max(maxY, cpy)
+    }
+
+    if (point.handleIn) {
+      const handleIn = unref(point.handleIn)
+      const cpx = (px as number) + handleIn.x
+      const cpy = (py as number) + handleIn.y
+      minX = Math.min(minX, cpx)
+      maxX = Math.max(maxX, cpx)
+      minY = Math.min(minY, cpy)
+      maxY = Math.max(maxY, cpy)
+    }
   }
 
   return {

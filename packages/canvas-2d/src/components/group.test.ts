@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setReactiveRuntime, fragment, each } from '@rasenjs/core'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 
 import {
   createMockContext,
@@ -163,6 +164,59 @@ describe('group', () => {
       // 验证两个形状都被绘制
       expect(ctx.fillRect).toHaveBeenCalledWith(10, 10, 20, 20)
       expect(ctx.arc).toHaveBeenCalled()
+    })
+  })
+
+  describe('响应式属性', () => {
+    it('应该响应rotation属性变化', async () => {
+      // 使用真实的 Vue 响应式系统
+      const vueRuntime = createReactiveRuntime()
+      setReactiveRuntime(vueRuntime)
+
+      const rotation = vueRuntime.ref(0)
+      const mountable = group({
+        x: 100,
+        y: 100,
+        rotation: rotation,
+        children: [rect({ x: -25, y: -25, width: 50, height: 50, fill: 'red' })]
+      })
+      cleanupFns.push(mountable(ctx))
+      await waitForAsync()
+
+      // 初始状态
+      expect(ctx.rotate).toHaveBeenCalledWith(0)
+      ;(ctx.rotate as ReturnType<typeof vi.fn>).mockClear()
+
+      // 更新rotation
+      rotation.value = Math.PI / 4
+      await waitForAsync()
+
+      // 验证旋转被重新应用
+      expect(ctx.rotate).toHaveBeenCalledWith(Math.PI / 4)
+    })
+
+    it('应该响应opacity属性变化', async () => {
+      // 使用真实的 Vue 响应式系统
+      const vueRuntime = createReactiveRuntime()
+      setReactiveRuntime(vueRuntime)
+
+      const opacity = vueRuntime.ref(1)
+      const mountable = group({
+        opacity: opacity,
+        children: [rect({ x: 10, y: 10, width: 30, height: 30, fill: 'red' })]
+      })
+      cleanupFns.push(mountable(ctx))
+      await waitForAsync()
+
+      // 初始状态
+      expect(ctx.globalAlpha).toBe(1)
+
+      // 更新opacity
+      opacity.value = 0.5
+      await waitForAsync()
+
+      // 验证透明度被更新
+      expect(ctx.globalAlpha).toBe(0.5)
     })
   })
 })

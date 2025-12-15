@@ -133,14 +133,57 @@ export function svgPathToPoints(data: string): {
           }
         }
 
+        // 二次贝塞尔曲线只有一个控制点，不需要设置 handleIn
         points.push({
           x,
           y,
-          handleIn: {
-            x: cpx - x,
-            y: cpy - y
-          },
           curveType: 'quadratic' // 标记为二次贝塞尔
+        })
+
+        currentX = x
+        currentY = y
+        break
+      }
+      case 'S': // smooth cubic Bezier (absolute)
+      case 's': {
+        // smooth cubic Bezier (relative)
+        // S命令的第一个控制点是前一个点的控制点关于当前点的镜像
+        let cp1x = currentX
+        let cp1y = currentY
+        
+        // 如果前一个点有handleOut，计算镜像点
+        if (points.length > 0) {
+          const prevSeg = points[points.length - 1]
+          if (prevSeg.handleOut) {
+            const prevHandleOut = typeof prevSeg.handleOut === 'object' && 'x' in prevSeg.handleOut
+              ? prevSeg.handleOut
+              : unref(prevSeg.handleOut)
+            const px = typeof prevSeg.x === 'number' ? prevSeg.x : unref(prevSeg.x)
+            const py = typeof prevSeg.y === 'number' ? prevSeg.y : unref(prevSeg.y)
+            // 镜像：cp1 = current - (handleOut)
+            cp1x = currentX - prevHandleOut.x
+            cp1y = currentY - prevHandleOut.y
+          }
+        }
+        
+        const cp2x = cmd === 'S' ? args[0] : currentX + args[0]
+        const cp2y = cmd === 'S' ? args[1] : currentY + args[1]
+        const x = cmd === 'S' ? args[2] : currentX + args[2]
+        const y = cmd === 'S' ? args[3] : currentY + args[3]
+
+        // 设置前一个点的出手柄
+        if (points.length > 0) {
+          const prevSeg = points[points.length - 1]
+          const px = typeof prevSeg.x === 'number' ? prevSeg.x : unref(prevSeg.x)
+          const py = typeof prevSeg.y === 'number' ? prevSeg.y : unref(prevSeg.y)
+          prevSeg.handleOut = { x: cp1x - px, y: cp1y - py }
+        }
+
+        // 添加新点，带入手柄
+        points.push({
+          x,
+          y,
+          handleIn: { x: cp2x - x, y: cp2y - y }
         })
 
         currentX = x

@@ -78,5 +78,38 @@ describe('path', () => {
       expect(ctx.fill).toHaveBeenCalled()
       expect(ctx.stroke).toHaveBeenCalled()
     })
+
+    it('应该正确计算贝塞尔曲线的边界框（包含控制点）', async () => {
+      // 测试 Q 命令：M 50 100 Q 150 20 250 100
+      // 控制点在 (150, 20)，曲线会向上延伸
+      // 边界框应该包含控制点的范围
+      const mountable = path({
+        data: 'M 50 100 Q 150 20 250 100',
+        stroke: 'blue'
+      })
+      cleanupFns.push(mountable(ctx))
+      await waitForAsync()
+
+      // 验证曲线被正确绘制
+      expect(ctx.quadraticCurveTo).toHaveBeenCalledWith(150, 20, 250, 100)
+      expect(ctx.stroke).toHaveBeenCalled()
+    })
+
+    it('应该正确计算三次贝塞尔曲线的边界框', async () => {
+      // 测试 C 和 S 命令：M 50 150 C 50 50 250 50 250 150 S 150 250 50 150
+      // 控制点会影响边界框
+      const mountable = path({
+        data: 'M 50 150 C 50 50 250 50 250 150 S 150 250 50 150',
+        stroke: 'red',
+        fill: 'pink'
+      })
+      cleanupFns.push(mountable(ctx))
+      await waitForAsync()
+
+      // 验证贝塞尔曲线被正确绘制
+      expect(ctx.bezierCurveTo).toHaveBeenCalled()
+      expect(ctx.fill).toHaveBeenCalled()
+      expect(ctx.stroke).toHaveBeenCalled()
+    })
   })
 })

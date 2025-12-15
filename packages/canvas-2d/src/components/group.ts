@@ -13,6 +13,7 @@ import {
   collectDrawPropsDependencies
 } from '../utils'
 import {
+  RenderContext,
   getRenderContext,
   hasRenderContext,
   enterGroupContext,
@@ -89,73 +90,73 @@ export const group = com(
         ctx.restore()
       }
 
-      // 如果有 RenderContext，注册 group 自己的绘制
-      if (hasRenderContext(ctx)) {
-        const renderContext = getRenderContext(ctx)
-        const canvas = ctx.canvas
+      // 自动创建 RenderContext（如果不存在）
+      if (!hasRenderContext(ctx)) {
+        new RenderContext(ctx)
+      }
 
-        // 进入 group 上下文，收集子组件
-        groupContext = enterGroupContext(ctx)
+      const renderContext = getRenderContext(ctx)
+      const canvas = ctx.canvas
 
-        // 注册 group 组件
-        componentId = renderContext.register({
-          bounds: () => ({
-            x: 0,
-            y: 0,
-            width: canvas.width,
-            height: canvas.height
-          }),
-          draw: drawGroup
-        })
+      // 进入 group 上下文，收集子组件
+      groupContext = enterGroupContext(ctx)
 
-        // mount 所有子组件（在 group 上下文中）
-        for (const child of props.children) {
-          const unmount = child(ctx)
-          childUnmounts.push(unmount)
-        }
+      // 注册 group 组件
+      componentId = renderContext.register({
+        bounds: () => ({
+          x: 0,
+          y: 0,
+          width: canvas.width,
+          height: canvas.height
+        }),
+        draw: drawGroup
+      })
 
-        // 退出 group 上下文
-        exitGroupContext(ctx)
+      // mount 所有子组件（在 group 上下文中）
+      for (const child of props.children) {
+        const unmount = child(ctx)
+        childUnmounts.push(unmount)
+      }
 
-        // 监听 group 属性变化
-        getReactiveRuntime().watch(
-          () => [
+      // 退出 group 上下文
+      exitGroupContext(ctx)
+
+      // 初始标记脏区域以触发首次渲染
+      renderContext.markDirty({
+        x: 0,
+        y: 0,
+        width: canvas.width,
+        height: canvas.height
+      })
+
+      // 监听 group 属性变化
+      const stop = getReactiveRuntime().watch(
+        () => {
+          const deps = [
+            props.rotation ? unref(props.rotation) : undefined,
             props.x ? unref(props.x) : undefined,
             props.y ? unref(props.y) : undefined,
             props.clip ? unref(props.clip) : undefined,
             ...collectDrawPropsDependencies(props)
-          ],
-          () => {
-            // group 属性变化时，标记整个 canvas 为脏区域触发重绘
-            renderContext.markDirty({
-              x: 0,
-              y: 0,
-              width: canvas.width,
-              height: canvas.height
-            })
-          },
-          { immediate: false }
-        )
-      } else {
-        // 没有 RenderContext 时，直接绘制
-        // 进入 group 上下文
-        groupContext = enterGroupContext(ctx)
-
-        // mount 所有子组件
-        for (const child of props.children) {
-          const unmount = child(ctx)
-          childUnmounts.push(unmount)
-        }
-
-        // 退出 group 上下文
-        exitGroupContext(ctx)
-
-        // 直接绘制
-        drawGroup()
-      }
+          ]
+          return deps
+        },
+        () => {
+          // group 属性变化时，标记整个 canvas 为脏区域触发重绘
+          renderContext.markDirty({
+            x: 0,
+            y: 0,
+            width: canvas.width,
+            height: canvas.height
+          })
+        },
+        { immediate: false }
+      )
 
       // 返回 cleanup 函数
       return () => {
+        // 停止监听
+        stop?.()
         // unmount 所有子组件
         childUnmounts.forEach((unmount) => unmount?.())
         // 注销 group 组件

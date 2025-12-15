@@ -68,34 +68,43 @@ export const element = com(
 
       const drawFn = () => draw(ctx)
 
-      const update = () => {
-        const newBounds = getBounds(ctx)
-        const renderContext = getRenderContext(ctx)
-
-        if (currentBounds) {
-          renderContext.markDirty(currentBounds)
-        }
-        renderContext.markDirty(newBounds)
-        currentBounds = newBounds
-      }
-
       // 注册到 RenderContext 或 group
       const groupContext = getCurrentGroupContext(ctx)
 
       if (groupContext) {
         // 在 group 上下文中，将 draw 函数添加到 group
         groupContext.childDrawFunctions.push(drawFn)
+        
+        // 在 group 中，不需要独立的 update 逻辑
+        // group 会负责整体的重绘
       } else {
         // 不在 group 中，直接注册到 RenderContext
         const renderContext = getRenderContext(ctx)
+        
+        // 先初始化 bounds
+        currentBounds = getBounds(ctx)
+        
         componentId = renderContext.register({
           bounds: () => currentBounds,
           draw: drawFn
         })
-      }
+        
+        // 标记初始脏区域
+        renderContext.markDirty(currentBounds)
+        
+        const update = () => {
+          const newBounds = getBounds(ctx)
 
-      // 监听响应式依赖
-      getReactiveRuntime().watch(deps, update, { immediate: true })
+          if (currentBounds) {
+            renderContext.markDirty(currentBounds)
+          }
+          renderContext.markDirty(newBounds)
+          currentBounds = newBounds
+        }
+
+        // 监听响应式依赖（不需要 immediate，因为已经手动标记了初始脏区域）
+        getReactiveRuntime().watch(deps, update, { immediate: false })
+      }
 
       // unmount 周期
       return () => {

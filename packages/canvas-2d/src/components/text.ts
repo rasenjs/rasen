@@ -43,24 +43,29 @@ export const text: SyncComponent<CanvasRenderingContext2D, [TextProps]> = (
       const letterSpacing = props.letterSpacing ? unref(props.letterSpacing) : 0
 
       ctx.font = font
-      ctx.textAlign = textAlign
-      ctx.textBaseline = textBaseline
-
-      let textWidth = ctx.measureText(textContent).width
-
-      // 如果有字间距,需要计算额外宽度
+      // 注意：不要设置 textAlign 和 textBaseline，因为我们只是用来测量
+      
+      let textWidth = 0
+      
+      // 如果有字间距，需要逐字符计算宽度（和 draw 保持一致）
       if (letterSpacing > 0) {
-        const numChars = textContent.length
-        textWidth += (numChars - 1) * letterSpacing
+        const chars = textContent.split('')
+        for (const char of chars) {
+          textWidth += ctx.measureText(char).width + letterSpacing
+        }
+        textWidth -= letterSpacing // 最后一个字符不需要额外间距
+      } else {
+        textWidth = ctx.measureText(textContent).width
       }
 
+      // 根据 textAlign 计算文本起始 x 坐标
       let textX = x
-
       if (textAlign === 'center') {
         textX = x - textWidth / 2
       } else if (textAlign === 'right' || textAlign === 'end') {
         textX = x - textWidth
       }
+      // left/start 的情况，textX 就是 x
 
       const fontSize = parseFloat(font)
       let textY = y
@@ -107,6 +112,9 @@ export const text: SyncComponent<CanvasRenderingContext2D, [TextProps]> = (
 
       if (letterSpacing > 0) {
         // 逐字符绘制以支持字间距
+        // 注意：逐字符绘制时需要使用 'left' 对齐，因为我们手动计算了起始位置
+        ctx.textAlign = 'left'
+        
         let currentX = x
         const chars = textContent.split('')
 
