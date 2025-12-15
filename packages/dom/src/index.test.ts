@@ -191,6 +191,52 @@ describe('@rasenjs/dom', () => {
       unmount?.()
     })
 
+    it('should support reactive ref in children array', async () => {
+      const count = ref(0)
+      const unmount = mount(
+        div({
+          children: [span({ children: ['Count: '] }), span({ children: [count] })]
+        }),
+        container
+      )
+
+      const spans = container.querySelectorAll('span')
+      expect(spans.length).toBe(2)
+      expect(spans[0].textContent).toBe('Count: ')
+      expect(spans[1].textContent).toBe('0')
+
+      count.value = 42
+      await Promise.resolve()
+
+      expect(spans[1].textContent).toBe('42')
+      unmount?.()
+    })
+
+    it('should support mixed string and ref in children array', async () => {
+      const name = ref('Alice')
+      const age = ref(25)
+      const unmount = mount(
+        div({
+          children: [
+            'Name: ',
+            span({ children: [name] }),
+            ', Age: ',
+            span({ children: [age] })
+          ]
+        }),
+        container
+      )
+
+      expect(container.textContent).toContain('Name: Alice, Age: 25')
+
+      name.value = 'Bob'
+      age.value = 30
+      await Promise.resolve()
+
+      expect(container.textContent).toContain('Name: Bob, Age: 30')
+      unmount?.()
+    })
+
     it('should mount child components array', () => {
       const unmount = mount(div({
         children: [span({ children: 'First' }), span({ children: 'Second' })]

@@ -239,44 +239,69 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 
     // 处理 children
     if (props.children !== undefined) {
-      const children = props.children
-      if (
-        typeof children === 'string' ||
-        (typeof children === 'object' &&
-          children !== null &&
-          'value' in children)
-      ) {
-        // String content (or ref to string)
-        stops.push(
-          watchProp(
-            () => {
-              const v = unref(children as PropValue<string>)
-              return String(v)
-            },
+      // 1. Normalize children to array
+      const childrenArray = Array.isArray(props.children)
+        ? props.children
+        : [props.children]
+
+      if (ctx?.isHydrating) {
+        ctx.enterChildren(el)
+      }
+
+      // 2. Process each child
+      for (const child of childrenArray) {
+        if (typeof child === 'string') {
+          // 字符串 - 创建或复用文本节点
+          let textNode: Text
+          if (ctx?.isHydrating) {
+            const claimed = ctx.claim()
+            if (claimed?.nodeType === Node.TEXT_NODE) {
+              textNode = claimed as Text
+            } else {
+              textNode = document.createTextNode(child)
+              el.appendChild(textNode)
+            }
+          } else {
+            textNode = document.createTextNode(child)
+            el.appendChild(textNode)
+          }
+          childUnmounts.push(() => textNode.remove())
+        } else if (
+          typeof child === 'object' &&
+          child !== null &&
+          'value' in child
+        ) {
+          // Ref 对象 - 创建或复用响应式文本节点
+          let textNode: Text
+          if (ctx?.isHydrating) {
+            const claimed = ctx.claim()
+            if (claimed?.nodeType === Node.TEXT_NODE) {
+              textNode = claimed as Text
+            } else {
+              textNode = document.createTextNode(String(unref(child)))
+              el.appendChild(textNode)
+            }
+          } else {
+            textNode = document.createTextNode(String(unref(child)))
+            el.appendChild(textNode)
+          }
+          const stop = watchProp(
+            () => String(unref(child)),
             (v) => {
-              el.textContent = v || ''
+              textNode.textContent = v || ''
             },
             hydrated
           )
-        )
-      } else if (Array.isArray(children)) {
-        // Mount functions (支持 string 和 Mountable 混合)
-        if (ctx?.isHydrating) {
-          ctx.enterChildren(el)
+          stops.push(stop)
+          childUnmounts.push(() => textNode.remove())
+        } else if (typeof child === 'function') {
+          // Mountable 函数
+          childUnmounts.push((child as Mountable<HTMLElement>)(el))
         }
-        for (const child of children) {
-          if (typeof child === 'string') {
-            // 字符串直接创建 text node
-            const textNode = document.createTextNode(child)
-            el.appendChild(textNode)
-            childUnmounts.push(() => textNode.remove())
-          } else if (typeof child === 'function') {
-            childUnmounts.push((child as Mountable<HTMLElement>)(el))
-          }
-        }
-        if (ctx?.isHydrating) {
-          ctx.exitChildren()
-        }
+      }
+
+      if (ctx?.isHydrating) {
+        ctx.exitChildren()
       }
     }
 
