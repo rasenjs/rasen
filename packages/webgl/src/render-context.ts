@@ -114,11 +114,26 @@ export class RenderContext {
    */
   markDirty(bounds?: Bounds) {
     if (this.options.dirtyTracking && bounds) {
-      this.dirtyRegions.push(bounds)
+      // Limit dirty regions to avoid excessive array operations
+      // When too many regions are dirty, just do full redraw
+      if (this.dirtyRegions.length < 50) {
+        this.dirtyRegions.push(bounds)
+      } else {
+        this.needsFullRedraw = true
+      }
     } else {
       this.needsFullRedraw = true
     }
     this.scheduleDraw()
+  }
+
+  /**
+   * Manually trigger full redraw (bypasses watch system)
+   * Use this for batch updates in animation loops
+   */
+  manualUpdate() {
+    this.needsFullRedraw = true
+    this.draw()
   }
 
   /**

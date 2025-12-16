@@ -158,8 +158,6 @@ export function svgPathToPoints(data: string): {
             const prevHandleOut = typeof prevSeg.handleOut === 'object' && 'x' in prevSeg.handleOut
               ? prevSeg.handleOut
               : unref(prevSeg.handleOut)
-            const px = typeof prevSeg.x === 'number' ? prevSeg.x : unref(prevSeg.x)
-            const py = typeof prevSeg.y === 'number' ? prevSeg.y : unref(prevSeg.y)
             // 镜像：cp1 = current - (handleOut)
             cp1x = currentX - prevHandleOut.x
             cp1y = currentY - prevHandleOut.y

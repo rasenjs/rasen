@@ -1,6 +1,6 @@
 import { setReactiveRuntime, each } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref, triggerRef, type Ref, type ShallowRef, shallowRef } from 'vue'
+import { ref, type Ref, type ShallowRef, shallowRef } from 'vue'
 import { div, h1, p, a, button, span, canvas, mount } from '@rasenjs/dom'
 import {
   rect,
@@ -132,7 +132,7 @@ function initShapes(count: number) {
 initShapes(500)
 
 // Update shapes positions
-// 优化：直接修改 shallowRef 的 value，减少边界检查的计算
+// P4 优化：让 Vue 自动批量调度，不使用 triggerRef
 function updateShapes() {
   const maxX = CANVAS_WIDTH
   const maxY = CANVAS_HEIGHT
@@ -166,13 +166,11 @@ function updateShapes() {
       newY = maxBoundY
     }
 
-    // 批量设置值
+    // P4: 直接修改值，Vue 会自动批量调度所有更新
+    // 不需要 triggerRef - shallowRef 修改会自动触发依赖
     refs.x.value = newX
     refs.y.value = newY
     refs.rotation.value += shape.rotationSpeed
-
-    // 只触发一次更新（而不是3次）
-    triggerRef(refs.x)
   }
 }
 

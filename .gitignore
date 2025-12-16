@@ -29,6 +29,10 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# Performance traces
+Trace-*.json
+**/capture-profile.ts
+
 # OS
 .DS_Store
 Thumbs.db

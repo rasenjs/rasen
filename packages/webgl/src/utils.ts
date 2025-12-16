@@ -13,10 +13,24 @@ export function unref<T>(value: MaybeRef<T>): T {
     : (value as T)
 }
 
+// Color cache for frequently used colors
+const colorCache = new Map<string, Color>()
+
 /**
  * Parse CSS color to RGBA (0-1 range for GPU)
+ * Uses cache to avoid repeated parsing of same colors
+ * Returns a copy to avoid mutation of cached object
  */
 export function parseColor(colorStr: string): Color {
+  // Check cache first
+  const cached = colorCache.get(colorStr)
+  if (cached) {
+    // Return a copy to avoid mutating cached color
+    return { r: cached.r, g: cached.g, b: cached.b, a: cached.a }
+  }
+  
+  let color: Color
+  
   // Simple color parsing - extend as needed
   if (colorStr.startsWith('#')) {
     const hex = colorStr.slice(1)
@@ -24,11 +38,18 @@ export function parseColor(colorStr: string): Color {
     const g = parseInt(hex.slice(2, 4), 16) / 255
     const b = parseInt(hex.slice(4, 6), 16) / 255
     const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
-    return { r, g, b, a }
+    color = { r, g, b, a }
+  } else {
+    // Default to white
+    color = { r: 1, g: 1, b: 1, a: 1 }
   }
   
-  // Default to white
-  return { r: 1, g: 1, b: 1, a: 1 }
+  // Cache for future use (limit cache size to prevent memory leak)
+  if (colorCache.size < 100) {
+    colorCache.set(colorStr, color)
+  }
+  
+  return color
 }
 
 /**
@@ -42,15 +63,24 @@ export function createIdentityMatrix(): number[] {
   ]
 }
 
+// Reusable translation matrix to reduce allocations
+const reusableMatrix = new Float32Array(9)
+
 /**
  * Create translation matrix
+ * Returns a reusable Float32Array - DO NOT store reference, values will change
  */
-export function createTranslationMatrix(x: number, y: number): number[] {
-  return [
-    1, 0, 0,
-    0, 1, 0,
-    x, y, 1
-  ]
+export function createTranslationMatrix(x: number, y: number): Float32Array {
+  reusableMatrix[0] = 1
+  reusableMatrix[1] = 0
+  reusableMatrix[2] = 0
+  reusableMatrix[3] = 0
+  reusableMatrix[4] = 1
+  reusableMatrix[5] = 0
+  reusableMatrix[6] = x
+  reusableMatrix[7] = y
+  reusableMatrix[8] = 1
+  return reusableMatrix
 }
 
 /**

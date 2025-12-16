@@ -8,7 +8,8 @@ import { ShaderProgram, DEFAULT_VERTEX_SHADER, DEFAULT_FRAGMENT_SHADER } from '.
 interface BatchItem {
   vertices: Float32Array
   color: Color
-  transform: number[] // 3x3 matrix
+  tx: number  // translation x (optimized: store only needed values)
+  ty: number  // translation y
 }
 
 export class BatchRenderer {
@@ -17,6 +18,15 @@ export class BatchRenderer {
   private colorBuffer: WebGLBuffer | null = null
   private batchItems: BatchItem[] = []
   private maxBatchSize = 10000 // Max vertices per batch
+  
+  // Reusable buffers to avoid allocation every frame
+  private positionsArray: Float32Array | null = null
+  private colorsArray: Float32Array | null = null
+  private currentCapacity = 0
+  
+  // Cache attribute locations to avoid repeated lookups
+  private positionLoc: number = -1
+  private colorLoc: number = -1
 
   constructor(
     private gl: WebGLRenderingContext | WebGL2RenderingContext,
@@ -28,13 +38,20 @@ export class BatchRenderer {
     // Create buffers
     this.positionBuffer = gl.createBuffer()
     this.colorBuffer = gl.createBuffer()
+    
+    // Cache attribute locations
+    this.positionLoc = this.shader.getAttribLocation('a_position')
+    this.colorLoc = this.shader.getAttribLocation('a_color')
   }
 
   /**
    * Add shape to batch
    */
-  addShape(vertices: Float32Array, color: Color, transform: number[]) {
-    this.batchItems.push({ vertices, color, transform })
+  addShape(vertices: Float32Array, color: Color, transform: Float32Array | number[]) {
+    // Extract translation values (avoid storing full matrix)
+    const tx = transform[6]
+    const ty = transform[7]
+    this.batchItems.push({ vertices, color, tx, ty })
     
     // Auto-flush if batch is full
     if (this.getTotalVertices() >= this.maxBatchSize) {
@@ -58,9 +75,21 @@ export class BatchRenderer {
     const gl = this.gl
     const totalVertices = this.getTotalVertices()
     
-    // Combine all vertices and colors
-    const positions = new Float32Array(totalVertices * 2)
-    const colors = new Float32Array(totalVertices * 4)
+    // Ensure buffers have enough capacity
+    if (!this.positionsArray || this.currentCapacity < totalVertices) {
+      // Grow capacity by 1.5x to avoid frequent reallocations
+      this.currentCapacity = Math.max(totalVertices, Math.ceil(this.currentCapacity * 1.5))
+      this.positionsArray = new Float32Array(this.currentCapacity * 2)
+      this.colorsArray = new Float32Array(this.currentCapacity * 4)
+    }
+    
+    // Reuse existing arrays
+    const positions = this.positionsArray
+    const colors = this.colorsArray
+    
+    if (!positions || !colors) {
+      return
+    }
     
     let posOffset = 0
     let colorOffset = 0
@@ -73,9 +102,9 @@ export class BatchRenderer {
         const x = item.vertices[i * 2]
         const y = item.vertices[i * 2 + 1]
         
-        // Apply transform (simplified - should use full matrix multiply)
-        positions[posOffset++] = x + item.transform[6] // tx
-        positions[posOffset++] = y + item.transform[7] // ty
+        // Apply translation
+        positions[posOffset++] = x + item.tx
+        positions[posOffset++] = y + item.ty
         
         // Add color
         colors[colorOffset++] = item.color.r
@@ -92,19 +121,17 @@ export class BatchRenderer {
     this.shader.setUniform('u_projection', this.projectionMatrix)
     this.shader.setUniform('u_matrix', [1, 0, 0, 0, 1, 0, 0, 0, 1]) // Identity for batched
     
-    // Position attribute
-    const positionLoc = this.shader.getAttribLocation('a_position')
+    // Position attribute - use cached location
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW)
-    gl.enableVertexAttribArray(positionLoc)
-    gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0)
+    gl.bufferData(gl.ARRAY_BUFFER, positions!.subarray(0, totalVertices * 2), gl.DYNAMIC_DRAW)
+    gl.enableVertexAttribArray(this.positionLoc)
+    gl.vertexAttribPointer(this.positionLoc, 2, gl.FLOAT, false, 0, 0)
     
-    // Color attribute
-    const colorLoc = this.shader.getAttribLocation('a_color')
+    // Color attribute - use cached location
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, colors, gl.DYNAMIC_DRAW)
-    gl.enableVertexAttribArray(colorLoc)
-    gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 0, 0)
+    gl.bufferData(gl.ARRAY_BUFFER, colors!.subarray(0, totalVertices * 4), gl.DYNAMIC_DRAW)
+    gl.enableVertexAttribArray(this.colorLoc)
+    gl.vertexAttribPointer(this.colorLoc, 4, gl.FLOAT, false, 0, 0)
     
     // Draw
     gl.drawArrays(gl.TRIANGLES, 0, totalVertices)
