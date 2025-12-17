@@ -3,10 +3,10 @@
  */
 
 import type { SyncComponent } from '@rasenjs/core'
-import type { MaybeRef, CommonDrawProps, TransformProps, Bounds } from '../types'
-import { unref, parseColor, createTranslationMatrix } from '../utils'
-import { getRenderContext } from '../render-context'
-import { element } from './element'
+import type { MaybeRef, CommonDrawProps, TransformProps, Bounds } from '../../types'
+import { unref, parseColor } from '../../utils'
+import { getRenderContext } from '../../render-context'
+import { element } from '../element'
 
 export interface ArcProps extends CommonDrawProps, TransformProps {
   x: MaybeRef<number>
@@ -131,8 +131,41 @@ export const arc: SyncComponent<
           cachedSegments = segments
         }
         const color = parseColor(fill)
-        color.a *= opacity
-        const transform = createTranslationMatrix(x, y)
+        
+        // Get accumulated transform from group hierarchy
+        const groupTransform = renderContext.getCurrentTransform()
+        
+        // Combine local opacity with group opacity
+        const finalOpacity = opacity * groupTransform.opacity
+        color.a *= finalOpacity
+        
+        // Apply parent rotation to local position
+        const cos = Math.cos(groupTransform.rotation)
+        const sin = Math.sin(groupTransform.rotation)
+        const rotatedX = x * cos - y * sin
+        const rotatedY = x * sin + y * cos
+        
+        const finalX = groupTransform.tx + rotatedX * groupTransform.scaleX
+        const finalY = groupTransform.ty + rotatedY * groupTransform.scaleY
+        const finalRotation = groupTransform.rotation
+        const finalScaleX = groupTransform.scaleX
+        const finalScaleY = groupTransform.scaleY
+        
+        // Create full transform matrix
+        const c = Math.cos(finalRotation)
+        const s = Math.sin(finalRotation)
+        const transform = [
+          finalScaleX * c,
+          finalScaleX * s,
+          0,
+          -finalScaleY * s,
+          finalScaleY * c,
+          0,
+          finalX,
+          finalY,
+          1
+        ]
+        
         batchRenderer.addShape(cachedGeometry, color, transform)
       }
     },

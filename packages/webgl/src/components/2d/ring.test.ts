@@ -1,13 +1,13 @@
 /**
- * Arrow component tests
+ * Ring component tests
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
-import { arrow } from './arrow'
-import { createMockWebGLContext, createMockReactiveRuntime } from '../test-utils'
+import { ring } from './ring'
+import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
-describe('arrow', () => {
+describe('ring', () => {
   let gl: WebGLRenderingContext
   let cleanupFns: Array<(() => void) | undefined>
 
@@ -26,14 +26,13 @@ describe('arrow', () => {
     vi.unstubAllGlobals()
   })
 
-  it('should create arrow component', () => {
-    const component = arrow({
-      x1: 50,
-      y1: 50,
-      x2: 150,
-      y2: 150,
-      fill: '#ff0088',
-      headSize: 10
+  it('should create ring component', () => {
+    const component = ring({
+      x: 100,
+      y: 100,
+      innerRadius: 30,
+      outerRadius: 50,
+      fill: '#00ffff'
     })
 
     expect(component).toBeDefined()
@@ -41,14 +40,15 @@ describe('arrow', () => {
     cleanupFns.push(cleanup)
   })
 
-  it('should support different head sizes', () => {
-    const component = arrow({
-      x1: 50,
-      y1: 50,
-      x2: 150,
-      y2: 150,
-      fill: '#ff0088',
-      headSize: 20
+  it('should support angle range', () => {
+    const component = ring({
+      x: 100,
+      y: 100,
+      innerRadius: 30,
+      outerRadius: 50,
+      fill: '#00ffff',
+      startAngle: 0,
+      endAngle: Math.PI
     })
 
     const cleanup = component(gl)

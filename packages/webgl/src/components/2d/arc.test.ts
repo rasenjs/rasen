@@ -1,13 +1,13 @@
 /**
- * Wedge component tests
+ * Arc component tests
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
-import { wedge } from './wedge'
-import { createMockWebGLContext, createMockReactiveRuntime } from '../test-utils'
+import { arc } from './arc'
+import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
-describe('wedge', () => {
+describe('arc', () => {
   let gl: WebGLRenderingContext
   let cleanupFns: Array<(() => void) | undefined>
 
@@ -26,14 +26,15 @@ describe('wedge', () => {
     vi.unstubAllGlobals()
   })
 
-  it('should create wedge component', () => {
-    const component = wedge({
+  it('should create arc component', () => {
+    const component = arc({
       x: 100,
       y: 100,
       radius: 50,
       startAngle: 0,
-      endAngle: Math.PI / 2,
-      fill: '#ff8800'
+      endAngle: Math.PI,
+      stroke: '#ff00ff',
+      lineWidth: 2
     })
 
     expect(component).toBeDefined()
@@ -41,14 +42,16 @@ describe('wedge', () => {
     cleanupFns.push(cleanup)
   })
 
-  it('should support full circle', () => {
-    const component = wedge({
+  it('should support counterclockwise', () => {
+    const component = arc({
       x: 100,
       y: 100,
       radius: 50,
       startAngle: 0,
-      endAngle: Math.PI * 2,
-      fill: '#ff8800'
+      endAngle: Math.PI,
+      stroke: '#ff00ff',
+      lineWidth: 2,
+      counterclockwise: true
     })
 
     const cleanup = component(gl)

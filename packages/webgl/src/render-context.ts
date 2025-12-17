@@ -4,11 +4,32 @@
 
 import type { Bounds } from './types'
 import { BatchRenderer } from './renderer/batch'
+import { InstancedBatchRenderer } from './renderer/instanced'
 import { createOrthoMatrix } from './utils'
 
 export interface ComponentInstance {
   bounds: () => Bounds | null
   draw: () => void
+}
+
+/**
+ * Transform state for group hierarchy
+ */
+export interface TransformState {
+  tx: number
+  ty: number
+  rotation: number
+  scaleX: number
+  scaleY: number
+  opacity: number
+}
+
+/**
+ * Group context - collects child components
+ */
+export interface GroupContext {
+  childDrawFunctions: (() => void)[]
+  childComponentIds: symbol[]
 }
 
 /**
@@ -20,6 +41,13 @@ export interface RenderContextOptions {
    * Combines multiple shapes into single draw call
    */
   batching?: boolean
+  
+  /**
+   * Enable instanced rendering (default: false)
+   * Use GPU instancing for massive performance (WebGL2 only)
+   * Note: When enabled, overrides batching option
+   */
+  instancing?: boolean
   
   /**
    * Enable dirty region tracking (default: true)
@@ -38,7 +66,17 @@ export class RenderContext {
   private needsFullRedraw: boolean = true
   private options: Required<RenderContextOptions>
   private batchRenderer: BatchRenderer | null = null
+  private instancedRenderer: InstancedBatchRenderer | null = null
   private projectionMatrix: number[]
+  private transformStack: TransformState[] = []
+  private currentTransform: TransformState = {
+    tx: 0,
+    ty: 0,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    opacity: 1
+  }
 
   constructor(
     private gl: WebGLRenderingContext | WebGL2RenderingContext,
@@ -46,6 +84,7 @@ export class RenderContext {
   ) {
     this.options = {
       batching: options.batching ?? true,
+      instancing: options.instancing ?? false,
       dirtyTracking: options.dirtyTracking ?? true
     }
     
@@ -67,8 +106,12 @@ export class RenderContext {
       logicalHeight
     )
     
-    // Create batch renderer
-    if (this.options.batching) {
+    // Create renderers based on options
+    if (this.options.instancing && gl instanceof WebGL2RenderingContext) {
+      // Use instanced rendering (WebGL2 only)
+      this.instancedRenderer = new InstancedBatchRenderer(gl, this.projectionMatrix)
+    } else if (this.options.batching) {
+      // Fallback to regular batch rendering
       this.batchRenderer = new BatchRenderer(gl, this.projectionMatrix)
     }
     
@@ -98,7 +141,19 @@ export class RenderContext {
    */
   register(instance: ComponentInstance): symbol {
     const id = Symbol()
-    this.components.set(id, instance)
+    
+    // Check if inside a group context
+    const groupContext = getCurrentGroupContext(this.gl)
+    if (groupContext) {
+      // Add to group's child collection instead of global components
+      groupContext.childDrawFunctions.push(() => instance.draw())
+      groupContext.childComponentIds.push(id)
+      // Don't add to global components - only group manages children
+    } else {
+      // Normal registration - only non-grouped components go here
+      this.components.set(id, instance)
+    }
+    
     return id
   }
 
@@ -106,6 +161,7 @@ export class RenderContext {
    * Unregister component
    */
   unregister(id: symbol) {
+    // Component might not be in components map if it was part of a group
     this.components.delete(id)
   }
 
@@ -163,8 +219,10 @@ export class RenderContext {
         component.draw()
       }
       
-      // Flush batch
-      if (this.batchRenderer) {
+      // Flush batch or instanced renderer
+      if (this.instancedRenderer) {
+        this.instancedRenderer.flush()
+      } else if (this.batchRenderer) {
         this.batchRenderer.flush()
       }
       
@@ -176,12 +234,83 @@ export class RenderContext {
       for (const component of this.components.values()) {
         component.draw()
       }
-      if (this.batchRenderer) {
+      if (this.instancedRenderer) {
+        this.instancedRenderer.flush()
+      } else if (this.batchRenderer) {
         this.batchRenderer.flush()
       }
     }
     
     this.dirtyRegions = []
+  }
+
+  /**
+   * Add a shape to render (unified interface)
+   * Automatically uses instanced or batch renderer based on options
+   */
+  addShape(
+    batchKey: string,
+    vertices: Float32Array,
+    color: { r: number; g: number; b: number; a: number },
+    transform: {
+      tx: number
+      ty: number
+      rotation?: number
+      scaleX?: number
+      scaleY?: number
+    }
+  ) {
+    if (this.instancedRenderer) {
+      // Use instanced rendering
+      this.instancedRenderer.addInstance(batchKey, vertices, {
+        tx: transform.tx,
+        ty: transform.ty,
+        rotation: transform.rotation ?? 0,
+        scaleX: transform.scaleX ?? 1,
+        scaleY: transform.scaleY ?? 1,
+        color
+      })
+    } else if (this.batchRenderer) {
+      // Use batch rendering - create full transform matrix
+      const matrix = this.createTransformMatrix(
+        transform.tx,
+        transform.ty,
+        transform.rotation ?? 0,
+        transform.scaleX ?? 1,
+        transform.scaleY ?? 1
+      )
+      this.batchRenderer.addShape(vertices, color, matrix)
+    }
+  }
+
+  /**
+   * Create full 2D transform matrix (translation + rotation + scale)
+   */
+  private createTransformMatrix(
+    tx: number,
+    ty: number,
+    rotation: number,
+    scaleX: number,
+    scaleY: number
+  ): number[] {
+    const cos = Math.cos(rotation)
+    const sin = Math.sin(rotation)
+    
+    // 2D transformation matrix in column-major order for WebGL
+    // [scaleX*cos, scaleX*sin, 0]
+    // [-scaleY*sin, scaleY*cos, 0]
+    // [tx, ty, 1]
+    return [
+      scaleX * cos,
+      scaleX * sin,
+      0,
+      -scaleY * sin,
+      scaleY * cos,
+      0,
+      tx,
+      ty,
+      1
+    ]
   }
 
   /**
@@ -192,6 +321,13 @@ export class RenderContext {
   }
 
   /**
+   * Get instanced renderer
+   */
+  getInstancedRenderer(): InstancedBatchRenderer | null {
+    return this.instancedRenderer
+  }
+
+  /**
    * Get projection matrix
    */
   getProjectionMatrix(): number[] {
@@ -199,7 +335,58 @@ export class RenderContext {
   }
 
   /**
-   * Destroy render context
+   * Push transform state (for group hierarchy)
+   */
+  pushTransform(transform: Partial<TransformState>) {
+    // Save current transform to stack
+    this.transformStack.push({ ...this.currentTransform })
+    
+    // Get transform values with defaults
+    const tx = transform.tx ?? 0
+    const ty = transform.ty ?? 0
+    const rotation = transform.rotation ?? 0
+    const scaleX = transform.scaleX ?? 1
+    const scaleY = transform.scaleY ?? 1
+    const opacity = transform.opacity ?? 1
+    
+    // Accumulate transforms (multiply matrices conceptually)
+    const parent = this.currentTransform
+    
+    // Apply parent rotation to child position
+    const cos = Math.cos(parent.rotation)
+    const sin = Math.sin(parent.rotation)
+    const rotatedX = tx * cos - ty * sin
+    const rotatedY = tx * sin + ty * cos
+    
+    this.currentTransform = {
+      tx: parent.tx + rotatedX * parent.scaleX,
+      ty: parent.ty + rotatedY * parent.scaleY,
+      rotation: parent.rotation + rotation,
+      scaleX: parent.scaleX * scaleX,
+      scaleY: parent.scaleY * scaleY,
+      opacity: parent.opacity * opacity
+    }
+  }
+  
+  /**
+   * Pop transform state
+   */
+  popTransform() {
+    const previous = this.transformStack.pop()
+    if (previous) {
+      this.currentTransform = previous
+    }
+  }
+  
+  /**
+   * Get current accumulated transform
+   */
+  getCurrentTransform(): TransformState {
+    return { ...this.currentTransform }
+  }
+
+  /**
+   * Cleanup
    */
   destroy() {
     if (this.rafId !== null) {
@@ -208,7 +395,11 @@ export class RenderContext {
     if (this.batchRenderer) {
       this.batchRenderer.destroy()
     }
+    if (this.instancedRenderer) {
+      this.instancedRenderer.destroy()
+    }
     this.components.clear()
+    this.transformStack = []
     renderContextMap.delete(this.gl)
   }
 }
@@ -249,4 +440,56 @@ export function hasRenderContext(
   gl: WebGLRenderingContext | WebGL2RenderingContext
 ): boolean {
   return renderContextMap.has(gl)
+}
+
+// Group context stack management
+const groupContextStack = new WeakMap<
+  WebGLRenderingContext | WebGL2RenderingContext,
+  GroupContext[]
+>()
+
+/**
+ * Enter group context - collect child components
+ */
+export function enterGroupContext(
+  gl: WebGLRenderingContext | WebGL2RenderingContext
+): GroupContext {
+  const groupContext: GroupContext = {
+    childDrawFunctions: [],
+    childComponentIds: []
+  }
+  
+  let stack = groupContextStack.get(gl)
+  if (!stack) {
+    stack = []
+    groupContextStack.set(gl, stack)
+  }
+  stack.push(groupContext)
+  
+  return groupContext
+}
+
+/**
+ * Exit group context
+ */
+export function exitGroupContext(
+  gl: WebGLRenderingContext | WebGL2RenderingContext
+): void {
+  const stack = groupContextStack.get(gl)
+  if (stack && stack.length > 0) {
+    stack.pop()
+  }
+}
+
+/**
+ * Get current group context (if inside a group)
+ */
+export function getCurrentGroupContext(
+  gl: WebGLRenderingContext | WebGL2RenderingContext
+): GroupContext | null {
+  const stack = groupContextStack.get(gl)
+  if (stack && stack.length > 0) {
+    return stack[stack.length - 1]
+  }
+  return null
 }

@@ -59,7 +59,7 @@ describe('@rasenjs/webgl utils', () => {
 
     it('should create translation matrix', () => {
       const matrix = createTranslationMatrix(10, 20)
-      expect(matrix).toEqual([
+      expect(Array.from(matrix)).toEqual([
         1, 0, 0,
         0, 1, 0,
         10, 20, 1

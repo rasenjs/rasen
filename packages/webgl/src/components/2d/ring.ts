@@ -3,10 +3,10 @@
  */
 
 import type { SyncComponent } from '@rasenjs/core'
-import type { MaybeRef, CommonDrawProps, TransformProps, Bounds } from '../types'
-import { unref, parseColor, createTranslationMatrix } from '../utils'
-import { getRenderContext } from '../render-context'
-import { element } from './element'
+import type { MaybeRef, CommonDrawProps, TransformProps, Bounds } from '../../types'
+import { unref, parseColor } from '../../utils'
+import { getRenderContext } from '../../render-context'
+import { element } from '../element'
 
 export interface RingProps extends CommonDrawProps, TransformProps {
   x: MaybeRef<number>
@@ -115,13 +115,15 @@ export const ring: SyncComponent<
       const segments = unref(props.segments) ?? 32
       const visible = unref(props.visible) ?? true
       const opacity = unref(props.opacity) ?? 1
+      const rotation = unref(props.rotation) ?? 0
+      const scaleX = unref(props.scaleX) ?? 1
+      const scaleY = unref(props.scaleY) ?? 1
 
       if (!visible || opacity <= 0) return
 
       const renderContext = getRenderContext(gl)
-      const batchRenderer = renderContext.getBatchRenderer()
 
-      if (fill && batchRenderer) {
+      if (fill) {
         if (!cachedGeometry || 
             cachedInnerRadius !== innerRadius ||
             cachedOuterRadius !== outerRadius ||
@@ -132,9 +134,34 @@ export const ring: SyncComponent<
           cachedSegments = segments
         }
         const color = parseColor(fill)
-        color.a *= opacity
-        const transform = createTranslationMatrix(x, y)
-        batchRenderer.addShape(cachedGeometry, color, transform)
+        
+        // Get accumulated transform from group hierarchy
+        const transform = renderContext.getCurrentTransform()
+        
+        // Combine local opacity with group opacity
+        const finalOpacity = opacity * transform.opacity
+        color.a *= finalOpacity
+        
+        // Apply parent rotation to local position
+        const cos = Math.cos(transform.rotation)
+        const sin = Math.sin(transform.rotation)
+        const rotatedX = x * cos - y * sin
+        const rotatedY = x * sin + y * cos
+        
+        const finalTransform = {
+          tx: transform.tx + rotatedX * transform.scaleX,
+          ty: transform.ty + rotatedY * transform.scaleY,
+          rotation: transform.rotation + rotation,
+          scaleX: transform.scaleX * scaleX,
+          scaleY: transform.scaleY * scaleY
+        }
+        
+        renderContext.addShape(
+          `ring-${segments}`,
+          cachedGeometry,
+          color,
+          finalTransform
+        )
       }
     },
 
@@ -146,7 +173,10 @@ export const ring: SyncComponent<
       unref(props.fill),
       unref(props.segments),
       unref(props.visible),
-      unref(props.opacity)
+      unref(props.opacity),
+      unref(props.rotation),
+      unref(props.scaleX),
+      unref(props.scaleY)
     ]
   })
 }

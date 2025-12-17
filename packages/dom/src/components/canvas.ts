@@ -84,6 +84,7 @@ export function canvas(props: {
   width: PropValue<number>
   height: PropValue<number>
   contextType: 'webgl'
+  contextOptions?: any
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
@@ -94,6 +95,7 @@ export function canvas(props: {
   width: PropValue<number>
   height: PropValue<number>
   contextType: 'webgl2'
+  contextOptions?: any
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
@@ -115,6 +117,7 @@ export function canvas<Ctx>(props: {
   width: PropValue<number>
   height: PropValue<number>
   contextType?: '2d' | 'webgl' | 'webgl2' | 'webgpu'
+  contextOptions?: any
   getContext?: ContextGetter<Ctx>
   dpr?: number
   className?: PropValue<string>
@@ -145,6 +148,11 @@ export function canvas<Ctx>(props: {
     // Store logical dimensions for WebGL projection matrix
     canvasEl.dataset.logicalWidth = String(width)
     canvasEl.dataset.logicalHeight = String(height)
+    
+    // Store context options for WebGL RenderContext
+    if (props.contextOptions) {
+      canvasEl.dataset.contextOptions = JSON.stringify(props.contextOptions)
+    }
 
     // 设置样式
     if (props.className) {

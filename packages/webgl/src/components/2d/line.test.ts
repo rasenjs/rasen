@@ -1,13 +1,13 @@
 /**
- * Ring component tests
+ * Line component tests
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
-import { ring } from './ring'
-import { createMockWebGLContext, createMockReactiveRuntime } from '../test-utils'
+import { line } from './line'
+import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
-describe('ring', () => {
+describe('line', () => {
   let gl: WebGLRenderingContext
   let cleanupFns: Array<(() => void) | undefined>
 
@@ -26,13 +26,14 @@ describe('ring', () => {
     vi.unstubAllGlobals()
   })
 
-  it('should create ring component', () => {
-    const component = ring({
-      x: 100,
-      y: 100,
-      innerRadius: 30,
-      outerRadius: 50,
-      fill: '#00ffff'
+  it('should create line component', () => {
+    const component = line({
+      x1: 0,
+      y1: 0,
+      x2: 100,
+      y2: 100,
+      stroke: '#000000',
+      lineWidth: 2
     })
 
     expect(component).toBeDefined()
@@ -40,15 +41,14 @@ describe('ring', () => {
     cleanupFns.push(cleanup)
   })
 
-  it('should support angle range', () => {
-    const component = ring({
-      x: 100,
-      y: 100,
-      innerRadius: 30,
-      outerRadius: 50,
-      fill: '#00ffff',
-      startAngle: 0,
-      endAngle: Math.PI
+  it('should handle different line widths', () => {
+    const component = line({
+      x1: 0,
+      y1: 0,
+      x2: 100,
+      y2: 100,
+      stroke: '#000000',
+      lineWidth: 5
     })
 
     const cleanup = component(gl)

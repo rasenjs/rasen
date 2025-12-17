@@ -1,13 +1,13 @@
 /**
- * Star component tests
+ * Wedge component tests
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
-import { star } from './star'
-import { createMockWebGLContext, createMockReactiveRuntime } from '../test-utils'
+import { wedge } from './wedge'
+import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
-describe('star', () => {
+describe('wedge', () => {
   let gl: WebGLRenderingContext
   let cleanupFns: Array<(() => void) | undefined>
 
@@ -26,14 +26,14 @@ describe('star', () => {
     vi.unstubAllGlobals()
   })
 
-  it('should create star component', () => {
-    const component = star({
+  it('should create wedge component', () => {
+    const component = wedge({
       x: 100,
       y: 100,
-      points: 5,
-      innerRadius: 30,
-      outerRadius: 60,
-      fill: '#ffff00'
+      radius: 50,
+      startAngle: 0,
+      endAngle: Math.PI / 2,
+      fill: '#ff8800'
     })
 
     expect(component).toBeDefined()
@@ -41,14 +41,14 @@ describe('star', () => {
     cleanupFns.push(cleanup)
   })
 
-  it('should support different point counts', () => {
-    const component = star({
+  it('should support full circle', () => {
+    const component = wedge({
       x: 100,
       y: 100,
-      points: 8,
-      innerRadius: 30,
-      outerRadius: 60,
-      fill: '#ffff00'
+      radius: 50,
+      startAngle: 0,
+      endAngle: Math.PI * 2,
+      fill: '#ff8800'
     })
 
     const cleanup = component(gl)

@@ -5,7 +5,6 @@
 import {
   com,
   getReactiveRuntime,
-  getBatchContext,
   type Mountable
 } from '@rasenjs/core'
 import {
@@ -40,7 +39,11 @@ export const element = com(
     return (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
       // Auto-create RenderContext if not exists
       if (!hasRenderContext(gl)) {
-        new RenderContext(gl)
+        // Read context options from canvas element
+        const canvas = gl.canvas as HTMLCanvasElement
+        const optionsStr = canvas.dataset.contextOptions
+        const options = optionsStr ? JSON.parse(optionsStr) : {}
+        new RenderContext(gl, options)
       }
 
       const renderContext = getRenderContext(gl)

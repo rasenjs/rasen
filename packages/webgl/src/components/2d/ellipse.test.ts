@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
 import { ellipse } from './ellipse'
-import { createMockWebGLContext, createMockReactiveRuntime } from '../test-utils'
+import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
 describe('ellipse', () => {
   let gl: WebGLRenderingContext

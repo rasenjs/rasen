@@ -8,8 +8,7 @@ import { ShaderProgram, DEFAULT_VERTEX_SHADER, DEFAULT_FRAGMENT_SHADER } from '.
 interface BatchItem {
   vertices: Float32Array
   color: Color
-  tx: number  // translation x (optimized: store only needed values)
-  ty: number  // translation y
+  transform: number[] // Full 2D transform matrix (3x3)
 }
 
 export class BatchRenderer {
@@ -48,10 +47,9 @@ export class BatchRenderer {
    * Add shape to batch
    */
   addShape(vertices: Float32Array, color: Color, transform: Float32Array | number[]) {
-    // Extract translation values (avoid storing full matrix)
-    const tx = transform[6]
-    const ty = transform[7]
-    this.batchItems.push({ vertices, color, tx, ty })
+    // Store full transform matrix for proper rotation/scale support
+    const transformArray = Array.isArray(transform) ? transform : Array.from(transform)
+    this.batchItems.push({ vertices, color, transform: transformArray })
     
     // Auto-flush if batch is full
     if (this.getTotalVertices() >= this.maxBatchSize) {
@@ -97,15 +95,18 @@ export class BatchRenderer {
     for (const item of this.batchItems) {
       const vertexCount = item.vertices.length / 2
       
-      // Transform and add vertices
+      const m = item.transform // 3x3 matrix in column-major order
+      
+      // Apply full 2D transform to each vertex
       for (let i = 0; i < vertexCount; i++) {
         const x = item.vertices[i * 2]
         const y = item.vertices[i * 2 + 1]
         
-        // Apply translation
-        positions[posOffset++] = x + item.tx
-        positions[posOffset++] = y + item.ty
-        
+        // Apply 2D transformation: [x', y'] = M * [x, y, 1]
+        // m[0]*x + m[3]*y + m[6]*1 = transformed x
+        // m[1]*x + m[4]*y + m[7]*1 = transformed y
+        positions[posOffset++] = m[0] * x + m[3] * y + m[6]
+        positions[posOffset++] = m[1] * x + m[4] * y + m[7]
         // Add color
         colors[colorOffset++] = item.color.r
         colors[colorOffset++] = item.color.g

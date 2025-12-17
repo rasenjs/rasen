@@ -1,13 +1,13 @@
 /**
- * Arc component tests
+ * Circle component tests
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
-import { arc } from './arc'
-import { createMockWebGLContext, createMockReactiveRuntime } from '../test-utils'
+import { circle } from './circle'
+import { createMockWebGLContext, createMockReactiveRuntime, waitForAsync } from '../../test-utils'
 
-describe('arc', () => {
+describe('circle', () => {
   let gl: WebGLRenderingContext
   let cleanupFns: Array<(() => void) | undefined>
 
@@ -26,15 +26,12 @@ describe('arc', () => {
     vi.unstubAllGlobals()
   })
 
-  it('should create arc component', () => {
-    const component = arc({
+  it('should create circle component', () => {
+    const component = circle({
       x: 100,
       y: 100,
       radius: 50,
-      startAngle: 0,
-      endAngle: Math.PI,
-      stroke: '#ff00ff',
-      lineWidth: 2
+      fill: '#00ff00'
     })
 
     expect(component).toBeDefined()
@@ -42,16 +39,35 @@ describe('arc', () => {
     cleanupFns.push(cleanup)
   })
 
-  it('should support counterclockwise', () => {
-    const component = arc({
+  it('should handle reactive radius', async () => {
+    const runtime = createMockReactiveRuntime()
+    setReactiveRuntime(runtime)
+    
+    const radius = runtime.ref(50)
+    const component = circle({
+      x: 100,
+      y: 100,
+      radius,
+      fill: '#00ff00'
+    })
+
+    const cleanup = component(gl)
+    cleanupFns.push(cleanup)
+
+    await waitForAsync()
+    radius.value = 100
+    await waitForAsync()
+
+    expect(radius.value).toBe(100)
+  })
+
+  it('should support segments', () => {
+    const component = circle({
       x: 100,
       y: 100,
       radius: 50,
-      startAngle: 0,
-      endAngle: Math.PI,
-      stroke: '#ff00ff',
-      lineWidth: 2,
-      counterclockwise: true
+      fill: '#00ff00',
+      segments: 16
     })
 
     const cleanup = component(gl)

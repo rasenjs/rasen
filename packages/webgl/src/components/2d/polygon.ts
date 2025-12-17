@@ -3,10 +3,10 @@
  */
 
 import type { SyncComponent } from '@rasenjs/core'
-import type { MaybeRef, CommonDrawProps, TransformProps, Bounds, Point } from '../types'
-import { unref, parseColor, createTranslationMatrix } from '../utils'
-import { getRenderContext } from '../render-context'
-import { element } from './element'
+import type { MaybeRef, CommonDrawProps, TransformProps, Bounds, Point } from '../../types'
+import { unref, parseColor } from '../../utils'
+import { getRenderContext } from '../../render-context'
+import { element } from '../element'
 
 export interface PolygonProps extends CommonDrawProps, TransformProps {
   points: MaybeRef<Point[]>
@@ -108,10 +108,13 @@ export const polygon: SyncComponent<
 
       if (!visible || opacity <= 0) return
 
-      const renderContext = getRenderContext(gl)
-      const batchRenderer = renderContext.getBatchRenderer()
+      const rotation = unref(props.rotation) ?? 0
+      const scaleX = unref(props.scaleX) ?? 1
+      const scaleY = unref(props.scaleY) ?? 1
 
-      if (fill && batchRenderer) {
+      const renderContext = getRenderContext(gl)
+
+      if (fill) {
         // Check cache - need deep compare for points array
         let needsRegen = !cachedGeometry || 
           !cachedPoints || 
@@ -134,9 +137,34 @@ export const polygon: SyncComponent<
         // Type guard: ensure geometry is not null after regeneration
         if (cachedGeometry) {
           const color = parseColor(fill)
-          color.a *= opacity
-          const transform = createTranslationMatrix(offsetX, offsetY)
-          batchRenderer.addShape(cachedGeometry, color, transform)
+          
+          // Get accumulated transform from group hierarchy
+          const transform = renderContext.getCurrentTransform()
+          
+          // Combine local opacity with group opacity
+          const finalOpacity = opacity * transform.opacity
+          color.a *= finalOpacity
+          
+          // Apply parent rotation to local position
+          const cos = Math.cos(transform.rotation)
+          const sin = Math.sin(transform.rotation)
+          const rotatedX = offsetX * cos - offsetY * sin
+          const rotatedY = offsetX * sin + offsetY * cos
+          
+          const finalTransform = {
+            tx: transform.tx + rotatedX * transform.scaleX,
+            ty: transform.ty + rotatedY * transform.scaleY,
+            rotation: transform.rotation + rotation,
+            scaleX: transform.scaleX * scaleX,
+            scaleY: transform.scaleY * scaleY
+          }
+          
+          renderContext.addShape(
+            `polygon-${points.length}`,
+            cachedGeometry,
+            color,
+            finalTransform
+          )
         }
       }
     },

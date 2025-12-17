@@ -5,6 +5,7 @@
  */
 
 export { RenderContext, type RenderContextOptions } from './render-context'
+export type { InstanceData } from './renderer/instanced'
 export * from './components'
 export * from './types'
 export * from './utils'

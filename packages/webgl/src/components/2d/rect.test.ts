@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
 import { rect } from './rect'
-import { createMockWebGLContext, createMockReactiveRuntime, waitForAsync } from '../test-utils'
+import { createMockWebGLContext, createMockReactiveRuntime, waitForAsync } from '../../test-utils'
 
 describe('rect', () => {
   let gl: WebGLRenderingContext

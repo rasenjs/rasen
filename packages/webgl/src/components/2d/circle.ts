@@ -3,10 +3,10 @@
  */
 
 import type { SyncComponent } from '@rasenjs/core'
-import type { MaybeRef, CommonDrawProps, TransformProps, Bounds } from '../types'
-import { unref, parseColor, createTranslationMatrix } from '../utils'
-import { getRenderContext } from '../render-context'
-import { element } from './element'
+import type { MaybeRef, CommonDrawProps, TransformProps, Bounds } from '../../types'
+import { unref, parseColor } from '../../utils'
+import { getRenderContext } from '../../render-context'
+import { element } from '../element'
 
 /**
  * Generate circle vertices (triangle fan approximation)
@@ -104,14 +104,16 @@ export const circle: SyncComponent<
       const segments = unref(props.segments) ?? 32
       const visible = unref(props.visible) ?? true
       const opacity = unref(props.opacity) ?? 1
+      const rotation = unref(props.rotation) ?? 0
+      const scaleX = unref(props.scaleX) ?? 1
+      const scaleY = unref(props.scaleY) ?? 1
 
       if (!visible || opacity <= 0 || radius <= 0) return
 
       const renderContext = getRenderContext(gl)
-      const batchRenderer = renderContext.getBatchRenderer()
 
-      if (fill && batchRenderer) {
-        // Check if geometry needs to be regenerated (only on shape changes)
+      if (fill) {
+        // Check if geometry needs to be regenerated
         if (cachedGeometry === null || 
             cachedRadius !== radius || 
             cachedSegments !== segments) {
@@ -122,13 +124,35 @@ export const circle: SyncComponent<
 
         // Parse color
         const color = parseColor(fill)
-        color.a *= opacity
+        
+        // Get accumulated transform from group hierarchy
+        const transform = renderContext.getCurrentTransform()
+        
+        // Combine local transform with group transform
+        const finalOpacity = opacity * transform.opacity
+        color.a *= finalOpacity
+        
+        // Apply parent rotation to local position
+        const cos = Math.cos(transform.rotation)
+        const sin = Math.sin(transform.rotation)
+        const rotatedX = x * cos - y * sin
+        const rotatedY = x * sin + y * cos
+        
+        const finalTransform = {
+          tx: transform.tx + rotatedX * transform.scaleX,
+          ty: transform.ty + rotatedY * transform.scaleY,
+          rotation: transform.rotation + rotation,
+          scaleX: transform.scaleX * scaleX,
+          scaleY: transform.scaleY * scaleY
+        }
 
-        // Use transform matrix for positioning
-        const transform = createTranslationMatrix(x, y)
-
-        // Add to batch
-        batchRenderer.addShape(cachedGeometry, color, transform)
+        // Add shape using unified interface
+        renderContext.addShape(
+          `circle-${segments}`,  // Batch key by segments count
+          cachedGeometry,
+          color,
+          finalTransform
+        )
       }
 
       // TODO: Implement stroke

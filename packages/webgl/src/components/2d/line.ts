@@ -3,10 +3,10 @@
  */
 
 import type { SyncComponent } from '@rasenjs/core'
-import type { MaybeRef, CommonDrawProps, TransformProps, Bounds } from '../types'
-import { unref, parseColor, createTranslationMatrix } from '../utils'
-import { getRenderContext } from '../render-context'
-import { element } from './element'
+import type { MaybeRef, CommonDrawProps, TransformProps, Bounds } from '../../types'
+import { unref, parseColor } from '../../utils'
+import { getRenderContext } from '../../render-context'
+import { element } from '../element'
 
 /**
  * Generate line vertices (as thick rectangle)
@@ -112,8 +112,29 @@ export const line: SyncComponent<
           cachedLineWidth = lineWidth
         }
         const color = parseColor(stroke)
-        color.a *= opacity
-        const transform = createTranslationMatrix(0, 0)
+        
+        // Get accumulated transform from group hierarchy
+        const groupTransform = renderContext.getCurrentTransform()
+        
+        // Combine local opacity with group opacity
+        const finalOpacity = opacity * groupTransform.opacity
+        color.a *= finalOpacity
+        
+        // Create full transform matrix
+        const cos = Math.cos(groupTransform.rotation)
+        const sin = Math.sin(groupTransform.rotation)
+        const transform = [
+          groupTransform.scaleX * cos,
+          groupTransform.scaleX * sin,
+          0,
+          -groupTransform.scaleY * sin,
+          groupTransform.scaleY * cos,
+          0,
+          groupTransform.tx,
+          groupTransform.ty,
+          1
+        ]
+        
         batchRenderer.addShape(cachedGeometry, color, transform)
       }
     },

@@ -1,13 +1,13 @@
 /**
- * Polygon component tests
+ * Arrow component tests
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
-import { polygon } from './polygon'
-import { createMockWebGLContext, createMockReactiveRuntime } from '../test-utils'
+import { arrow } from './arrow'
+import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
-describe('polygon', () => {
+describe('arrow', () => {
   let gl: WebGLRenderingContext
   let cleanupFns: Array<(() => void) | undefined>
 
@@ -26,14 +26,14 @@ describe('polygon', () => {
     vi.unstubAllGlobals()
   })
 
-  it('should create polygon component', () => {
-    const component = polygon({
-      points: [
-        { x: 100, y: 50 },
-        { x: 150, y: 100 },
-        { x: 50, y: 100 }
-      ],
-      fill: '#00ff88'
+  it('should create arrow component', () => {
+    const component = arrow({
+      x1: 50,
+      y1: 50,
+      x2: 150,
+      y2: 150,
+      fill: '#ff0088',
+      headSize: 10
     })
 
     expect(component).toBeDefined()
@@ -41,19 +41,14 @@ describe('polygon', () => {
     cleanupFns.push(cleanup)
   })
 
-  it('should support complex polygons', () => {
-    const component = polygon({
-      points: [
-        { x: 100, y: 50 },
-        { x: 120, y: 80 },
-        { x: 150, y: 90 },
-        { x: 130, y: 110 },
-        { x: 100, y: 120 },
-        { x: 70, y: 110 },
-        { x: 50, y: 90 },
-        { x: 80, y: 80 }
-      ],
-      fill: '#00ff88'
+  it('should support different head sizes', () => {
+    const component = arrow({
+      x1: 50,
+      y1: 50,
+      x2: 150,
+      y2: 150,
+      fill: '#ff0088',
+      headSize: 20
     })
 
     const cleanup = component(gl)
