@@ -3,7 +3,12 @@
 /**
  * Router configuration
  */
+import { setReactiveRuntime } from '@rasenjs/core'
+import { createReactiveRuntime } from '@rasenjs/reactive-signals'
 import { createRouter, createBrowserHistory, route } from '@rasenjs/router'
+
+// Initialize reactive runtime before creating router
+setReactiveRuntime(createReactiveRuntime())
 
 // Define routes
 export const routes = {
