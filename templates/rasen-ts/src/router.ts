@@ -10,8 +10,8 @@ import { createRouter, createBrowserHistory, route } from '@rasenjs/router'
 // Initialize reactive runtime before creating router
 setReactiveRuntime(createReactiveRuntime())
 
-// Define routes
-export const routes = {
+// Define routes configuration
+const routesConfig = {
   home: route('/'),
   counter: route('/counter'),
   todo: route('/todo'),
@@ -20,6 +20,7 @@ export const routes = {
 }
 
 // Create router instance
-export const router = createRouter(routes, {
+// The actual Route objects are available at router.routes
+export const router = createRouter(routesConfig, {
   history: createBrowserHistory(),
 })

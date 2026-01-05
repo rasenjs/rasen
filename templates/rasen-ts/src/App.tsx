@@ -4,8 +4,8 @@ import { ref, computed } from '@rasenjs/reactive-signals'
 import { com } from '@rasenjs/core'
 import { createRouterView, createLink } from '@rasenjs/router-dom'
 
-// Import router and routes
-import { router, routes } from './router'
+// Import router
+import { router } from './router'
 
 // Import views
 import { HomeView } from './views/HomeView'
@@ -40,7 +40,7 @@ export const App = com(() => {
       <header class="header">
         <div class="header-content">
           <div class="logo-section">
-            <Link to={routes.home} class="logo-link">
+            <Link to={router.routes.home} class="logo-link">
               <img src="/logo.svg" class="logo" alt="Rasen logo" />
               <div class="brand">
                 <h1 class="title">Rasen</h1>
@@ -61,31 +61,31 @@ export const App = com(() => {
       <nav class="nav">
         <div class="nav-content">
           <Link 
-            to={routes.home} 
+            to={router.routes.home} 
             class={computed(() => currentPath.value === '/' ? 'nav-link active' : 'nav-link')}
           >
             🏠 Home
           </Link>
           <Link 
-            to={routes.counter} 
+            to={router.routes.counter} 
             class={computed(() => currentPath.value === '/counter' ? 'nav-link active' : 'nav-link')}
           >
             🔢 Counter
           </Link>
           <Link 
-            to={routes.todo} 
+            to={router.routes.todo} 
             class={computed(() => currentPath.value === '/todo' ? 'nav-link active' : 'nav-link')}
           >
             📝 Todo
           </Link>
           <Link 
-            to={routes.timer} 
+            to={router.routes.timer} 
             class={computed(() => currentPath.value === '/timer' ? 'nav-link active' : 'nav-link')}
           >
             ⏱️ Timer
           </Link>
           <Link 
-            to={routes.about} 
+            to={router.routes.about} 
             class={computed(() => currentPath.value === '/about' ? 'nav-link active' : 'nav-link')}
           >
             ℹ️ About
