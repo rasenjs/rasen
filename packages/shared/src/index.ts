@@ -5,3 +5,4 @@
  */
 
 export { template, isTemplate, type Template, type ParamDef } from './template'
+export * from './bounds-utils'
