@@ -12,30 +12,28 @@ export interface Bounds {
 export interface ComponentInstance {
   bounds: () => Bounds | null
   draw: () => void
+  previousBounds?: Bounds | null  // Track previous bounds for dirty region optimization
 }
 
 /**
- * 渲染上下文配置选项
+ * Render context options
  */
 export interface RenderContextOptions {
   /**
-   * 是否启用脏区域检测
-   * 默认为 true（开启，只重绘脏区域）
-   *
-   * 开启时：只清除并重绘脏区域内的组件
-   * 关闭时：每次变化都清空整个画布并重绘所有组件
+   * Enable dirty region tracking (default: true)
+   * Only redraws changed regions
    */
   dirtyTracking?: boolean
 }
 
 /**
- * 渲染上下文
+ * Canvas 2D Render Context
  */
 export class RenderContext {
   private components = new Map<symbol, ComponentInstance>()
   private dirtyRegions: Bounds[] = []
   private rafId: number | null = null
-  private needsFullRedraw: boolean = false
+  private needsFullRedraw: boolean = true
   private options: Required<RenderContextOptions>
 
   constructor(
@@ -50,29 +48,38 @@ export class RenderContext {
   }
 
   /**
-   * 注册组件
+   * Register component
    */
   register(instance: ComponentInstance): symbol {
-    const id = Symbol()
+    const id = Symbol('component')
+    // Only initialize previousBounds if dirty tracking is enabled
+    if (this.options.dirtyTracking) {
+      instance.previousBounds = instance.bounds()
+    }
     this.components.set(id, instance)
     return id
   }
 
   /**
-   * 注销组件
+   * Unregister component
    */
   unregister(id: symbol) {
     this.components.delete(id)
   }
 
   /**
-   * 标记脏区域
+   * Mark dirty region
    */
   markDirty(bounds?: Bounds) {
     if (this.options.dirtyTracking && bounds) {
-      this.dirtyRegions.push(bounds)
+      // Limit dirty regions to avoid excessive array operations
+      // When too many regions are dirty, just do full redraw
+      if (this.dirtyRegions.length < 50) {
+        this.dirtyRegions.push(bounds)
+      } else {
+        this.needsFullRedraw = true
+      }
     } else {
-      // 不启用脏区域检测时，标记需要全量重绘
       this.needsFullRedraw = true
     }
     this.scheduleDraw()
@@ -84,18 +91,18 @@ export class RenderContext {
   private scheduleDraw() {
     if (this.rafId !== null) return
 
-    // 在浏览器环境使用 requestAnimationFrame，在测试环境使用 queueMicrotask
+    // Use requestAnimationFrame in browser, queueMicrotask in test environment
     if (typeof requestAnimationFrame !== 'undefined') {
       this.rafId = requestAnimationFrame(() => {
         this.rafId = null
-        this.flush()
+        this.draw()
       })
     } else {
-      // 测试环境：使用 queueMicrotask 立即执行
+      // Test environment
       this.rafId = 1 as unknown as number
       queueMicrotask(() => {
         this.rafId = null
-        this.flush()
+        this.draw()
       })
     }
   }
@@ -140,90 +147,102 @@ export class RenderContext {
   }
 
   /**
-   * 执行绘制
+   * Execute draw
    */
-  private flush() {
+  private draw() {
     const canvas = this.ctx.canvas
 
-    if (this.options.dirtyTracking) {
-      // 脏区域检测模式
-      if (this.dirtyRegions.length === 0) return
-
-      const dirtyBounds = this.mergeDirtyRegions()
-      this.dirtyRegions = []
-
-      if (!dirtyBounds) return
-
-      // 只清除脏区域
-      this.ctx.save()
-      this.ctx.beginPath()
-      this.ctx.rect(
-        dirtyBounds.x,
-        dirtyBounds.y,
-        dirtyBounds.width,
-        dirtyBounds.height
-      )
-      this.ctx.clip()
-      this.ctx.clearRect(
-        dirtyBounds.x,
-        dirtyBounds.y,
-        dirtyBounds.width,
-        dirtyBounds.height
-      )
-
-      // 只重绘与脏区域相交的组件
-      this.components.forEach((comp) => {
-        const compBounds = comp.bounds()
-        if (compBounds && this.boundsIntersect(compBounds, dirtyBounds)) {
-          comp.draw()
-        }
-      })
-
-      this.ctx.restore()
-    } else {
-      // 全量重绘模式（默认）
-      if (!this.needsFullRedraw) return
-      this.needsFullRedraw = false
-
-      // 清空整个 canvas 并重绘所有组件
+    if (this.needsFullRedraw) {
+      // Full redraw mode - no bounds tracking needed
       this.ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      // 重绘所有组件
-      this.components.forEach((comp) => {
+      // Just draw, skip bounds calculation
+      for (const comp of this.components.values()) {
         comp.draw()
-      })
+      }
+
+      this.needsFullRedraw = false
+    } else if (this.dirtyRegions.length > 0) {
+      // Dirty region rendering
+      const dirtyBounds = this.mergeDirtyRegions()
+      
+      if (dirtyBounds) {
+        // Clear and redraw dirty region
+        this.ctx.save()
+        this.ctx.beginPath()
+        this.ctx.rect(
+          dirtyBounds.x,
+          dirtyBounds.y,
+          dirtyBounds.width,
+          dirtyBounds.height
+        )
+        this.ctx.clip()
+        
+        // Clear entire dirty region
+        this.ctx.clearRect(
+          dirtyBounds.x,
+          dirtyBounds.y,
+          dirtyBounds.width,
+          dirtyBounds.height
+        )
+
+        // Redraw components that intersect with dirty region
+        for (const comp of this.components.values()) {
+          const compBounds = comp.bounds()
+          const prevBounds = comp.previousBounds
+          
+          let shouldDraw = false
+          // Check current bounds
+          if (compBounds && this.boundsIntersect(compBounds, dirtyBounds)) {
+            shouldDraw = true
+          }
+          // Check last drawn bounds (might have moved away from there)
+          if (!shouldDraw && prevBounds && this.boundsIntersect(prevBounds, dirtyBounds)) {
+            shouldDraw = true
+          }
+          
+          if (shouldDraw) {
+            comp.draw()
+          }
+          
+          // Update previousBounds for next frame dirty tracking
+          comp.previousBounds = compBounds ? { ...compBounds } : null
+        }
+
+        this.ctx.restore()
+      }
     }
-  }
-
-  /**
-   * 同步刷新 - 供测试使用
-   * 在测试环境中，queueMicrotask 可能不会立即执行
-   * 这个方法可以强制立即执行渲染
-   */
-  flushSync() {
-    // 取消已调度的渲染
-    if (this.rafId !== null) {
-      this.rafId = null
-    }
-
-    // 强制清屏并重绘所有组件（即使没有脏区域）
-    const canvas = this.ctx.canvas
-    this.ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-    // 重绘所有组件
-    this.components.forEach((comp) => {
-      comp.draw()
-    })
-
-    // 清空脏区域列表
+    
     this.dirtyRegions = []
   }
 
   /**
-   * 销毁上下文
+   * Manually trigger full redraw (bypasses watch system)
+   * Use this for batch updates in animation loops or testing
+   */
+  flushSync() {
+    // Cancel any scheduled draw
+    if (this.rafId !== null) {
+      this.rafId = null
+    }
+
+    // Force full redraw
+    const canvas = this.ctx.canvas
+    this.ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    // Draw all components
+    this.components.forEach((comp) => {
+      comp.draw()
+    })
+
+    // Clear dirty regions
+    this.dirtyRegions = []
+  }
+
+  /**
+   * Cleanup
    */
   destroy() {
-    // 清空调度标记
     this.rafId = null
     this.components.clear()
     this.dirtyRegions = []

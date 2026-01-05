@@ -3,6 +3,7 @@
  */
 
 import type { Bounds } from './types'
+import { boundsIntersect, mergeBounds } from '@rasenjs/shared'
 import { BatchRenderer } from './renderer/batch'
 import { InstancedBatchRenderer } from './renderer/instanced'
 import { createOrthoMatrix } from './utils'
@@ -10,6 +11,7 @@ import { createOrthoMatrix } from './utils'
 export interface ComponentInstance {
   bounds: () => Bounds | null
   draw: () => void
+  lastDrawnBounds?: Bounds | null  // Bounds when last drawn, for dirty checking
 }
 
 /**
@@ -211,10 +213,10 @@ export class RenderContext {
     const gl = this.gl
     
     if (this.needsFullRedraw) {
-      // Clear entire canvas
+      // Full redraw - no bounds tracking needed
       gl.clear(gl.COLOR_BUFFER_BIT)
       
-      // Draw all components
+      // Just draw, skip bounds calculation
       for (const component of this.components.values()) {
         component.draw()
       }
@@ -228,16 +230,42 @@ export class RenderContext {
       
       this.needsFullRedraw = false
     } else if (this.dirtyRegions.length > 0) {
-      // TODO: Implement dirty region rendering
-      // For now, just do full redraw
-      gl.clear(gl.COLOR_BUFFER_BIT)
-      for (const component of this.components.values()) {
-        component.draw()
-      }
-      if (this.instancedRenderer) {
-        this.instancedRenderer.flush()
-      } else if (this.batchRenderer) {
-        this.batchRenderer.flush()
+      // Dirty region rendering
+      const dirtyBounds = mergeBounds(this.dirtyRegions)
+      
+      if (dirtyBounds) {
+        // Clear entire canvas (WebGL doesn't have partial clear)
+        gl.clear(gl.COLOR_BUFFER_BIT)
+        
+        // Redraw components that intersect with dirty region
+        for (const component of this.components.values()) {
+          const currentBounds = component.bounds()
+          const lastBounds = component.lastDrawnBounds
+          
+          let shouldDraw = false
+          // Check current bounds
+          if (currentBounds && boundsIntersect(currentBounds, dirtyBounds)) {
+            shouldDraw = true
+          }
+          // Check last drawn bounds (might have moved away from there)
+          if (!shouldDraw && lastBounds && boundsIntersect(lastBounds, dirtyBounds)) {
+            shouldDraw = true
+          }
+          
+          if (shouldDraw) {
+            component.draw()
+          }
+          
+          // Update lastDrawnBounds for next frame dirty tracking
+          component.lastDrawnBounds = currentBounds ? { ...currentBounds } : null
+        }
+        
+        // Flush batch or instanced renderer
+        if (this.instancedRenderer) {
+          this.instancedRenderer.flush()
+        } else if (this.batchRenderer) {
+          this.batchRenderer.flush()
+        }
       }
     }
     

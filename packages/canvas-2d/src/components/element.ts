@@ -95,10 +95,15 @@ export const element = com(
         const update = () => {
           const newBounds = getBounds(ctx)
 
+          // Mark both old and new bounds dirty for animation trails
+          // Old bounds: clear previous position
+          // New bounds: render at new position
           if (currentBounds) {
             renderContext.markDirty(currentBounds)
           }
-          renderContext.markDirty(newBounds)
+          if (newBounds) {
+            renderContext.markDirty(newBounds)
+          }
           currentBounds = newBounds
         }
 

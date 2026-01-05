@@ -1,6 +1,7 @@
 /**
  * WebGL types - reusable across components
  */
+import type { Bounds } from '@rasenjs/shared'
 
 // Re-export common types from canvas-2d compatible definitions
 export interface Ref<T = unknown> {
@@ -23,12 +24,7 @@ export interface Size {
   height: number
 }
 
-export interface Bounds {
-  x: number
-  y: number
-  width: number
-  height: number
-}
+export type { Bounds }
 
 /**
  * Color in RGBA format (0-1 range for GPU)
