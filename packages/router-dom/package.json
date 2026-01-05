@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/router-dom",
-  "version": "0.1.3-alpha",
+  "version": "0.1.4-alpha",
   "description": "Rasen Router for DOM - batteries included",
   "type": "module",
   "main": "./dist/index.cjs",

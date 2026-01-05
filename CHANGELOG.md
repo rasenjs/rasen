@@ -5,6 +5,19 @@ All notable changes to the Rasen project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4-alpha] - 2026-01-05
+
+### Fixed
+
+#### Router
+- **Critical**: Fixed Link component not passing through props like `class` and `style`
+  - Link components were missing CSS classes causing styling issues
+  - Now properly spreads all additional props to the underlying Anchor component
+
+#### Template
+- Restored original home page structure with hero section, code examples, and features grid
+- Fixed layout structure to match original design
+
 ## [0.1.3-alpha] - 2026-01-05
 
 ### Added
