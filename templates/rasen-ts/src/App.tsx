@@ -93,10 +93,8 @@ export const App = com(() => {
         </div>
       </nav>
 
-      {/* Main Content with Router View */}
-      <main class="main">
-        <RouterView />
-      </main>
+      {/* Router View */}
+      <RouterView />
 
       {/* Footer */}
       <footer class="footer">

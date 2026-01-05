@@ -201,7 +201,7 @@ export function createRouterLink<TRoutes extends Record<string, unknown>, Host>(
     props: any,
     ...restChildren: Array<Child<Host>>
   ): Mountable<Host> {
-    const { to, params, query, children: propsChildren } = props
+    const { to, params, query, children: propsChildren, ...restProps } = props
 
     // 支持两种方式：props.children 或 rest 参数
     const children = propsChildren ?? restChildren
@@ -241,7 +241,8 @@ export function createRouterLink<TRoutes extends Record<string, unknown>, Host>(
       return router.current.route === to
     }
 
-    return Anchor({ href, dataActive: isActive, onClick }, ...children)
+    // 合并所有props，包括用户传入的其他属性（如class, style等）
+    return Anchor({ ...restProps, href, dataActive: isActive, onClick }, ...children)
   }
 
   return Link
