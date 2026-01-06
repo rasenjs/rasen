@@ -10,11 +10,11 @@
   },
   "dependencies": {
     "@rasenjs/core": "^0.1.3-alpha",
-    "@rasenjs/dom": "^0.1.3-alpha",
+    "@rasenjs/dom": "0.1.4-alpha",
     "@rasenjs/jsx-runtime": "^0.1.3-alpha",
     "@rasenjs/reactive-signals": "^0.1.3-alpha",
-    "@rasenjs/router": "^0.1.4-alpha",
-    "@rasenjs/router-dom": "^0.1.4-alpha"
+    "@rasenjs/router": "0.1.5-alpha",
+    "@rasenjs/router-dom": "0.1.5-alpha",
   },
   "devDependencies": {
     "typescript": "^5.6.0",

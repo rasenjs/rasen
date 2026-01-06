@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/router",
-  "version": "0.1.4-alpha",
+  "version": "0.1.5-alpha",
   "description": "Headless router - Framework-agnostic path matching and routing utilities",
   "type": "module",
   "main": "./dist/index.cjs",
