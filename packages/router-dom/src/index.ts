@@ -54,6 +54,7 @@ import { a } from '@rasenjs/dom'
 import { hostHooks } from '@rasenjs/dom'
 import type { Mountable } from '@rasenjs/core'
 import type { Router } from '@rasenjs/router'
+import type { ElementProps } from '@rasenjs/dom'
 
 // Import scroll restoration
 import { useScrollRestoration, type ScrollPosition } from './scroll-restoration'
@@ -67,15 +68,14 @@ export { useScrollRestoration, type ScrollPosition }
  *
  * 自动注入 DOM 操作钩子，无需手动配置
  */
-export function createRouterView<TRoutes extends object>(
-  router: Router,
+export function createRouterView<TRoutes extends Record<string, unknown>>(
+  router: Router<TRoutes>,
   views: ViewsConfig<TRoutes, HTMLElement>,
   options: {
     default?: () => Mountable<HTMLElement>
   } = {}
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return createRouterViewFactory<any, HTMLElement, Node>(router as any, views, {
+  return createRouterViewFactory<TRoutes, HTMLElement, Node>(router, views, {
     ...options,
     hostHooks
   })
@@ -86,19 +86,22 @@ export function createRouterView<TRoutes extends object>(
  *
  * 使用 <a> 元素作为锚点，自动处理 data-active 属性
  */
-export function createLink(router: Router) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return createRouterLinkFactory<any, HTMLElement>(router as any, a)
+export function createRouterLink<TRoutes extends Record<string, unknown>>(router: Router<TRoutes>) {
+  // 提取 a 元素的 props 类型（不包括 tag）
+  type AnchorProps = Omit<ElementProps<'a'>, 'tag'>
+  return createRouterLinkFactory<TRoutes, HTMLElement, AnchorProps>(router, a)
 }
 
-// Alias for compatibility
-export const createRouterLink = createLink
+/**
+ * @deprecated Use createRouterLink instead
+ */
+export const createLink = createRouterLink
 
 /**
  * 创建 LeaveGuard 组件（DOM 版）
  *
  * 与 router 版本相同，因为不需要 DOM 特定操作
  */
-export function createLeaveGuard(router: Router) {
+export function createLeaveGuard<TRoutes extends Record<string, unknown>>(router: Router<TRoutes>) {
   return createLeaveGuardFactory(router)
 }

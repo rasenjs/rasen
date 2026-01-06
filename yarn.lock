@@ -3114,7 +3114,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/core@npm:^0.1.2-alpha, @rasenjs/core@workspace:*, @rasenjs/core@workspace:packages/core":
+"@rasenjs/core@npm:^0.1.3-alpha, @rasenjs/core@workspace:*, @rasenjs/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@rasenjs/core@workspace:packages/core"
   dependencies:
@@ -3127,7 +3127,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/dom@npm:^0.1.2-alpha, @rasenjs/dom@workspace:*, @rasenjs/dom@workspace:packages/dom":
+"@rasenjs/dom@npm:^0.1.3-alpha, @rasenjs/dom@workspace:*, @rasenjs/dom@workspace:packages/dom":
   version: 0.0.0-use.local
   resolution: "@rasenjs/dom@workspace:packages/dom"
   dependencies:
@@ -3231,7 +3231,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/jsx-runtime@npm:^0.1.2-alpha, @rasenjs/jsx-runtime@workspace:*, @rasenjs/jsx-runtime@workspace:packages/jsx-runtime":
+"@rasenjs/jsx-runtime@npm:^0.1.3-alpha, @rasenjs/jsx-runtime@workspace:*, @rasenjs/jsx-runtime@workspace:packages/jsx-runtime":
   version: 0.0.0-use.local
   resolution: "@rasenjs/jsx-runtime@workspace:packages/jsx-runtime"
   dependencies:
@@ -3277,7 +3277,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/reactive-signals@npm:^0.1.2-alpha, @rasenjs/reactive-signals@workspace:*, @rasenjs/reactive-signals@workspace:packages/reactive-signals":
+"@rasenjs/reactive-signals@npm:^0.1.3-alpha, @rasenjs/reactive-signals@workspace:*, @rasenjs/reactive-signals@workspace:packages/reactive-signals":
   version: 0.0.0-use.local
   resolution: "@rasenjs/reactive-signals@workspace:packages/reactive-signals"
   dependencies:
@@ -3301,7 +3301,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/router-dom@workspace:*, @rasenjs/router-dom@workspace:packages/router-dom":
+"@rasenjs/router-dom@npm:^0.1.4-alpha, @rasenjs/router-dom@workspace:*, @rasenjs/router-dom@workspace:packages/router-dom":
   version: 0.0.0-use.local
   resolution: "@rasenjs/router-dom@workspace:packages/router-dom"
   dependencies:
@@ -3315,7 +3315,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/router@workspace:*, @rasenjs/router@workspace:packages/router":
+"@rasenjs/router@npm:^0.1.4-alpha, @rasenjs/router@workspace:*, @rasenjs/router@workspace:packages/router":
   version: 0.0.0-use.local
   resolution: "@rasenjs/router@workspace:packages/router"
   dependencies:
@@ -10309,10 +10309,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "rasen-app@workspace:templates/rasen-ts"
   dependencies:
-    "@rasenjs/core": "npm:^0.1.2-alpha"
-    "@rasenjs/dom": "npm:^0.1.2-alpha"
-    "@rasenjs/jsx-runtime": "npm:^0.1.2-alpha"
-    "@rasenjs/reactive-signals": "npm:^0.1.2-alpha"
+    "@rasenjs/core": "npm:^0.1.3-alpha"
+    "@rasenjs/dom": "npm:^0.1.3-alpha"
+    "@rasenjs/jsx-runtime": "npm:^0.1.3-alpha"
+    "@rasenjs/reactive-signals": "npm:^0.1.3-alpha"
+    "@rasenjs/router": "npm:^0.1.4-alpha"
+    "@rasenjs/router-dom": "npm:^0.1.4-alpha"
     typescript: "npm:^5.6.0"
     vite: "npm:^6.0.0"
   languageName: unknown

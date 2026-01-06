@@ -4,6 +4,7 @@
 
 export { domContext } from './dom-context'
 export { element } from './element'
+export type { ElementProps, HTMLTagName } from './element'
 export { html } from './html'
 export { each, repeat } from './each'
 export { when } from './when'

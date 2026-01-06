@@ -2,7 +2,7 @@
 
 import { ref, computed } from '@rasenjs/reactive-signals'
 import { com } from '@rasenjs/core'
-import { createRouterView, createLink } from '@rasenjs/router-dom'
+import { createRouterView, createRouterLink } from '@rasenjs/router-dom'
 
 // Import router
 import { router } from './router'
@@ -29,10 +29,10 @@ const RouterView = createRouterView(router, {
   about: () => AboutView(),
 })
 
-const Link = createLink(router)
+const Link = createRouterLink(router)
 
 export const App = com(() => {
-  const currentPath = computed(() => router.currentRoute.value?.path || '/')
+  const currentPath = computed(() => router.current?.path || '/')
 
   return (
     <div class="app">

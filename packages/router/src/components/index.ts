@@ -71,6 +71,7 @@ export function makeRouterReactive<TRoutes extends Record<string, any>>(
 
 /**
  * 子元素类型
+ * 与 DOM 的 Child 类型兼容
  */
 export type Child<Host> = string | Mountable<Host>
 
@@ -98,9 +99,9 @@ export interface AnchorProps {
  * 接受 (props, ...children) 或 (...args) 形式
  * 与 @rasenjs/dom 的 a 组件兼容
  */
-export type Anchor<Host> = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ...args: any[]
+export type Anchor<Host, P = any> = (
+  props: P,
+  ...children: Array<Child<Host>>
 ) => Mountable<Host>
 
 // ============================================================================
@@ -113,36 +114,39 @@ export type Anchor<Host> = (
  * 支持两种导航方式，具有完整的类型推断：
  * 1. 通过 Route 对象（类型安全）- params 根据 Route 的参数类型自动可选/必需
  * 2. 通过字符串路由键（类型安全）- params 根据实际传入自动可选/必需
+ * 
+ * 通过泛型 AnchorProps 支持扩展宿主组件的所有属性（如 class, style 等）
  */
 
 /** Link Props - 通过 Route 对象（无参数或自动判断） */
-export interface LinkPropsRoute<
+export type LinkPropsRoute<
   P extends Record<string, unknown> = Record<string, never>,
   Q extends QuerySchema = Record<string, never>,
-  Host = unknown
-> {
+  Host = unknown,
+  AP = {}
+> = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   to: Route<P, Q, any>
   params?: P extends Record<string, never> ? never : P
   query?: Partial<InferQueryParams<Q>>
-  children?: Array<Child<Host>>
-}
+  children?: Array<Child<Host>> | Child<Host>
+} & Omit<AP, 'to' | 'params' | 'query' | 'children'>
 
 /** Link Props - 通过字符串键（无参数） */
-export interface LinkPropsKey<Host = unknown> {
+export type LinkPropsKey<Host = unknown, AP = {}> = {
   to: string
   params?: never
   query?: Record<string, unknown>
-  children?: Array<Child<Host>>
-}
+  children?: Array<Child<Host>> | Child<Host>
+} & Omit<AP, 'to' | 'params' | 'query' | 'children'>
 
 /** Link Props - 通过字符串键（有参数） */
-export interface LinkPropsKeyWithParams<Host = unknown> {
+export type LinkPropsKeyWithParams<Host = unknown, AP = {}> = {
   to: string
   params: Record<string, unknown>
   query?: Record<string, unknown>
-  children?: Array<Child<Host>>
-}
+  children?: Array<Child<Host>> | Child<Host>
+} & Omit<AP, 'to' | 'params' | 'query' | 'children'>
 
 /**
  * 创建 Link 组件
@@ -170,20 +174,24 @@ export interface LinkPropsKeyWithParams<Host = unknown> {
  * Link({ to: 'user', params: { id: '123' } }, 'User')
  * ```
  */
-export function createRouterLink<TRoutes extends Record<string, unknown>, Host>(
+export function createRouterLink<
+  TRoutes extends Record<string, unknown>, 
+  Host,
+  AnchorPropsType = any
+>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   router: Router<TRoutes>,
-  Anchor: Anchor<Host>
+  Anchor: Anchor<Host, AnchorPropsType>
 ) {
   // 重载签名 - 顺序很重要，更具体的重载应该在前面
   
   function Link(
-    props: LinkPropsKeyWithParams<Host>,
+    props: LinkPropsKeyWithParams<Host, AnchorPropsType>,
     ...restChildren: Array<Child<Host>>
   ): Mountable<Host>
 
   function Link(
-    props: LinkPropsKey<Host>,
+    props: LinkPropsKey<Host, AnchorPropsType>,
     ...restChildren: Array<Child<Host>>
   ): Mountable<Host>
 
@@ -191,7 +199,7 @@ export function createRouterLink<TRoutes extends Record<string, unknown>, Host>(
     P extends Record<string, unknown>,
     Q extends QuerySchema = Record<string, never>
   >(
-    props: LinkPropsRoute<P, Q, Host>,
+    props: LinkPropsRoute<P, Q, Host, AnchorPropsType>,
     ...restChildren: Array<Child<Host>>
   ): Mountable<Host>
 
@@ -204,7 +212,13 @@ export function createRouterLink<TRoutes extends Record<string, unknown>, Host>(
     const { to, params, query, children: propsChildren, ...restProps } = props
 
     // 支持两种方式：props.children 或 rest 参数
-    const children = propsChildren ?? restChildren
+    // props.children 可能是单个 child 或数组
+    let children: Array<Child<Host>>
+    if (propsChildren !== undefined) {
+      children = Array.isArray(propsChildren) ? propsChildren : [propsChildren]
+    } else {
+      children = restChildren
+    }
 
     // 构建 options
     const options = params !== undefined || query !== undefined
