@@ -32,6 +32,8 @@
     "examples:webgl:dev": "yarn workspace @rasenjs/examples-webgl dev",
     "examples:webgl:build": "yarn workspace @rasenjs/examples-webgl build",
     "examples:webgl:preview": "yarn workspace @rasenjs/examples-webgl preview",
+    "examples:ssr:dev": "yarn workspace @rasenjs/example-ssr dev",
+    "examples:ssr:build": "yarn workspace @rasenjs/example-ssr build",
     "www:dev": "yarn workspace @rasenjs/www dev",
     "www:build": "yarn workspace @rasenjs/www build",
     "www:preview": "yarn workspace @rasenjs/www preview"

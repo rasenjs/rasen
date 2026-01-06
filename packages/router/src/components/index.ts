@@ -375,14 +375,15 @@ export function createRouterView<TRoutes extends Record<string, unknown>, Host =
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   // 收集所有 Route 到视图的映射
-  const routeToView = new Map<
-    Route<any, any, any>,
+  // 使用 fullPath 作为 key 而不是 Route 对象，避免 SSR+hydration 时引用不匹配
+  const pathToView = new Map<
+    string,
     (params: any) => Mountable<Host>
   >()
-  const routeToKey = new Map<Route<any, any, any>, string>()
+  const pathToKey = new Map<string, string>()
   // 收集每个路由所在层级的布局
-  const routeToLayouts = new Map<
-    Route<any, any, any>,
+  const pathToLayouts = new Map<
+    string,
     LayoutComponent<Host>[]
   >()
   /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -414,9 +415,10 @@ export function createRouterView<TRoutes extends Record<string, unknown>, Host =
       if (routeValue && routeValue._isRoute === true) {
         // 这是一个 Route
         if (typeof viewValue === 'function') {
-          routeToView.set(routeValue, viewValue)
-          routeToKey.set(routeValue, fullKey)
-          routeToLayouts.set(routeValue, layouts)
+          const fullPath = routeValue.fullPath
+          pathToView.set(fullPath, viewValue)
+          pathToKey.set(fullPath, fullKey)
+          pathToLayouts.set(fullPath, layouts)
         }
       } else if (
         routeValue &&
@@ -456,14 +458,19 @@ export function createRouterView<TRoutes extends Record<string, unknown>, Host =
     // 构建 switch 的 cases
     const cases: Record<string, () => Mountable<Host>> = {}
 
-    for (const [route, viewFactory] of routeToView) {
-      const key = routeToKey.get(route)!
-      const layouts = routeToLayouts.get(route) || []
+    for (const [fullPath, viewFactory] of pathToView) {
+      const key = pathToKey.get(fullPath)!
+      const layouts = pathToLayouts.get(fullPath) || []
 
+      // case 工厂返回 Mountable，在其中获取最新的 router.current
       cases[key] = () => {
-        const match = router.current
-        const params = match?.params ?? {}
-        return wrapWithLayouts(() => viewFactory(params), layouts)
+        // wrapWithLayouts 返回 Mountable<Host>
+        // 直接返回它，让它在挂载时获取 params
+        return wrapWithLayouts(() => {
+          const match = router.current
+          const params = match?.params ?? {}
+          return viewFactory(params)
+        }, layouts)
       }
     }
 
@@ -471,7 +478,8 @@ export function createRouterView<TRoutes extends Record<string, unknown>, Host =
       value: () => {
         const currentRoute = router.current?.route
         if (!currentRoute) return undefined
-        return routeToKey.get(currentRoute)
+        // 使用 fullPath 查找，避免对象引用问题
+        return pathToKey.get(currentRoute.fullPath)
       },
       cases,
       default: options?.default,

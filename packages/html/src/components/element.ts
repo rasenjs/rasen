@@ -19,11 +19,10 @@ export const element = (props: {
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
   attrs?: PropValue<Record<string, string | number | boolean>>
-  /** Text content or child mount functions */
-  children?: PropValue<string> | Array<Mountable<StringHost>>
+  /** Text content or child mount functions (including reactive text functions) */
+  children?: PropValue<string> | Array<string | (() => string | number) | Mountable<StringHost>>
   value?: PropValue<string | number>
-  // SSR 不需要事件处理，但保持 API 兼容
-  on?: Record<string, (e: Event) => void>
+  // SSR does not need events - removed for consistency
 }): Mountable<StringHost> => {
   return (host: StringHost) => {
     const tag = props.tag
@@ -56,13 +55,29 @@ export const element = (props: {
       html += stringifyAttr('value', String(value))
     }
 
-    // attrs
+    // attrs (other attributes)
     const attrs = unrefValue(props.attrs)
     if (attrs) {
       for (const [key, val] of Object.entries(attrs)) {
         // 跳过无效的属性名（数字开头或纯数字）
         if (/^\d/.test(key)) continue
         html += stringifyAttr(key, val)
+      }
+    }
+    
+    // 处理其他props（除了特殊props和已处理的）
+    const specialProps = new Set(['tag', 'id', 'className', 'style', 'value', 'attrs', 'children', 'on'])
+    for (const [key, val] of Object.entries(props)) {
+      if (specialProps.has(key)) continue
+      if (key.startsWith('on')) continue // 跳过事件处理器（SSR不需要）
+      if (val === undefined || val === null) continue
+      
+      const attrValue = unrefValue(val as PropValue<unknown>)
+      if (attrValue !== undefined && attrValue !== null) {
+        // 只处理基本类型（string, number, boolean）
+        if (typeof attrValue === 'string' || typeof attrValue === 'number' || typeof attrValue === 'boolean') {
+          html += stringifyAttr(key, attrValue)
+        }
       }
     }
 
@@ -81,7 +96,7 @@ export const element = (props: {
         // String content (or ref to string)
         html += escapeHtml(String(unrefValue(children as PropValue<string>)))
       } else if (Array.isArray(children) && children.length > 0) {
-        // Mountable children - 创建子宿主收集子元素内容
+        // Array of children - 创建子宿主收集子元素内容
         const childHost: StringHost = {
           fragments: [],
           append(s: string) {
@@ -93,7 +108,22 @@ export const element = (props: {
         }
 
         for (const child of children) {
-          child(childHost)
+          if (child === null || child === undefined) continue
+          
+          if (typeof child === 'string') {
+            // String child
+            childHost.append(escapeHtml(child))
+          } else if (typeof child === 'function') {
+            // Function - could be Mountable or reactive text function
+            // Call it with childHost and check the return value type
+            const result = (child as any)(childHost)
+            
+            // If it returns string/number, it's a reactive text function that ignored our parameter
+            if (typeof result === 'string' || typeof result === 'number') {
+              childHost.append(escapeHtml(String(result)))
+            }
+            // Otherwise it's a Mountable, already executed correctly
+          }
         }
 
         html += childHost.toString()

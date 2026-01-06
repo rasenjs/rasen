@@ -1,0 +1,26 @@
+{
+  "name": "@rasenjs/web",
+  "version": "0.1.0-alpha",
+  "description": "Isomorphic web components with routing (exports DOM or HTML based on environment)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "ssr": "./dist/html.js",
+      "browser": "./dist/dom.js",
+      "default": "./dist/dom.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@rasenjs/dom": "workspace:*",
+    "@rasenjs/html": "workspace:*",
+    "@rasenjs/router-dom": "workspace:*",
+    "@rasenjs/router-html": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  }
+}

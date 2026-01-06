@@ -8,8 +8,8 @@ import { element, type ElementProps, type HTMLTagName } from './element'
 /** 元素组件的 Props 类型（不含 tag） */
 type Props<T extends HTMLTagName> = Omit<ElementProps<T>, 'tag'>
 
-/** Child 类型 */
-type Child = Mountable<HTMLElement> | string
+/** Child 类型 - 响应式文本函数需要放在前面，避免被误匹配为 Mountable */
+type Child = string | (() => string | number) | Mountable<HTMLElement>
 
 /**
  * 创建元素组件的工厂函数
@@ -17,10 +17,22 @@ type Child = Mountable<HTMLElement> | string
  * 最终统一转成 element({ tag, children, ... }) 的形式
  */
 function createElement<T extends HTMLTagName>(tag: T) {
-  return (
+  // 重载：明确支持响应式文本函数
+  function el(): Mountable<HTMLElement>
+  function el(text: string): Mountable<HTMLElement>
+  function el(textFn: () => string | number): Mountable<HTMLElement>
+  function el(child: Mountable<HTMLElement>): Mountable<HTMLElement>
+  function el(props: Props<T>): Mountable<HTMLElement>
+  function el(props: Props<T>, ...children: Child[]): Mountable<HTMLElement>
+  function el(text: string, ...children: Child[]): Mountable<HTMLElement>
+  function el(textFn: () => string | number, ...children: Child[]): Mountable<HTMLElement>
+  function el(child: Mountable<HTMLElement>, ...children: Child[]): Mountable<HTMLElement>
+  
+  // 实现
+  function el(
     propsOrChild?: Props<T> | Child,
     ...restChildren: Child[]
-  ): Mountable<HTMLElement> => {
+  ): Mountable<HTMLElement> {
     // 没有参数
     if (propsOrChild === undefined) {
       return element({ tag } as unknown as ElementProps<T>)
@@ -50,6 +62,8 @@ function createElement<T extends HTMLTagName>(tag: T) {
 
     return element({ tag, ...props } as unknown as ElementProps<T>)
   }
+  
+  return el
 }
 
 // ============================================================================

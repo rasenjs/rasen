@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "jsxImportSource": "@rasenjs/jsx-runtime"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
