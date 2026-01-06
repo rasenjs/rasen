@@ -43,6 +43,8 @@
 | -------------------------------------------------------- | -------------------------------------------- |
 | [@rasenjs/core](./packages/core)                         | Core runtime and type definitions            |
 | [@rasenjs/dom](./packages/dom)                           | DOM rendering components                     |
+| [@rasenjs/router](./packages/router)                     | Framework-agnostic router core               |
+| [@rasenjs/router-dom](./packages/router-dom)             | DOM-specific router components               |
 | [@rasenjs/canvas-2d](./packages/canvas-2d)               | Canvas 2D rendering components               |
 | [@rasenjs/react-native](./packages/react-native)         | React Native Fabric renderer                 |
 | [@rasenjs/gpui](./packages/gpui)                         | GPU-accelerated native desktop (Zed's GPUI)  |
@@ -95,6 +97,54 @@ const Counter = () =>
 
 // 4. Mount to DOM
 mount(Counter(), document.getElementById('app'))
+```
+
+### With Router
+
+```typescript
+import { setReactiveRuntime } from '@rasenjs/core'
+import { createReactiveRuntime } from '@rasenjs/reactive-signals'
+import { createRouter, createBrowserHistory, route } from '@rasenjs/router'
+import { createRouterView, createRouterLink } from '@rasenjs/router-dom'
+import { div, mount } from '@rasenjs/dom'
+
+// Setup reactive runtime
+setReactiveRuntime(createReactiveRuntime())
+
+// Define routes
+const router = createRouter({
+  home: route('/'),
+  about: route('/about'),
+}, {
+  history: createBrowserHistory(),
+})
+
+// Create router components
+const RouterView = createRouterView(router, {
+  home: () => div({ textContent: 'Home Page' }),
+  about: () => div({ textContent: 'About Page' }),
+})
+
+const Link = createRouterLink(router)
+
+// App with navigation
+const App = () => div({
+  children: [
+    Link({ to: router.routes.home, children: 'Home' }),
+    Link({ to: router.routes.about, children: 'About' }),
+    RouterView(),
+  ]
+})
+
+mount(App(), document.getElementById('app'))
+```
+
+**Try the template with Router:**
+```bash
+npx degit rasenjs/rasen/templates/rasen-ts my-app
+cd my-app
+yarn install
+yarn dev
 ```
 
 ## Cross-Platform Examples
