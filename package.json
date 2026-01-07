@@ -7,7 +7,6 @@
   "workspaces": [
     "packages/*",
     "examples/*",
-    "templates/*",
     "www"
   ],
   "scripts": {

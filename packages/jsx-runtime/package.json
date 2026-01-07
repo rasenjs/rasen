@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/jsx-runtime",
-  "version": "0.1.4-alpha",
+  "version": "0.1.5-alpha",
   "description": "JSX runtime for Rasen",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -47,11 +47,13 @@
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
-  "dependencies": {
-    "@rasenjs/core": "workspace:*",
-    "@rasenjs/web": "workspace:*"
+  "peerDependencies": {
+    "@rasenjs/core": "^0.1.0-alpha",
+    "@rasenjs/web": "^0.1.0-alpha"
   },
   "devDependencies": {
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/web": "workspace:*",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"
   }
