@@ -11,8 +11,8 @@
  */
 
 import type { Mountable } from '@rasenjs/core'
-import { getReactiveRuntime, fragment } from '@rasenjs/core'
-import { text } from '@rasenjs/web'
+import { getReactiveRuntime } from '@rasenjs/core'
+import { text, fragment } from '@rasenjs/web'
 import { findTag } from './tag-config'
 
 // Auto-configure default DOM tags
@@ -188,11 +188,11 @@ export function jsxs(
  * 
  * JSX 用法: <>hello {count} world</>
  * 
- * 内部复用 @rasenjs/core 的 fragment 实现
+ * 内部复用 @rasenjs/web 的 fragment 实现
  */
 export function Fragment(props: { children?: JSXChild | JSXChild[] }): Mountable<unknown> {
   // 先将 JSX 子元素转换为 Mountable[]
   const childMounts = processChildren(props.children)
-  // 复用 core 的 fragment
-  return fragment({ children: childMounts })
+  // 复用 web 的 fragment (已适配 DOM)
+  return fragment({ children: childMounts }) as Mountable<unknown>
 }
