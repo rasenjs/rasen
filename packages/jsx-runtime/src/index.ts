@@ -1,24 +1,24 @@
 /**
  * JSX Runtime for Rasen
  * 
- * 将 JSX 语法转换为 Rasen 的组件调用
+ * Converts JSX syntax to Rasen component calls
  * 
- * 特性:
- * 1. 灵活的标签注册机制
- * 2. 支持多个渲染目标 (DOM, Canvas, 自定义)
- * 3. 响应式子元素支持
- * 4. 自动依赖追踪
+ * Features:
+ * 1. Flexible tag registration mechanism
+ * 2. Supports multiple render targets (DOM, SSR, custom)
+ * 3. Reactive children support
+ * 4. Automatic dependency tracking
  */
 
 import type { Mountable } from '@rasenjs/core'
 import { getReactiveRuntime, fragment } from '@rasenjs/core'
-import { watchProp } from '@rasenjs/dom'
+import { text } from '@rasenjs/web'
 import { findTag } from './tag-config'
 
-// 自动配置默认 DOM 标签
+// Auto-configure default DOM tags
 import './auto-config'
 
-// 导出配置函数和类型供用户使用
+// Export configuration functions and types for users
 export {
   registerTag,
   configureTags,
@@ -69,7 +69,7 @@ interface JSXElement {
 }
 
 /**
- * 处理子元素，转换为 Mountable 数组
+ * Process children, converting to Mountable array
  */
 function processChildren(children: JSXChild | JSXChild[]): Mountable<unknown>[] {
   if (children === null || children === undefined) {
@@ -85,53 +85,24 @@ function processChildren(children: JSXChild | JSXChild[]): Mountable<unknown>[] 
     }
 
     if (typeof child === 'string' || typeof child === 'number') {
-      // 静态文本节点
-      const text = String(child)
-      result.push((host: unknown) => {
-        if (host instanceof HTMLElement) {
-          const textNode = document.createTextNode(text)
-          host.appendChild(textNode)
-          return () => {
-            textNode.remove()
-          }
-        }
-        return undefined
-      })
+      // Static text node - use text() from @rasenjs/web
+      result.push(text({ content: child }) as Mountable<unknown>)
     } else if (getReactiveRuntime().isRef(child)) {
-      // 响应式 ref - 创建响应式文本节点
+      // Reactive ref - create reactive text node
       const refChild = child as unknown as { value: unknown }
-      result.push((host: unknown) => {
-        if (host instanceof HTMLElement) {
-          const textNode = document.createTextNode(String(refChild.value))
-          host.appendChild(textNode)
-          
-          // 监听 ref 变化
-          const stop = watchProp(
-            () => String(refChild.value),
-            (newText: string) => {
-              textNode.textContent = newText
-            }
-          )
-          
-          return () => {
-            stop()
-            textNode.remove()
-          }
-        }
-        return undefined
-      })
+      result.push(text({ content: () => String(refChild.value) }) as Mountable<unknown>)
     } else if (typeof child === 'function') {
-      // 函数类型 - 现在所有函数都是 Mountable
-      // 区分：带参数的是 getter，不带参数且返回 unmount 的是 Mountable
-      // 但我们无法运行时区分，所以按 JSX 语义：
-      // - 如果是组件返回的函数（Mountable），直接使用
-      // - 如果是 () => value 形式的 getter，当作动态文本
+      // Function type - all functions are now Mountable
+      // Distinction: with parameters it's a getter, without parameters and returning unmount it's Mountable
+      // But we can't distinguish at runtime, so by JSX semantics:
+      // - If it's a function returned by a component (Mountable), use it directly
+      // - If it's a () => value getter, treat as dynamic text
       // 
-      // 这里采用简化策略：直接当作 Mountable 使用
-      // 如果用户想用 getter，应该用 {() => expr} 形式，这会被解析为 JSX 表达式
+      // Simplified strategy here: treat directly as Mountable
+      // If user wants to use getter, should use {() => expr} form, which will be parsed as JSX expression
       result.push(child as Mountable<unknown>)
     } else if (isJSXElement(child)) {
-      // 嵌套的 JSX 元素，递归处理
+      // Nested JSX element, process recursively
       const mountFn = mountableFromJSX(child)
       result.push(mountFn)
     }

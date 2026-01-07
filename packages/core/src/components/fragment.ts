@@ -2,119 +2,100 @@ import { type Mountable } from '../types'
 import { getReactiveRuntime } from '../reactive'
 
 /**
+ * Fragment host hooks for text node creation and updates
+ * All hooks are required for fragment to work properly
+ */
+export interface FragmentHostHooks<Host = unknown, N = unknown> {
+  /** Create a text node with the given content */
+  createTextNode: (text: string) => N
+  /** Append a node to the host */
+  appendNode: (host: Host, node: N) => void
+  /** Update a text node's content */
+  updateTextNode: (node: N, text: string) => void
+  /** Remove a text node */
+  removeNode: (node: N) => void
+}
+
+/**
  * 子元素类型
  */
-type FragmentChild<Host> = 
+export type FragmentChild<Host> = 
   | string 
   | number 
   | Mountable<Host>
   | { value: unknown }  // Ref
 
 /**
- * 处理单个子元素，返回 Mountable
+ * Fragment config
  */
-function processChild<Host>(child: FragmentChild<Host>): Mountable<Host> {
+export interface FragmentConfig<Host, N> {
+  children: Array<FragmentChild<Host>>
+  hooks: FragmentHostHooks<Host, N>
+}
+
+/**
+ * Process a single child element
+ */
+function processChild<Host, N>(
+  child: FragmentChild<Host>,
+  hooks: FragmentHostHooks<Host, N>
+): Mountable<Host> {
   const runtime = getReactiveRuntime()
   
   if (typeof child === 'string' || typeof child === 'number') {
-    // 静态文本 - 返回通用 Mountable，具体实现由 host 决定
+    // Static text
     const text = String(child)
     return (host: Host) => {
-      if (host instanceof HTMLElement) {
-        const textNode = document.createTextNode(text)
-        host.appendChild(textNode)
-        return () => textNode.remove()
-      }
-      // 其他 host 类型可以扩展
-      return undefined
+      const textNode = hooks.createTextNode(text)
+      hooks.appendNode(host, textNode)
+      return () => hooks.removeNode(textNode)
     }
   }
   
   if (runtime.isRef(child)) {
-    // 响应式 ref
+    // Reactive ref
     const refChild = child as { value: unknown }
     return (host: Host) => {
-      if (host instanceof HTMLElement) {
-        const textNode = document.createTextNode(String(refChild.value))
-        host.appendChild(textNode)
-        
-        const stop = runtime.watch(
-          () => refChild.value,
-          (newVal) => {
-            textNode.textContent = String(newVal)
-          }
-        )
-        
-        return () => {
-          stop()
-          textNode.remove()
+      const textNode = hooks.createTextNode(String(refChild.value))
+      hooks.appendNode(host, textNode)
+      
+      const stop = runtime.watch(
+        () => refChild.value,
+        (newVal) => {
+          hooks.updateTextNode(textNode, String(newVal))
         }
+      )
+      
+      return () => {
+        stop()
+        hooks.removeNode(textNode)
       }
-      return undefined
     }
   }
   
-  // 已经是 Mountable
+  // Already a Mountable
   return child as Mountable<Host>
 }
 
 /**
- * Fragment 接口 - 支持两种用法
+ * Core fragment implementation - requires host hooks
+ * 
+ * This is the platform-agnostic core that handles:
+ * - Static text children (string/number)
+ * - Reactive ref children (with watch)
+ * - Mountable children (components)
+ * 
+ * Platform-specific implementations (DOM/HTML) should wrap this
+ * and provide their own hooks.
  */
-interface FragmentFunction {
-  // 对象参数用法: fragment({ children: [...] })
-  <Host = unknown>(config: { children: Array<Mountable<Host>> }): Mountable<Host>
-  // Tagged template 用法: fragment`hello ${count} world`
-  <Host = unknown>(strings: TemplateStringsArray, ...values: FragmentChild<Host>[]): Mountable<Host>
-}
-
-/**
- * fragment - 组合多个子组件
- * 
- * @example
- * // 对象参数用法
- * fragment({ children: [child1, child2] })
- * 
- * // Tagged template 用法
- * fragment`Count: ${count} items`
- * 
- * // 别名
- * f`Count: ${count} items`
- */
-export const fragment: FragmentFunction = <Host = unknown>(
-  configOrStrings: { children: Array<Mountable<Host>> } | TemplateStringsArray,
-  ...values: FragmentChild<Host>[]
-): Mountable<Host> => {
-  // 检测是否是 tagged template 调用
-  if (Array.isArray(configOrStrings) && 'raw' in configOrStrings) {
-    const strings = configOrStrings as TemplateStringsArray
-    
-    // 交织 strings 和 values
-    const children: FragmentChild<Host>[] = []
-    for (let i = 0; i < strings.length; i++) {
-      if (strings[i]) {
-        children.push(strings[i])
-      }
-      if (i < values.length) {
-        children.push(values[i])
-      }
-    }
-    
-    const mounts = children.map(child => processChild<Host>(child))
-    
-    return (host: Host) => {
-      const unmounts = mounts.map(m => m(host))
-      return () => unmounts.forEach(unmount => unmount?.())
-    }
-  }
+export function fragment<Host = unknown, N = unknown>(
+  config: FragmentConfig<Host, N>
+): Mountable<Host> {
+  const { children, hooks } = config
+  const mounts = children.map(child => processChild(child, hooks))
   
-  // 对象参数用法
-  const config = configOrStrings as { children: Array<Mountable<Host>> }
   return (host: Host) => {
-    const unmounts = config.children.map((child) => child(host))
-    return () => unmounts.forEach((unmount) => unmount?.())
+    const unmounts = mounts.map(m => m(host))
+    return () => unmounts.forEach(unmount => unmount?.())
   }
 }
-
-// 导出 f 作为别名
-export { fragment as f }

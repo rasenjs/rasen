@@ -103,11 +103,19 @@ export function hydrate(
     // 执行组件（会复用已有 DOM）
     const unmount = mount(component, container)
 
-    // 检查是否有未消费的节点
+    // 检查是否有未消费的节点并清理它们
     if (ctx.currentNode) {
       console.warn(
-        '[Rasen Hydration] Extra nodes found in container after hydration'
+        '[Rasen Hydration] Extra nodes found in container after hydration, removing them'
       )
+      // 移除所有剩余未被claim的节点
+      let node: Node | null = ctx.currentNode
+      while (node) {
+        const next: Node | null = node.nextSibling
+        node.parentNode?.removeChild(node)
+        node = next
+      }
+      ctx.currentNode = null
     }
 
     return unmount

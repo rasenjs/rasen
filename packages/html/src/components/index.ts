@@ -5,6 +5,9 @@
 export { stringContext, renderToString, renderToStringMultiple } from './string-context'
 export { element } from './element'
 export { html } from './html'
+export { text } from './text'
+export type { TextProps } from './text'
+export { fragment, f } from './fragment'
 export {
   // 基础元素
   div,

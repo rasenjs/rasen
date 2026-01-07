@@ -258,6 +258,8 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             if (claimed?.nodeType === Node.TEXT_NODE) {
               textNode = claimed as Text
             } else {
+              // Mismatch: remove claimed node and create new one
+              if (claimed) claimed.parentNode?.removeChild(claimed)
               textNode = document.createTextNode(child)
               el.appendChild(textNode)
             }
@@ -278,6 +280,8 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             if (claimed?.nodeType === Node.TEXT_NODE) {
               textNode = claimed as Text
             } else {
+              // Mismatch: remove claimed node and create new one
+              if (claimed) claimed.parentNode?.removeChild(claimed)
               textNode = document.createTextNode(String(unref(child)))
               el.appendChild(textNode)
             }
@@ -307,6 +311,8 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
               if (claimed?.nodeType === Node.TEXT_NODE) {
                 textNode = claimed as Text
               } else {
+                // Mismatch: remove claimed node and create new one
+                if (claimed) claimed.parentNode?.removeChild(claimed)
                 textNode = document.createTextNode(String(result))
                 el.appendChild(textNode)
               }

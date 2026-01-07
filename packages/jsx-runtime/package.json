@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@rasenjs/core": "workspace:*",
-    "@rasenjs/dom": "workspace:*"
+    "@rasenjs/web": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.3.5",

@@ -1,5 +1,5 @@
 /**
- * 默认配置 - 自动配置 DOM 标签
+ * Default configuration - auto-configure web tags
  */
 
 import { configureTags } from './tag-config'
@@ -26,7 +26,7 @@ import {
   select,
   option,
   canvas,
-  // svg, // SVG 需要单独处理
+  // svg, // SVG requires separate handling
   section,
   article,
   header,
@@ -41,10 +41,10 @@ import {
   small,
   br,
   hr
-} from '@rasenjs/dom'
+} from '@rasenjs/web'
 
-// 自动配置默认 DOM 标签
-// 使用空字符串作为前缀，表示这些是无前缀的标签
+// Auto-configure default web tags
+// Use empty string as prefix to indicate these are unprefixed tags
 configureTags({
   '': {
     div,
