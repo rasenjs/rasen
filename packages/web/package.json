@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/web",
-  "version": "0.1.0-alpha",
+  "version": "0.1.1-alpha",
   "description": "Isomorphic web components with routing (exports DOM or HTML based on environment)",
   "type": "module",
   "exports": {
