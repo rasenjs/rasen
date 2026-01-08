@@ -20,11 +20,20 @@
   <a href="#roadmap">Roadmap</a>
 </p>
 
-> 🚧 **Work In Progress**
+> 🎉 **Early Preview Available!**
 >
-> This framework is still under active development and has **NOT been published to npm**.
+> ✨ The **web-related packages** (@rasenjs/web, templates) have been published for early testing!
 >
-> **Please do not use this in production.** APIs are unstable and may change at any time.
+> 🧪 **Try it now:**
+> ```bash
+> npx degit rasenjs/rasen/templates/rasen-ts my-rasen-app
+> cd my-rasen-app
+> yarn install
+> yarn dev
+> ```
+>
+> ⚠️ **Important:** This framework is still in active development. Core packages are not yet published.
+> APIs are unstable and may change. Please do not use in production yet.
 >
 > If you're interested in this project, feel free to ⭐ star and watch for updates!
 
@@ -39,27 +48,84 @@
 
 ## Packages
 
-| Package                                                  | Description                                  |
-| -------------------------------------------------------- | -------------------------------------------- |
-| [@rasenjs/core](./packages/core)                         | Core runtime and type definitions            |
-| [@rasenjs/dom](./packages/dom)                           | DOM rendering components                     |
-| [@rasenjs/router](./packages/router)                     | Framework-agnostic router core               |
-| [@rasenjs/router-dom](./packages/router-dom)             | DOM-specific router components               |
-| [@rasenjs/canvas-2d](./packages/canvas-2d)               | Canvas 2D rendering components               |
-| [@rasenjs/react-native](./packages/react-native)         | React Native Fabric renderer                 |
-| [@rasenjs/gpui](./packages/gpui)                         | GPU-accelerated native desktop (Zed's GPUI)  |
-| [@rasenjs/lvgl](./packages/lvgl)                         | Embedded UI for ESP32/STM32 (LVGL + QuickJS) |
-| [@rasenjs/html](./packages/html)                         | HTML renderer for SSR/SSG                    |
-| [@rasenjs/jsx-runtime](./packages/jsx-runtime)           | JSX/TSX runtime support                      |
-| [@rasenjs/reactive-vue](./packages/reactive-vue)         | Vue 3 reactivity adapter                     |
-| [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter                         |
+| Package                                                  | Description                                  | Status |
+| -------------------------------------------------------- | -------------------------------------------- | ------ |
+| [@rasenjs/core](./packages/core)                         | Core runtime and type definitions            | 🧪 Alpha |
+| [@rasenjs/web](./packages/web)                           | **Web bundle (DOM + Router + SSR)**          | 🧪 Alpha |
+| [@rasenjs/dom](./packages/dom)                           | DOM rendering components                     | 🧪 Alpha |
+| [@rasenjs/router](./packages/router)                     | Framework-agnostic router core               | 🧪 Alpha |
+| [@rasenjs/router-dom](./packages/router-dom)             | DOM-specific router components               | 🧪 Alpha |
+| [@rasenjs/canvas-2d](./packages/canvas-2d)               | Canvas 2D rendering components               | 🧪 Alpha |
+| [@rasenjs/webgl](./packages/webgl)                       | WebGL rendering components                   | 🏗️ Under Construction |
+| [@rasenjs/react-native](./packages/react-native)         | React Native Fabric renderer                 | 🏗️ Under Construction |
+| [@rasenjs/gpui](./packages/gpui)                         | GPU-accelerated native desktop (Zed's GPUI)  | 🏗️ Under Construction |
+| [@rasenjs/lvgl](./packages/lvgl)                         | Embedded UI for ESP32/STM32 (LVGL + QuickJS) | 🏗️ Under Construction |
+| [@rasenjs/html](./packages/html)                         | HTML renderer for SSR/SSG                    | 🧪 Alpha |
+| [@rasenjs/jsx-runtime](./packages/jsx-runtime)           | JSX/TSX runtime support                      | 🧪 Alpha |
+| [@rasenjs/reactive-vue](./packages/reactive-vue)         | Vue 3 reactivity adapter                     | 🧪 Alpha |
+| [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter                         | 🧪 Alpha |
+| [@rasenjs/reactive-nanostores](./packages/reactive-nanostores) | Nanostores reactivity adapter          | 🧪 Alpha |
+
+### 🎉 Published Packages
+
+The **@rasenjs/web** package is now available for early testing! It bundles DOM rendering, router, and SSR capabilities in one convenient package.
+
+**Quick start with the template:**
+
+```bash
+# Use degit to clone the template
+npx degit rasenjs/rasen/templates/rasen-ts my-rasen-app
+cd my-rasen-app
+
+# Install dependencies
+yarn install
+
+# Start dev server (with HMR)
+yarn dev
+
+# Build for production
+yarn build
+
+# Preview production build
+yarn preview
+
+# Server-side rendering
+yarn ssr
+```
+
+**Or install the package directly:**
+
+```bash
+npm install @rasenjs/web @rasenjs/reactive-vue vue
+```
+
+The template includes:
+- ✅ Pre-configured TypeScript + Vite
+- ✅ DOM rendering with @rasenjs/web
+- ✅ File-based routing example
+- ✅ SSR/SSG support
+- ✅ Development server with HMR
+- ✅ Production build optimization
 
 ## Quick Start
 
 ### Installation
 
+> 🎉 **Try the published @rasenjs/web package!**
+> 
+> ```bash
+> # Quick start with the template (recommended)
+> npx degit rasenjs/rasen/templates/rasen-ts my-rasen-app
+> cd my-rasen-app
+> yarn install
+> yarn dev
+> ```
+
 ```bash
-# Core + DOM rendering + Vue reactivity
+# Install published web bundle (DOM + Router + SSR)
+npm install @rasenjs/web @rasenjs/reactive-vue vue
+
+# Or install individual packages (not yet published)
 npm install @rasenjs/core @rasenjs/dom @rasenjs/reactive-vue vue
 
 # Or with Signals
@@ -138,7 +204,7 @@ const App = () => div({
 mount(App(), document.getElementById('app'))
 ```
 
-**Try the template with Router:**
+**🚀 Try it yourself:**
 ```bash
 npx degit rasenjs/rasen/templates/rasen-ts my-app
 cd my-app

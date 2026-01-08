@@ -3,14 +3,9 @@
 /**
  * SSR entry point
  */
-import { configureTags } from '@rasenjs/jsx-runtime'
-import * as htmlTags from '@rasenjs/html'
 import { createMemoryHistory } from '@rasenjs/router'
 import { renderToString } from '@rasenjs/html'
 import { createApp } from './App'
-
-// Configure JSX to use HTML components for SSR
-configureTags({ '': htmlTags })
 
 // Import CSS content (in production, this would be extracted)
 import styleContent from './style.css?inline'
