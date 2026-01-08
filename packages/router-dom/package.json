@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/router-dom",
-  "version": "0.1.6-alpha",
+  "version": "0.1.7-alpha",
   "description": "Rasen Router for DOM - batteries included",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -22,10 +22,10 @@
     "dist"
   ],
   "scripts": {
-    "build": "yarn clean && tsup",
-    "dev": "tsup --watch",
-    "test": "vitest --run",
-    "test:watch": "vitest",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "test": "../../node_modules/.bin/vitest --run",
+    "test:watch": "../../node_modules/.bin/vitest",
     "clean": "rm -rf dist"
   },
   "dependencies": {

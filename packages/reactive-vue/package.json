@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/reactive-vue",
-  "version": "0.1.3-alpha",
+  "version": "0.1.4-alpha",
   "description": "Vue Composition API adapter for Rasen",
   "type": "module",
   "main": "./dist/index.cjs",

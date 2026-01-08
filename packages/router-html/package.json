@@ -1,6 +1,6 @@
 {
   "name": "@rasenjs/router-html",
-  "version": "0.1.0-alpha",
+  "version": "0.1.1-alpha",
   "description": "Rasen Router for HTML/SSR - batteries included",
   "type": "module",
   "main": "./dist/index.cjs",
