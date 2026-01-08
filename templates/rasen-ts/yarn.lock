@@ -234,157 +234,104 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rasenjs/core@npm:0.1.2-alpha":
-  version: 0.1.2-alpha
-  resolution: "@rasenjs/core@npm:0.1.2-alpha"
-  peerDependencies:
-    vue: ^3.3.0
-  peerDependenciesMeta:
-    vue:
-      optional: true
-  checksum: 10c0/bfe35d83524c173a26cee6b447a41daa0dd9bbfc6aa7ee9d4a7b513ac6e34459f0be24c865c1e7cd5c9c04d9f321e15744c32c61df04a2c736d35c27ea5efe12
-  languageName: node
-  linkType: hard
-
-"@rasenjs/core@npm:0.1.3-alpha":
-  version: 0.1.3-alpha
-  resolution: "@rasenjs/core@npm:0.1.3-alpha"
-  peerDependencies:
-    vue: ^3.3.0
-  peerDependenciesMeta:
-    vue:
-      optional: true
-  checksum: 10c0/362af8494f485ca106c683568f759945b450e04024062e7971bbfb4654873b3627aa2ff13e52d1ebc107767fd8d1398395673b547a97d0a5e68333f2f443d64b
-  languageName: node
-  linkType: hard
-
-"@rasenjs/core@npm:0.1.4-alpha":
-  version: 0.1.4-alpha
-  resolution: "@rasenjs/core@npm:0.1.4-alpha"
-  peerDependencies:
-    vue: ^3.3.0
-  peerDependenciesMeta:
-    vue:
-      optional: true
-  checksum: 10c0/a3ae53d0ea94fe6e1e7af4498eecf816bd3e3b3a5a98568096f6b17675d8052e933eb7c6ea8c45c4c57bac85b8a7c1862da77115c7cf60bd9908058c8c5b6c0a
-  languageName: node
-  linkType: hard
-
-"@rasenjs/dom@npm:0.1.5-alpha":
+"@rasenjs/core@npm:0.1.5-alpha, @rasenjs/core@npm:^0.1.5-alpha":
   version: 0.1.5-alpha
-  resolution: "@rasenjs/dom@npm:0.1.5-alpha"
-  dependencies:
-    "@rasenjs/core": "npm:0.1.3-alpha"
-  checksum: 10c0/13e0da3548e8b5d81b319ced71519597162f463706cf04c641944c540bc9392868157b16145b7a728e83af63816fed95521ad8abc61098c9a12f0932da0983e8
-  languageName: node
-  linkType: hard
-
-"@rasenjs/dom@npm:0.1.6-alpha":
-  version: 0.1.6-alpha
-  resolution: "@rasenjs/dom@npm:0.1.6-alpha"
-  dependencies:
-    "@rasenjs/core": "npm:0.1.4-alpha"
-  checksum: 10c0/948f75a69b494cc37fcd7a1826e90e6812194b5ebb89d40e8dc86b78e482af8f0d1c0dc3f8c312eda94f2ca3e04945cfa50ee8a1d831e2227d816567c18cb4d8
-  languageName: node
-  linkType: hard
-
-"@rasenjs/html@npm:0.1.1-alpha":
-  version: 0.1.1-alpha
-  resolution: "@rasenjs/html@npm:0.1.1-alpha"
-  dependencies:
-    "@rasenjs/core": "npm:0.1.3-alpha"
-  checksum: 10c0/e811deeb41c2634eea67630040560d8c99b068aa7ebe277ecea088458b748a9d5fca6f0706ca3a9acee151a8dbb5ceedc6979581e3a1aa86a318954d4f301b1f
-  languageName: node
-  linkType: hard
-
-"@rasenjs/html@npm:0.1.2-alpha":
-  version: 0.1.2-alpha
-  resolution: "@rasenjs/html@npm:0.1.2-alpha"
-  dependencies:
-    "@rasenjs/core": "npm:0.1.4-alpha"
-  checksum: 10c0/c5d6f64cc869951f767fffe42c3497f0cf9ef0c8eaad8d232f7a52bb7323c58ed3a53113009e30422822022942ab990f1544de89e4a50d009007c129849b6442
-  languageName: node
-  linkType: hard
-
-"@rasenjs/jsx-runtime@npm:0.1.5-alpha":
-  version: 0.1.5-alpha
-  resolution: "@rasenjs/jsx-runtime@npm:0.1.5-alpha"
-  peerDependencies:
-    "@rasenjs/core": ^0.1.0-alpha
-    "@rasenjs/web": ^0.1.0-alpha
-  checksum: 10c0/db77d45ba470749e19eba6b00bc329b678aa0982c0999c108333ef5eadd28ab161a287e2a72e4fb3b64b69d8dce71f949a19a0e84f3aa0a46287a3c6ba347626
-  languageName: node
-  linkType: hard
-
-"@rasenjs/reactive-signals@npm:0.1.2-alpha":
-  version: 0.1.2-alpha
-  resolution: "@rasenjs/reactive-signals@npm:0.1.2-alpha"
-  dependencies:
-    "@rasenjs/core": "npm:0.1.2-alpha"
-    signal-polyfill: "npm:^0.1.2"
-  checksum: 10c0/ca4eba2a97a1dd67489bb30c05f5623cae9965d7b29bd0823b0b230a4938aee578c204925a09f69e0ca79a3a268f1033ddf058725fa1ee1cadabc005fe02444f
-  languageName: node
-  linkType: hard
-
-"@rasenjs/router-dom@npm:0.1.6-alpha":
-  version: 0.1.6-alpha
-  resolution: "@rasenjs/router-dom@npm:0.1.6-alpha"
-  dependencies:
-    "@rasenjs/core": "npm:0.1.3-alpha"
-    "@rasenjs/dom": "npm:0.1.5-alpha"
-    "@rasenjs/router": "npm:0.1.6-alpha"
-  peerDependencies:
-    zod: ^3.22.0
-  checksum: 10c0/5d00e73062e55cc3f293f868d0b4c86b2dda499afc837394d4d7e793f8f247a3f87db15c1c2bec8b8047624d5860204acb465f2229e12756722376667c5c16a2
-  languageName: node
-  linkType: hard
-
-"@rasenjs/router-html@npm:0.1.0-alpha":
-  version: 0.1.0-alpha
-  resolution: "@rasenjs/router-html@npm:0.1.0-alpha"
-  dependencies:
-    "@rasenjs/core": "npm:0.1.3-alpha"
-    "@rasenjs/html": "npm:0.1.1-alpha"
-    "@rasenjs/router": "npm:0.1.6-alpha"
-  peerDependencies:
-    zod: ^3.22.0
-  checksum: 10c0/5f8001af82621fee1c6941670a916e9906dac1d855a909784e92746b385219d3232673e754e73758eb388ed53a17555c810db2e2d702e51cc63b60aa00c08ef4
-  languageName: node
-  linkType: hard
-
-"@rasenjs/router@npm:0.1.6-alpha":
-  version: 0.1.6-alpha
-  resolution: "@rasenjs/router@npm:0.1.6-alpha"
-  dependencies:
-    "@rasenjs/core": "npm:0.1.3-alpha"
-    "@rasenjs/shared": "npm:0.1.3-alpha"
-  peerDependencies:
-    zod: ^3.0.0
-  checksum: 10c0/cc1bf1b93be817a8f0fffe141918697c7a4c50986dd1e5b0eff6fcba755011c1071a8ac20644d717ca4d6f321e0f09997535931179142af2fbceb8d1490e25bb
-  languageName: node
-  linkType: hard
-
-"@rasenjs/shared@npm:0.1.3-alpha":
-  version: 0.1.3-alpha
-  resolution: "@rasenjs/shared@npm:0.1.3-alpha"
+  resolution: "@rasenjs/core@npm:0.1.5-alpha"
   peerDependencies:
     zod: ^3.0.0
   peerDependenciesMeta:
     zod:
-      optional: false
-  checksum: 10c0/aa2ac7511641d36d8d876c6d671f0748dddc62405ea742a30876bb663449f6136fd53552e34c7b3f459864b6f5e73af63350013c978f88f82db282c2635c9556
+      optional: true
+  checksum: 10c0/df9cd28896841562853a33cf51d869f3e8e0428c9d889aa43e04eab5d6a3287594b8b4d6645586823201967ba00c3dd88ac510dc65703aa6f6050ff33e967178
   languageName: node
   linkType: hard
 
-"@rasenjs/web@npm:0.1.1-alpha":
-  version: 0.1.1-alpha
-  resolution: "@rasenjs/web@npm:0.1.1-alpha"
+"@rasenjs/dom@npm:0.1.7-alpha":
+  version: 0.1.7-alpha
+  resolution: "@rasenjs/dom@npm:0.1.7-alpha"
   dependencies:
-    "@rasenjs/dom": "npm:0.1.6-alpha"
-    "@rasenjs/html": "npm:0.1.2-alpha"
-    "@rasenjs/router-dom": "npm:0.1.6-alpha"
-    "@rasenjs/router-html": "npm:0.1.0-alpha"
-  checksum: 10c0/1e8537c1800bc8786cf2c53838a35428d2b4609108b0f34a6ce29f4308292938120cee85f031c7dc7a8dbad4c435114267723b6494a95ebd85d670292b716e93
+    "@rasenjs/core": "npm:^0.1.5-alpha"
+    "@rasenjs/jsx-runtime": "npm:^0.1.6-alpha"
+  checksum: 10c0/238cc1a52e2951f6f4866e86b6f92e82ce087f753fd1f7990ef7e3a70e147c1a5664cd76a2748d280c42c23e470dbd4c05bcbba33628508478d46d7e1f5a9539
+  languageName: node
+  linkType: hard
+
+"@rasenjs/html@npm:0.1.3-alpha":
+  version: 0.1.3-alpha
+  resolution: "@rasenjs/html@npm:0.1.3-alpha"
+  dependencies:
+    "@rasenjs/core": "npm:^0.1.5-alpha"
+    "@rasenjs/jsx-runtime": "npm:^0.1.6-alpha"
+  checksum: 10c0/149c0bffffd105ab85d2278618d91d7727e6c555f3177ced6b9b85d1813f773ed69396d404725d22bfe391b886024e391b46260344f0f4e7547cf5f069b4aec6
+  languageName: node
+  linkType: hard
+
+"@rasenjs/jsx-runtime@npm:0.1.6-alpha, @rasenjs/jsx-runtime@npm:^0.1.6-alpha":
+  version: 0.1.6-alpha
+  resolution: "@rasenjs/jsx-runtime@npm:0.1.6-alpha"
+  peerDependencies:
+    "@rasenjs/core": ">=0.1.0-alpha"
+    "@rasenjs/web": ">=0.1.0-alpha"
+  checksum: 10c0/244526628e8ac5a5a4b349c197408fe6000406e30efe2de3eb57f59b3a7330a0220072b98e87bc4ab886c48d916222fdcaf9926dc4b5cc26d246ac0fb7ff7c5d
+  languageName: node
+  linkType: hard
+
+"@rasenjs/reactive-signals@npm:0.1.4-alpha":
+  version: 0.1.4-alpha
+  resolution: "@rasenjs/reactive-signals@npm:0.1.4-alpha"
+  dependencies:
+    "@rasenjs/core": "npm:^0.1.5-alpha"
+    signal-polyfill: "npm:^0.2.2"
+  checksum: 10c0/8bb92b13a1e65b089efffe97132f138140000131f117d45f2578866b9417217cb55eec38c1d1b06a07fcd1baed6edcf32c6cd67d183df5f5e5a181eaacb8dfc6
+  languageName: node
+  linkType: hard
+
+"@rasenjs/router-dom@npm:0.1.7-alpha":
+  version: 0.1.7-alpha
+  resolution: "@rasenjs/router-dom@npm:0.1.7-alpha"
+  dependencies:
+    "@rasenjs/core": "npm:^0.1.5-alpha"
+    "@rasenjs/dom": "npm:0.1.7-alpha"
+    "@rasenjs/router": "npm:0.1.7-alpha"
+  peerDependencies:
+    zod: ^3.22.0
+  checksum: 10c0/c1752290c2b195f4d7a6d279f1ab21f48b9f7d4ee0d68bad58a2bf0a79b73773801ed8458d64205cf95c7fbd9d33b21ae2e1d8451c104bdcc217dab3ddf19ffa
+  languageName: node
+  linkType: hard
+
+"@rasenjs/router-html@npm:0.1.1-alpha":
+  version: 0.1.1-alpha
+  resolution: "@rasenjs/router-html@npm:0.1.1-alpha"
+  dependencies:
+    "@rasenjs/core": "npm:^0.1.5-alpha"
+    "@rasenjs/html": "npm:0.1.3-alpha"
+    "@rasenjs/router": "npm:0.1.7-alpha"
+  peerDependencies:
+    zod: ^3.22.0
+  checksum: 10c0/f9628ee5fb8cdadc39e1fb968d4f9757a83604b223a92ed66f31882fa562dfec733c9f0b98c06d551cc34090579ef69cd649810feb02d4319546abf7ae83ae0f
+  languageName: node
+  linkType: hard
+
+"@rasenjs/router@npm:0.1.7-alpha":
+  version: 0.1.7-alpha
+  resolution: "@rasenjs/router@npm:0.1.7-alpha"
+  dependencies:
+    "@rasenjs/core": "npm:^0.1.5-alpha"
+  peerDependencies:
+    zod: ^3.0.0
+  checksum: 10c0/12d05d67d0d12aadb1620a03f58e2c2c6a890d06c358a428fb060719c80545b7899df63c719e708a6b22258c89fa0998eb02d2dede890a32b938f646c6c2229a
+  languageName: node
+  linkType: hard
+
+"@rasenjs/web@npm:0.1.3-alpha":
+  version: 0.1.3-alpha
+  resolution: "@rasenjs/web@npm:0.1.3-alpha"
+  dependencies:
+    "@rasenjs/dom": "npm:0.1.7-alpha"
+    "@rasenjs/html": "npm:0.1.3-alpha"
+    "@rasenjs/router-dom": "npm:0.1.7-alpha"
+    "@rasenjs/router-html": "npm:0.1.1-alpha"
+  checksum: 10c0/1959186e8b87522b5a2acd63c0e7112ba3e9470643b85be15dbd0020fbf145eef4360e318cc134b37d510cc116b9442809e05120950f3f8e42da47c00f3471f9
   languageName: node
   linkType: hard
 
@@ -1691,12 +1638,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "rasen-app@workspace:."
   dependencies:
-    "@rasenjs/core": "npm:0.1.3-alpha"
-    "@rasenjs/html": "npm:0.1.2-alpha"
-    "@rasenjs/jsx-runtime": "npm:0.1.5-alpha"
-    "@rasenjs/reactive-signals": "npm:0.1.2-alpha"
-    "@rasenjs/router": "npm:0.1.6-alpha"
-    "@rasenjs/web": "npm:0.1.1-alpha"
+    "@rasenjs/core": "npm:0.1.5-alpha"
+    "@rasenjs/html": "npm:0.1.3-alpha"
+    "@rasenjs/jsx-runtime": "npm:0.1.6-alpha"
+    "@rasenjs/reactive-signals": "npm:0.1.4-alpha"
+    "@rasenjs/router": "npm:0.1.7-alpha"
+    "@rasenjs/web": "npm:0.1.3-alpha"
     "@types/express": "npm:^4.17.21"
     "@types/node": "npm:^20.0.0"
     express: "npm:^4.18.2"
@@ -1925,10 +1872,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"signal-polyfill@npm:^0.1.2":
-  version: 0.1.2
-  resolution: "signal-polyfill@npm:0.1.2"
-  checksum: 10c0/93096b9bd471ef1e500a1803e23a64837888bd9bfc894880d8341cefea6362d602b10d5ec21f2efaa5c45319927a734b479513efcedcd687491afbe5ec0cf379
+"signal-polyfill@npm:^0.2.2":
+  version: 0.2.2
+  resolution: "signal-polyfill@npm:0.2.2"
+  checksum: 10c0/485b0e66d93961454af32e7fbff88130138dffcbf7bce35e5c873d760ceb9ce33a125dd63cc59454c739c43246980515b1162cbe0ebc975a974ee036fb58d18a
   languageName: node
   linkType: hard
 

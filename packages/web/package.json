@@ -1,11 +1,11 @@
 {
   "name": "@rasenjs/web",
-  "version": "0.1.2-alpha",
+  "version": "0.1.3-alpha",
   "description": "Isomorphic web components with routing (exports DOM or HTML based on environment)",
   "type": "module",
   "exports": {
     ".": {
-      "ssr": "./dist/html.js",
+      "node": "./dist/html.js",
       "browser": "./dist/dom.js",
       "default": "./dist/dom.js"
     },
