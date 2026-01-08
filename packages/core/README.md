@@ -22,10 +22,14 @@ Rasen is reactive-system agnostic. You need to configure a reactive runtime befo
 
 ```typescript
 import { setReactiveRuntime, getReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
 // Set the runtime (do this once at app startup)
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
+
+// Or manually with createReactiveRuntime if needed:
+// import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+// setReactiveRuntime(createReactiveRuntime())
 
 // Get the runtime (used internally by renderers)
 const runtime = getReactiveRuntime()

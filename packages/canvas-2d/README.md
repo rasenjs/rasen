@@ -15,14 +15,13 @@ npm install @rasenjs/canvas-2d @rasenjs/core @rasenjs/dom
 ## Quick Start
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { canvas, mount } from '@rasenjs/dom'
 import { rect, circle, text } from '@rasenjs/canvas-2d'
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
 // Setup reactive runtime
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Create reactive state
 const x = ref(50)
@@ -439,7 +438,7 @@ rect({
 All props can be reactive:
 
 ```typescript
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
 const position = ref({ x: 0, y: 0 })
 const color = ref('#ff0000')

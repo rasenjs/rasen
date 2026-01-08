@@ -1,10 +1,10 @@
-import { setReactiveRuntime, mount } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { mount } from '@rasenjs/core'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { rect, circle, RenderContext } from '@rasenjs/webgl'
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
 // Setup reactive runtime
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Create reactive state
 const x = ref(100)

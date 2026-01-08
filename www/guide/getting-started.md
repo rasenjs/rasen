@@ -57,11 +57,10 @@ npm install @rasenjs/jsx-runtime
 First, you need to configure the reactive runtime. This only needs to be done once at app initialization:
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
 // Initialize with Vue's reactivity
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 ```
 
 ### 2. Create Reactive State
@@ -69,7 +68,7 @@ setReactiveRuntime(createReactiveRuntime())
 Use the reactive library directly:
 
 ```typescript
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
 const count = ref(0)
 const doubled = computed(() => count.value * 2)
@@ -111,11 +110,11 @@ mount(Counter(), document.getElementById('app'))
 
 ```typescript
 import { com, setReactiveRuntime, getReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, span, mount } from '@rasenjs/dom'
 
 // 1. Setup reactive runtime
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // 2. Define component with com
 const Counter = com(() => {
@@ -162,7 +161,7 @@ If you prefer JSX syntax, configure your `tsconfig.json`:
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "@rasenjs/jsx-runtime"
+    "jsxImportSource": "@rasenjs/dom"
   }
 }
 ```
@@ -171,7 +170,7 @@ Then you can write components using JSX:
 
 ```tsx
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
 const Counter = com(() => {
   const runtime = getReactiveRuntime()

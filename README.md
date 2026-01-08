@@ -72,13 +72,12 @@ npm install @rasenjs/jsx-runtime
 ### Basic Example
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, mount } from '@rasenjs/dom'
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
 // 1. Setup reactive runtime
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // 2. Create reactive state
 const count = ref(0)
@@ -103,13 +102,13 @@ mount(Counter(), document.getElementById('app'))
 
 ```typescript
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-signals'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { createRouter, createBrowserHistory, route } from '@rasenjs/router'
 import { createRouterView, createRouterLink } from '@rasenjs/router-dom'
 import { div, mount } from '@rasenjs/dom'
 
 // Setup reactive runtime
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Define routes
 const router = createRouter({
@@ -396,7 +395,7 @@ const html = renderToString(
 ### With JSX
 
 ```tsx
-// tsconfig.json: { "jsx": "react-jsx", "jsxImportSource": "@rasenjs/jsx-runtime" }
+// tsconfig.json: { "jsx": "react-jsx", "jsxImportSource": "@rasenjs/dom" }
 
 const Counter = () => {
   const count = ref(0)

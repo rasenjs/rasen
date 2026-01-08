@@ -3,7 +3,7 @@
  */
 
 import type { ZodType } from 'zod'
-import type { Template } from '@rasenjs/shared'
+import type { Template } from '@rasenjs/core/utils'
 
 /**
  * Query 参数 Schema

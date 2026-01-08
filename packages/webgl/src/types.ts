@@ -1,7 +1,7 @@
 /**
  * WebGL types - reusable across components
  */
-import type { Bounds } from '@rasenjs/shared'
+import type { Bounds } from '@rasenjs/core/utils'
 
 // Re-export common types from canvas-2d compatible definitions
 export interface Ref<T = unknown> {

@@ -15,7 +15,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "@rasenjs/jsx-runtime"
+    "jsxImportSource": "@rasenjs/web"
   },
   "include": ["src"]
 }

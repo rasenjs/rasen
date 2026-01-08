@@ -9,12 +9,11 @@ A simple counter demonstrating reactive state:
 ::: code-group
 
 ```typescript [DOM]
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, span, mount } from '@rasenjs/dom'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const count = ref(0)
 
@@ -47,8 +46,7 @@ mount(Counter(), document.getElementById('app'))
 ```
 
 ```typescript [React Native]
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import {
   view,
   text,
@@ -57,7 +55,7 @@ import {
 } from '@rasenjs/react-native'
 import { ref } from 'vue'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const App = () => {
   const count = ref(0)
@@ -105,11 +103,11 @@ A complete todo application:
 
 ```typescript
 import { setReactiveRuntime, each } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, input, button, ul, li, span, mount } from '@rasenjs/dom'
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 interface Todo {
   id: number
@@ -227,13 +225,12 @@ mount(TodoApp(), document.getElementById('app'))
 Animated graphics using Canvas 2D:
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { canvas, mount } from '@rasenjs/dom'
 import { rect, circle, text } from '@rasenjs/canvas-2d'
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const time = ref(0)
 const x = computed(() => 200 + Math.sin(time.value * 0.02) * 150)

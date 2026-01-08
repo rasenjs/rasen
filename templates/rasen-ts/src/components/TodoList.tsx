@@ -2,7 +2,7 @@
 
 import { com } from '@rasenjs/core'
 import { ref, computed } from '@rasenjs/reactive-signals'
-import { each, f } from '@rasenjs/core'
+import { each } from '@rasenjs/core'
 
 interface Todo {
   id: number
@@ -83,13 +83,13 @@ export const TodoList = com(() => {
       {/* Stats */}
       <div class="todo-stats">
         <span class="stat-item">
-          {f`${computed(() => stats.value.total)} total`}
+          {computed(() => `${stats.value.total} total`)}
         </span>
         <span class="stat-item">
-          {f`${computed(() => stats.value.active)} active`}
+          {computed(() => `${stats.value.active} active`)}
         </span>
         <span class="stat-item">
-          {f`${computed(() => stats.value.completed)} done`}
+          {computed(() => `${stats.value.completed} done`)}
         </span>
       </div>
 

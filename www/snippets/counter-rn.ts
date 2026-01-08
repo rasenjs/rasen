@@ -1,14 +1,13 @@
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import {
   view,
   text,
   touchableOpacity,
   registerApp
 } from '@rasenjs/react-native'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const App = () => {
   const count = ref(0)

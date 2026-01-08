@@ -21,7 +21,7 @@
 
     /* JSX for Rasen */
     "jsx": "react-jsx",
-    "jsxImportSource": "@rasenjs/jsx-runtime",
+    "jsxImportSource": "@rasenjs/web",
 
     /* Exclude React types if accidentally present */
     "types": []

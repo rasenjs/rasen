@@ -15,7 +15,7 @@
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*",
-    "vue": "^3.4.0"
+    "@vue/reactivity": "^3.5.25"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

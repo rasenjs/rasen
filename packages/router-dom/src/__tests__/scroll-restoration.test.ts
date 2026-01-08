@@ -5,12 +5,12 @@
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest'
 import { createRouter, route, template } from '@rasenjs/router'
 import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-signals'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { useScrollRestoration } from '../scroll-restoration'
 
 // 初始化响应式运行时
 beforeAll(() => {
-  setReactiveRuntime(createReactiveRuntime())
+  useReactiveRuntime()
 })
 
 describe('useScrollRestoration', () => {

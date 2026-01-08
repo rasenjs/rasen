@@ -49,12 +49,11 @@ features:
 ::: code-group
 
 ```typescript [DOM]
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, mount } from '@rasenjs/dom'
 import { ref } from 'vue'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const count = ref(0)
 

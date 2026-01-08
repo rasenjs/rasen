@@ -8,6 +8,20 @@
       "ssr": "./dist/html.js",
       "browser": "./dist/dom.js",
       "default": "./dist/dom.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "worker": "./dist/jsx-runtime.js",
+      "browser": "./dist/jsx-runtime.js",
+      "node": "./dist/jsx-runtime-ssr.js",
+      "default": "./dist/jsx-runtime.js"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.ts",
+      "worker": "./dist/jsx-dev-runtime.js",
+      "browser": "./dist/jsx-dev-runtime.js",
+      "node": "./dist/jsx-dev-runtime-ssr.js",
+      "default": "./dist/jsx-dev-runtime.js"
     }
   },
   "scripts": {

@@ -1,14 +1,13 @@
 /**
  * SSR entry point
  */
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { createMemoryHistory } from '@rasenjs/router'
 import { renderToString } from '@rasenjs/html'
 import { createApp } from './App'
 
 // Setup reactive runtime for SSR (needed for com() wrapper)
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 export function render(url: string) {
   const history = createMemoryHistory(url)

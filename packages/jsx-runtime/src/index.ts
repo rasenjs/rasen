@@ -12,11 +12,7 @@
 
 import type { Mountable } from '@rasenjs/core'
 import { getReactiveRuntime } from '@rasenjs/core'
-import { text, fragment } from '@rasenjs/web'
 import { findTag } from './tag-config'
-
-// Auto-configure default DOM tags
-import './auto-config'
 
 // Export configuration functions and types for users
 export {
@@ -27,6 +23,38 @@ export {
   type TagConfig,
   type TagComponent as TagComponentType
 } from './tag-config'
+
+/**
+ * Primitive component type for text nodes
+ */
+export type TextPrimitive = (props: { content: unknown }) => Mountable<unknown>
+
+/**
+ * Primitive component type for fragment nodes
+ */
+export type FragmentPrimitive = (props: { children?: Mountable<unknown>[] }) => Mountable<unknown>
+
+/**
+ * Injected primitives - must be set by integrating packages
+ */
+let textPrimitive: TextPrimitive | null = null
+let fragmentPrimitive: FragmentPrimitive | null = null
+
+/**
+ * Set text primitive component
+ * Should be called by integrating packages (web/dom/html)
+ */
+export function setTextPrimitive(fn: TextPrimitive) {
+  textPrimitive = fn
+}
+
+/**
+ * Set fragment primitive component
+ * Should be called by integrating packages (web/dom/html)
+ */
+export function setFragmentPrimitive(fn: FragmentPrimitive) {
+  fragmentPrimitive = fn
+}
 
 /**
  * 标签组件类型
@@ -85,12 +113,18 @@ function processChildren(children: JSXChild | JSXChild[]): Mountable<unknown>[] 
     }
 
     if (typeof child === 'string' || typeof child === 'number') {
-      // Static text node - use text() from @rasenjs/web
-      result.push(text({ content: child }) as Mountable<unknown>)
+      // Static text node
+      if (!textPrimitive) {
+        throw new Error('Text primitive not configured. Please use @rasenjs/web, @rasenjs/dom, or @rasenjs/html as jsxImportSource.')
+      }
+      result.push(textPrimitive({ content: child }) as Mountable<unknown>)
     } else if (getReactiveRuntime().isRef(child)) {
       // Reactive ref - create reactive text node
+      if (!textPrimitive) {
+        throw new Error('Text primitive not configured. Please use @rasenjs/web, @rasenjs/dom, or @rasenjs/html as jsxImportSource.')
+      }
       const refChild = child as unknown as { value: unknown }
-      result.push(text({ content: () => String(refChild.value) }) as Mountable<unknown>)
+      result.push(textPrimitive({ content: () => String(refChild.value) }) as Mountable<unknown>)
     } else if (typeof child === 'function') {
       // Function type - all functions are now Mountable
       // Distinction: with parameters it's a getter, without parameters and returning unmount it's Mountable
@@ -184,15 +218,18 @@ export function jsxs(
 }
 
 /**
- * Fragment 组件 - 用于 JSX
+ * Fragment component - used in JSX
  * 
- * JSX 用法: <>hello {count} world</>
+ * JSX usage: <>hello {count} world</>
  * 
- * 内部复用 @rasenjs/web 的 fragment 实现
+ * Uses injected fragment primitive from integrating packages
  */
 export function Fragment(props: { children?: JSXChild | JSXChild[] }): Mountable<unknown> {
-  // 先将 JSX 子元素转换为 Mountable[]
+  if (!fragmentPrimitive) {
+    throw new Error('Fragment primitive not configured. Please use @rasenjs/web, @rasenjs/dom, or @rasenjs/html as jsxImportSource.')
+  }
+  // Convert JSX children to Mountable[]
   const childMounts = processChildren(props.children)
-  // 复用 web 的 fragment (已适配 DOM)
-  return fragment({ children: childMounts }) as Mountable<unknown>
+  // Use injected fragment primitive
+  return fragmentPrimitive({ children: childMounts }) as Mountable<unknown>
 }

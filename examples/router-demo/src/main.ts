@@ -6,8 +6,8 @@
  */
 
 import { z } from 'zod'
-import { ref, setReactiveRuntime, type Mountable, com } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-signals'
+import { ref, type Mountable, com } from '@rasenjs/core'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import {
   div,
   a,
@@ -41,7 +41,7 @@ import {
 // ============================================
 // 初始化响应式运行时
 // ============================================
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // ============================================
 // 1. 定义路由（使用模板字面量）

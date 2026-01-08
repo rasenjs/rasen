@@ -10,12 +10,13 @@ import {
   type RoutesConfig,
   type HistoryAdapter
 } from '../index'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 
 // 为每个测试重新创建响应式运行时，防止内存积累
 let createdRouters: Array<{ destroy(): void }> = []
 
 beforeEach(() => {
-  setReactiveRuntime(createReactiveRuntime())
+  useReactiveRuntime()
   createdRouters = []
 })
 

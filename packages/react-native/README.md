@@ -40,17 +40,16 @@ npm install @rasenjs/react-native @rasenjs/core
 ### 1. Setup Reactive Runtime
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 ```
 
 ### 2. Create Components
 
 ```typescript
 import { view, text, touchableOpacity } from '@rasenjs/react-native'
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
 const count = ref(0)
 

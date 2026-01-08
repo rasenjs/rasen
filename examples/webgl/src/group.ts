@@ -1,9 +1,9 @@
-import { setReactiveRuntime, getReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { getReactiveRuntime } from '@rasenjs/core'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, h1, h2, p, button, canvas, mount } from '@rasenjs/dom'
 import { group, circle, rect } from '@rasenjs/webgl'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Example 1: Simple rotating group (animation disabled for debugging)
 function simpleGroup() {

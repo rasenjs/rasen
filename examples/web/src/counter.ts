@@ -1,9 +1,8 @@
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime, ref } from '@rasenjs/reactive-signals'
+import { ref, useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { div, h1, button, span, mount } from '@rasenjs/dom'
 
 // 初始化 Signals 响应式运行时
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const count = ref(0)
 

@@ -9,10 +9,9 @@ This section documents the core APIs of Rasen.
 Sets the global reactive runtime. Must be called before mounting any components.
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 ```
 
 [Learn more →](/api/set-reactive-runtime)
@@ -188,9 +187,9 @@ import {
 ### Vue Adapter
 
 ```typescript
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 ```
 
 ### Signals Adapter
@@ -198,5 +197,5 @@ setReactiveRuntime(createReactiveRuntime())
 ```typescript
 import { createReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 ```

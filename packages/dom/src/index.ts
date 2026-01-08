@@ -6,6 +6,18 @@ export * from './components'
 export { watchProp } from './utils'
 export { hostHooks, type HostHooks } from './host-hooks'
 
+import type { Mountable } from '@rasenjs/core'
+import { getReactiveRuntime } from '@rasenjs/core'
+import {
+  createHydrationContext,
+  setHydrationContext,
+  getHydrationContext,
+  isHydrating
+} from './hydration-context'
+
+// 导出 hydration 相关
+export { getHydrationContext, isHydrating }
+
 // 事件修饰器
 export {
   // 底层函数
@@ -53,17 +65,6 @@ export {
   type EventModifierPlugin
 } from './utils/index'
 
-import type { Mountable } from '@rasenjs/core'
-import {
-  createHydrationContext,
-  setHydrationContext,
-  getHydrationContext,
-  isHydrating
-} from './hydration-context'
-
-// 导出 hydration 相关
-export { getHydrationContext, isHydrating }
-
 /**
  * 挂载组件到 DOM 元素
  *
@@ -75,7 +76,15 @@ export function mount<T extends Element>(
   mountable: Mountable<T>,
   container: T
 ): (() => void) | undefined {
-  return mountable(container)
+  const runtime = getReactiveRuntime()
+  const scope = runtime.effectScope()
+  
+  const unmount = scope.run(() => mountable(container))
+  
+  return () => {
+    unmount?.()
+    scope.stop()
+  }
 }
 
 /**

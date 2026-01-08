@@ -14,9 +14,10 @@ import {
   escapeHtml,
   stringifyStyle
 } from './index'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
 beforeEach(() => {
-  setReactiveRuntime(createReactiveRuntime())
+  useReactiveRuntime()
 })
 
 describe('@rasenjs/html', () => {

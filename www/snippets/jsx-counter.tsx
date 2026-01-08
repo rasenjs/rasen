@@ -1,10 +1,9 @@
-// tsconfig.json: { "jsx": "react-jsx", "jsxImportSource": "@rasenjs/jsx-runtime" }
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+// tsconfig.json: { "jsx": "react-jsx", "jsxImportSource": "@rasenjs/dom" }
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { mount } from '@rasenjs/dom'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const Counter = () => {
   const count = ref(0)

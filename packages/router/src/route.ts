@@ -2,7 +2,7 @@
  * @rasenjs/router - Route Definition
  */
 
-import { template, type Template } from '@rasenjs/shared'
+import { template, type Template } from '@rasenjs/core/utils'
 import type { RouteInput, Route, RouteOptions, QuerySchema } from './types'
 
 /** 空模板，用于无参数路由 */

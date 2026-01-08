@@ -1,11 +1,10 @@
 /// <reference types="@rasenjs/jsx-runtime/jsx" />
 
-import { ref, computed } from '@rasenjs/reactive-signals'
+import { ref, computed, type Ref, useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { com } from '@rasenjs/core'
-import { createRouterView, createRouterLink } from '@rasenjs/router-dom'
-
-// Import router
-import { router } from './router'
+import type { HistoryAdapter } from '@rasenjs/router'
+import { createRouter, route } from '@rasenjs/router'
+import { createRouterView, createRouterLink } from '@rasenjs/web'
 
 // Import views
 import { HomeView } from './views/HomeView'
@@ -17,22 +16,48 @@ import { AboutView } from './views/AboutView'
 // Import components
 import { ThemeToggle } from './components/ThemeToggle'
 
-// Global theme state
-export const isDark = ref(true)
+// Global theme state (initialized in createApp)
+export let isDark: Ref<boolean>
 
-// Create router components
-const RouterView = createRouterView(router, {
-  home: () => HomeView(),
-  counter: () => CounterView(),
-  todo: () => TodoView(),
-  timer: () => TimerView(),
-  about: () => AboutView(),
-})
+// Define routes configuration
+const routesConfig = {
+  home: route('/'),
+  counter: route('/counter'),
+  todo: route('/todo'),
+  timer: route('/timer'),
+  about: route('/about'),
+}
 
-const Link = createRouterLink(router)
+/**
+ * Create isomorphic App component
+ * @param history - History adapter (BrowserHistory for client, MemoryHistory for SSR)
+ */
+export function createApp(history: HistoryAdapter) {
+  // CRITICAL: Ensure reactive runtime is set before any reactive operations
+  // This works because @rasenjs/core is externalized (not in vite.config noExternal)
+  useReactiveRuntime()
+  
+  // Initialize global theme state (will be reused across SSR and client)
+  if (!isDark) {
+    isDark = ref(true)
+  }
+  
+  // Create router with the provided history
+  const router = createRouter(routesConfig, { history })
+  
+  // Create router components
+  const RouterView = createRouterView(router, {
+    home: () => HomeView(),
+    counter: () => CounterView(),
+    todo: () => TodoView(),
+    timer: () => TimerView(),
+    about: () => AboutView(),
+  })
 
-export const App = com(() => {
-  const currentPath = computed(() => router.current?.path || '/')
+  const Link = createRouterLink(router)
+
+  return com(() => {
+    const currentPath = computed(() => router.current?.path || '/')
 
   return (
     <div class="app">
@@ -109,4 +134,5 @@ export const App = com(() => {
       </footer>
     </div>
   )
-})
+  })
+}

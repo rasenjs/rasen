@@ -1,37 +1,44 @@
 /**
- * TC39 Signals 适配器
- * 将 TC39 Signals 提案的响应式系统适配到 Rasen
+ * TC39 Signals adapter
+ * Adapts TC39 Signals proposal's reactivity system to Rasen
  */
 
 import { Signal } from 'signal-polyfill'
-import type { ReactiveRuntime, Ref, ReadonlyRef } from '@rasenjs/core'
+import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
 
-// 创建单例运行时（延迟初始化）
+// Symbol for identifying Rasen refs
+const RASEN_REF_SYMBOL = Symbol('rasen.signals.ref')
+
+// Create singleton runtime (lazily initialized)
 let runtime: ReactiveRuntime | undefined
 
-// 当前活跃的 scope (用于收集 watch)
+// Currently active scope (for collecting watchers)
 let currentScope: { addCleanup: (cleanup: () => void) => void } | null = null
 
 /**
- * 创建 Signals 响应式运行时
+ * Creates Signals reactive runtime
  */
 export function createReactiveRuntime(): ReactiveRuntime {
   return {
-    watch: (source, callback, options) => {
-      let oldValue: any = undefined
+    watch<T>(
+      source: (() => T) | Ref<T> | ReadonlyRef<T>,
+      callback: (value: T, oldValue: T) => void,
+      options?: { immediate?: boolean; deep?: boolean }
+    ): () => void {
+      let oldValue: T | undefined = undefined
       let isFirstRun = true
       let stopped = false
 
-      // 创建一个 Computed 作为 effect
+      // Create a Computed as effect
       const effect = new Signal.Computed(() => {
         if (stopped) return
         
-        const newValue = source()
+        const newValue = typeof source === 'function' ? source() : (source as Ref<T>).value
         
-        if (!isFirstRun) {
+        if (!isFirstRun && oldValue !== undefined) {
           callback(newValue, oldValue)
         } else if (options?.immediate) {
-          // immediate 选项时，第一次 oldValue 也是当前值
+          // For immediate option, first oldValue is also the current value
           callback(newValue, newValue)
         }
         
@@ -43,14 +50,14 @@ export function createReactiveRuntime(): ReactiveRuntime {
         return newValue
       })
 
-      // 创建 Watcher 监听 effect
+      // Create Watcher to listen to effect
       const watcher = new Signal.subtle.Watcher(() => {
-        // 延迟执行，避免在通知阶段读取 signal
+        // Delay execution to avoid reading signal during notification phase
         queueMicrotask(() => {
           if (!stopped) {
-            // 先执行 effect
+            // Execute effect first
             effect.get()
-            // 如果还没停止，继续监听
+            // If not stopped, continue watching
             if (!stopped) {
               watcher.watch(effect)
             }
@@ -58,21 +65,21 @@ export function createReactiveRuntime(): ReactiveRuntime {
         })
       })
 
-      // 监听 effect 本身
+      // Watch effect itself
       watcher.watch(effect)
       
-      // 初次执行，建立依赖关系并触发 immediate 回调
+      // Initial execution to establish dependencies and trigger immediate callback
       effect.get()
-      // 初次执行后也需要重新监听
+      // Need to re-watch after initial execution
       watcher.watch(effect)
 
-      // 返回停止函数
+      // Return stop function
       const stopFn = () => {
         stopped = true
         watcher.unwatch(effect)
       }
       
-      // 如果在 scope 内，注册清理函数
+      // If within a scope, register cleanup function
       if (currentScope) {
         currentScope.addCleanup(stopFn)
       }
@@ -81,7 +88,7 @@ export function createReactiveRuntime(): ReactiveRuntime {
     },
 
     effectScope: () => {
-      // 创建 scope 容器，收集内部创建的所有 watch
+      // Create scope container to collect all watchers created inside
       const cleanups: (() => void)[] = []
       let isActive = true
 
@@ -94,7 +101,7 @@ export function createReactiveRuntime(): ReactiveRuntime {
         run: <T>(fn: () => T): T | undefined => {
           if (!isActive) return undefined
           
-          // 设置当前 scope
+          // Set current scope
           const prevScope = currentScope
           currentScope = scope
           try {
@@ -106,7 +113,7 @@ export function createReactiveRuntime(): ReactiveRuntime {
         stop: () => {
           if (!isActive) return
           isActive = false
-          // 清理所有收集的副作用
+          // Clean up all collected side effects
           cleanups.forEach(cleanup => cleanup())
           cleanups.length = 0
         }
@@ -117,32 +124,36 @@ export function createReactiveRuntime(): ReactiveRuntime {
 
     ref: <T>(value: T): Ref<T> => {
       const signal = new Signal.State(value)
-      return {
+      const ref = {
         get value() {
           return signal.get()
         },
         set value(newValue: T) {
           signal.set(newValue)
-        }
+        },
+        [RASEN_REF_SYMBOL]: true
       }
+      return ref
     },
 
     computed: <T>(getter: () => T): ReadonlyRef<T> => {
       const signal = new Signal.Computed(getter)
-      return {
+      const computed = {
         get value() {
           return signal.get()
-        }
+        },
+        [RASEN_REF_SYMBOL]: true
       }
+      return computed
     },
 
     unref: <T>(value: T | Ref<T> | ReadonlyRef<T> | (() => T)): T => {
-      // 检查是否是 getter 函数（但排除 Ref 对象，因为它们也有 value）
+      // Check if it's a getter function (but exclude Ref objects, as they also have value)
       if (typeof value === 'function') {
-        // 执行 getter 函数
+        // Execute getter function
         return (value as () => T)()
       }
-      // 检查是否有 value 属性（Ref 或 ReadonlyRef）
+      // Check if it has value property (Ref or ReadonlyRef)
       if (value && typeof value === 'object' && 'value' in value) {
         return (value as Ref<T>).value
       }
@@ -150,13 +161,30 @@ export function createReactiveRuntime(): ReactiveRuntime {
     },
 
     isRef: (value: unknown): boolean => {
-      // TC39 Signals 检查是否有 value 属性
-      return value !== null && typeof value === 'object' && 'value' in value
+      return (
+        value !== null &&
+        typeof value === 'object' &&
+        RASEN_REF_SYMBOL in value
+      )
     }
   }
 }
 
-// 获取或创建单例运行时
+/**
+ * Convenience function that creates and sets the Signals reactive runtime
+ * 
+ * @example
+ * ```ts
+ * import { useReactiveRuntime } from '@rasenjs/reactive-signals'
+ * 
+ * useReactiveRuntime()
+ * ```
+ */
+export function useReactiveRuntime(): void {
+  setReactiveRuntime(createReactiveRuntime())
+}
+
+// Get or create singleton runtime
 function getRuntime(): ReactiveRuntime {
   if (!runtime) {
     runtime = createReactiveRuntime()
@@ -165,21 +193,21 @@ function getRuntime(): ReactiveRuntime {
 }
 
 /**
- * 便捷的 ref 函数
+ * Convenient ref function
  */
 export function ref<T>(value: T): Ref<T> {
   return getRuntime().ref(value)
 }
 
 /**
- * 便捷的 computed 函数
+ * Convenient computed function
  */
 export function computed<T>(getter: () => T): ReadonlyRef<T> {
   return getRuntime().computed(getter)
 }
 
 /**
- * 便捷的 watch 函数
+ * Convenient watch function
  */
 export function watch<T>(
   source: () => T,
@@ -190,14 +218,14 @@ export function watch<T>(
 }
 
 /**
- * 便捷的 unref 函数
+ * Convenient unref function
  */
 export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
   return getRuntime().unref(value)
 }
 
 /**
- * 便捷的 isRef 函数
+ * Convenient isRef function
  */
 export function isRef(value: unknown): boolean {
   return getRuntime().isRef(value)

@@ -1,10 +1,9 @@
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { canvas, mount } from '@rasenjs/dom'
 import { rect, text } from '@rasenjs/canvas-2d'
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const x = ref(50)
 

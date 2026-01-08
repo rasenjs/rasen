@@ -29,7 +29,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@rasenjs/core": "workspace:*",
+    "@rasenjs/core": "workspace:^",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/router": "workspace:*"
   },

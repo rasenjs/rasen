@@ -170,7 +170,6 @@ export function createMobXRuntime(): ReactiveRuntime {
 ## Usage
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
 import { createSolidRuntime } from './solid-adapter'
 
 setReactiveRuntime(createSolidRuntime())

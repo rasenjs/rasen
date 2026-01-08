@@ -1,9 +1,8 @@
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, mount } from '@rasenjs/dom'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const count = ref(0)
 

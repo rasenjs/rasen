@@ -50,12 +50,12 @@ We don't create a new reactive system. Through the `ReactiveRuntime` interface, 
 
 ```typescript
 // Use Vue's reactivity
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-setReactiveRuntime(createReactiveRuntime())
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+useReactiveRuntime()
 
 // Or use TC39 Signals
-import { createReactiveRuntime } from '@rasenjs/reactive-signals'
-setReactiveRuntime(createReactiveRuntime())
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
+useReactiveRuntime()
 ```
 
 ### Render Target Decoupling

@@ -5,11 +5,11 @@
  */
 
 import { registerApp, view, text, touchable } from '@rasenjs/react-native';
-import { createReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals';
-import { setReactiveRuntime } from '@rasenjs/core';
+import { ref, computed } from '@rasenjs/reactive-signals';
+import { useReactiveRuntime } from '@rasenjs/reactive-signals';
 
 // 初始化响应式运行时
-setReactiveRuntime(createReactiveRuntime());
+useReactiveRuntime();
 
 // ============================================================================
 // 响应式状态

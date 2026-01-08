@@ -5,7 +5,7 @@
     "target": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "preserve",
-    "jsxImportSource": "@rasenjs/jsx-runtime"
+    "jsxImportSource": "@rasenjs/web"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

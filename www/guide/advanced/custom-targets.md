@@ -112,13 +112,12 @@ export function mount(
 ## Usage
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { ref } from 'vue'
 import * as THREE from 'three'
 import { mesh, group, mount } from './three-adapter'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const scene = new THREE.Scene()
 const rotation = ref({ x: 0, y: 0, z: 0 })

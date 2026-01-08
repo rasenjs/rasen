@@ -2,7 +2,7 @@
 
 import { com } from '@rasenjs/core'
 import { ref, computed } from '@rasenjs/reactive-signals'
-import { f } from '@rasenjs/core'
+import { f } from '@rasenjs/web'
 
 export const Timer = com(() => {
   const seconds = ref(0)
@@ -22,6 +22,9 @@ export const Timer = com(() => {
 
   const start = () => {
     if (isRunning.value) return
+    // 仅在浏览器环境中执行
+    if (typeof window === 'undefined') return
+    
     isRunning.value = true
     intervalRef.value = window.setInterval(() => {
       seconds.value++

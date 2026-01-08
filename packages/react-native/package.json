@@ -41,7 +41,7 @@
   "author": "Rasen Contributors",
   "license": "MIT",
   "dependencies": {
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
   },
   "peerDependencies": {
     "react-native": ">=0.72.0"

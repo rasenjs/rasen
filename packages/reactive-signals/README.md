@@ -15,11 +15,10 @@ npm install @rasenjs/reactive-signals @rasenjs/core signal-polyfill
 ## Quick Start
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
+import { useReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
 
 // Setup runtime (do this once at app startup)
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Use Signals-based reactivity
 const count = ref(0)
@@ -164,11 +163,10 @@ const MyComponent = com(() => {
 ## With Rasen Components
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
+import { useReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
 import { div, button, mount } from '@rasenjs/dom'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const count = ref(0)
 

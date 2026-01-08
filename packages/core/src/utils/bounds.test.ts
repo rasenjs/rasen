@@ -14,7 +14,7 @@ import {
   boundsExpand,
   boundsClone,
   type Bounds
-} from '../bounds-utils'
+} from './bounds'
 
 describe('boundsIntersect', () => {
   it('should detect overlapping bounds', () => {

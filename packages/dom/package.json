@@ -11,6 +11,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js",
+      "require": "./dist/jsx-runtime.cjs"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.ts",
+      "import": "./dist/jsx-dev-runtime.js",
+      "require": "./dist/jsx-dev-runtime.cjs"
     }
   },
   "files": [
@@ -43,6 +53,11 @@
   "author": "Rasen Contributors",
   "license": "MIT",
   "dependencies": {
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^",
+    "@rasenjs/jsx-runtime": "workspace:^"
+  },
+  "devDependencies": {
+    "@rasenjs/reactive-vue": "workspace:*",
+    "@vue/reactivity": "^3.5.25"
   }
 }

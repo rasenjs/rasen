@@ -15,13 +15,12 @@ npm install @rasenjs/dom @rasenjs/core
 ## Quick Start
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, input, mount } from '@rasenjs/dom'
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
 // Setup reactive runtime
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Create reactive state
 const name = ref('World')
@@ -133,7 +132,7 @@ const link = a({
 Props can be reactive values:
 
 ```typescript
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
 const isActive = ref(false)
 const count = ref(0)

@@ -64,29 +64,23 @@ export function watchProp<T>(
 ): () => void {
   const runtime = getReactiveRuntime()
   
-  // 优化：缓存上一次的值，避免不必要的 DOM 更新
-  let oldValue: T | undefined = undefined
-  const hasOldValue = !skipImmediate
-  
+  // 立即执行一次（除非在 hydration 模式）
   if (!skipImmediate) {
     try {
-      oldValue = getter()
-      setter(oldValue)
+      const value = getter()
+      setter(value)
     } catch (e) {
       // 忽略初始化错误
     }
   }
   
+  // 监听后续变化
   const stop = runtime.watch(
     getter,
     (newValue) => {
-      // 只有值真正改变时才更新 DOM
-      if (!hasOldValue || oldValue !== newValue) {
-        setter(newValue)
-        oldValue = newValue
-      }
+      setter(newValue)
     },
-    { immediate: false } // 已经手动处理了 immediate
+    { immediate: false }
   )
   
   return stop

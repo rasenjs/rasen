@@ -15,9 +15,9 @@
     "@rasenjs/core": "workspace:*",
     "@rasenjs/react-native": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*",
+    "@vue/reactivity": "^3.5.25",
     "react": "18.3.1",
-    "react-native": "0.76.9",
-    "vue": "^3.4.0"
+    "react-native": "0.76.9"
   },
   "devDependencies": {
     "@babel/core": "^7.23.0",

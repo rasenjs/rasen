@@ -17,6 +17,11 @@
       "import": "./dist/components.js",
       "require": "./dist/components.cjs"
     },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js",
+      "require": "./dist/utils.cjs"
+    },
     "./test-utils": {
       "types": "./dist/test-utils.d.ts",
       "import": "./dist/test-utils.js",
@@ -53,14 +58,11 @@
   },
   "author": "Rasen Contributors",
   "license": "MIT",
-  "devDependencies": {
-    "vue": "^3.3.10"
-  },
   "peerDependencies": {
-    "vue": "^3.3.0"
+    "zod": "^3.0.0"
   },
   "peerDependenciesMeta": {
-    "vue": {
+    "zod": {
       "optional": true
     }
   }

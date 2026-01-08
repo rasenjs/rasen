@@ -1,0 +1,45 @@
+{
+  "name": "@rasenjs/reactive-nanostores",
+  "version": "0.1.0",
+  "description": "Nanostores adapter for Rasen",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "rasen",
+    "nanostores",
+    "reactive",
+    "adapter"
+  ],
+  "author": "Rasen Team",
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:^",
+    "nanostores": "^0.11.3"
+  },
+  "devDependencies": {
+    "nanostores": "^0.11.3",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

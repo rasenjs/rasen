@@ -64,7 +64,7 @@ interface EffectScope {
  */
 export interface ReactiveRuntime {
   watch<T>(
-    source: () => T,
+    source: (() => T) | Ref<T> | ReadonlyRef<T>,
     callback: WatchCallback<T>,
     options?: WatchOptions
   ): WatchStopHandle

@@ -1,24 +1,22 @@
 /**
- * @rasenjs/shared - Template
- *
- * 字符串模板序列化/反序列化工具
- * 基于 Tagged Template Literal + Zod
+ * Template utilities for string template serialization/deserialization
+ * Based on Tagged Template Literal + Zod
  *
  * @example
  * ```typescript
  * import { z } from 'zod'
- * import { template } from '@rasenjs/shared'
+ * import { template } from '@rasenjs/core'
  *
- * // 定义模板
+ * // Define template
  * const userPath = template`/users/${{ id: z.string() }}`
  *
- * // 解析
+ * // Parse
  * userPath.parse('/users/123')  // { id: '123' }
  *
- * // 格式化
+ * // Format
  * userPath.format({ id: '123' })  // '/users/123'
  *
- * // 类型转换
+ * // Type conversion
  * const postPath = template`/posts/${{ id: z.coerce.number() }}`
  * postPath.parse('/posts/42')  // { id: 42 } (number)
  * ```
@@ -27,17 +25,17 @@
 import { z, type ZodType, type ZodObject, type ZodRawShape } from 'zod'
 
 /**
- * 参数定义：{ name: ZodSchema }
+ * Parameter definition: { name: ZodSchema }
  */
 export type ParamDef<T extends ZodRawShape = ZodRawShape> = T
 
 /**
- * 模板参数：可以是参数定义对象，也可以是另一个 Template
+ * Template parameter: can be parameter definition object or another Template
  */
 export type TemplateParam = Record<string, ZodType> | Template<Record<string, unknown>>
 
 /**
- * 判断是否为 Template 实例
+ * Check if value is a Template instance
  */
 export function isTemplate(value: unknown): value is Template<Record<string, unknown>> {
   return (
@@ -51,78 +49,78 @@ export function isTemplate(value: unknown): value is Template<Record<string, unk
 }
 
 /**
- * 模板实例接口
+ * Template instance interface
  */
 export interface Template<TParams extends Record<string, unknown> = Record<string, never>> {
   /**
-   * 解析字符串，返回参数对象
-   * 解析失败返回 null
+   * Parse string, return parameter object
+   * Returns null if parsing fails
    */
   parse(input: string): TParams | null
 
   /**
-   * 安全解析，返回 { success, data, error }
+   * Safe parse, returns { success, data, error }
    */
   safeParse(input: string):
     | { success: true; data: TParams }
     | { success: false; error: Error }
 
   /**
-   * 格式化参数为字符串
+   * Format parameters to string
    */
   format(params: TParams): string
 
   /**
-   * 测试字符串是否匹配模板
+   * Test if string matches template
    */
   test(input: string): boolean
 
   /**
-   * 获取模板的正则表达式
+   * Get template regex
    */
   readonly regex: RegExp
 
   /**
-   * 获取参数名列表
+   * Get parameter names list
    */
   readonly paramNames: string[]
 
   /**
-   * 原始模板模式（用于调试）
+   * Raw template pattern (for debugging)
    */
   readonly pattern: string
 
   /**
-   * 合并的 Zod schema
+   * Merged Zod schema
    */
   readonly schema: ZodObject<ZodRawShape>
 
   /**
-   * 创建带前缀的新模板（不修改原模板）
-   * @param prefix 要添加的前缀字符串
-   * @returns 新的 Template 实例
+   * Create new template with prefix (does not modify original)
+   * @param prefix Prefix string to add
+   * @returns New Template instance
    */
   prefix(prefix: string): Template<TParams>
 
   /**
-   * 内部标记
+   * Internal marker
    * @internal
    */
   readonly _isTemplate: true
 }
 
 /**
- * 转义正则特殊字符
+ * Escape regex special characters
  */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**
- * 从 Zod schema 获取匹配正则
+ * Get matching regex from Zod schema
  */
 function getParamPattern(schema: ZodType): string {
-  // 使用 any 来访问内部结构，因为 Zod 没有暴露这些类型
+  // Use any to access internal structure, as Zod doesn't expose these types
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const def = schema._def as any
 
@@ -131,7 +129,7 @@ function getParamPattern(schema: ZodType): string {
     return '-?\\d+(?:\\.\\d+)?'
   }
 
-  // z.coerce.number() 是 ZodPipeline
+  // z.coerce.number() is ZodPipeline
   if (def.typeName === 'ZodPipeline' && def.out?._def?.typeName === 'ZodNumber') {
     return '-?\\d+(?:\\.\\d+)?'
   }
@@ -151,12 +149,12 @@ function getParamPattern(schema: ZodType): string {
     return '(?:true|false|1|0)'
   }
 
-  // 默认匹配非斜杠字符
+  // Default: match non-slash characters
   return '[^/]+'
 }
 
 /**
- * 从参数定义提取信息
+ * Parse parameter definition info
  */
 function parseParamDef(param: Record<string, ZodType>): {
   name: string
@@ -176,12 +174,12 @@ function parseParamDef(param: Record<string, ZodType>): {
 }
 
 /**
- * 合并参数类型的辅助类型
- * 支持 Record<string, ZodType> 和 Template 两种参数类型
+ * Helper type for merging parameter types
+ * Supports both Record<string, ZodType> and Template parameter types
  */
 type ExtractParams<T> = T extends Template<infer P>
   ? P extends Record<string, never>
-    ? unknown  // 空参数返回 unknown，合并时会被忽略
+    ? unknown  // Empty params return unknown, will be ignored in merge
     : P
   : T extends Record<string, ZodType>
     ? { [K in keyof T]: z.infer<T[K]> }
@@ -198,25 +196,25 @@ type MergeParams<T extends TemplateParam[]> = T extends []
     : never
 
 /**
- * 创建模板
+ * Create template
  *
  * @example
  * ```typescript
- * // 单参数
+ * // Single parameter
  * const tpl = template`/users/${{ id: z.string() }}`
  * tpl.parse('/users/123')  // { id: '123' }
  * tpl.format({ id: '123' }) // '/users/123'
  *
- * // 多参数 + 类型转换
+ * // Multiple parameters + type conversion
  * const tpl = template`/users/${{ userId: z.string() }}/posts/${{ postId: z.coerce.number() }}`
  * tpl.parse('/users/abc/posts/123')  // { userId: 'abc', postId: 123 }
  *
- * // 枚举
+ * // Enum
  * const tpl = template`/status/${{ status: z.enum(['active', 'inactive']) }}`
  * tpl.parse('/status/active')  // { status: 'active' }
  * tpl.parse('/status/unknown') // null
  *
- * // 嵌套模板
+ * // Nested template
  * const user = template`/users/${{ userId: z.string() }}`
  * const userPost = template`${user}/posts/${{ postId: z.coerce.number() }}`
  * userPost.parse('/users/abc/posts/123')  // { userId: 'abc', postId: 123 }
@@ -226,7 +224,7 @@ export function template<T extends TemplateParam[]>(
   strings: TemplateStringsArray,
   ...params: T
 ): Template<MergeParams<T>> {
-  // 解析所有参数定义（包括嵌套模板）
+  // Parse all parameter definitions (including nested templates)
   type ParamInfo = {
     type: 'param'
     name: string
@@ -244,7 +242,7 @@ export function template<T extends TemplateParam[]>(
     return { type: 'param', ...parseParamDef(p as Record<string, ZodType>) }
   })
 
-  // 构建正则表达式
+  // Build regex
   let regexStr = '^'
   let pattern = ''
 
@@ -256,7 +254,7 @@ export function template<T extends TemplateParam[]>(
     if (i < paramInfos.length) {
       const info = paramInfos[i]
       if (info.type === 'template') {
-        // 嵌套模板：提取其正则（去掉 ^ 和 $）
+        // Nested template: extract its regex (remove ^ and $)
         const nestedRegex = info.template.regex.source.slice(1, -1)
         regexStr += nestedRegex
         pattern += info.template.pattern
@@ -270,13 +268,13 @@ export function template<T extends TemplateParam[]>(
   regexStr += '$'
   const regex = new RegExp(regexStr)
 
-  // 收集所有参数名和 schema
+  // Collect all parameter names and schemas
   const allParamNames: string[] = []
   const schemaShape: ZodRawShape = {}
 
   for (const info of paramInfos) {
     if (info.type === 'template') {
-      // 合并嵌套模板的参数
+      // Merge nested template parameters
       allParamNames.push(...info.template.paramNames)
       const nestedShape = info.template.schema.shape
       for (const [key, value] of Object.entries(nestedShape)) {
@@ -295,13 +293,13 @@ export function template<T extends TemplateParam[]>(
       const match = input.match(regex)
       if (!match) return null
 
-      // 提取原始字符串值，需要按顺序遍历捕获组
+      // Extract raw string values, need to traverse capture groups in order
       const rawParams: Record<string, string> = {}
       let matchIndex = 1
 
       for (const info of paramInfos) {
         if (info.type === 'template') {
-          // 嵌套模板的每个参数都有一个捕获组
+          // Each parameter of nested template has a capture group
           for (const name of info.template.paramNames) {
             rawParams[name] = match[matchIndex++]
           }
@@ -310,7 +308,7 @@ export function template<T extends TemplateParam[]>(
         }
       }
 
-      // 用 Zod 解析和转换
+      // Parse and convert with Zod
       const result = mergedSchema.safeParse(rawParams)
       if (!result.success) return null
 
@@ -354,7 +352,7 @@ export function template<T extends TemplateParam[]>(
         if (i < paramInfos.length) {
           const info = paramInfos[i]
           if (info.type === 'template') {
-            // 嵌套模板：使用其 format 方法
+            // Nested template: use its format method
             result += info.template.format(params as Record<string, unknown>)
           } else {
             const value = (params as Record<string, unknown>)[info.name]
@@ -389,14 +387,14 @@ export function template<T extends TemplateParam[]>(
     },
 
     prefix(prefixStr: string): Template<MergeParams<T>> {
-      // 创建新的正则：prefix + 原正则（去掉 ^ 和 $）
-      const innerRegex = regex.source.slice(1, -1) // 去掉 ^ 和 $
+      // Create new regex: prefix + original regex (remove ^ and $)
+      const innerRegex = regex.source.slice(1, -1) // Remove ^ and $
       const newRegex = new RegExp(`^${escapeRegex(prefixStr)}${innerRegex}$`)
 
-      // 新的 pattern
+      // New pattern
       const newPattern = prefixStr + pattern
 
-      // 保存原始 format 函数引用
+      // Save original format function reference
       const originalFormat = (params: MergeParams<T>) => {
         let result = ''
         for (let i = 0; i < strings.length; i++) {
@@ -417,7 +415,7 @@ export function template<T extends TemplateParam[]>(
         return result
       }
 
-      // 创建带前缀的新 Template
+      // Create new Template with prefix
       const createPrefixedTemplate = (
         currentPrefix: string,
         currentPattern: string,
@@ -505,7 +503,7 @@ export function template<T extends TemplateParam[]>(
     },
 
     /**
-     * 内部标记，用于识别 Template 实例
+     * Internal marker, used to identify Template instances
      */
     _isTemplate: true as const
   } as Template<MergeParams<T>>

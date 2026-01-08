@@ -13,12 +13,11 @@ import { div, button, span, mount } from '@rasenjs/dom'
 ## Basic Usage
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, button, span, mount } from '@rasenjs/dom'
 import { ref } from 'vue'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const count = ref(0)
 

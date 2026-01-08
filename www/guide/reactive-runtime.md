@@ -31,10 +31,9 @@ interface ReactiveRuntime {
 Before using Rasen, you must set up a reactive runtime:
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 ```
 
 This should be done once at app initialization, before mounting any components.
@@ -46,11 +45,10 @@ This should be done once at app initialization, before mounting any components.
 The recommended adapter for most use cases:
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref, computed, watch } from 'vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { ref, computed, watch } from '@vue/reactivity'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Use Vue's reactive primitives directly
 const count = ref(0)
@@ -62,10 +60,9 @@ const doubled = computed(() => count.value * 2)
 For projects preferring the emerging Signals standard:
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime, ref } from '@rasenjs/reactive-signals'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Use the adapter's ref
 const count = ref(0)
@@ -76,7 +73,7 @@ const count = ref(0)
 ### With Vue Runtime
 
 ```typescript
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive } from '@vue/reactivity'
 
 // Primitive values
 const count = ref(0)
@@ -213,10 +210,9 @@ Set the reactive runtime before any components are created:
 
 ```typescript
 // main.ts
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Now safe to import and use components
 import { App } from './App'
@@ -229,7 +225,7 @@ Don't import reactive primitives from Rasen — use the library directly:
 
 ```typescript
 // ✅ Good
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 
 // ❌ Avoid
 import { ref } from '@rasenjs/core'  // Only for internal use

@@ -1,9 +1,9 @@
-import { setReactiveRuntime, each, com } from '@rasenjs/core'
-import { createReactiveRuntime, ref } from '@rasenjs/reactive-signals'
+import { each, com } from '@rasenjs/core'
+import { ref, useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { div, h1, input, button, ul, li, span, mount } from '@rasenjs/dom'
 
 // 初始化 Signals 响应式运行时
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 interface Todo {
   id: number

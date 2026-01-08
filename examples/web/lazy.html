@@ -18,13 +18,12 @@
   <div id="app"></div>
 
   <script type="module">
-    import { setReactiveRuntime } from '@rasenjs/core';
-    import { createReactiveRuntime } from '@rasenjs/reactive-signals';
+    import { useReactiveRuntime } from '@rasenjs/reactive-signals';
     import { mount } from '@rasenjs/dom';
     import { LazyExamples } from './src/lazy-example';
 
     // 设置 Reactive Runtime
-    setReactiveRuntime(createReactiveRuntime());
+    useReactiveRuntime();
 
     // 挂载主组件
     mount(LazyExamples(), document.getElementById('app'));

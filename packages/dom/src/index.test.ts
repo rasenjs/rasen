@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 import {
   mount,
   hydrate,
@@ -49,12 +49,13 @@ import {
   once,
   self
 } from './index'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
 // Setup
 let container: HTMLElement
 
 beforeEach(() => {
-  setReactiveRuntime(createReactiveRuntime())
+  useReactiveRuntime()
   container = document.createElement('div')
   document.body.appendChild(container)
 })

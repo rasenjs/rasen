@@ -6,22 +6,41 @@ JSX/TSX runtime for the Rasen reactive rendering framework.
 
 ```bash
 npm install @rasenjs/jsx-runtime @rasenjs/core @rasenjs/dom
+# or @rasenjs/html for SSR, or @rasenjs/web for isomorphic
 ```
 
 ## Overview
 
-`@rasenjs/jsx-runtime` provides JSX support for Rasen, allowing you to write components using familiar JSX syntax.
+`@rasenjs/jsx-runtime` provides the core JSX transformation logic for Rasen. It uses an **injection pattern** - you should import JSX runtime from your rendering package (`@rasenjs/dom`, `@rasenjs/html`, or `@rasenjs/web`), not directly from this package.
 
 ## Quick Start
 
 ### 1. Configure TypeScript
 
+Choose the appropriate `jsxImportSource` based on your rendering target:
+
 ```json
-// tsconfig.json
+// For SPA (DOM only)
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "@rasenjs/jsx-runtime"
+    "jsxImportSource": "@rasenjs/dom"
+  }
+}
+
+// For SSR/SSG (HTML only)
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@rasenjs/html"
+  }
+}
+
+// For Isomorphic (automatic browser/node selection)
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@rasenjs/web"
   }
 }
 ```
@@ -29,12 +48,11 @@ npm install @rasenjs/jsx-runtime @rasenjs/core @rasenjs/dom
 ### 2. Write JSX Components
 
 ```tsx
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { mount } from '@rasenjs/dom'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const count = ref(0)
 

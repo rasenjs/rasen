@@ -383,14 +383,14 @@ const views = {
 
 ```typescript
 import { z } from 'zod'
-import { setReactiveRuntime, type Mountable } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-signals'
+import { type Mountable } from '@rasenjs/core'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { div, a, h1, nav, mount } from '@rasenjs/dom'
 import { template as tpl, createRouter, createBrowserHistory } from '@rasenjs/router'
 import { createRouterLink, createRouterView, layout } from '@rasenjs/router/components'
 
 // Initialize reactive runtime
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Create router with declarative routes configuration
 const router = createRouter({

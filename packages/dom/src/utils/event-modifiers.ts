@@ -15,7 +15,7 @@
 import {
   createModifierChain,
   type ModifierPlugin as CoreModifierPlugin
-} from '@rasenjs/core'
+} from '@rasenjs/core/utils'
 
 // ============================================
 // 事件修饰器插件接口

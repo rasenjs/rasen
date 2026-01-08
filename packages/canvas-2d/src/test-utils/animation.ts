@@ -52,22 +52,22 @@ export function hasContent(
 }
 
 /**
- * 等待 Vue nextTick 并强制同步刷新渲染
+ * Wait for Vue nextTick and force sync refresh
  */
 export async function waitForUpdate(renderContext: {
   flushSync: () => void
 }): Promise<void> {
-  // 动态导入 Vue 的 nextTick（如果可用）
+  // Dynamically import Vue's nextTick (if available)
   try {
-    const { nextTick } = await import('vue')
-    // 等待 Vue 的 nextTick
+    const { nextTick } = await import('@vue/reactivity')
+    // Wait for Vue's nextTick
     await nextTick()
   } catch {
-    // 如果 Vue 不可用，直接等待微任务
+    // If Vue is not available, just wait for microtask
   }
-  // 再等待一个微任务，确保 queueMicrotask 中的任务也被执行
+  // Wait for another microtask to ensure tasks in queueMicrotask are executed
   await Promise.resolve()
-  // 如果还没有执行，强制同步刷新
+  // If not executed yet, force sync refresh
   renderContext.flushSync()
 }
 

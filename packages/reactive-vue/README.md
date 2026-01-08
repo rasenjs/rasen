@@ -5,7 +5,7 @@ Vue 3 reactivity adapter for the Rasen reactive rendering framework.
 ## Installation
 
 ```bash
-npm install @rasenjs/reactive-vue @rasenjs/core vue
+npm install @rasenjs/reactive-vue @rasenjs/core @vue/reactivity
 ```
 
 ## Overview
@@ -15,12 +15,11 @@ npm install @rasenjs/reactive-vue @rasenjs/core vue
 ## Quick Start
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref, computed, watch } from 'vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { ref, computed, watch } from '@vue/reactivity'
 
 // Setup runtime (do this once at app startup)
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Now you can use Vue reactivity with Rasen components
 const count = ref(0)
@@ -50,7 +49,7 @@ setReactiveRuntime(runtime)
 Once the runtime is set, import Vue's reactivity APIs directly:
 
 ```typescript
-import { ref, computed, reactive, watch, watchEffect } from 'vue'
+import { ref, computed, reactive, watch, watchEffect } from '@vue/reactivity'
 
 // Refs
 const count = ref(0)
@@ -79,7 +78,7 @@ watchEffect(() => {
 ## With Rasen Components
 
 ```typescript
-import { ref, computed } from 'vue'
+import { ref, computed } from '@vue/reactivity'
 import { div, button, mount } from '@rasenjs/dom'
 
 const count = ref(0)

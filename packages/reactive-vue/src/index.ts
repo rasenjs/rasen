@@ -1,8 +1,8 @@
 /**
- * Vue Reactivity 适配器
- * 将 Vue 的响应式系统适配到 Rasen
+ * Vue Reactivity adapter
+ * Adapts Vue's reactivity system to Rasen
  * 
- * 使用 @vue/reactivity 而非完整的 vue 包，减小包体积
+ * Uses @vue/reactivity instead of the full vue package to reduce bundle size
  */
 
 import {
@@ -11,41 +11,83 @@ import {
   ref as vueRef,
   computed as vueComputed,
   unref as vueUnref,
-  isRef
+  isRef,
+  type WatchStopHandle,
+  type WatchOptions,
+  type Ref as VueRef,
+  type ComputedRef
 } from '@vue/reactivity'
-import type { ReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
+
+// Symbol for identifying Rasen refs (Vue refs are already marked by Vue's internal implementation)
+const RASEN_REF_SYMBOL = Symbol('rasen.vue.ref')
 
 /**
- * 创建 Vue 响应式运行时
+ * Creates Vue reactive runtime
  */
 export function createReactiveRuntime(): ReactiveRuntime {
   return {
-    watch: (source: any, callback: any, options: any) => {
-      return vueWatch(source, callback, options) as any
+    watch<T>(
+      source: (() => T) | Ref<T> | ReadonlyRef<T>,
+      callback: (value: T, oldValue: T) => void,
+      options?: { immediate?: boolean; deep?: boolean }
+    ): () => void {
+      return vueWatch(source as (() => T), callback, options as WatchOptions) as WatchStopHandle
     },
 
-    effectScope: () => {
-      return vueEffectScope() as any
+    effectScope(): {
+      run<T>(fn: () => T): T | undefined
+      stop(): void
+    } {
+      const scope = vueEffectScope()
+      return {
+        run: <T>(fn: () => T) => scope.run(fn),
+        stop: () => scope.stop()
+      }
     },
 
-    ref: ((value: any) => {
-      return vueRef(value) as any
-    }) as any,
+    ref<T>(value: T): Ref<T> {
+      const ref = vueRef(value) as unknown as Ref<T>
+      // Mark as Rasen ref
+      Object.defineProperty(ref, RASEN_REF_SYMBOL, { value: true, enumerable: false })
+      return ref
+    },
 
-    computed: ((getter: any) => {
-      return vueComputed(getter) as any
-    }) as any,
+    computed<T>(getter: () => T): ReadonlyRef<T> {
+      const computed = vueComputed(getter) as unknown as ReadonlyRef<T>
+      // Mark as Rasen ref
+      Object.defineProperty(computed, RASEN_REF_SYMBOL, { value: true, enumerable: false })
+      return computed
+    },
 
-    unref: <T>(value: T | unknown): T => {
-      // 检查是否是 getter 函数
+    unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
+      // Check if it's a getter function
       if (typeof value === 'function') {
         return (value as () => T)()
       }
-      return (isRef(value) ? vueUnref(value) : value) as T
+      return (isRef(value) ? vueUnref(value as VueRef<T> | ComputedRef<T>) : value) as T
     },
 
-    isRef: (value: unknown): boolean => {
-      return isRef(value)
+    isRef(value: unknown): value is Ref<unknown> | ReadonlyRef<unknown> {
+      return (
+        value !== null &&
+        typeof value === 'object' &&
+        (RASEN_REF_SYMBOL in value || isRef(value))
+      )
     }
   }
+}
+
+/**
+ * Convenience function that creates and sets the Vue reactive runtime
+ * 
+ * @example
+ * ```ts
+ * import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+ * 
+ * useReactiveRuntime()
+ * ```
+ */
+export function useReactiveRuntime(): void {
+  setReactiveRuntime(createReactiveRuntime())
 }

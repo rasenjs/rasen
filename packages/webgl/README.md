@@ -19,14 +19,13 @@ npm install @rasenjs/webgl @rasenjs/core @rasenjs/dom
 ## Quick Start
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { canvas, mount } from '@rasenjs/dom'
 import { rect, circle } from '@rasenjs/webgl'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
 // Setup reactive runtime
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Create reactive state
 const x = ref(50)

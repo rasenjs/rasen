@@ -42,13 +42,12 @@ Build tools like Vite automatically select the correct export condition based on
 Write your component once, and it works in both SSR and client environments:
 
 ```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, p, button } from '@rasenjs/web'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
 // Setup reactive runtime
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Isomorphic component - works in both SSR and browser
 export const Counter = () => {

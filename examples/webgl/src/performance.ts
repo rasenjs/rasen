@@ -1,6 +1,6 @@
-import { setReactiveRuntime, each } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref, type Ref, type ShallowRef, shallowRef } from 'vue'
+import { each } from '@rasenjs/core'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { ref, type Ref, type ShallowRef, shallowRef } from '@vue/reactivity'
 import { div, h1, p, a, button, span, canvas, mount } from '@rasenjs/dom'
 import {
   rect,
@@ -12,7 +12,7 @@ import {
   wedge
 } from '@rasenjs/webgl'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // Canvas dimensions
 const CANVAS_WIDTH = 1200

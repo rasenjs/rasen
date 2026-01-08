@@ -1,10 +1,10 @@
-import { setReactiveRuntime, type MountFunction } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref } from 'vue'
+import { type MountFunction } from '@rasenjs/core'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { ref } from '@vue/reactivity'
 import { div, h1, p, a, button, canvas, mount } from '@rasenjs/dom'
 import { rect, circle } from '@rasenjs/webgl'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const rotation = ref(0)
 const scale = ref(1)

@@ -130,8 +130,8 @@ describe('template', () => {
   describe('type safety', () => {
     it('should infer correct types', () => {
       const tpl = template`/users/${{ userId: z.string() }}/posts/${{ postId: z.coerce.number() }}`
-
-      // 这些应该类型正确
+      
+      // These should be type-correct
       const result = tpl.parse('/users/abc/posts/123')
       if (result) {
         const userId: string = result.userId
@@ -140,7 +140,7 @@ describe('template', () => {
         expect(postId).toBe(123)
       }
 
-      // format 也应该类型正确
+      // format should also be type-correct
       tpl.format({ userId: 'abc', postId: 123 })
     })
   })
@@ -245,12 +245,12 @@ describe('template', () => {
       const base = template`/${{ id: z.string() }}`
       const prefixed = base.prefix('/users')
 
-      // 原模板不变
+      // Original template unchanged
       expect(base.pattern).toBe('/:id')
       expect(base.parse('/123')).toEqual({ id: '123' })
       expect(base.parse('/users/123')).toBeNull()
 
-      // 新模板带前缀
+      // New template has prefix
       expect(prefixed.pattern).toBe('/users/:id')
       expect(prefixed.parse('/users/123')).toEqual({ id: '123' })
       expect(prefixed.parse('/123')).toBeNull()

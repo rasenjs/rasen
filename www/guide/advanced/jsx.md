@@ -16,7 +16,7 @@ npm install @rasenjs/jsx-runtime
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "@rasenjs/jsx-runtime"
+    "jsxImportSource": "@rasenjs/dom"
   }
 }
 ```
@@ -24,12 +24,11 @@ npm install @rasenjs/jsx-runtime
 ## Usage
 
 ```tsx
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { mount } from '@rasenjs/dom'
 import { ref } from 'vue'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const App = () => {
   const count = ref(0)

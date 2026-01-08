@@ -3,7 +3,7 @@
  */
 
 import type { Bounds } from './types'
-import { boundsIntersect, mergeBounds } from '@rasenjs/shared'
+import { boundsIntersect, mergeBounds } from '@rasenjs/core/utils'
 import { BatchRenderer } from './renderer/batch'
 import { InstancedBatchRenderer } from './renderer/instanced'
 import { createOrthoMatrix } from './utils'

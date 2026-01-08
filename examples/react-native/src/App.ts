@@ -5,9 +5,9 @@
  * Fabric architecture, bypassing React's reconciler.
  */
 
-import { setReactiveRuntime, com } from '@rasenjs/core';
-import { createReactiveRuntime } from '@rasenjs/reactive-vue';
-import { ref, type Ref } from 'vue';
+import { com } from '@rasenjs/core';
+import { useReactiveRuntime } from '@rasenjs/reactive-vue';
+import { ref, type Ref } from '@vue/reactivity';
 import {
   view,
   text,
@@ -19,7 +19,7 @@ import {
 } from '@rasenjs/react-native';
 
 // Create and set Vue reactive runtime
-setReactiveRuntime(createReactiveRuntime());
+useReactiveRuntime();
 
 // Type alias for Todo item
 interface TodoItem {

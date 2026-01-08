@@ -29,12 +29,11 @@ import {
   type Child
 } from '../components'
 import type { Mountable } from '@rasenjs/core'
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-signals'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 
 // 为每个测试重新创建响应式运行时，防止内存积累
 beforeEach(() => {
-  setReactiveRuntime(createReactiveRuntime())
+  useReactiveRuntime()
 })
 
 // 创建测试用的路由

@@ -41,6 +41,6 @@ export type {
 // 导出错误类
 export { NavigationAbortedError } from './types'
 
-// Re-export Template type from shared
-export type { Template } from '@rasenjs/shared'
+// Re-export Template type from core/utils
+export type { Template } from '@rasenjs/core/utils'
 

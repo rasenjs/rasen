@@ -3,7 +3,7 @@
 import { com } from '@rasenjs/core'
 import { computed } from '@rasenjs/reactive-signals'
 import type { Ref } from '@rasenjs/core'
-import { each } from '@rasenjs/dom'
+import { each } from '@rasenjs/web'
 
 interface Tab {
   id: string

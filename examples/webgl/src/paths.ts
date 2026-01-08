@@ -1,9 +1,9 @@
-import { setReactiveRuntime, type MountFunction } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { type MountFunction } from '@rasenjs/core'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, h1, p, a, canvas, mount } from '@rasenjs/dom'
 import { line, arrow, polygon } from '@rasenjs/webgl'
 
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 const backLink = a({
   href: './index.html',

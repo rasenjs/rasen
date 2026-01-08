@@ -4,8 +4,7 @@
 
 import { getReactiveRuntime } from '@rasenjs/core'
 import type { Ref } from '@rasenjs/core'
-import { template, isTemplate } from '@rasenjs/shared'
-import type { Template } from '@rasenjs/shared'
+import { template, isTemplate, type Template } from '@rasenjs/core/utils'
 import type {
   Route,
   RouteMatch,

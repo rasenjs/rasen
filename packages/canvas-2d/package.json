@@ -42,11 +42,13 @@
   "author": "Rasen Contributors",
   "license": "MIT",
   "dependencies": {
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.83",
+    "@rasenjs/reactive-vue": "workspace:*",
     "@types/pngjs": "^6.0.5",
+    "@vue/reactivity": "^3.5.25",
     "cross-env": "^7.0.3",
     "pixelmatch": "^5.3.0",
     "pngjs": "^7.0.0"

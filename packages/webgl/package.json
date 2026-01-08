@@ -41,7 +41,7 @@
   "author": "Rasen Contributors",
   "license": "MIT",
   "dependencies": {
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

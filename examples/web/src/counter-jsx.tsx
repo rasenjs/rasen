@@ -5,12 +5,11 @@
 
 /// <reference types="@rasenjs/jsx-runtime/jsx" />
 
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
+import { ref, computed, useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { mount } from '@rasenjs/dom'
 
 // 设置响应式运行时
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 // 响应式状态
 

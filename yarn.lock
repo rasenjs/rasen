@@ -3106,32 +3106,35 @@ __metadata:
   resolution: "@rasenjs/canvas-2d@workspace:packages/canvas-2d"
   dependencies:
     "@napi-rs/canvas": "npm:^0.1.83"
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
+    "@rasenjs/reactive-vue": "workspace:*"
     "@types/pngjs": "npm:^6.0.5"
+    "@vue/reactivity": "npm:^3.5.25"
     cross-env: "npm:^7.0.3"
     pixelmatch: "npm:^5.3.0"
     pngjs: "npm:^7.0.0"
   languageName: unknown
   linkType: soft
 
-"@rasenjs/core@npm:^0.1.3-alpha, @rasenjs/core@workspace:*, @rasenjs/core@workspace:packages/core":
+"@rasenjs/core@workspace:*, @rasenjs/core@workspace:^, @rasenjs/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@rasenjs/core@workspace:packages/core"
-  dependencies:
-    vue: "npm:^3.3.10"
   peerDependencies:
-    vue: ^3.3.0
+    zod: ^3.0.0
   peerDependenciesMeta:
-    vue:
+    zod:
       optional: true
   languageName: unknown
   linkType: soft
 
-"@rasenjs/dom@npm:0.1.4-alpha, @rasenjs/dom@workspace:*, @rasenjs/dom@workspace:packages/dom":
+"@rasenjs/dom@workspace:*, @rasenjs/dom@workspace:packages/dom":
   version: 0.0.0-use.local
   resolution: "@rasenjs/dom@workspace:packages/dom"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
+    "@rasenjs/jsx-runtime": "workspace:^"
+    "@rasenjs/reactive-vue": "workspace:*"
+    "@vue/reactivity": "npm:^3.5.25"
   languageName: unknown
   linkType: soft
 
@@ -3140,12 +3143,9 @@ __metadata:
   resolution: "@rasenjs/example-ssr@workspace:examples/ssr"
   dependencies:
     "@rasenjs/core": "workspace:*"
-    "@rasenjs/dom": "workspace:*"
-    "@rasenjs/html": "workspace:*"
     "@rasenjs/reactive-vue": "workspace:*"
     "@rasenjs/router": "workspace:*"
-    "@rasenjs/router-dom": "workspace:*"
-    "@rasenjs/router-html": "workspace:*"
+    "@rasenjs/web": "workspace:*"
     "@types/express": "npm:^4.17.21"
     "@types/node": "npm:^20.0.0"
     express: "npm:^4.18.2"
@@ -3162,9 +3162,9 @@ __metadata:
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/reactive-vue": "workspace:*"
+    "@vue/reactivity": "npm:^3.5.25"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
-    vue: "npm:^3.4.0"
   languageName: unknown
   linkType: soft
 
@@ -3187,11 +3187,11 @@ __metadata:
     "@react-native/typescript-config": "npm:0.76.9"
     "@types/react": "npm:^18.2.0"
     "@types/react-native": "npm:^0.73.0"
+    "@vue/reactivity": "npm:^3.5.25"
     metro-react-native-babel-preset: "npm:^0.77.0"
     react: "npm:18.3.1"
     react-native: "npm:0.76.9"
     typescript: "npm:^5.3.3"
-    vue: "npm:^3.4.0"
   languageName: unknown
   linkType: soft
 
@@ -3216,8 +3216,8 @@ __metadata:
     "@rasenjs/core": "workspace:*"
     "@rasenjs/reactive-vue": "workspace:*"
     "@rasenjs/webgl": "workspace:*"
+    "@vue/reactivity": "npm:^3.5.25"
     vite: "npm:^6.0.3"
-    vue: "npm:^3.5.13"
   languageName: unknown
   linkType: soft
 
@@ -3225,7 +3225,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/gpui@workspace:packages/gpui"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
     "@types/node": "npm:^22.10.1"
     tsup: "npm:^8.3.5"
     typescript: "npm:^5.7.2"
@@ -3246,18 +3246,22 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/html@workspace:packages/html"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
+    "@rasenjs/jsx-runtime": "workspace:^"
   languageName: unknown
   linkType: soft
 
-"@rasenjs/jsx-runtime@npm:^0.1.3-alpha, @rasenjs/jsx-runtime@workspace:*, @rasenjs/jsx-runtime@workspace:packages/jsx-runtime":
+"@rasenjs/jsx-runtime@workspace:*, @rasenjs/jsx-runtime@workspace:^, @rasenjs/jsx-runtime@workspace:packages/jsx-runtime":
   version: 0.0.0-use.local
   resolution: "@rasenjs/jsx-runtime@workspace:packages/jsx-runtime"
   dependencies:
     "@rasenjs/core": "workspace:*"
-    "@rasenjs/dom": "workspace:*"
+    "@rasenjs/web": "workspace:*"
     tsup: "npm:^8.3.5"
     typescript: "npm:^5.7.2"
+  peerDependencies:
+    "@rasenjs/core": ">=0.1.0-alpha"
+    "@rasenjs/web": ">=0.1.0-alpha"
   languageName: unknown
   linkType: soft
 
@@ -3265,7 +3269,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/lvgl@workspace:packages/lvgl"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
     "@types/node": "npm:^22.10.1"
     tsup: "npm:^8.3.5"
     typescript: "npm:^5.7.2"
@@ -3286,7 +3290,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/react-native@workspace:packages/react-native"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
     "@types/react-native": "npm:^0.72.0"
   peerDependencies:
     react-native: ">=0.72.0"
@@ -3296,11 +3300,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/reactive-signals@npm:^0.1.3-alpha, @rasenjs/reactive-signals@workspace:*, @rasenjs/reactive-signals@workspace:packages/reactive-signals":
+"@rasenjs/reactive-nanostores@workspace:packages/reactive-nanostores":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/reactive-nanostores@workspace:packages/reactive-nanostores"
+  dependencies:
+    "@rasenjs/core": "workspace:^"
+    nanostores: "npm:^0.11.3"
+    tsup: "npm:^8.3.5"
+    typescript: "npm:^5.7.2"
+  languageName: unknown
+  linkType: soft
+
+"@rasenjs/reactive-signals@workspace:*, @rasenjs/reactive-signals@workspace:packages/reactive-signals":
   version: 0.0.0-use.local
   resolution: "@rasenjs/reactive-signals@workspace:packages/reactive-signals"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
     "@types/jsdom": "npm:^27"
     jsdom: "npm:^27.2.0"
     signal-polyfill: "npm:^0.2.2"
@@ -3313,18 +3328,18 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/reactive-vue@workspace:packages/reactive-vue"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
     "@vue/reactivity": "npm:^3.5.25"
     tsup: "npm:^8.3.5"
     typescript: "npm:^5.7.2"
   languageName: unknown
   linkType: soft
 
-"@rasenjs/router-dom@npm:0.1.5-alpha, @rasenjs/router-dom@workspace:*, @rasenjs/router-dom@workspace:packages/router-dom":
+"@rasenjs/router-dom@workspace:*, @rasenjs/router-dom@workspace:packages/router-dom":
   version: 0.0.0-use.local
   resolution: "@rasenjs/router-dom@workspace:packages/router-dom"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/router": "workspace:*"
     tsup: "npm:^8.0.0"
@@ -3338,7 +3353,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/router-html@workspace:packages/router-html"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
     "@rasenjs/html": "workspace:*"
     "@rasenjs/router": "workspace:*"
     tsup: "npm:^8.0.0"
@@ -3348,47 +3363,24 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/router-web@workspace:packages/router-web":
-  version: 0.0.0-use.local
-  resolution: "@rasenjs/router-web@workspace:packages/router-web"
-  dependencies:
-    "@rasenjs/router-dom": "workspace:*"
-    "@rasenjs/router-html": "workspace:*"
-    tsup: "npm:^8.0.1"
-    typescript: "npm:^5.3.3"
-  languageName: unknown
-  linkType: soft
-
-"@rasenjs/router@npm:0.1.5-alpha, @rasenjs/router@workspace:*, @rasenjs/router@workspace:packages/router":
+"@rasenjs/router@workspace:*, @rasenjs/router@workspace:packages/router":
   version: 0.0.0-use.local
   resolution: "@rasenjs/router@workspace:packages/router"
   dependencies:
-    "@rasenjs/core": "workspace:*"
-    "@rasenjs/shared": "workspace:*"
+    "@rasenjs/core": "workspace:^"
   peerDependencies:
     zod: ^3.0.0
   languageName: unknown
   linkType: soft
 
-"@rasenjs/shared@workspace:*, @rasenjs/shared@workspace:packages/shared":
-  version: 0.0.0-use.local
-  resolution: "@rasenjs/shared@workspace:packages/shared"
-  dependencies:
-    zod: "npm:^3.22.0"
-  peerDependencies:
-    zod: ^3.0.0
-  peerDependenciesMeta:
-    zod:
-      optional: false
-  languageName: unknown
-  linkType: soft
-
-"@rasenjs/web@workspace:packages/web":
+"@rasenjs/web@workspace:*, @rasenjs/web@workspace:packages/web":
   version: 0.0.0-use.local
   resolution: "@rasenjs/web@workspace:packages/web"
   dependencies:
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/html": "workspace:*"
+    "@rasenjs/router-dom": "workspace:*"
+    "@rasenjs/router-html": "workspace:*"
     tsup: "npm:^8.0.1"
     typescript: "npm:^5.3.3"
   languageName: unknown
@@ -3398,7 +3390,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/webgl@workspace:packages/webgl"
   dependencies:
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/core": "workspace:^"
     "@types/node": "npm:^22.10.2"
     typescript: "npm:^5.7.2"
     vitest: "npm:^2.1.8"
@@ -9878,6 +9870,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"nanostores@npm:^0.11.3":
+  version: 0.11.4
+  resolution: "nanostores@npm:0.11.4"
+  checksum: 10c0/45ce577ccd96938b756c238e5783b0de3369381905f164e7bd003794d34a3c1eb7bddb049699a48a35bb03d9745bcb3cd6ad549b5e81493b2de22ae2bdccf14c
+  languageName: node
+  linkType: hard
+
 "natural-compare@npm:^1.4.0":
   version: 1.4.0
   resolution: "natural-compare@npm:1.4.0"
@@ -10797,21 +10796,6 @@ __metadata:
   checksum: 10c0/96c032ac2475c8027b7a4e9fe22dc0dfe0f6d90b85e496e0f016fbdb99d6d066de0112e680805075bd989905e2123b3b3d002765149294dce0c1f7f01fcc2ea0
   languageName: node
   linkType: hard
-
-"rasen-app@workspace:templates/rasen-ts":
-  version: 0.0.0-use.local
-  resolution: "rasen-app@workspace:templates/rasen-ts"
-  dependencies:
-    "@rasenjs/core": "npm:^0.1.3-alpha"
-    "@rasenjs/dom": "npm:0.1.4-alpha"
-    "@rasenjs/jsx-runtime": "npm:^0.1.3-alpha"
-    "@rasenjs/reactive-signals": "npm:^0.1.3-alpha"
-    "@rasenjs/router": "npm:0.1.5-alpha"
-    "@rasenjs/router-dom": "npm:0.1.5-alpha"
-    typescript: "npm:^5.6.0"
-    vite: "npm:^6.0.0"
-  languageName: unknown
-  linkType: soft
 
 "rasen-monorepo@workspace:.":
   version: 0.0.0-use.local
@@ -12370,7 +12354,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:^5.0.0, typescript@npm:^5.3.0, typescript@npm:^5.3.2, typescript@npm:^5.3.3, typescript@npm:^5.6.0, typescript@npm:^5.6.3, typescript@npm:^5.7.2":
+"typescript@npm:^5.0.0, typescript@npm:^5.3.0, typescript@npm:^5.3.2, typescript@npm:^5.3.3, typescript@npm:^5.6.3, typescript@npm:^5.7.2":
   version: 5.9.3
   resolution: "typescript@npm:5.9.3"
   bin:
@@ -12380,7 +12364,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@npm%3A^5.0.0#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.3.0#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.3.2#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.3.3#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.6.0#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.6.3#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.7.2#optional!builtin<compat/typescript>":
+"typescript@patch:typescript@npm%3A^5.0.0#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.3.0#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.3.2#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.3.3#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.6.3#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.7.2#optional!builtin<compat/typescript>":
   version: 5.9.3
   resolution: "typescript@patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"
   bin:
@@ -12857,7 +12841,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vue@npm:^3.3.10, vue@npm:^3.4.0, vue@npm:^3.5.13":
+"vue@npm:^3.5.13":
   version: 3.5.25
   resolution: "vue@npm:3.5.25"
   dependencies:
@@ -13236,7 +13220,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zod@npm:^3.22.0, zod@npm:^3.24.0, zod@npm:^3.24.1":
+"zod@npm:^3.24.0, zod@npm:^3.24.1":
   version: 3.25.76
   resolution: "zod@npm:3.25.76"
   checksum: 10c0/5718ec35e3c40b600316c5b4c5e4976f7fee68151bc8f8d90ec18a469be9571f072e1bbaace10f1e85cf8892ea12d90821b200e980ab46916a6166a4260a983c

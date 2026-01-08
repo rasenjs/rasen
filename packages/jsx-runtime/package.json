@@ -48,8 +48,8 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@rasenjs/core": "^0.1.0-alpha",
-    "@rasenjs/web": "^0.1.0-alpha"
+    "@rasenjs/core": ">=0.1.0-alpha",
+    "@rasenjs/web": ">=0.1.0-alpha"
   },
   "devDependencies": {
     "@rasenjs/core": "workspace:*",

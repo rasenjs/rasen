@@ -8,10 +8,11 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { setReactiveRuntime, getReactiveRuntime } from './reactive'
 import { createReactiveRuntime } from '@rasenjs/reactive-signals'
 import { com } from './com'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
 describe('com - 内存泄漏检测', () => {
   beforeEach(() => {
-    setReactiveRuntime(createReactiveRuntime())
+    useReactiveRuntime()
   })
 
   it('单个组件创建和销毁应该调用 cleanup', () => {

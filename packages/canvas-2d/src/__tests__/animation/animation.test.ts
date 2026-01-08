@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createCanvas } from '@napi-rs/canvas'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { rect, RenderContext } from '../../index'
@@ -20,9 +20,10 @@ import {
   waitForUpdate,
   getPixelData
 } from '../../test-utils'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
 // 设置响应式运行时
-setReactiveRuntime(createReactiveRuntime())
+useReactiveRuntime()
 
 describe('动画和脏区域检测', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
