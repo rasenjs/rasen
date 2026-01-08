@@ -32,7 +32,7 @@
 > yarn dev
 > ```
 >
-> ⚠️ **Important:** This framework is still in active development. Core packages are not yet published.
+> ⚠️ **Important:** This framework is still in active development. Most packages are in alpha stage.
 > APIs are unstable and may change. Please do not use in production yet.
 >
 > If you're interested in this project, feel free to ⭐ star and watch for updates!
