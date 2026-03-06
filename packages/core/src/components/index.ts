@@ -12,7 +12,7 @@ export {
   type RepeatImplConfig
 } from './each'
 export { when, type WhenConfig, type WhenHostHooks } from './when'
-export { switchCase, match, type SwitchConfig, type SwitchHostHooks } from './switch'
+export { match, switchCase, type MatchConfig, type MatchHostHooks } from './match'
 export { 
   fragment,
   type FragmentConfig,

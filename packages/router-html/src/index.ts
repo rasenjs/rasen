@@ -48,8 +48,12 @@ import type { StringHost } from '@rasenjs/html'
 // Import HTML elements
 import { a } from '@rasenjs/html'
 
+// Import match host hooks for SSR
+import { matchHostHooks } from '@rasenjs/html'
+
 // Import router component factories and types
 import {
+  createRouterView as createRouterViewFactory,
   createRouterLink as createRouterLinkFactory,
   layout,
   type ViewsConfig,
@@ -62,8 +66,11 @@ export { layout, type ViewsConfig, type LayoutComponent }
 /**
  * 创建 RouterView 组件（HTML/SSR 版）
  *
- * 静态渲染当前匹配的路由，无响应式
+ * 静态渲染当前匹配的路由，但输出 match 标记以支持客户端水合
  * API 与 @rasenjs/router-dom 的 createRouterView 完全一致
+ * 
+ * 内部使用 @rasenjs/router 的 createRouterView 工厂 + SSR match hooks
+ * match 组件会自动处理 marker 的插入，无需手动管理
  */
 export function createRouterView<TRoutes extends Record<string, unknown>>(
   router: Router<TRoutes>,
@@ -72,56 +79,10 @@ export function createRouterView<TRoutes extends Record<string, unknown>>(
     default?: () => Mountable<StringHost>
   } = {}
 ): () => Mountable<StringHost> {
-  // Build route fullPath -> view key mapping
-  const routes = router.routes
-  const routeToKey = new Map<string, string>()
-  
-  function collect(routeObj: any, prefix: string = '') {
-    for (const key of Object.keys(routeObj)) {
-      const routeValue = routeObj[key]
-      const fullKey = prefix ? `${prefix}.${key}` : key
-      
-      if (routeValue && routeValue._isRoute === true) {
-        // Use fullPath as key instead of route object
-        routeToKey.set(routeValue.fullPath, fullKey)
-      } else if (routeValue && typeof routeValue === 'object') {
-        collect(routeValue, fullKey)
-      }
-    }
-  }
-  
-  collect(routes, '')
-  
-  return () => {
-    return (host: StringHost) => {
-      // SSR mode: render once, no reactivity needed
-      const matched = router.current
-      
-      if (matched?.route) {
-        // Use fullPath instead of route object reference
-        const viewKey = routeToKey.get(matched.route.fullPath) as keyof TRoutes
-        
-        if (viewKey && views[viewKey]) {
-          const viewFactory = views[viewKey]
-          // Check if it's a function
-          if (typeof viewFactory === 'function') {
-            // viewFactory returns Mountable directly
-            const mountable = viewFactory(matched.params as any)
-            mountable(host)
-          }
-        } else if (options.default) {
-          // Use default view
-          options.default()(host)
-        }
-      } else if (options.default) {
-        // No matched route, use default view
-        options.default()(host)
-      }
-      
-      // SSR does not need unmount
-      return undefined
-    }
-  }
+  return createRouterViewFactory<TRoutes, StringHost, string>(router, views, {
+    ...options,
+    hostHooks: matchHostHooks
+  })
 }
 
 /**

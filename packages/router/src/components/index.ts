@@ -5,10 +5,10 @@
  *
  * 完全平台无关：可用于 DOM、React Native、Canvas 等任何渲染目标
  * 使用 data 属性（如 data-active）代替 class，更抽象
- * 使用 core 的 switch 组件实现 RouterView
+ * 使用 core 的 match 组件实现 RouterView
  */
 
-import { switchCase, getReactiveRuntime, type SwitchHostHooks, type Mountable } from '@rasenjs/core'
+import { match, getReactiveRuntime, type MatchHostHooks, type Mountable } from '@rasenjs/core'
 import type { 
   Router, 
   Route, 
@@ -367,7 +367,7 @@ export function createRouterView<TRoutes extends Record<string, unknown>, Host =
   views: ViewsConfig<TRoutes, Host> & Record<string, any>,
   options?: {
     default?: () => Mountable<Host>
-    hostHooks?: SwitchHostHooks<Host, N>
+    hostHooks?: MatchHostHooks<Host, N>
   }
 ): () => Mountable<Host> {
   // 从 router 获取 routes 配置
@@ -474,7 +474,7 @@ export function createRouterView<TRoutes extends Record<string, unknown>, Host =
       }
     }
 
-    return switchCase({
+    return match({
       value: () => {
         const currentRoute = router.current?.route
         if (!currentRoute) return undefined

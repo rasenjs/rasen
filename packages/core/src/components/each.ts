@@ -25,7 +25,7 @@ interface Instance<N = unknown> {
  * 宿主操作钩子 - 全部可选
  */
 export interface EachHostHooks<Host = unknown, N = unknown> {
-  createMarker?: () => N
+  createMarker?: (host: Host, content: string) => N
   appendMarker?: (host: Host, marker: N) => void
   insertBefore?: (host: Host, node: N, before: N | null) => void
   removeNode?: (node: N) => void
@@ -111,7 +111,7 @@ interface EachImplConfig<T extends object, Host, N> {
   render: (item: T, index: number) => Mountable<Host>
 
   // 可选的宿主操作钩子
-  createMarker?: () => N
+  createMarker?: (host: Host, markerType: string) => N
   appendMarker?: (host: Host, marker: N) => void
   insertBefore?: (host: Host, node: N, before: N | null) => void
   removeNode?: (node: N) => void
@@ -139,7 +139,7 @@ const eachImpl = com(
       let currentItems: T[] = []
 
       // 末尾标记
-      const endMarker = config.createMarker?.()
+      const endMarker = config.createMarker?.(host, 'e')
       if (endMarker && config.appendMarker) {
         config.appendMarker(host, endMarker)
       }
@@ -364,7 +364,7 @@ interface RepeatImplConfig<T, Host, N> {
   render: (item: T, index: number) => Mountable<Host>
 
   // 可选的宿主操作钩子
-  createMarker?: () => N
+  createMarker?: (host: Host, markerType: string) => N
   appendMarker?: (host: Host, marker: N) => void
   removeNode?: (node: N) => void
   createFragment?: () => {
@@ -389,7 +389,7 @@ const repeatImpl = com(
       let instances: Instance<N>[] = []
 
       // 末尾标记
-      const endMarker = config.createMarker?.()
+      const endMarker = config.createMarker?.(host, 'e')
       if (endMarker && config.appendMarker) {
         config.appendMarker(host, endMarker)
       }

@@ -5,6 +5,7 @@
 export * from './components'
 export { watchProp } from './utils'
 export { hostHooks, type HostHooks } from './host-hooks'
+export { MARKERS, isMarkerMatch, MARKER_DEBUG_MAP } from './marker-constants'
 
 import type { Mountable } from '@rasenjs/core'
 import { getReactiveRuntime } from '@rasenjs/core'

@@ -1,9 +1,9 @@
 /**
  * DOM fragment implementation
  */
-import { getReactiveRuntime, type Mountable, type FragmentChild } from '@rasenjs/core'
+import { type Mountable, type FragmentChild } from '@rasenjs/core'
 import { getHydrationContext } from '../hydration-context'
-import { watchProp } from '../utils'
+import { isMarkerMatch } from '../marker-constants'
 
 const hostHooks = {
   createTextNode: (text: string) => {
@@ -31,6 +31,37 @@ const hostHooks = {
   },
   removeNode: (node: Node) => {
     node.parentNode?.removeChild(node)
+  },
+  createMarker: (_host: HTMLElement, content: string) => {
+    const ctx = getHydrationContext()
+    
+    if (ctx?.isHydrating) {
+      // In hydration mode, claim existing comment marker
+      const claimed = ctx.claim()
+      if (claimed?.nodeType === Node.COMMENT_NODE) {
+        const comment = claimed as Comment
+        // Verify it's the correct marker using helper
+        if (isMarkerMatch(comment, content)) {
+          return comment
+        }
+      }
+      // Marker mismatch - create new one
+      console.warn(
+        `[Rasen Hydration] Fragment marker mismatch: expected "<!-- ${content} -->"`,
+        claimed
+      )
+      return document.createComment(content)
+    }
+    return document.createComment(content)
+  },
+  appendMarker: (host: HTMLElement, marker: Node) => {
+    // Only append if not already in DOM (hydration scenario)
+    if (!marker.parentNode) {
+      host.appendChild(marker)
+    }
+  },
+  removeMarker: (marker: Node) => {
+    marker.parentNode?.removeChild(marker)
   }
 }
 
@@ -60,62 +91,31 @@ export const fragment: FragmentFunction = (
   configOrStrings: { children: Array<Mountable<HTMLElement>> } | TemplateStringsArray,
   ...values: FragmentChild<HTMLElement>[]
 ): Mountable<HTMLElement> => {
-  const runtime = getReactiveRuntime()
+  // 统一使用 core fragment - 无论是对象参数还是 tagged template
+  const { fragment: coreFragment } = require('@rasenjs/core')
   
   // 检测是否是 tagged template 调用
   if (Array.isArray(configOrStrings) && 'raw' in configOrStrings) {
     const strings = configOrStrings as TemplateStringsArray
     
-    // 对于 template strings，我们需要创建一个单独的文本节点来匹配 SSR 输出
-    // 而不是为每个部分创建独立的节点
-    return (host: HTMLElement) => {
-      const ctx = getHydrationContext()
-      
-      // 创建 computed 来组合所有部分
-      const getText = () => {
-        let result = ''
-        for (let i = 0; i < strings.length; i++) {
-          result += strings[i]
-          if (i < values.length) {
-            const value = values[i]
-            if (runtime.isRef(value)) {
-              result += String((value as any).value)
-            } else if (typeof value === 'string' || typeof value === 'number') {
-              result += String(value)
-            }
-          }
-        }
-        return result
+    // Tagged template: 将所有部分组合成单个响应式文本 child
+    // core fragment 会通过 hostHooks.createTextNode 处理 hydration
+    const children: Array<FragmentChild<HTMLElement>> = []
+    
+    // 将 template strings 和 values 交错组合
+    for (let i = 0; i < strings.length; i++) {
+      if (strings[i]) {
+        children.push(strings[i])
       }
-      
-      let textNode: Text
-      if (ctx?.isHydrating) {
-        const claimed = ctx.claim()
-        if (claimed?.nodeType === Node.TEXT_NODE) {
-          textNode = claimed as Text
-        } else {
-          textNode = document.createTextNode(getText())
-          host.appendChild(textNode)
-        }
-      } else {
-        textNode = document.createTextNode(getText())
-        host.appendChild(textNode)
-      }
-      
-      // 监听所有响应式值的变化
-      const stop = watchProp(getText, (text) => {
-        textNode.textContent = text
-      }, ctx?.isHydrating ?? false)
-      
-      return () => {
-        stop()
-        textNode.remove()
+      if (i < values.length) {
+        children.push(values[i])
       }
     }
+    
+    return coreFragment({ children, hooks: hostHooks })
   }
   
-  // 对象参数用法 - 使用 core fragment with hooks
-  const { fragment: coreFragment } = require('@rasenjs/core')
+  // 对象参数用法
   const config = configOrStrings as { children: Array<Mountable<HTMLElement>> }
   return coreFragment({ children: config.children, hooks: hostHooks })
 }

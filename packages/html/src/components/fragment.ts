@@ -4,15 +4,16 @@
 import { getReactiveRuntime, type Mountable, type FragmentChild } from '@rasenjs/core'
 import type { StringHost } from '../types'
 import { escapeHtml } from '../utils'
+import { MARKERS, createMarker } from '../marker-constants'
 
 /**
- * HTML fragment uses empty comments as separators between text nodes
- * to preserve the same structure as client-side rendering for proper hydration
+ * HTML fragment uses comment markers to preserve boundaries for hydration
+ * Following the same pattern as text nodes: <!-- f --> and <!-- /f -->
  */
 const hostHooks = {
   createTextNode: (text: string) => {
     // Wrap each text piece with comment markers for hydration matching
-    return `<!-- t -->${escapeHtml(text)}<!-- /t -->`
+    return `${createMarker(MARKERS.TEXT_START)}${escapeHtml(text)}${createMarker(MARKERS.TEXT_END)}`
   },
   appendNode: (host: StringHost, node: string) => host.append(node),
   updateTextNode: () => {
@@ -20,6 +21,13 @@ const hostHooks = {
   },
   removeNode: () => {
     // SSR 中不需要移除节点
+  },
+  createMarker: (_host: StringHost, content: string) => {
+    return createMarker(content)
+  },
+  appendMarker: (host: StringHost, marker: string) => host.append(marker),
+  removeMarker: () => {
+    // SSR 中不需要移除标记
   }
 }
 

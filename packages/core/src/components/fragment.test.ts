@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
-import { fragment } from './fragment'
+import { setReactiveRuntime, getReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
+import { fragment, type FragmentHostHooks } from './fragment'
 
 // ============================================
 // 测试辅助工具
@@ -59,9 +59,27 @@ function createMockReactiveRuntime(): ReactiveRuntime {
   }
 }
 
+// Mock host hooks for testing
+function createMockHostHooks<Host = unknown, N = unknown>(): FragmentHostHooks<Host, N> {
+  return {
+    createTextNode: (text: string) => ({ type: 'text', text } as N),
+    appendNode: () => {},
+    updateTextNode: () => {},
+    removeNode: () => {},
+    createMarker: (_host: Host, content: string) => ({ type: 'marker', content } as N),
+    appendMarker: () => {},
+    removeMarker: () => {}
+  }
+}
+
+// Setup reactive runtime for tests
+function useReactiveRuntime() {
+  setReactiveRuntime(createMockReactiveRuntime())
+}
+
 describe('fragment', () => {
   beforeEach(() => {
-    setReactiveRuntime(createMockReactiveRuntime())
+    useReactiveRuntime()
   })
 
   afterEach(() => {
@@ -229,6 +247,288 @@ describe('fragment', () => {
       outerFragment({})
 
       expect(mountOrder).toEqual(['outer', 'inner', 'inner', 'outer'])
+    })
+  })
+
+  describe('带 hooks 的功能', () => {
+    it('应该能处理文本节点', () => {
+      const textNodes: Array<{ type: string; text: string }> = []
+      const hooks = createMockHostHooks()
+      hooks.createTextNode = (text: string) => {
+        const node = { type: 'text', text }
+        textNodes.push(node)
+        return node as any
+      }
+
+      const frag = fragment({ 
+        children: ['Hello', ' ', 'World'], 
+        hooks 
+      })
+      frag({})
+
+      expect(textNodes).toHaveLength(3)
+      expect(textNodes[0].text).toBe('Hello')
+      expect(textNodes[1].text).toBe(' ')
+      expect(textNodes[2].text).toBe('World')
+    })
+
+    it('应该能处理混合内容', () => {
+      const mountCalls: string[] = []
+      const textNodes: string[] = []
+      
+      const hooks = createMockHostHooks()
+      hooks.createTextNode = (text: string) => {
+        textNodes.push(text)
+        return { type: 'text', text } as any
+      }
+
+      const component = (() => {
+        mountCalls.push('component')
+        return () => {}
+      })
+
+      const frag = fragment({ 
+        children: ['Text1', component, 'Text2'], 
+        hooks 
+      })
+      frag({})
+
+      expect(textNodes).toEqual(['Text1', 'Text2'])
+      expect(mountCalls).toEqual(['component'])
+    })
+
+    it('应该添加边界标记（如果提供）', () => {
+      const markers: Array<{ type: string; content: string }> = []
+      const hooks = createMockHostHooks()
+      hooks.createMarker = (_host: any, content: string) => {
+        const marker = { type: 'marker', content }
+        markers.push(marker)
+        return marker as any
+      }
+
+      const child = (() => () => {})
+
+      const frag = fragment({ children: [child], hooks })
+      frag({})
+
+      expect(markers).toHaveLength(2)
+      expect(markers[0].content).toBe('f')
+      expect(markers[1].content).toBe('/f')
+    })
+
+    it('应该在没有标记钩子时正常工作', () => {
+      const hooks = createMockHostHooks()
+      delete hooks.createMarker
+      delete hooks.appendMarker
+      delete hooks.removeMarker
+
+      const child = (() => () => {})
+
+      const frag = fragment({ children: [child], hooks })
+      const cleanup = frag({})
+
+      expect(() => cleanup?.()).not.toThrow()
+    })
+
+    it('应该在 unmount 时移除标记', () => {
+      const markers: any[] = []
+      const removedMarkers: any[] = []
+      
+      const hooks = createMockHostHooks()
+      hooks.createMarker = (_host: any, content: string) => {
+        const marker = { type: 'marker', content }
+        markers.push(marker)
+        return marker
+      }
+      hooks.removeMarker = (marker: any) => {
+        removedMarkers.push(marker)
+      }
+
+      const child = (() => () => {})
+      
+      const frag = fragment({ children: [child], hooks })
+      const cleanup = frag({})
+
+      expect(markers).toHaveLength(2)
+      expect(removedMarkers).toHaveLength(0)
+
+      cleanup?.()
+
+      expect(removedMarkers).toHaveLength(2)
+      expect(removedMarkers[0]).toBe(markers[0])
+      expect(removedMarkers[1]).toBe(markers[1])
+    })
+
+    it('应该正确更新响应式文本节点', () => {
+      const runtime = getReactiveRuntime()
+      const count = runtime.ref(0)
+      
+      let watchCallback: ((val: number) => void) | null = null
+      const originalWatch = runtime.watch
+      runtime.watch = (source: any, callback: any, options?: any) => {
+        watchCallback = callback
+        if (options?.immediate) {
+          callback(source())
+        }
+        return originalWatch(source, callback, options)
+      }
+      
+      const updates: string[] = []
+      const hooks = createMockHostHooks()
+      hooks.createTextNode = (text: string) => ({ text })
+      hooks.updateTextNode = (node: any, text: string) => {
+        node.text = text
+        updates.push(text)
+      }
+
+      const frag = fragment({ 
+        children: [count], 
+        hooks 
+      })
+      frag({})
+
+      expect(watchCallback).toBeTruthy()
+      expect(updates).toHaveLength(0)
+
+      // Manually trigger the watch callback
+      watchCallback!(1)
+      expect(updates).toHaveLength(1)
+      expect(updates[0]).toBe('1')
+
+      watchCallback!(42)
+      expect(updates).toHaveLength(2)
+      expect(updates[1]).toBe('42')
+    })
+
+    it('应该在 unmount 时停止响应式文本节点的监听', () => {
+      const runtime = getReactiveRuntime()
+      const count = runtime.ref(0)
+      
+      let stopCalled = false
+      const originalWatch = runtime.watch
+      runtime.watch = (source: any, callback: any, options?: any) => {
+        const stop = originalWatch(source, callback, options)
+        return () => {
+          stopCalled = true
+          stop()
+        }
+      }
+
+      const hooks = createMockHostHooks()
+
+      const frag = fragment({ 
+        children: [count], 
+        hooks 
+      })
+      const cleanup = frag({})
+
+      expect(stopCalled).toBe(false)
+
+      cleanup?.()
+
+      expect(stopCalled).toBe(true)
+    })
+
+    it('应该正确调用所有 hooks 方法', () => {
+      const calls: string[] = []
+      
+      const hooks = createMockHostHooks()
+      hooks.createTextNode = (text: string) => {
+        calls.push(`createTextNode:${text}`)
+        return { text }
+      }
+      hooks.appendNode = () => {
+        calls.push('appendNode')
+      }
+      hooks.createMarker = (_host: any, content: string) => {
+        calls.push(`createMarker:${content}`)
+        return { content }
+      }
+      hooks.appendMarker = () => {
+        calls.push('appendMarker')
+      }
+      hooks.removeNode = () => {
+        calls.push('removeNode')
+      }
+      hooks.removeMarker = () => {
+        calls.push('removeMarker')
+      }
+
+      const frag = fragment({ 
+        children: ['Hello'], 
+        hooks 
+      })
+      const cleanup = frag({})
+
+      expect(calls).toEqual([
+        'createMarker:f',
+        'appendMarker',
+        'createTextNode:Hello',
+        'appendNode',
+        'createMarker:/f',
+        'appendMarker'
+      ])
+
+      calls.length = 0
+      cleanup?.()
+
+      expect(calls).toEqual([
+        'removeNode',
+        'removeMarker',
+        'removeMarker'
+      ])
+    })
+
+    it('应该处理数字类型的子元素', () => {
+      const textNodes: string[] = []
+      const hooks = createMockHostHooks()
+      hooks.createTextNode = (text: string) => {
+        textNodes.push(text)
+        return { text }
+      }
+
+      const frag = fragment({ 
+        children: [0, 42, -1, 3.14], 
+        hooks 
+      })
+      frag({})
+
+      expect(textNodes).toEqual(['0', '42', '-1', '3.14'])
+    })
+
+    it('应该在缺少 hooks 时对文本节点发出警告', () => {
+      const warns: string[] = []
+      const originalWarn = console.warn
+      console.warn = (msg: string) => warns.push(msg)
+
+      const frag = fragment({ 
+        children: ['Hello'] 
+      })
+      frag({})
+
+      console.warn = originalWarn
+
+      expect(warns).toHaveLength(1)
+      expect(warns[0]).toContain('Text children require hooks')
+    })
+
+    it('应该在缺少 hooks 时对响应式 ref 发出警告', () => {
+      const runtime = getReactiveRuntime()
+      const count = runtime.ref(0)
+
+      const warns: string[] = []
+      const originalWarn = console.warn
+      console.warn = (msg: string) => warns.push(msg)
+
+      const frag = fragment({ 
+        children: [count] 
+      })
+      frag({})
+
+      console.warn = originalWarn
+
+      expect(warns).toHaveLength(1)
+      expect(warns[0]).toContain('Reactive ref children require hooks')
     })
   })
 })

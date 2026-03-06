@@ -7,8 +7,8 @@ import { type Mountable, type PropValue } from '../types'
  * 不提供时 when 仍能正确工作，只是没有位置精确控制
  */
 export interface WhenHostHooks<Host = unknown, N = unknown> {
-  /** 创建标记节点，用于定位插入位置 */
-  createMarker?: () => N
+  /** 创建标记节点，用于定位插入位置 (receives host to ensure correct document context) */
+  createMarker?: (host: Host, content: string) => N
   /** 将标记节点添加到宿主 */
   appendMarker?: (host: Host, marker: N) => void
   /** 在指定位置之前插入节点 */
@@ -35,7 +35,7 @@ export interface WhenConfig<Host, N = unknown> {
   else?: () => Mountable<Host>
 
   // 可选的宿主操作钩子
-  createMarker?: () => N
+  createMarker?: (host: Host, content: string) => N
   appendMarker?: (host: Host, marker: N) => void
   insertBefore?: (host: Host, node: N, before: N | null) => void
   removeNode?: (node: N) => void
@@ -75,7 +75,7 @@ export const when = com(
       const runtime = getReactiveRuntime()
 
       // 创建标记（可选）
-      const marker = config.createMarker?.()
+      const marker = config.createMarker?.(host, 'w')
       if (marker && config.appendMarker) {
         config.appendMarker(host, marker)
       }

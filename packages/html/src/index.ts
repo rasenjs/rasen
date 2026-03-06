@@ -13,3 +13,5 @@ export {
   isVoidElement,
   VOID_ELEMENTS
 } from './utils'
+export { MARKERS, createMarker, MARKER_DEBUG_MAP } from './marker-constants'
+export { whenHostHooks, eachHostHooks, matchHostHooks } from './host-hooks'

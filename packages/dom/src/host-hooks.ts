@@ -1,24 +1,58 @@
 /**
  * DOM 宿主钩子
  *
- * 为 core 的 when、each、switchCase 等组件提供 DOM 操作能力
+ * 为 core 的 when、each、match 等组件提供 DOM 操作能力
  * 这些操作是平台相关的，每个渲染目标需要自己实现
  *
  * 统一的 DOM 操作集合，包含所有组件可能需要的操作
  * 各组件按需使用其中的部分
  */
 
+import { getHydrationContext } from './hydration-context'
+import { isMarkerMatch } from './marker-constants'
+
 /**
  * DOM 宿主钩子
  *
- * 包含 when、each、repeat、switchCase 等组件需要的所有 DOM 操作
+ * 包含 when、each、repeat、match 等组件需要的所有 DOM 操作
+ * 支持 SSR hydration：在水合模式下会 claim 已有节点而不是创建新节点
  */
 export const hostHooks = {
-  /** 创建标记节点（注释节点） */
-  createMarker: () => document.createComment('') as Node,
+  /** 创建标记节点（注释节点）from host's ownerDocument to support iframe */
+  createMarker: (host: HTMLElement, content: string) => {
+    const hydrationContext = getHydrationContext()
+    
+    if (hydrationContext) {
+      // Hydration mode: claim existing marker
+      const node = hydrationContext.claim()
+      if (node && node.nodeType === Node.COMMENT_NODE) {
+        const comment = node as Comment
+        
+        // Verify marker content matches expected content
+        if (!isMarkerMatch(comment, content)) {
+          throw new Error(
+            `[Rasen Hydration] Marker mismatch: expected "${content}", got "${comment.textContent?.trim()}"`
+          )
+        }
+        
+        return comment
+      }
+      throw new Error('[Rasen Hydration] Expected marker comment but got: ' + node?.nodeName)
+    }
+    
+    // Client mode: create new marker with specified content
+    return (host.ownerDocument || document).createComment(content) as Node
+  },
 
   /** 将标记添加到宿主 */
   appendMarker: (host: HTMLElement, marker: Node) => {
+    const hydrationContext = getHydrationContext()
+    
+    // In hydration mode, marker is already in DOM, skip append
+    if (hydrationContext) {
+      return
+    }
+    
     host.appendChild(marker)
   },
 

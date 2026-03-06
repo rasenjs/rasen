@@ -8,6 +8,9 @@ export { html } from './html'
 export { text } from './text'
 export type { TextProps } from './text'
 export { fragment, f } from './fragment'
+export { when } from './when'
+export { each, repeat } from './each'
+export { match, switchCase } from './match'
 export {
   // 基础元素
   div,
