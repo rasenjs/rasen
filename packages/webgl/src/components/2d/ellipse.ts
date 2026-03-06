@@ -30,11 +30,11 @@ function createEllipseGeometry(
   segments: number = 32
 ): Float32Array {
   // Pre-allocate Float32Array
-  const vertexCount = (segments + 1) * 3 * 2
+  const vertexCount = segments * 3 * 2
   const vertices = new Float32Array(vertexCount)
   let offset = 0
   
-  for (let i = 0; i <= segments; i++) {
+  for (let i = 0; i < segments; i++) {
     const angle1 = (i / segments) * Math.PI * 2
     const angle2 = ((i + 1) / segments) * Math.PI * 2
     

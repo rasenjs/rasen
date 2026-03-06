@@ -45,6 +45,30 @@ describe('@rasenjs/webgl utils', () => {
       const color = parseColor('rgb(255, 0, 0)')
       expect(color).toEqual({ r: 1, g: 1, b: 1, a: 1 })
     })
+
+    it('should parse rgba format', () => {
+      const color = parseColor('rgba(255, 128, 64, 0.5)')
+      expect(color.r).toBeCloseTo(1, 2)
+      expect(color.g).toBeCloseTo(0.502, 2)
+      expect(color.b).toBeCloseTo(0.251, 2)
+      expect(color.a).toBe(0.5)
+    })
+
+    it('should parse rgb format', () => {
+      const color = parseColor('rgb(255, 128, 64)')
+      expect(color.r).toBeCloseTo(1, 2)
+      expect(color.g).toBeCloseTo(0.502, 2)
+      expect(color.b).toBeCloseTo(0.251, 2)
+      expect(color.a).toBe(1)
+    })
+
+    it('should parse rgba with spaces', () => {
+      const color = parseColor('rgba( 255, 128, 64, 0.75 )')
+      expect(color.r).toBeCloseTo(1, 2)
+      expect(color.g).toBeCloseTo(0.502, 2)
+      expect(color.b).toBeCloseTo(0.251, 2)
+      expect(color.a).toBe(0.75)
+    })
   })
 
   describe('matrix operations', () => {

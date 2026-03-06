@@ -39,6 +39,29 @@ export function parseColor(colorStr: string): Color {
     const b = parseInt(hex.slice(4, 6), 16) / 255
     const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
     color = { r, g, b, a }
+  } else if (colorStr.startsWith('rgba')) {
+    // Parse rgba(r, g, b, a) format
+    const match = colorStr.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)/)
+    if (match) {
+      const r = parseInt(match[1], 10) / 255
+      const g = parseInt(match[2], 10) / 255
+      const b = parseInt(match[3], 10) / 255
+      const a = match[4] !== undefined ? parseFloat(match[4]) : 1
+      color = { r, g, b, a }
+    } else {
+      color = { r: 1, g: 1, b: 1, a: 1 }
+    }
+  } else if (colorStr.startsWith('rgb')) {
+    // Parse rgb(r, g, b) format
+    const match = colorStr.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/)
+    if (match) {
+      const r = parseInt(match[1], 10) / 255
+      const g = parseInt(match[2], 10) / 255
+      const b = parseInt(match[3], 10) / 255
+      color = { r, g, b, a: 1 }
+    } else {
+      color = { r: 1, g: 1, b: 1, a: 1 }
+    }
   } else {
     // Default to white
     color = { r: 1, g: 1, b: 1, a: 1 }
