@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transition Demo - Rasen</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+    }
+    
+    /* Fade transition */
+    .fade-enter-from {
+      opacity: 0;
+    }
+    .fade-enter-active {
+      transition: opacity 0.4s ease;
+    }
+    .fade-enter-to {
+      opacity: 1;
+    }
+    .fade-leave-from {
+      opacity: 1;
+    }
+    .fade-leave-active {
+      transition: opacity 0.4s ease;
+    }
+    .fade-leave-to {
+      opacity: 0;
+    }
+    
+    /* Slide transition */
+    .slide-enter-from {
+      opacity: 0;
+      transform: translateX(100px);
+    }
+    .slide-enter-active {
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .slide-enter-to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .slide-leave-from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .slide-leave-active {
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .slide-leave-to {
+      opacity: 0;
+      transform: translateX(-100px);
+    }
+    
+    /* Scale transition */
+    .scale-enter-from {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    .scale-enter-active {
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .scale-enter-to {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .scale-leave-from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .scale-leave-active {
+      transition: all 0.3s ease-in;
+    }
+    .scale-leave-to {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    
+    /* Bounce transition */
+    .bounce-enter-from {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+    .bounce-enter-active {
+      transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+    .bounce-enter-to {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .bounce-leave-from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .bounce-leave-active {
+      transition: all 0.3s ease;
+    }
+    .bounce-leave-to {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+    
+    /* List transition (for transition-group) */
+    .list-enter-from {
+      opacity: 0;
+      transform: translateY(-20px) scale(0.9);
+    }
+    .list-enter-active {
+      transition: all 0.3s ease;
+    }
+    .list-enter-to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    .list-leave-from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    .list-leave-active {
+      transition: all 0.3s ease;
+      position: absolute;
+    }
+    .list-leave-to {
+      opacity: 0;
+      transform: translateY(20px) scale(0.9);
+    }
+    .list-move {
+      transition: transform 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/transition.ts"></script>
+</body>
+</html>
