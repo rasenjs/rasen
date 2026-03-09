@@ -17,6 +17,7 @@ export {
   polygon,
   arrow,
   image,
+  sprite,
   path,
   point,
   group

@@ -1,0 +1,53 @@
+{
+  "name": "@rasenjs/animation",
+  "version": "0.1.1",
+  "description": "Rasen animation primitives - tween and spring animations",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "test": "../../node_modules/.bin/vitest --run",
+    "typecheck": "../../node_modules/.bin/tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@rasenjs/reactive-vue": "workspace:*"
+  },
+  "keywords": [
+    "animation",
+    "tween",
+    "spring",
+    "reactive"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/animation"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/animation",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT"
+}
