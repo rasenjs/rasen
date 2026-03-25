@@ -13,79 +13,65 @@ export interface ArrowProps extends CommonDrawProps, TransformProps {
   y1: MaybeRef<number>
   x2: MaybeRef<number>
   y2: MaybeRef<number>
+  z?: MaybeRef<number>
   fill?: MaybeRef<string>
   stroke?: MaybeRef<string>
   lineWidth?: MaybeRef<number>
   arrowSize?: MaybeRef<number>
 }
 
-/**
- * Generate arrow geometry (line + arrowhead)
- */
 function createArrowGeometry(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
+  dx: number,
+  dy: number,
   lineWidth: number,
   arrowSize: number
 ): Float32Array {
   const vertices: number[] = []
   
-  // Line body
-  const dx = x2 - x1
-  const dy = y2 - y1
   const len = Math.sqrt(dx * dx + dy * dy)
+  if (len === 0) return new Float32Array(0)
+  
   const nx = -dy / len * lineWidth / 2
   const ny = dx / len * lineWidth / 2
   
-  // Shorten line to make room for arrowhead
   const shortenRatio = 1 - arrowSize / len
-  const x2Short = x1 + dx * shortenRatio
-  const y2Short = y1 + dy * shortenRatio
+  const x2Short = dx * shortenRatio
+  const y2Short = dy * shortenRatio
   
-  // Line triangles
   vertices.push(
-    x1 + nx, y1 + ny,
-    x2Short + nx, y2Short + ny,
-    x1 - nx, y1 - ny,
+    0 + nx, 0 + ny, 0,
+    x2Short + nx, y2Short + ny, 0,
+    0 - nx, 0 - ny, 0,
     
-    x2Short + nx, y2Short + ny,
-    x2Short - nx, y2Short - ny,
-    x1 - nx, y1 - ny
+    x2Short + nx, y2Short + ny, 0,
+    x2Short - nx, y2Short - ny, 0,
+    0 - nx, 0 - ny, 0
   )
   
-  // Arrowhead
-  const arrowAngle = Math.PI / 6 // 30 degrees
+  const arrowAngle = Math.PI / 6
   const arrowDir = Math.atan2(dy, dx)
   
-  const arrow1X = x2 - Math.cos(arrowDir + arrowAngle) * arrowSize
-  const arrow1Y = y2 - Math.sin(arrowDir + arrowAngle) * arrowSize
-  const arrow2X = x2 - Math.cos(arrowDir - arrowAngle) * arrowSize
-  const arrow2Y = y2 - Math.sin(arrowDir - arrowAngle) * arrowSize
+  const arrow1X = dx - Math.cos(arrowDir + arrowAngle) * arrowSize
+  const arrow1Y = dy - Math.sin(arrowDir + arrowAngle) * arrowSize
+  const arrow2X = dx - Math.cos(arrowDir - arrowAngle) * arrowSize
+  const arrow2Y = dy - Math.sin(arrowDir - arrowAngle) * arrowSize
   
   vertices.push(
-    x2, y2,
-    arrow1X, arrow1Y,
-    arrow2X, arrow2Y
+    dx, dy, 0,
+    arrow1X, arrow1Y, 0,
+    arrow2X, arrow2Y, 0
   )
   
   return new Float32Array(vertices)
 }
 
-/**
- * Arrow component
- */
 export const arrow: SyncComponent<
   WebGLRenderingContext | WebGL2RenderingContext,
   [ArrowProps]
 > = (props: ArrowProps) => {
-  // Arrow geometry must include absolute coords since line endpoints define the shape
   let cachedGeometry: Float32Array | null = null
-  let cachedX1: number | null = null
-  let cachedY1: number | null = null
-  let cachedX2: number | null = null
-  let cachedY2: number | null = null
+  let cachedDx: number | null = null
+  let cachedDy: number | null = null
   let cachedLineWidth: number | null = null
   let cachedArrowSize: number | null = null
   
@@ -115,6 +101,7 @@ export const arrow: SyncComponent<
     draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
       const x1 = unref(props.x1)
       const y1 = unref(props.y1)
+      const z = unref(props.z) ?? 0
       const x2 = unref(props.x2)
       const y2 = unref(props.y2)
       const fill = unref(props.fill) || unref(props.stroke)
@@ -126,55 +113,58 @@ export const arrow: SyncComponent<
       if (!visible || opacity <= 0 || !fill) return
 
       const renderContext = getRenderContext(gl)
-      const batchRenderer = renderContext.getBatchRenderer()
 
-      if (batchRenderer) {
-        if (!cachedGeometry || 
-            cachedX1 !== x1 ||
-            cachedY1 !== y1 ||
-            cachedX2 !== x2 ||
-            cachedY2 !== y2 ||
-            cachedLineWidth !== lineWidth ||
-            cachedArrowSize !== arrowSize) {
-          cachedGeometry = createArrowGeometry(x1, y1, x2, y2, lineWidth, arrowSize)
-          cachedX1 = x1
-          cachedY1 = y1
-          cachedX2 = x2
-          cachedY2 = y2
-          cachedLineWidth = lineWidth
-          cachedArrowSize = arrowSize
-        }
-        const color = parseColor(fill)
-        
-        // Get accumulated transform from group hierarchy
-        const groupTransform = renderContext.getCurrentTransform()
-        
-        // Combine local opacity with group opacity
-        const finalOpacity = opacity * groupTransform.opacity
-        color.a *= finalOpacity
-        
-        // Create full transform matrix
-        const cos = Math.cos(groupTransform.rotation)
-        const sin = Math.sin(groupTransform.rotation)
-        const transform = [
-          groupTransform.scaleX * cos,
-          groupTransform.scaleX * sin,
-          0,
-          -groupTransform.scaleY * sin,
-          groupTransform.scaleY * cos,
-          0,
-          groupTransform.tx,
-          groupTransform.ty,
-          1
-        ]
-        
-        batchRenderer.addShape(cachedGeometry, color, transform)
+      const dx = x2 - x1
+      const dy = y2 - y1
+
+      if (!cachedGeometry || 
+          cachedDx !== dx ||
+          cachedDy !== dy ||
+          cachedLineWidth !== lineWidth ||
+          cachedArrowSize !== arrowSize) {
+        cachedGeometry = createArrowGeometry(dx, dy, lineWidth, arrowSize)
+        cachedDx = dx
+        cachedDy = dy
+        cachedLineWidth = lineWidth
+        cachedArrowSize = arrowSize
       }
+      
+      const color = parseColor(fill)
+      
+      const groupTransform = renderContext.getCurrentTransform()
+      
+      const finalOpacity = opacity * groupTransform.opacity
+      color.a *= finalOpacity
+      
+      const cos = Math.cos(groupTransform.rotationZ)
+      const sin = Math.sin(groupTransform.rotationZ)
+      const rotatedX = x1 * cos - y1 * sin
+      const rotatedY = x1 * sin + y1 * cos
+      
+      const finalTransform = {
+        tx: groupTransform.tx + rotatedX * groupTransform.scaleX,
+        ty: groupTransform.ty + rotatedY * groupTransform.scaleY,
+        tz: groupTransform.tz + z * groupTransform.scaleZ,
+        rotationX: groupTransform.rotationX,
+        rotationY: groupTransform.rotationY,
+        rotationZ: groupTransform.rotationZ,
+        scaleX: groupTransform.scaleX,
+        scaleY: groupTransform.scaleY,
+        scaleZ: groupTransform.scaleZ
+      }
+      
+      renderContext.addShape(
+        `arrow-${lineWidth}-${arrowSize}`,
+        cachedGeometry,
+        color,
+        finalTransform
+      )
     },
 
     deps: () => [
       unref(props.x1),
       unref(props.y1),
+      unref(props.z),
       unref(props.x2),
       unref(props.y2),
       unref(props.fill),

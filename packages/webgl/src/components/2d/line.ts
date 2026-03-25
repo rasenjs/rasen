@@ -1,5 +1,5 @@
 /**
- * Line component
+ * Line component (2D/3D unified)
  */
 
 import type { SyncComponent } from '@rasenjs/core'
@@ -10,10 +10,12 @@ import { element } from '../element'
 
 /**
  * Generate line vertices (as thick rectangle)
+ * Now supports z coordinate for 3D
  */
 function createLineGeometry(
   x1: number,
   y1: number,
+  z: number,
   x2: number,
   y2: number,
   thickness: number
@@ -25,22 +27,22 @@ function createLineGeometry(
   const ny = dx / len * thickness / 2
   
   return new Float32Array([
-    // Triangle 1
-    x1 + nx, y1 + ny,
-    x2 + nx, y2 + ny,
-    x1 - nx, y1 - ny,
-    // Triangle 2
-    x2 + nx, y2 + ny,
-    x2 - nx, y2 - ny,
-    x1 - nx, y1 - ny
+    x1 + nx, y1 + ny, z,
+    x2 + nx, y2 + ny, z,
+    x1 - nx, y1 - ny, z,
+    x2 + nx, y2 + ny, z,
+    x2 - nx, y2 - ny, z,
+    x1 - nx, y1 - ny, z
   ])
 }
 
 export interface LineProps extends CommonDrawProps, TransformProps {
   x1: MaybeRef<number>
   y1: MaybeRef<number>
+  z?: MaybeRef<number>
   x2: MaybeRef<number>
   y2: MaybeRef<number>
+  z2?: MaybeRef<number>
   stroke?: MaybeRef<string>
   lineWidth?: MaybeRef<number>
 }
@@ -52,7 +54,6 @@ export const line: SyncComponent<
   WebGLRenderingContext | WebGL2RenderingContext,
   [LineProps]
 > = (props: LineProps) => {
-  // Line geometry must include absolute coords since endpoints define the shape
   let cachedGeometry: Float32Array | null = null
   let cachedX1: number | null = null
   let cachedY1: number | null = null
@@ -85,6 +86,7 @@ export const line: SyncComponent<
     draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
       const x1 = unref(props.x1)
       const y1 = unref(props.y1)
+      const z = unref(props.z) ?? 0
       const x2 = unref(props.x2)
       const y2 = unref(props.y2)
       const stroke = unref(props.stroke)
@@ -92,62 +94,79 @@ export const line: SyncComponent<
       const visible = unref(props.visible) ?? true
       const opacity = unref(props.opacity) ?? 1
 
+      const rotationX = unref(props.rotationX) ?? 0
+      const rotationY = unref(props.rotationY) ?? 0
+      const rotation = unref(props.rotation) ?? 0
+      const scaleX = unref(props.scaleX) ?? 1
+      const scaleY = unref(props.scaleY) ?? 1
+      const scaleZ = unref(props.scaleZ) ?? 1
+
       if (!visible || opacity <= 0 || !stroke) return
 
       const renderContext = getRenderContext(gl)
-      const batchRenderer = renderContext.getBatchRenderer()
 
-      if (batchRenderer) {
-        if (!cachedGeometry || 
-            cachedX1 !== x1 ||
-            cachedY1 !== y1 ||
-            cachedX2 !== x2 ||
-            cachedY2 !== y2 ||
-            cachedLineWidth !== lineWidth) {
-          cachedGeometry = createLineGeometry(x1, y1, x2, y2, lineWidth)
-          cachedX1 = x1
-          cachedY1 = y1
-          cachedX2 = x2
-          cachedY2 = y2
-          cachedLineWidth = lineWidth
-        }
-        const color = parseColor(stroke)
-        
-        // Get accumulated transform from group hierarchy
-        const groupTransform = renderContext.getCurrentTransform()
-        
-        // Combine local opacity with group opacity
-        const finalOpacity = opacity * groupTransform.opacity
-        color.a *= finalOpacity
-        
-        // Create full transform matrix
-        const cos = Math.cos(groupTransform.rotation)
-        const sin = Math.sin(groupTransform.rotation)
-        const transform = [
-          groupTransform.scaleX * cos,
-          groupTransform.scaleX * sin,
-          0,
-          -groupTransform.scaleY * sin,
-          groupTransform.scaleY * cos,
-          0,
-          groupTransform.tx,
-          groupTransform.ty,
-          1
-        ]
-        
-        batchRenderer.addShape(cachedGeometry, color, transform)
+      if (!cachedGeometry || 
+          cachedX1 !== x1 ||
+          cachedY1 !== y1 ||
+          cachedX2 !== x2 ||
+          cachedY2 !== y2 ||
+          cachedLineWidth !== lineWidth) {
+        cachedGeometry = createLineGeometry(0, 0, 0, x2 - x1, y2 - y1, lineWidth)
+        cachedX1 = x1
+        cachedY1 = y1
+        cachedX2 = x2
+        cachedY2 = y2
+        cachedLineWidth = lineWidth
       }
+      
+      const color = parseColor(stroke)
+      
+      const transform = renderContext.getCurrentTransform()
+      
+      const finalOpacity = opacity * transform.opacity
+      color.a *= finalOpacity
+      
+      const cos = Math.cos(transform.rotationZ)
+      const sin = Math.sin(transform.rotationZ)
+      const rotatedX = x1 * cos - y1 * sin
+      const rotatedY = x1 * sin + y1 * cos
+      
+      const finalTransform = {
+        tx: transform.tx + rotatedX * transform.scaleX,
+        ty: transform.ty + rotatedY * transform.scaleY,
+        tz: transform.tz + z * transform.scaleZ,
+        rotationX: transform.rotationX + rotationX,
+        rotationY: transform.rotationY + rotationY,
+        rotationZ: transform.rotationZ + rotation,
+        scaleX: transform.scaleX * scaleX,
+        scaleY: transform.scaleY * scaleY,
+        scaleZ: transform.scaleZ * scaleZ
+      }
+
+      renderContext.addShape(
+        `line-${lineWidth}`,
+        cachedGeometry,
+        color,
+        finalTransform
+      )
     },
 
     deps: () => [
       unref(props.x1),
       unref(props.y1),
+      unref(props.z),
       unref(props.x2),
       unref(props.y2),
       unref(props.stroke),
       unref(props.lineWidth),
       unref(props.visible),
-      unref(props.opacity)
+      unref(props.opacity),
+      unref(props.rotation),
+      unref(props.rotationX),
+      unref(props.rotationY),
+      unref(props.scaleX),
+      unref(props.scaleY),
+      unref(props.scaleZ)
     ]
   })
 }

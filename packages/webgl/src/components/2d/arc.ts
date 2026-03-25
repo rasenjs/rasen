@@ -1,5 +1,5 @@
 /**
- * Arc component
+ * Arc component (2D/3D unified)
  */
 
 import type { SyncComponent } from '@rasenjs/core'
@@ -11,6 +11,7 @@ import { element } from '../element'
 export interface ArcProps extends CommonDrawProps, TransformProps {
   x: MaybeRef<number>
   y: MaybeRef<number>
+  z?: MaybeRef<number>
   radius: MaybeRef<number>
   startAngle: MaybeRef<number>
   endAngle: MaybeRef<number>
@@ -22,10 +23,12 @@ export interface ArcProps extends CommonDrawProps, TransformProps {
 
 /**
  * Generate arc geometry (pie slice)
+ * Now supports z coordinate for 3D
  */
 function createArcGeometry(
   x: number,
   y: number,
+  z: number,
   radius: number,
   startAngle: number,
   endAngle: number,
@@ -34,8 +37,7 @@ function createArcGeometry(
   const angleRange = endAngle - startAngle
   const segmentAngle = angleRange / segments
   
-  // Pre-allocate Float32Array
-  const vertexCount = segments * 3 * 2
+  const vertexCount = segments * 3 * 3
   const vertices = new Float32Array(vertexCount)
   let offset = 0
   
@@ -43,15 +45,15 @@ function createArcGeometry(
     const angle1 = startAngle + segmentAngle * i
     const angle2 = startAngle + segmentAngle * (i + 1)
     
-    // Center point
     vertices[offset++] = x
     vertices[offset++] = y
-    // First point on arc
+    vertices[offset++] = z
     vertices[offset++] = x + Math.cos(angle1) * radius
     vertices[offset++] = y + Math.sin(angle1) * radius
-    // Second point on arc
+    vertices[offset++] = z
     vertices[offset++] = x + Math.cos(angle2) * radius
     vertices[offset++] = y + Math.sin(angle2) * radius
+    vertices[offset++] = z
   }
   
   return vertices
@@ -105,6 +107,7 @@ export const arc: SyncComponent<
     draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
       const x = unref(props.x)
       const y = unref(props.y)
+      const z = unref(props.z) ?? 0
       const radius = unref(props.radius)
       const startAngle = unref(props.startAngle)
       const endAngle = unref(props.endAngle)
@@ -113,18 +116,24 @@ export const arc: SyncComponent<
       const visible = unref(props.visible) ?? true
       const opacity = unref(props.opacity) ?? 1
 
+      const rotation = unref(props.rotation) ?? 0
+      const rotationX = unref(props.rotationX) ?? 0
+      const rotationY = unref(props.rotationY) ?? 0
+      const scaleX = unref(props.scaleX) ?? 1
+      const scaleY = unref(props.scaleY) ?? 1
+      const scaleZ = unref(props.scaleZ) ?? 1
+
       if (!visible || opacity <= 0) return
 
       const renderContext = getRenderContext(gl)
-      const batchRenderer = renderContext.getBatchRenderer()
 
-      if (fill && batchRenderer) {
+      if (fill) {
         if (!cachedGeometry || 
             cachedRadius !== radius ||
             cachedStartAngle !== startAngle ||
             cachedEndAngle !== endAngle ||
             cachedSegments !== segments) {
-          cachedGeometry = createArcGeometry(0, 0, radius, startAngle, endAngle, segments)
+          cachedGeometry = createArcGeometry(0, 0, 0, radius, startAngle, endAngle, segments)
           cachedRadius = radius
           cachedStartAngle = startAngle
           cachedEndAngle = endAngle
@@ -132,47 +141,41 @@ export const arc: SyncComponent<
         }
         const color = parseColor(fill)
         
-        // Get accumulated transform from group hierarchy
-        const groupTransform = renderContext.getCurrentTransform()
+        const transform = renderContext.getCurrentTransform()
         
-        // Combine local opacity with group opacity
-        const finalOpacity = opacity * groupTransform.opacity
+        const finalOpacity = opacity * transform.opacity
         color.a *= finalOpacity
         
-        // Apply parent rotation to local position
-        const cos = Math.cos(groupTransform.rotation)
-        const sin = Math.sin(groupTransform.rotation)
+        const cos = Math.cos(transform.rotationZ)
+        const sin = Math.sin(transform.rotationZ)
         const rotatedX = x * cos - y * sin
         const rotatedY = x * sin + y * cos
         
-        const finalX = groupTransform.tx + rotatedX * groupTransform.scaleX
-        const finalY = groupTransform.ty + rotatedY * groupTransform.scaleY
-        const finalRotation = groupTransform.rotation
-        const finalScaleX = groupTransform.scaleX
-        const finalScaleY = groupTransform.scaleY
+        const finalTransform = {
+          tx: transform.tx + rotatedX * transform.scaleX,
+          ty: transform.ty + rotatedY * transform.scaleY,
+          tz: transform.tz + z * transform.scaleZ,
+          rotationX: transform.rotationX + rotationX,
+          rotationY: transform.rotationY + rotationY,
+          rotationZ: transform.rotationZ + rotation,
+          scaleX: transform.scaleX * scaleX,
+          scaleY: transform.scaleY * scaleY,
+          scaleZ: transform.scaleZ * scaleZ
+        }
         
-        // Create full transform matrix
-        const c = Math.cos(finalRotation)
-        const s = Math.sin(finalRotation)
-        const transform = [
-          finalScaleX * c,
-          finalScaleX * s,
-          0,
-          -finalScaleY * s,
-          finalScaleY * c,
-          0,
-          finalX,
-          finalY,
-          1
-        ]
-        
-        batchRenderer.addShape(cachedGeometry, color, transform)
+        renderContext.addShape(
+          `arc-${radius}-${segments}`,
+          cachedGeometry,
+          color,
+          finalTransform
+        )
       }
     },
 
     deps: () => [
       unref(props.x),
       unref(props.y),
+      unref(props.z),
       unref(props.radius),
       unref(props.startAngle),
       unref(props.endAngle),
@@ -181,7 +184,13 @@ export const arc: SyncComponent<
       unref(props.lineWidth),
       unref(props.segments),
       unref(props.visible),
-      unref(props.opacity)
+      unref(props.opacity),
+      unref(props.rotation),
+      unref(props.rotationX),
+      unref(props.rotationY),
+      unref(props.scaleX),
+      unref(props.scaleY),
+      unref(props.scaleZ)
     ]
   })
 }

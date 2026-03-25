@@ -1,5 +1,5 @@
 /**
- * Ellipse component
+ * Ellipse component (2D/3D unified)
  */
 
 import type { SyncComponent } from '@rasenjs/core'
@@ -11,6 +11,7 @@ import { element } from '../element'
 export interface EllipseProps extends CommonDrawProps, TransformProps {
   x: MaybeRef<number>
   y: MaybeRef<number>
+  z?: MaybeRef<number>
   radiusX: MaybeRef<number>
   radiusY: MaybeRef<number>
   fill?: MaybeRef<string>
@@ -21,16 +22,17 @@ export interface EllipseProps extends CommonDrawProps, TransformProps {
 
 /**
  * Generate ellipse geometry
+ * Now supports z coordinate for 3D
  */
 function createEllipseGeometry(
   x: number,
   y: number,
+  z: number,
   radiusX: number,
   radiusY: number,
   segments: number = 32
 ): Float32Array {
-  // Pre-allocate Float32Array
-  const vertexCount = segments * 3 * 2
+  const vertexCount = segments * 3 * 3
   const vertices = new Float32Array(vertexCount)
   let offset = 0
   
@@ -38,15 +40,15 @@ function createEllipseGeometry(
     const angle1 = (i / segments) * Math.PI * 2
     const angle2 = ((i + 1) / segments) * Math.PI * 2
     
-    // Center point
     vertices[offset++] = x
     vertices[offset++] = y
-    // First point on ellipse
+    vertices[offset++] = z
     vertices[offset++] = x + Math.cos(angle1) * radiusX
     vertices[offset++] = y + Math.sin(angle1) * radiusY
-    // Second point on ellipse
+    vertices[offset++] = z
     vertices[offset++] = x + Math.cos(angle2) * radiusX
     vertices[offset++] = y + Math.sin(angle2) * radiusY
+    vertices[offset++] = z
   }
   
   return vertices
@@ -102,6 +104,7 @@ export const ellipse: SyncComponent<
     draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
       const x = unref(props.x)
       const y = unref(props.y)
+      const z = unref(props.z) ?? 0
       const radiusX = unref(props.radiusX)
       const radiusY = unref(props.radiusY)
       const fill = unref(props.fill)
@@ -109,8 +112,11 @@ export const ellipse: SyncComponent<
       const visible = unref(props.visible) ?? true
       const opacity = unref(props.opacity) ?? 1
       const rotation = unref(props.rotation) ?? 0
+      const rotationX = unref(props.rotationX) ?? 0
+      const rotationY = unref(props.rotationY) ?? 0
       const scaleX = unref(props.scaleX) ?? 1
       const scaleY = unref(props.scaleY) ?? 1
+      const scaleZ = unref(props.scaleZ) ?? 1
 
       if (!visible || opacity <= 0) return
 
@@ -121,32 +127,33 @@ export const ellipse: SyncComponent<
             cachedRadiusX !== radiusX ||
             cachedRadiusY !== radiusY ||
             cachedSegments !== segments) {
-          cachedGeometry = createEllipseGeometry(0, 0, radiusX, radiusY, segments)
+          cachedGeometry = createEllipseGeometry(0, 0, 0, radiusX, radiusY, segments)
           cachedRadiusX = radiusX
           cachedRadiusY = radiusY
           cachedSegments = segments
         }
         const color = parseColor(fill)
         
-        // Get accumulated transform from group hierarchy
         const transform = renderContext.getCurrentTransform()
         
-        // Combine local opacity with group opacity
         const finalOpacity = opacity * transform.opacity
         color.a *= finalOpacity
         
-        // Apply parent rotation to local position
-        const cos = Math.cos(transform.rotation)
-        const sin = Math.sin(transform.rotation)
+        const cos = Math.cos(transform.rotationZ)
+        const sin = Math.sin(transform.rotationZ)
         const rotatedX = x * cos - y * sin
         const rotatedY = x * sin + y * cos
         
         const finalTransform = {
           tx: transform.tx + rotatedX * transform.scaleX,
           ty: transform.ty + rotatedY * transform.scaleY,
-          rotation: transform.rotation + rotation,
+          tz: transform.tz + z * transform.scaleZ,
+          rotationX: transform.rotationX + rotationX,
+          rotationY: transform.rotationY + rotationY,
+          rotationZ: transform.rotationZ + rotation,
           scaleX: transform.scaleX * scaleX,
-          scaleY: transform.scaleY * scaleY
+          scaleY: transform.scaleY * scaleY,
+          scaleZ: transform.scaleZ * scaleZ
         }
         
         renderContext.addShape(
@@ -161,6 +168,7 @@ export const ellipse: SyncComponent<
     deps: () => [
       unref(props.x),
       unref(props.y),
+      unref(props.z),
       unref(props.radiusX),
       unref(props.radiusY),
       unref(props.fill),
@@ -170,8 +178,11 @@ export const ellipse: SyncComponent<
       unref(props.visible),
       unref(props.opacity),
       unref(props.rotation),
+      unref(props.rotationX),
+      unref(props.rotationY),
       unref(props.scaleX),
-      unref(props.scaleY)
+      unref(props.scaleY),
+      unref(props.scaleZ)
     ]
   })
 }

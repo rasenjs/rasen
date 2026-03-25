@@ -20,18 +20,20 @@ import {
 } from '../../render-context'
 
 export interface GroupProps {
-  // Transform properties
   x?: number | Ref<number> | ReadonlyRef<number>
   y?: number | Ref<number> | ReadonlyRef<number>
+  z?: number | Ref<number> | ReadonlyRef<number>
   rotation?: number | Ref<number> | ReadonlyRef<number>
+  rotationX?: number | Ref<number> | ReadonlyRef<number>
+  rotationY?: number | Ref<number> | ReadonlyRef<number>
+  rotationZ?: number | Ref<number> | ReadonlyRef<number>
   scaleX?: number | Ref<number> | ReadonlyRef<number>
   scaleY?: number | Ref<number> | ReadonlyRef<number>
+  scaleZ?: number | Ref<number> | ReadonlyRef<number>
   
-  // Display properties
   visible?: boolean | Ref<boolean> | ReadonlyRef<boolean>
   opacity?: number | Ref<number> | ReadonlyRef<number>
   
-  // Children
   children: Array<Mountable<WebGLRenderingContext | WebGL2RenderingContext>>
 }
 
@@ -82,13 +84,16 @@ export const group = com(
       let componentId: symbol | null = null
       let groupContext: GroupContext | null = null
       
-      // Use props directly if they are refs, otherwise create refs
-      // This allows reactive updates when props are refs
       const x: Ref<number> = runtime.isRef(props.x) ? props.x as Ref<number> : runtime.ref(unref(props.x) ?? 0)
       const y: Ref<number> = runtime.isRef(props.y) ? props.y as Ref<number> : runtime.ref(unref(props.y) ?? 0)
+      const z: Ref<number> = runtime.isRef(props.z) ? props.z as Ref<number> : runtime.ref(unref(props.z) ?? 0)
       const rotation: Ref<number> = runtime.isRef(props.rotation) ? props.rotation as Ref<number> : runtime.ref(unref(props.rotation) ?? 0)
+      const rotationX: Ref<number> = runtime.isRef(props.rotationX) ? props.rotationX as Ref<number> : runtime.ref(unref(props.rotationX) ?? 0)
+      const rotationY: Ref<number> = runtime.isRef(props.rotationY) ? props.rotationY as Ref<number> : runtime.ref(unref(props.rotationY) ?? 0)
+      const rotationZ: Ref<number> = runtime.isRef(props.rotationZ) ? props.rotationZ as Ref<number> : runtime.ref(unref(props.rotationZ) ?? rotation.value)
       const scaleX: Ref<number> = runtime.isRef(props.scaleX) ? props.scaleX as Ref<number> : runtime.ref(unref(props.scaleX) ?? 1)
       const scaleY: Ref<number> = runtime.isRef(props.scaleY) ? props.scaleY as Ref<number> : runtime.ref(unref(props.scaleY) ?? 1)
+      const scaleZ: Ref<number> = runtime.isRef(props.scaleZ) ? props.scaleZ as Ref<number> : runtime.ref(unref(props.scaleZ) ?? 1)
       const visible: Ref<boolean> = runtime.isRef(props.visible) ? props.visible as Ref<boolean> : runtime.ref(unref(props.visible) ?? true)
       const opacity: Ref<number> = runtime.isRef(props.opacity) ? props.opacity as Ref<number> : runtime.ref(unref(props.opacity) ?? 1)
       
@@ -97,13 +102,17 @@ export const group = com(
         if (!visible.value || opacity.value <= 0) return
         if (!groupContext) return
         
-        // Push transform state
         renderContext.pushTransform({
           tx: x.value,
           ty: y.value,
+          tz: z.value,
           rotation: rotation.value,
+          rotationX: rotationX.value,
+          rotationY: rotationY.value,
+          rotationZ: rotationZ.value,
           scaleX: scaleX.value,
           scaleY: scaleY.value,
+          scaleZ: scaleZ.value,
           opacity: opacity.value
         })
         
@@ -138,14 +147,18 @@ export const group = com(
       // Mark as dirty to trigger initial render
       renderContext.markDirty()
       
-      // Watch transform changes
       runtime.watch(
         () => [
           x.value,
           y.value,
+          z.value,
           rotation.value,
+          rotationX.value,
+          rotationY.value,
+          rotationZ.value,
           scaleX.value,
           scaleY.value,
+          scaleZ.value,
           visible.value,
           opacity.value
         ],

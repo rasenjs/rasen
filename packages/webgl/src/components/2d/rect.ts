@@ -1,5 +1,5 @@
 /**
- * Rectangle component
+ * Rectangle component (2D/3D unified)
  */
 
 import type { SyncComponent } from '@rasenjs/core'
@@ -10,28 +10,29 @@ import { element } from '../element'
 
 /**
  * Generate rectangle vertices (two triangles)
+ * Now supports z coordinate for 3D
  */
 function createRectGeometry(
   x: number,
   y: number,
+  z: number,
   width: number,
   height: number
 ): Float32Array {
   return new Float32Array([
-    // Triangle 1
-    x, y,
-    x + width, y,
-    x, y + height,
-    // Triangle 2
-    x + width, y,
-    x + width, y + height,
-    x, y + height
+    x, y, z,
+    x + width, y, z,
+    x, y + height, z,
+    x + width, y, z,
+    x + width, y + height, z,
+    x, y + height, z
   ])
 }
 
 export interface RectProps extends CommonDrawProps, TransformProps {
   x: MaybeRef<number>
   y: MaybeRef<number>
+  z?: MaybeRef<number>
   width: MaybeRef<number>
   height: MaybeRef<number>
   fill?: MaybeRef<string>
@@ -89,6 +90,7 @@ export const rect: SyncComponent<
     draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
       const x = unref(props.x)
       const y = unref(props.y)
+      const z = unref(props.z) ?? 0
       const width = unref(props.width)
       const height = unref(props.height)
       const fill = unref(props.fill)
@@ -96,48 +98,49 @@ export const rect: SyncComponent<
       const opacity = unref(props.opacity) ?? 1
 
       const rotation = unref(props.rotation) ?? 0
+      const rotationX = unref(props.rotationX) ?? 0
+      const rotationY = unref(props.rotationY) ?? 0
       const scaleX = unref(props.scaleX) ?? 1
       const scaleY = unref(props.scaleY) ?? 1
+      const scaleZ = unref(props.scaleZ) ?? 1
 
       if (!visible || opacity <= 0) return
 
       const renderContext = getRenderContext(gl)
 
       if (fill) {
-        // Check cache (only on size changes)
         if (!cachedGeometry || 
             cachedWidth !== width ||
             cachedHeight !== height) {
-          cachedGeometry = createRectGeometry(0, 0, width, height)
+          cachedGeometry = createRectGeometry(0, 0, 0, width, height)
           cachedWidth = width
           cachedHeight = height
         }
 
-        // Parse color
         const color = parseColor(fill)
         
-        // Get accumulated transform from group hierarchy
         const transform = renderContext.getCurrentTransform()
         
-        // Combine local opacity with group opacity
         const finalOpacity = opacity * transform.opacity
         color.a *= finalOpacity
         
-        // Apply parent rotation to local position
-        const cos = Math.cos(transform.rotation)
-        const sin = Math.sin(transform.rotation)
+        const cos = Math.cos(transform.rotationZ)
+        const sin = Math.sin(transform.rotationZ)
         const rotatedX = x * cos - y * sin
         const rotatedY = x * sin + y * cos
         
         const finalTransform = {
           tx: transform.tx + rotatedX * transform.scaleX,
           ty: transform.ty + rotatedY * transform.scaleY,
-          rotation: transform.rotation + rotation,
+          tz: transform.tz + z * transform.scaleZ,
+          rotationX: transform.rotationX + rotationX,
+          rotationY: transform.rotationY + rotationY,
+          rotationZ: transform.rotationZ + rotation,
           scaleX: transform.scaleX * scaleX,
-          scaleY: transform.scaleY * scaleY
+          scaleY: transform.scaleY * scaleY,
+          scaleZ: transform.scaleZ * scaleZ
         }
 
-        // Add shape using unified interface
         renderContext.addShape(
           `rect-${width}-${height}`,
           cachedGeometry,
@@ -145,14 +148,12 @@ export const rect: SyncComponent<
           finalTransform
         )
       }
-
-      // TODO: Implement stroke
-      // TODO: Implement corner radius
     },
 
     deps: () => [
       unref(props.x),
       unref(props.y),
+      unref(props.z),
       unref(props.width),
       unref(props.height),
       unref(props.fill),
@@ -162,8 +163,11 @@ export const rect: SyncComponent<
       unref(props.visible),
       unref(props.opacity),
       unref(props.rotation),
+      unref(props.rotationX),
+      unref(props.rotationY),
       unref(props.scaleX),
-      unref(props.scaleY)
+      unref(props.scaleY),
+      unref(props.scaleZ)
     ]
   })
 }

@@ -54,10 +54,15 @@ export interface CommonDrawProps {
 }
 
 /**
- * Transform properties
+ * Transform properties (2D/3D unified)
  */
 export interface TransformProps {
+  z?: number | Ref<number> | ReadonlyRef<number>
   rotation?: number | Ref<number> | ReadonlyRef<number>
+  rotationX?: number | Ref<number> | ReadonlyRef<number>
+  rotationY?: number | Ref<number> | ReadonlyRef<number>
+  rotationZ?: number | Ref<number> | ReadonlyRef<number>
   scaleX?: number | Ref<number> | ReadonlyRef<number>
   scaleY?: number | Ref<number> | ReadonlyRef<number>
+  scaleZ?: number | Ref<number> | ReadonlyRef<number>
 }

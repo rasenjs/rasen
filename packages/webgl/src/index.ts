@@ -13,3 +13,6 @@ export * from './utils'
 // Re-export renderer utilities for advanced usage
 export { ShaderProgram, DEFAULT_VERTEX_SHADER, DEFAULT_FRAGMENT_SHADER } from './renderer/shader'
 export { BatchRenderer } from './renderer/batch'
+
+// Re-export math library for convenience
+export * from '@rasenjs/math'

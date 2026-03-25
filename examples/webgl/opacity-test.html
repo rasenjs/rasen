@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Opacity Test - WebGL</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .test-card {
+      background: #2a2a3e;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    h2 {
+      margin-top: 0;
+    }
+    canvas {
+      background: #000;
+      border-radius: 4px;
+    }
+    .controls {
+      margin-top: 10px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 WebGL Opacity Test</h1>
+  
+  <div class="test-card">
+    <h2>Test 1: Basic Opacity</h2>
+    <p>Two overlapping circles with different opacity values</p>
+    <canvas id="canvas1" width="400" height="300"></canvas>
+    <div class="controls">
+      <button onclick="test1Opacity(0.3)">Opacity 0.3</button>
+      <button onclick="test1Opacity(0.5)">Opacity 0.5</button>
+      <button onclick="test1Opacity(0.7)">Opacity 0.7</button>
+      <button onclick="test1Opacity(1.0)">Opacity 1.0</button>
+    </div>
+  </div>
+
+  <div class="test-card">
+    <h2>Test 2: Overlapping Shapes</h2>
+    <p>Multiple shapes with different opacities overlapping</p>
+    <canvas id="canvas2" width="400" height="300"></canvas>
+  </div>
+
+  <div class="test-card">
+    <h2>Test 3: Group Opacity</h2>
+    <p>Group with opacity affecting children</p>
+    <canvas id="canvas3" width="400" height="300"></canvas>
+  </div>
+
+  <script type="module">
+    import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+    import { div, canvas, mount } from '@rasenjs/dom'
+    import { rect, circle, group, RenderContext } from '@rasenjs/webgl'
+    import { ref } from '@vue/reactivity'
+
+    useReactiveRuntime()
+
+    // Test 1: Basic opacity
+    const test1OpacityValue = ref(0.7)
+    
+    window.test1Opacity = (value) => {
+      test1OpacityValue.value = value
+    }
+
+    const canvas1 = document.getElementById('canvas1')
+    const gl1 = canvas1.getContext('webgl2') || canvas1.getContext('webgl')
+    const ctx1 = new RenderContext(gl1, { batching: true, dirtyTracking: true })
+
+    const test1Components = [
+      circle({ x: 150, y: 150, radius: 60, fill: '#ff6b6b', opacity: test1OpacityValue }),
+      circle({ x: 250, y: 150, radius: 60, fill: '#4ecdc4', opacity: 0.5 })
+    ]
+
+    test1Components.forEach(comp => comp(gl1))
+
+    // Test 2: Multiple overlapping shapes
+    const canvas2 = document.getElementById('canvas2')
+    const gl2 = canvas2.getContext('webgl2') || canvas2.getContext('webgl')
+    const ctx2 = new RenderContext(gl2, { batching: true, dirtyTracking: true })
+
+    const test2Components = [
+      rect({ x: 50, y: 50, width: 150, height: 150, fill: '#ff6b6b', opacity: 0.5 }),
+      rect({ x: 100, y: 100, width: 150, height: 150, fill: '#4ecdc4', opacity: 0.5 }),
+      circle({ x: 250, y: 200, radius: 60, fill: '#ffd93d', opacity: 0.7 }),
+      rect({ x: 200, y: 50, width: 100, height: 100, fill: '#a29bfe', opacity: 0.3 })
+    ]
+
+    test2Components.forEach(comp => comp(gl2))
+
+    // Test 3: Group opacity
+    const canvas3 = document.getElementById('canvas3')
+    const gl3 = canvas3.getContext('webgl2') || canvas3.getContext('webgl')
+    const ctx3 = new RenderContext(gl3, { batching: true, dirtyTracking: true })
+
+    const test3Components = [
+      group({
+        x: 200,
+        y: 150,
+        opacity: 0.5,
+        children: [
+          circle({ x: -50, y: 0, radius: 40, fill: '#ff6b6b' }),
+          circle({ x: 50, y: 0, radius: 40, fill: '#4ecdc4' }),
+          rect({ x: -20, y: -60, width: 40, height: 40, fill: '#ffd93d' })
+        ]
+      }),
+      circle({ x: 300, y: 150, radius: 30, fill: '#a29bfe', opacity: 0.8 })
+    ]
+
+    test3Components.forEach(comp => comp(gl3))
+
+    console.log('✅ Opacity tests loaded')
+  </script>
+</body>
+</html>

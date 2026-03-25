@@ -1,5 +1,5 @@
 /**
- * Star component
+ * Star component (2D/3D unified)
  */
 
 import type { SyncComponent } from '@rasenjs/core'
@@ -11,6 +11,7 @@ import { element } from '../element'
 export interface StarProps extends CommonDrawProps, TransformProps {
   x: MaybeRef<number>
   y: MaybeRef<number>
+  z?: MaybeRef<number>
   numPoints: MaybeRef<number>
   innerRadius: MaybeRef<number>
   outerRadius: MaybeRef<number>
@@ -21,16 +22,17 @@ export interface StarProps extends CommonDrawProps, TransformProps {
 
 /**
  * Generate star geometry
+ * Now supports z coordinate for 3D
  */
 function createStarGeometry(
   x: number,
   y: number,
+  z: number,
   numPoints: number,
   innerRadius: number,
   outerRadius: number
 ): Float32Array {
-  // Pre-allocate Float32Array
-  const vertexCount = numPoints * 2 * 3 * 2 // points * 2 * triangles * vertices * coords
+  const vertexCount = numPoints * 2 * 3 * 3
   const vertices = new Float32Array(vertexCount)
   let offset = 0
   const angleStep = Math.PI / numPoints
@@ -42,15 +44,15 @@ function createStarGeometry(
     const radius1 = i % 2 === 0 ? outerRadius : innerRadius
     const radius2 = (i + 1) % 2 === 0 ? outerRadius : innerRadius
     
-    // Center point
     vertices[offset++] = x
     vertices[offset++] = y
-    // First point
+    vertices[offset++] = z
     vertices[offset++] = x + Math.cos(angle1) * radius1
     vertices[offset++] = y + Math.sin(angle1) * radius1
-    // Second point
+    vertices[offset++] = z
     vertices[offset++] = x + Math.cos(angle2) * radius2
     vertices[offset++] = y + Math.sin(angle2) * radius2
+    vertices[offset++] = z
   }
   
   return vertices
@@ -99,6 +101,7 @@ export const star: SyncComponent<
     draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
       const x = unref(props.x)
       const y = unref(props.y)
+      const z = unref(props.z) ?? 0
       const points = unref(props.numPoints)
       const innerRadius = unref(props.innerRadius)
       const outerRadius = unref(props.outerRadius)
@@ -106,8 +109,11 @@ export const star: SyncComponent<
       const visible = unref(props.visible) ?? true
       const opacity = unref(props.opacity) ?? 1
       const rotation = unref(props.rotation) ?? 0
+      const rotationX = unref(props.rotationX) ?? 0
+      const rotationY = unref(props.rotationY) ?? 0
       const scaleX = unref(props.scaleX) ?? 1
       const scaleY = unref(props.scaleY) ?? 1
+      const scaleZ = unref(props.scaleZ) ?? 1
 
       if (!visible || opacity <= 0) return
 
@@ -118,32 +124,33 @@ export const star: SyncComponent<
             cachedPoints !== points ||
             cachedInnerRadius !== innerRadius ||
             cachedOuterRadius !== outerRadius) {
-          cachedGeometry = createStarGeometry(0, 0, points, innerRadius, outerRadius)
+          cachedGeometry = createStarGeometry(0, 0, 0, points, innerRadius, outerRadius)
           cachedPoints = points
           cachedInnerRadius = innerRadius
           cachedOuterRadius = outerRadius
         }
         const color = parseColor(fill)
         
-        // Get accumulated transform from group hierarchy
         const transform = renderContext.getCurrentTransform()
         
-        // Combine local opacity with group opacity
         const finalOpacity = opacity * transform.opacity
         color.a *= finalOpacity
         
-        // Apply parent rotation to local position
-        const cos = Math.cos(transform.rotation)
-        const sin = Math.sin(transform.rotation)
+        const cos = Math.cos(transform.rotationZ)
+        const sin = Math.sin(transform.rotationZ)
         const rotatedX = x * cos - y * sin
         const rotatedY = x * sin + y * cos
         
         const finalTransform = {
           tx: transform.tx + rotatedX * transform.scaleX,
           ty: transform.ty + rotatedY * transform.scaleY,
-          rotation: transform.rotation + rotation,
+          tz: transform.tz + z * transform.scaleZ,
+          rotationX: transform.rotationX + rotationX,
+          rotationY: transform.rotationY + rotationY,
+          rotationZ: transform.rotationZ + rotation,
           scaleX: transform.scaleX * scaleX,
-          scaleY: transform.scaleY * scaleY
+          scaleY: transform.scaleY * scaleY,
+          scaleZ: transform.scaleZ * scaleZ
         }
         
         renderContext.addShape(
@@ -158,6 +165,7 @@ export const star: SyncComponent<
     deps: () => [
       unref(props.x),
       unref(props.y),
+      unref(props.z),
       unref(props.numPoints),
       unref(props.innerRadius),
       unref(props.outerRadius),
@@ -167,8 +175,11 @@ export const star: SyncComponent<
       unref(props.visible),
       unref(props.opacity),
       unref(props.rotation),
+      unref(props.rotationX),
+      unref(props.rotationY),
       unref(props.scaleX),
-      unref(props.scaleY)
+      unref(props.scaleY),
+      unref(props.scaleZ)
     ]
   })
 }
