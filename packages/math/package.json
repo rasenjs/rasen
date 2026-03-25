@@ -1,0 +1,49 @@
+{
+  "name": "@rasenjs/math",
+  "version": "0.1.0-alpha",
+  "description": "Rasen math library - Vector, Matrix, and Quaternion operations",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "test": "../../node_modules/.bin/vitest --run",
+    "typecheck": "../../node_modules/.bin/tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "math",
+    "vector",
+    "matrix",
+    "quaternion",
+    "3d",
+    "webgl"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/math"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/math",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT"
+}
