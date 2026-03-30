@@ -120,3 +120,76 @@ export function getReactiveRuntime(): ReactiveRuntime {
 export function ref<T>(value: T): Ref<T> {
   return getReactiveRuntime().ref(value)
 }
+
+/**
+ * 监听对象属性的响应式更新
+ * 
+ * 遍历对象的每个属性，如果属性值是响应式的（Ref/ReadonlyRef/Getter），
+ * 则设置 watch 监听，当属性变化时调用回调函数。
+ * 
+ * @param obj - 要监听的对象
+ * @param callback - 当任何响应式属性变化时的回调函数
+ * @param immediate - 是否立即执行一次回调
+ * @returns 清理函数，停止所有监听
+ * 
+ * @example
+ * ```ts
+ * const bgImage = ref('url(image1.png)')
+ * const style = { 'background-image': bgImage, color: 'red' }
+ * 
+ * const stop = watchObjectProps(style, (key, value) => {
+ *   element.style.setProperty(key, String(value))
+ * })
+ * 
+ * bgImage.value = 'url(image2.png)' // 会触发回调
+ * stop() // 清理监听
+ * ```
+ */
+export function watchObjectProps(
+  obj: Record<string, unknown>,
+  callback: (key: string, value: unknown) => void,
+  immediate = true
+): () => void {
+  const runtime = getReactiveRuntime()
+  const stops: Array<() => void> = []
+  
+  for (const [key, value] of Object.entries(obj)) {
+    // 检查是否是响应式值
+    if (runtime.isRef(value)) {
+      // Ref 或 ReadonlyRef
+      if (immediate) {
+        callback(key, runtime.unref(value))
+      }
+      
+      const stop = runtime.watch(
+        value as Ref<unknown> | ReadonlyRef<unknown>,
+        (newValue) => {
+          callback(key, newValue)
+        }
+      )
+      stops.push(stop)
+    } else if (typeof value === 'function') {
+      // Getter 函数
+      if (immediate) {
+        callback(key, (value as () => unknown)())
+      }
+      
+      const stop = runtime.watch(
+        value as () => unknown,
+        (newValue) => {
+          callback(key, newValue)
+        }
+      )
+      stops.push(stop)
+    } else {
+      // 普通值，直接设置
+      if (immediate) {
+        callback(key, value)
+      }
+    }
+  }
+  
+  return () => {
+    stops.forEach(stop => stop())
+  }
+}

@@ -1,5 +1,5 @@
 import type { PropValue, Ref, Mountable } from '@rasenjs/core'
-import { unref, setAttribute, setStyle, watchProp } from '../utils'
+import { unref, setAttribute, setStyle, watchProp, watchObjectProps } from '../utils'
 import { warnInvalidEventCase } from '../utils/dev-warnings'
 import { getHydrationContext } from '../hydration-context'
 import type {
@@ -222,19 +222,49 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 
     // 处理 style
     if (props.style !== undefined) {
-      stops.push(
-        watchProp(
-          () => unref(props.style),
-          (styleValue) => {
-            if (typeof styleValue === 'string') {
-              el.style.cssText = styleValue
-            } else if (styleValue) {
-              setStyle(el, styleValue as Record<string, string | number>)
-            }
-          },
-          false // 始终执行immediate，确保style被正确设置（包括hydration模式）
+      // 检查 props.style 本身是否是响应式的
+      const isReactiveStyle = typeof props.style === 'function' || 
+                               (props.style && typeof props.style === 'object' && 'value' in props.style)
+      
+      if (isReactiveStyle) {
+        // 响应式的 style - 监听整个 style 对象的变化
+        stops.push(
+          watchProp(
+            () => unref(props.style),
+            (styleValue) => {
+              if (typeof styleValue === 'string') {
+                el.style.cssText = styleValue
+              } else if (styleValue && typeof styleValue === 'object') {
+                // 清空现有样式
+                el.style.cssText = ''
+                // 设置新样式
+                setStyle(el, styleValue as Record<string, string | number>)
+              }
+            },
+            hydrated
+          )
         )
-      )
+      } else {
+        // 普通对象 style - 支持内部属性的响应式
+        const styleValue = props.style
+        
+        if (typeof styleValue === 'string') {
+          el.style.cssText = styleValue
+        } else if (styleValue && typeof styleValue === 'object') {
+          const stop = watchObjectProps(
+            styleValue as Record<string, unknown>,
+            (key, value) => {
+              if (value === null || value === undefined) {
+                el.style.removeProperty(key)
+              } else {
+                el.style.setProperty(key, String(value))
+              }
+            },
+            !hydrated
+          )
+          stops.push(stop)
+        }
+      }
     }
 
     // 处理 children

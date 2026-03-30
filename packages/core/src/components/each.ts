@@ -29,7 +29,7 @@ export interface EachHostHooks<Host = unknown, N = unknown> {
   appendMarker?: (host: Host, marker: N) => void
   insertBefore?: (host: Host, node: N, before: N | null) => void
   removeNode?: (node: N) => void
-  createFragment?: () => {
+  createFragment?: (host: Host) => {
     host: Host
     flush: (host: Host, before: N | null) => void
   }
@@ -115,7 +115,7 @@ interface EachImplConfig<T extends object, Host, N> {
   appendMarker?: (host: Host, marker: N) => void
   insertBefore?: (host: Host, node: N, before: N | null) => void
   removeNode?: (node: N) => void
-  createFragment?: () => {
+  createFragment?: (host: Host) => {
     host: Host
     flush: (host: Host, before: N | null) => void
   }
@@ -197,7 +197,7 @@ const eachImpl = com(
 
         if (currentItems.length === 0 || !hasExisting) {
           if (config.createFragment) {
-            const { host: fragmentHost, flush } = config.createFragment()
+            const { host: fragmentHost, flush } = config.createFragment(host)
 
             for (let i = 0; i < newItems.length; i++) {
               const item = newItems[i]
@@ -367,7 +367,7 @@ interface RepeatImplConfig<T, Host, N> {
   createMarker?: (host: Host, markerType: string) => N
   appendMarker?: (host: Host, marker: N) => void
   removeNode?: (node: N) => void
-  createFragment?: () => {
+  createFragment?: (host: Host) => {
     host: Host
     flush: (host: Host, before: N | null) => void
   }
@@ -417,7 +417,7 @@ const repeatImpl = com(
         // 创建新的实例（如果需要）
         if (newLength > oldLength) {
           if (config.createFragment && newLength - oldLength > 1) {
-            const { host: fragmentHost, flush } = config.createFragment()
+            const { host: fragmentHost, flush } = config.createFragment(host)
 
             for (let i = oldLength; i < newLength; i++) {
               const instance: Instance<N> = {}

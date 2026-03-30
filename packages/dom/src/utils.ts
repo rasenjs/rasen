@@ -1,5 +1,5 @@
 import type { PropValue } from '@rasenjs/core'
-import { getReactiveRuntime, unrefValue } from '@rasenjs/core'
+import { getReactiveRuntime, unrefValue, watchObjectProps as watchObjectPropsCore } from '@rasenjs/core'
 
 /**
  * 解包 Ref、ReadonlyRef 或 Getter
@@ -85,3 +85,9 @@ export function watchProp<T>(
   
   return stop
 }
+
+/**
+ * 监听对象属性的响应式更新
+ * 用于处理 style 等对象类型属性的响应式支持
+ */
+export const watchObjectProps = watchObjectPropsCore
