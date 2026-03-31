@@ -2,11 +2,14 @@
  * View 组件
  */
 
-import { component, type ViewProps, type RNMountable } from './component'
+import 'react-native/Libraries/Components/View/ViewNativeComponent'
+
+import type { Mountable } from '@rasenjs/core'
+import { component, type ViewProps, type Host } from './component'
 
 /**
  * View 组件 - 基础容器
- *
+ * 
  * @example
  * ```ts
  * // 定义组件
@@ -16,12 +19,12 @@ import { component, type ViewProps, type RNMountable } from './component'
  *     text({ children: 'Hello' })
  *   ]
  * })
- *
+ * 
  * // 挂载
- * mount(hostConfig, rootTag, App)
+ * mount(reactNativePrivateInterface, rootTag, App)
  * ```
  */
-export function view(props: ViewProps = {}): RNMountable {
+export function view(props: ViewProps = {}): Mountable<Host> {
   return component('View', props)
 }
 

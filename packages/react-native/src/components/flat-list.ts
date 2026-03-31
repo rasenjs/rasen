@@ -8,9 +8,7 @@
  * 当前版本会渲染所有数据项，适合小型列表。
  */
 
-import type { Mountable } from '@rasenjs/core'
-import { com } from '@rasenjs/core'
-import type { RenderContext, Props } from '../render-context'
+import type { RenderContext, Instance, Props } from '../render-context'
 import { createInstance, appendChild, getChildContext } from '../render-context'
 import { unref, isRef, watchProp } from '../utils'
 import type { RNMountable, ComponentProps } from './component'
@@ -41,7 +39,7 @@ export interface FlatListProps<T> extends ComponentProps {
  * FlatList 组件 - 高性能列表
  *
  * @param props - FlatList 属性
- * @returns Mountable<RenderContext>
+ * @returns RNMountable
  *
  * @example
  * ```ts
@@ -54,99 +52,81 @@ export interface FlatListProps<T> extends ComponentProps {
  * })
  * ```
  */
-export const flatList = com(
-  <T>(props: FlatListProps<T>): Mountable<RenderContext> => {
-    // setup 阶段
-    const {
-      data,
-      renderItem,
-      keyExtractor = (_item: T, index: number) => String(index),
-      horizontal = false,
-      showsHorizontalScrollIndicator = true,
-      showsVerticalScrollIndicator = true,
-      contentContainerStyle,
-      style,
-      ...restProps
-    } = props
+export function flatList<T>(props: FlatListProps<T>): RNMountable {
+  const {
+    data,
+    renderItem,
+    keyExtractor = (_item: T, index: number) => String(index),
+    horizontal = false,
+    showsHorizontalScrollIndicator = true,
+    showsVerticalScrollIndicator = true,
+    contentContainerStyle,
+    style,
+    ...restProps
+  } = props
 
-    // mount 阶段
-    return (ctx: RenderContext) => {
-      // 收集子组件的 unmount
-      const childUnmounts: Array<(() => void) | undefined> = []
-
-      // 创建 ScrollView 容器
-      const scrollViewProps: Props = {
-        ...(style && typeof style === 'object' ? style : {}),
-        horizontal,
-        showsHorizontalScrollIndicator,
-        showsVerticalScrollIndicator,
-        scrollEventThrottle: 16,
-        removeClippedSubviews: true
-      }
-
-      const scrollView = createInstance(ctx, 'RCTScrollView', scrollViewProps)
-
-      // 创建内容容器
-      const contentContainerProps: Props = {
-        ...(contentContainerStyle && typeof contentContainerStyle === 'object'
-          ? contentContainerStyle
-          : {}),
-        collapsable: false
-      }
-      const contentContainer = createInstance(
-        ctx,
-        'RCTView',
-        contentContainerProps
-      )
-      appendChild(scrollView, contentContainer)
-
-      // 获取子组件的渲染上下文
-      const childCtx = getChildContext(ctx, 'RCTScrollView')
-
-      // 当前渲染的 item unmounts
-      let itemUnmounts: Array<(() => void) | undefined> = []
-
-      // 渲染列表项的函数
-      const renderItems = (items: T[]) => {
-        // 清理旧的 items
-        itemUnmounts.forEach((unmount) => unmount?.())
-        itemUnmounts = []
-
-        items.forEach((item, index) => {
-          // 使用 keyExtractor 生成 key（用于将来的优化）
-          keyExtractor(item, index)
-
-          const itemMount = renderItem({ item, index })
-          const unmount = itemMount(childCtx)
-          itemUnmounts.push(unmount)
-        })
-      }
-
-      // 初始渲染
-      const initialData = unref(data)
-      renderItems(initialData)
-
-      // 如果 data 是响应式的，监听变化（由 com 自动清理）
-      if (isRef(data)) {
-        watchProp(
-          () => unref(data),
-          (newData) => {
-            renderItems(newData)
-          }
-        )
-      }
-
-      // 处理其他 props
-      void restProps
-
-      // unmount 阶段
-      return () => {
-        itemUnmounts.forEach((unmount) => unmount?.())
-        childUnmounts.forEach((unmount) => unmount?.())
-        // TODO: remove scrollView from parent
-      }
+  return (ctx: RenderContext): Instance => {
+    // 创建 ScrollView 容器
+    const scrollViewProps: Props = {
+      ...(style && typeof style === 'object' ? style : {}),
+      horizontal,
+      showsHorizontalScrollIndicator,
+      showsVerticalScrollIndicator,
+      scrollEventThrottle: 16,
+      removeClippedSubviews: true,
     }
+
+    const scrollView = createInstance(ctx, 'RCTScrollView', scrollViewProps)
+
+    // 创建内容容器
+    const contentContainerProps: Props = {
+      ...(contentContainerStyle && typeof contentContainerStyle === 'object' ? contentContainerStyle : {}),
+      collapsable: false,
+    }
+    const contentContainer = createInstance(ctx, 'RCTView', contentContainerProps)
+    appendChild(scrollView, contentContainer)
+
+    // 获取子组件的渲染上下文
+    const childCtx = getChildContext(ctx, 'RCTScrollView')
+
+    // 渲染列表项的函数
+    const renderItems = (items: T[]) => {
+      // TODO: 实现差异更新，而不是清空重建
+      // 当前简化实现：直接渲染所有项
+
+      items.forEach((item, index) => {
+        // 使用 keyExtractor 生成 key（用于将来的优化）
+        keyExtractor(item, index)
+
+        const itemMount = renderItem({ item, index })
+        const itemInstance = itemMount(childCtx)
+
+        if (itemInstance) {
+          appendChild(contentContainer, itemInstance)
+        }
+      })
+    }
+
+    // 初始渲染
+    const initialData = unref(data)
+    renderItems(initialData)
+
+    // 如果 data 是响应式的，监听变化
+    if (isRef(data)) {
+      watchProp(
+        () => unref(data),
+        (newData) => {
+          // TODO: 智能差异更新
+          // 当前会触发重新渲染（需要实现子节点清理）
+        }
+      )
+    }
+
+    // 处理其他 props
+    void restProps
+
+    return scrollView
   }
-)
+}
 
 export default flatList

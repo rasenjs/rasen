@@ -10,7 +10,7 @@ import { component, type TouchableProps, type RNMountable } from './component'
  * @example
  * ```ts
  * touchable({
- *   onPress: () => console.log('Pressed!'),
+ *   onPress: () => {},
  *   style: { padding: 12 },
  *   children: [
  *     text({ children: 'Click me' })
@@ -25,8 +25,7 @@ export function touchable(props: TouchableProps = {}): RNMountable {
     ...restProps,
     accessible: true,
     accessibilityRole: 'button',
-    // 将 onPress 转换为 onTouchEnd
-    onTouchEnd: onPress && !disabled ? () => onPress() : undefined
+    onTouchEnd: onPress && !disabled ? () => onPress() : undefined,
   })
 }
 

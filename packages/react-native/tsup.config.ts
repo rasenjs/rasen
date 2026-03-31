@@ -8,6 +8,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
+  outDir: 'dist',
   // 不打包任何外部依赖
   external: [
     /^@rasenjs\/.*/,

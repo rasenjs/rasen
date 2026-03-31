@@ -31,7 +31,7 @@ export function textInput(props: TextInputProps = {}): RNMountable {
   // TextInput 使用 'text' 属性而不是 'value'
   const textInputProps: Record<string, unknown> = {
     ...restProps,
-    ...(value !== undefined && { text: value })
+    ...(value !== undefined && { text: value }),
   }
 
   return component('TextInput', textInputProps)

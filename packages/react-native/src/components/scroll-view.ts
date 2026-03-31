@@ -41,7 +41,7 @@ export function scrollView(props: ScrollViewProps = {}): RNMountable {
   return component('ScrollView', {
     ...restProps,
     // ScrollView 默认属性
-    scrollEventThrottle: 16
+    scrollEventThrottle: 16,
   })
 }
 

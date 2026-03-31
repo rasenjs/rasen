@@ -2,11 +2,14 @@
  * Text 组件
  */
 
-import { component, type TextProps, type RNMountable } from './component'
+import 'react-native/Libraries/Text/TextNativeComponent'
+
+import type { Mountable } from '@rasenjs/core'
+import { component, type TextProps, type Host } from './component'
 
 /**
  * Text 组件 - 文本显示
- *
+ * 
  * @example
  * ```ts
  * text({
@@ -15,7 +18,7 @@ import { component, type TextProps, type RNMountable } from './component'
  * })
  * ```
  */
-export function text(props: TextProps = {}): RNMountable {
+export function text(props: TextProps = {}): Mountable<Host> {
   return component('Text', props)
 }
 

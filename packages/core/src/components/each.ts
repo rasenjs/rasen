@@ -295,7 +295,10 @@ const eachImpl = com(
       updateList()
 
       // 监听变化（由 com 自动清理）
-      runtime.watch(config.items, updateList, { deep: false })
+      runtime.watch(config.items, () => {
+        console.log('[Rasen] each items changed, triggering updateList')
+        updateList()
+      }, { deep: false })
 
       // unmount
       return () => {
