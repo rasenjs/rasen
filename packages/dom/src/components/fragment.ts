@@ -1,7 +1,7 @@
 /**
  * DOM fragment implementation
  */
-import { type Mountable, type FragmentChild } from '@rasenjs/core'
+import { type Mountable, type FragmentChild, fragment as coreFragment } from '@rasenjs/core'
 import { getHydrationContext } from '../hydration-context'
 import { isMarkerMatch } from '../marker-constants'
 
@@ -91,9 +91,6 @@ export const fragment: FragmentFunction = (
   configOrStrings: { children: Array<Mountable<HTMLElement>> } | TemplateStringsArray,
   ...values: FragmentChild<HTMLElement>[]
 ): Mountable<HTMLElement> => {
-  // 统一使用 core fragment - 无论是对象参数还是 tagged template
-  const { fragment: coreFragment } = require('@rasenjs/core')
-  
   // 检测是否是 tagged template 调用
   if (Array.isArray(configOrStrings) && 'raw' in configOrStrings) {
     const strings = configOrStrings as TemplateStringsArray

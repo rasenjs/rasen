@@ -29,7 +29,7 @@ export const transitionGroup = com(<T extends object>(
 ): Mountable<HTMLElement> => {
   return (host: HTMLElement) => {
     const { items, children, name = 'v', tag = 'div' } = config
-    let instances = new Map<unknown, ItemInstance>()
+    const instances = new Map<unknown, ItemInstance>()
 
     const container = document.createElement(tag)
     container.style.position = 'relative'

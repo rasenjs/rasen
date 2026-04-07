@@ -59,7 +59,7 @@ export const transition = com((config: TransitionConfig): Mountable<HTMLElement>
 
       const mountable = children()
       currentUnmount = mountable(host)
-      el = (currentUnmount as any)?.node ?? null
+      el = host.firstElementChild as HTMLElement | null
 
       if (!el) return
 

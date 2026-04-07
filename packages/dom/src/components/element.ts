@@ -107,7 +107,7 @@ type TagToElement<T extends HTMLTagName> = HTMLElementTagNameMap[T]
  * 基础 Props（所有元素共享）
  */
 interface BaseElementProps {
-  ref?: Ref<HTMLElement | null> | ((el: HTMLElement | null) => void)
+  ref?: unknown
   children?: PropValue<string> | Array<string | (() => string | number) | Mountable<HTMLElement>>
 }
 
@@ -331,7 +331,8 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
         } else if (typeof child === 'function') {
           // 可能是 Mountable 函数，也可能是返回字符串/数字的响应式函数
           // 先调用一次，检查返回值类型
-          const result = (child as Function)(el)
+          type ChildFn = (host: HTMLElement) => unknown
+          const result = (child as ChildFn)(el)
           
           // 如果返回值是字符串或数字，当作响应式文本内容处理
           if (typeof result === 'string' || typeof result === 'number') {
@@ -361,7 +362,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             childUnmounts.push(() => textNode.remove())
           } else {
             // 返回值是 unmount 函数（或 undefined），是真正的 Mountable
-            childUnmounts.push(result)
+            childUnmounts.push(result as (() => void) | undefined)
           }
         }
       }

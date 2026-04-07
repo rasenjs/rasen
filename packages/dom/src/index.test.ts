@@ -3,8 +3,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import { ref, computed } from '@vue/reactivity'
 import {
   mount,
@@ -146,8 +144,8 @@ describe('@rasenjs/dom', () => {
 
     it('should set arbitrary attributes', () => {
       const unmount = mount(div({
-        dataId: '123', ariaLabel: 'test'
-      }), container)
+        'data-id': '123', 'aria-label': 'test'
+      } as Record<string, unknown>), container)
       const el = container.firstElementChild as HTMLElement
       expect(el.getAttribute('data-id')).toBe('123')
       expect(el.getAttribute('aria-label')).toBe('test')
@@ -195,21 +193,18 @@ describe('@rasenjs/dom', () => {
     it('should support reactive ref in children array', async () => {
       const count = ref(0)
       const unmount = mount(
-        div({
-          children: [span({ children: ['Count: '] }), span({ children: [count] })]
-        }),
+        div({}, 'Count: ', span({}, count)),
         container
       )
 
       const spans = container.querySelectorAll('span')
-      expect(spans.length).toBe(2)
-      expect(spans[0].textContent).toBe('Count: ')
-      expect(spans[1].textContent).toBe('0')
+      expect(spans.length).toBe(1)
+      expect(spans[0].textContent).toBe('0')
 
       count.value = 42
       await Promise.resolve()
 
-      expect(spans[1].textContent).toBe('42')
+      expect(spans[0].textContent).toBe('42')
       unmount?.()
     })
 
@@ -217,14 +212,7 @@ describe('@rasenjs/dom', () => {
       const name = ref('Alice')
       const age = ref(25)
       const unmount = mount(
-        div({
-          children: [
-            'Name: ',
-            span({ children: [name] }),
-            ', Age: ',
-            span({ children: [age] })
-          ]
-        }),
+        div({}, 'Name: ', span({}, name), ', Age: ', span({}, age)),
         container
       )
 
@@ -364,7 +352,7 @@ describe('@rasenjs/dom', () => {
 
     it('should throw when container is null', () => {
       const App = () => div({})
-      expect(() => mount(App(), null)).toThrow()
+      expect(() => mount(App(), null as unknown as HTMLElement)).toThrow()
     })
   })
 
@@ -1462,7 +1450,7 @@ describe('@rasenjs/dom', () => {
 
   describe('lazy', () => {
     it('should load component from async loader', async () => {
-      const { lazy, div } = await import('./index')
+      const { lazy } = await import('./index')
       
       // 模拟异步模块加载
       const loader = async () => {
@@ -1527,9 +1515,9 @@ describe('@rasenjs/dom', () => {
       const { lazy } = await import('./index')
       
       const Component = async () => {
-        // 非常快速的加载
         return (host: HTMLElement) => {
           host.textContent = 'Loaded'
+          return () => { host.textContent = '' }
         }
       }
 
@@ -1537,8 +1525,9 @@ describe('@rasenjs/dom', () => {
         loader: Component,
         loading: () => (host: HTMLElement) => {
           host.textContent = 'Loading...'
+          return () => { host.textContent = '' }
         },
-        minDelay: 100  // 最小延迟 100ms
+        minDelay: 100
       })
 
       const startTime = Date.now()

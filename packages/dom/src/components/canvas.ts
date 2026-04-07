@@ -1,6 +1,16 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
 import { unrefValue } from '@rasenjs/core'
 
+interface GPUAdapter {
+  requestDevice: () => Promise<unknown>
+}
+
+interface NavigatorWithGPU extends Navigator {
+  gpu?: {
+    requestAdapter: () => Promise<GPUAdapter | null>
+  }
+}
+
 /**
  * 获取 Canvas 渲染上下文的函数类型
  */
@@ -14,11 +24,12 @@ export const contextGetters = {
   webgl: (canvas: HTMLCanvasElement) => canvas.getContext('webgl'),
   webgl2: (canvas: HTMLCanvasElement) => canvas.getContext('webgl2'),
   webgpu: async (canvas: HTMLCanvasElement) => {
-    if (!(navigator as any).gpu) return null
-    const adapter = await (navigator as any).gpu.requestAdapter()
+    const nav = navigator as NavigatorWithGPU
+    if (!nav.gpu) return null
+    const adapter = await nav.gpu.requestAdapter()
     if (!adapter) return null
     await adapter.requestDevice()
-    return canvas.getContext('webgpu') as any
+    return canvas.getContext('webgpu')
   }
 } as const
 
@@ -84,7 +95,7 @@ export function canvas(props: {
   width: PropValue<number>
   height: PropValue<number>
   contextType: 'webgl'
-  contextOptions?: any
+  contextOptions?: WebGLContextAttributes
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
@@ -95,7 +106,7 @@ export function canvas(props: {
   width: PropValue<number>
   height: PropValue<number>
   contextType: 'webgl2'
-  contextOptions?: any
+  contextOptions?: WebGLContextAttributes
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
@@ -117,7 +128,7 @@ export function canvas<Ctx>(props: {
   width: PropValue<number>
   height: PropValue<number>
   contextType?: '2d' | 'webgl' | 'webgl2' | 'webgpu'
-  contextOptions?: any
+  contextOptions?: WebGLContextAttributes
   getContext?: ContextGetter<Ctx>
   dpr?: number
   className?: PropValue<string>

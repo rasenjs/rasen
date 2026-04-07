@@ -7,8 +7,11 @@
 import type { PropValue, Mountable } from '@rasenjs/core';
 
 // Rasen equivalents for Preact types
-export interface Ref<T> {
-	current: T;
+// 支持任何带有 value 属性的响应式对象
+export type Ref<T> = {
+	value: T
+} | {
+	value: unknown
 }
 
 export interface ClassAttributes<T> {

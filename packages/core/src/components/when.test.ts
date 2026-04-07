@@ -224,6 +224,59 @@ describe('when', () => {
       const unmount = result({})
       expect(() => unmount?.()).not.toThrow()
     })
+
+    it('条件从 true 变成 false 时应该 unmount 之前的分支', () => {
+      const thenUnmounted = vi.fn()
+      const elseUnmounted = vi.fn()
+
+      const condition = runtime.ref(true)
+
+      const result = when({
+        condition,
+        then: () => (() => {
+          return () => thenUnmounted()
+        }),
+        else: () => (() => {
+          return () => elseUnmounted()
+        })
+      })
+
+      result({})
+      expect(thenUnmounted).not.toHaveBeenCalled()
+      expect(elseUnmounted).not.toHaveBeenCalled()
+
+      condition.value = false
+      runtime.triggerWatchers()
+
+      expect(thenUnmounted).toHaveBeenCalled()
+      expect(elseUnmounted).not.toHaveBeenCalled()
+    })
+
+    it('条件从 false 变成 true 时应该 unmount else 分支', () => {
+      const thenUnmounted = vi.fn()
+      const elseUnmounted = vi.fn()
+
+      const condition = runtime.ref(false)
+
+      const result = when({
+        condition,
+        then: () => (() => {
+          return () => thenUnmounted()
+        }),
+        else: () => (() => {
+          return () => elseUnmounted()
+        })
+      })
+
+      result({})
+      expect(elseUnmounted).not.toHaveBeenCalled()
+
+      condition.value = true
+      runtime.triggerWatchers()
+
+      expect(elseUnmounted).toHaveBeenCalled()
+      expect(thenUnmounted).not.toHaveBeenCalled()
+    })
   })
 
   describe('host 传递', () => {

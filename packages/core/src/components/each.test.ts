@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
 import { each, repeat } from './each'
+import { when } from './when'
 
 // ============================================
 // 测试辅助工具
@@ -194,6 +195,278 @@ describe('each', () => {
       cleanup?.()
       expect(unmounted).toEqual([1, 2])
     })
+  })
+})
+
+describe('each + when 嵌套', () => {
+  let runtime: ReturnType<typeof createMockReactiveRuntime>
+
+  beforeEach(() => {
+    runtime = createMockReactiveRuntime()
+    setReactiveRuntime(runtime)
+  })
+
+  it('when condition 变成 false 时应该 unmount when 内部的组件', () => {
+    const items = [
+      { id: 1, visible: true },
+      { id: 2, visible: true }
+    ]
+    const unmounted: number[] = []
+
+    const eachMountable = each(items, (item) =>
+      when({
+        condition: () => item.visible,
+        then: () => (() => {
+          return () => unmounted.push(item.id)
+        })
+      })
+    )
+
+    eachMountable({})
+    expect(unmounted).toEqual([])
+
+    items[1].visible = false
+    runtime.triggerWatchers()
+
+    expect(unmounted).toEqual([2])
+  })
+
+  it('item 从列表移除时应该 unmount', () => {
+    const items = [
+      { id: 1 },
+      { id: 2 }
+    ]
+    const unmounted: number[] = []
+
+    const eachMountable = each(items, (item) =>
+      (() => {
+        return () => unmounted.push(item.id)
+      })
+    )
+
+    const cleanup = eachMountable({})
+    expect(unmounted).toEqual([])
+
+    cleanup?.()
+    expect(unmounted).toEqual([1, 2])
+  })
+
+  it('复现场景：showDetail 从 false->true->false，detail 应该正确显示和隐藏', () => {
+    const items = [
+      { id: 1, name: 'Item 1', showDetail: false },
+      { id: 2, name: 'Item 2', showDetail: false }
+    ]
+    const detailMounted: number[] = []
+    const detailUnmounted: number[] = []
+
+    const eachMountable = each(items, (item) =>
+      when({
+        condition: () => item.showDetail,
+        then: () => (() => {
+          detailMounted.push(item.id)
+          return () => detailUnmounted.push(item.id)
+        })
+      })
+    )
+
+    const host = {}
+    eachMountable(host)
+
+    expect(detailMounted).toEqual([])
+    expect(detailUnmounted).toEqual([])
+
+    items[0].showDetail = true
+    runtime.triggerWatchers()
+    expect(detailMounted).toEqual([1])
+    expect(detailUnmounted).toEqual([])
+
+    items[0].showDetail = false
+    runtime.triggerWatchers()
+    expect(detailMounted).toEqual([1])
+    expect(detailUnmounted).toEqual([1])
+  })
+
+  it('复现场景：切换多个 item 的 showDetail', () => {
+    const items = [
+      { id: 1, showDetail: false },
+      { id: 2, showDetail: false }
+    ]
+    const detailUnmounted: number[] = []
+
+    const eachMountable = each(items, (item) =>
+      when({
+        condition: () => item.showDetail,
+        then: () => (() => () => detailUnmounted.push(item.id))
+      })
+    )
+
+    eachMountable({})
+
+    items[0].showDetail = true
+    runtime.triggerWatchers()
+
+    items[1].showDetail = true
+    runtime.triggerWatchers()
+
+    expect(detailUnmounted).toEqual([])
+
+    items[0].showDetail = false
+    runtime.triggerWatchers()
+    expect(detailUnmounted).toEqual([1])
+
+    items[1].showDetail = false
+    runtime.triggerWatchers()
+    expect(detailUnmounted).toEqual([1, 2])
+  })
+
+  it('复现场景：div 内部嵌套 when()，条件变化时应该正确清理', () => {
+    const items = [
+      { id: 1, name: 'Item 1', showDetail: false },
+      { id: 2, name: 'Item 2', showDetail: false }
+    ]
+
+    const mounted: number[] = []
+    const unmounted: number[] = []
+
+    const eachMountable = each(items, (item) =>
+      when({
+        condition: () => item.showDetail,
+        then: () => (() => {
+          mounted.push(item.id)
+          return () => unmounted.push(item.id)
+        })
+      })
+    )
+
+    eachMountable({})
+
+    expect(mounted).toEqual([])
+    expect(unmounted).toEqual([])
+
+    items[0].showDetail = true
+    runtime.triggerWatchers()
+
+    expect(mounted).toEqual([1])
+    expect(unmounted).toEqual([])
+
+    items[0].showDetail = false
+    runtime.triggerWatchers()
+
+    expect(mounted).toEqual([1])
+    expect(unmounted).toEqual([1])
+  })
+
+  it('复现场景：同一个 item 内部有多个 when()，应该各自独立工作', () => {
+    const items = [
+      { id: 1, showA: false, showB: false }
+    ]
+
+    const mountedA: number[] = []
+    const mountedB: number[] = []
+    const unmountedA: number[] = []
+    const unmountedB: number[] = []
+
+    // 同一个 item 内部有两个 when
+    const eachMountable = each(items, (item) => {
+      const whenA = when({
+        condition: () => item.showA,
+        then: () => (() => {
+          mountedA.push(item.id)
+          return () => unmountedA.push(item.id)
+        })
+      })
+
+      const whenB = when({
+        condition: () => item.showB,
+        then: () => (() => {
+          mountedB.push(item.id)
+          return () => unmountedB.push(item.id)
+        })
+      })
+
+      return (host: unknown) => {
+        const unmountA = whenA(host)
+        const unmountB = whenB(host)
+        return () => {
+          unmountA?.()
+          unmountB?.()
+        }
+      }
+    })
+
+    eachMountable({})
+
+    expect(mountedA).toEqual([])
+    expect(mountedB).toEqual([])
+
+    items[0].showA = true
+    runtime.triggerWatchers()
+
+    expect(mountedA).toEqual([1])
+    expect(mountedB).toEqual([])
+
+    items[0].showB = true
+    runtime.triggerWatchers()
+
+    expect(mountedA).toEqual([1])
+    expect(mountedB).toEqual([1])
+
+    items[0].showA = false
+    runtime.triggerWatchers()
+
+    expect(unmountedA).toEqual([1])
+    expect(unmountedB).toEqual([])
+
+    items[0].showB = false
+    runtime.triggerWatchers()
+
+    expect(unmountedB).toEqual([1])
+  })
+
+  it('复现场景：each + 多个 when，验证 DOM 分支不会残留', () => {
+    const items = [
+      { id: 1, showA: false, showB: false },
+      { id: 2, showA: false, showB: false }
+    ]
+
+    const unmountedA: number[] = []
+    const unmountedB: number[] = []
+
+    const eachMountable = each(items, (item) => {
+      const whenA = when({
+        condition: () => item.showA,
+        then: () => (() => () => unmountedA.push(item.id))
+      })
+
+      const whenB = when({
+        condition: () => item.showB,
+        then: () => (() => () => unmountedB.push(item.id))
+      })
+
+      return (host: unknown) => {
+        const unmountA = whenA(host)
+        const unmountB = whenB(host)
+        return () => {
+          unmountA?.()
+          unmountB?.()
+        }
+      }
+    })
+
+    eachMountable({})
+
+    items[0].showA = true
+    items[1].showA = true
+    runtime.triggerWatchers()
+    expect(unmountedA).toEqual([])
+
+    items[0].showA = false
+    runtime.triggerWatchers()
+    expect(unmountedA).toEqual([1])
+
+    items[1].showA = false
+    runtime.triggerWatchers()
+    expect(unmountedA).toEqual([1, 2])
   })
 })
 

@@ -27,8 +27,10 @@ export interface MatchConfig<
   /** Reactive value for matching cases */
   value: PropValue<K | null | undefined>
 
-  /** Branch mapping: key -> component factory */
-  cases: Partial<Record<K, (key: K) => Mountable<Host>>>
+  /** Branch mapping - supports both object and array forms */
+  /** Object form: value matching (key -> component) */
+  /** Array form: condition matching [[condition, component], ...] */
+  cases: Partial<Record<K, (key: K) => Mountable<Host>>> | Array<[() => boolean, () => Mountable<Host>]>
 
   /** Default branch (when no match) */
   default?: () => Mountable<Host>
@@ -48,7 +50,7 @@ export interface MatchConfig<
  * Only switches branches when value actually changes, performance optimized.
  *
  * @example
- * // Basic usage
+ * // Object form - value matching
  * match({
  *   value: () => currentTab,
  *   cases: {
@@ -59,7 +61,18 @@ export interface MatchConfig<
  *   default: () => NotFoundView()
  * })
  *
- * // Router scenario
+ * // Array form - condition matching [[condition, component], ...]
+ * match({
+ *   value: () => status,
+ *   cases: [
+ *     [() => status === 'loading', () => Loading()],
+ *     [() => status === 'error', () => ErrorMsg()],
+ *     [() => status === 'success', () => SuccessContent()],
+ *   ],
+ *   default: () => DefaultContent()
+ * })
+ *
+ * // Router scenario with key parameter
  * match({
  *   value: () => router.current?.key,
  *   cases: {
@@ -101,15 +114,21 @@ export const match = com(
 
       // Mount branch
       const mountBranch = (key: K | null | undefined) => {
-        // Get corresponding factory function
         let factory:
           | ((key: K) => Mountable<Host>)
           | (() => Mountable<Host>)
           | undefined
 
-        if (key != null && config.cases[key]) {
+        if (Array.isArray(config.cases)) {
+          const pair = config.cases.find(([condition]) => condition())
+          if (pair) {
+            factory = pair[1]
+          }
+        } else if (key != null && config.cases[key]) {
           factory = config.cases[key]
-        } else if (config.default) {
+        }
+
+        if (!factory && config.default) {
           factory = config.default
         }
 
@@ -117,7 +136,6 @@ export const match = com(
 
         let targetHost = host
 
-        // If has marker and insertBefore, create proxy host
         if (marker && config.insertBefore) {
           targetHost = {
             appendChild: (node: N) => {
@@ -131,9 +149,8 @@ export const match = com(
           } as unknown as Host
         }
 
-        // Create and mount component
         const mountable =
-          key != null && config.cases[key]
+          key != null && factory !== config.default && !Array.isArray(config.cases)
             ? (factory as (key: K) => Mountable<Host>)(key)
             : (factory as () => Mountable<Host>)()
 
