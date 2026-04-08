@@ -193,6 +193,69 @@ describe('when', () => {
 
       expect(thenMounted).toHaveBeenCalled()
     })
+
+    it('应该支持函数类型的条件并追踪依赖变化', () => {
+      const count = runtime.ref(0)
+      const thenMounted = vi.fn()
+      const elseMounted = vi.fn()
+
+      const result = when({
+        condition: () => count.value > 5,
+        then: () => (() => {
+          thenMounted()
+          return () => {}
+        }),
+        else: () => (() => {
+          elseMounted()
+          return () => {}
+        })
+      })
+
+      result({})
+
+      expect(thenMounted).not.toHaveBeenCalled()
+      expect(elseMounted).toHaveBeenCalled()
+
+      count.value = 10
+      runtime.triggerWatchers()
+
+      expect(thenMounted).toHaveBeenCalled()
+      expect(elseMounted).toHaveBeenCalledTimes(1)
+    })
+
+    it('函数条件应该能访问多个响应式依赖', () => {
+      const a = runtime.ref(1)
+      const b = runtime.ref(2)
+      const thenMounted = vi.fn()
+      const elseMounted = vi.fn()
+
+      const result = when({
+        condition: () => a.value + b.value > 2,
+        then: () => (() => {
+          thenMounted()
+          return () => {}
+        }),
+        else: () => (() => {
+          elseMounted()
+          return () => {}
+        })
+      })
+
+      result({})
+
+      expect(thenMounted).toHaveBeenCalled()
+
+      a.value = 10
+      runtime.triggerWatchers()
+
+      expect(thenMounted).toHaveBeenCalledTimes(1)
+
+      b.value = -20
+      runtime.triggerWatchers()
+
+      expect(thenMounted).toHaveBeenCalledTimes(1)
+      expect(elseMounted).toHaveBeenCalled()
+    })
   })
 
   describe('unmount', () => {

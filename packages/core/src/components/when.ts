@@ -121,8 +121,15 @@ export const when = com(
       }
 
       // 监听条件变化（由 com 自动清理）
+      // 如果 condition 是函数，直接作为 getter 传递以支持依赖追踪
+      // 否则通过 unrefValue 处理 Ref/computed
+      const conditionSource: () => boolean =
+        typeof config.condition === 'function'
+          ? config.condition
+          : () => unrefValue(config.condition)
+
       runtime.watch(
-        () => unrefValue(config.condition),
+        conditionSource,
         (value) => {
           const targetBranch = value ? 'then' : 'else'
 
