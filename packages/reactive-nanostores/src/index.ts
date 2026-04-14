@@ -175,6 +175,10 @@ export function createReactiveRuntime(): ReactiveRuntime {
         typeof value === 'object' && 
         LISTEN_SYMBOL in value
       )
+    },
+
+    isReactive<T extends object>(_value: T): boolean {
+      return false
     }
   }
 }

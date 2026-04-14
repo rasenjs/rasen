@@ -13,6 +13,7 @@ import { when } from './when'
 
 function createMockReactiveRuntime(): ReactiveRuntime & {
   triggerWatchers: () => void
+  markReactive: (obj: object) => void
 } {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const watchers: Array<{
@@ -21,6 +22,7 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
   }> = []
 
   const refs = new WeakSet<{ value: unknown }>()
+  const reactiveObjects = new WeakSet<object>()
 
   return {
     ref: <T>(value: T): Ref<T> => {
@@ -40,14 +42,15 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
       callback: (value: T, oldValue: T) => void,
       options?: { immediate?: boolean }
     ) => {
+      const sourceFn = typeof source === 'function' ? source : () => source
       const watcher = {
-        source: source as () => unknown,
+        source: sourceFn as () => unknown,
         callback: callback as (value: unknown, oldValue: unknown) => void
       }
       watchers.push(watcher)
 
       if (options?.immediate) {
-        callback(source(), undefined as T)
+        callback(sourceFn(), undefined as T)
       }
 
       return () => {
@@ -74,6 +77,14 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
         typeof value === 'object' &&
         refs.has(value as { value: unknown })
       )
+    },
+
+    isReactive: <T extends object>(value: T): boolean => {
+      return reactiveObjects.has(value)
+    },
+
+    markReactive: (obj: object) => {
+      reactiveObjects.add(obj)
     },
 
     triggerWatchers: () => {
@@ -175,6 +186,72 @@ describe('each', () => {
 
       eachMountable({})
       expect(mounted).toEqual([1])
+    })
+  })
+
+  describe('reactive 数组内部变化', () => {
+    it('当 reactive 数组 push 时应该触发更新', () => {
+      const items = [{ id: 1 }] as { id: number }[]
+      runtime.markReactive(items)
+      const mounted: number[] = []
+
+      const eachMountable = each(items, (item) =>
+        (() => {
+          mounted.push(item.id)
+          return () => {}
+        })
+      )
+
+      eachMountable({})
+      expect(mounted).toEqual([1])
+
+      items.push({ id: 2 })
+      runtime.triggerWatchers()
+
+      expect(mounted).toEqual([1, 2])
+    })
+
+    it('当 reactive 数组 splice 时应该触发更新', () => {
+      const items = [{ id: 1 }, { id: 2 }, { id: 3 }] as { id: number }[]
+      runtime.markReactive(items)
+      const unmounted: number[] = []
+
+      const eachMountable = each(items, (item) =>
+        (() => {
+          return () => unmounted.push(item.id)
+        })
+      )
+
+      eachMountable({})
+      expect(unmounted).toEqual([])
+
+      items.splice(1, 1)
+      runtime.triggerWatchers()
+
+      expect(unmounted).toEqual([2])
+    })
+
+    it('当 reactive 数组替换 item 时应该触发更新', () => {
+      const items = [{ id: 1 }] as { id: number }[]
+      runtime.markReactive(items)
+      const unmounted: number[] = []
+      const mounted: number[] = []
+
+      const eachMountable = each(items, (item) =>
+        (() => {
+          mounted.push(item.id)
+          return () => unmounted.push(item.id)
+        })
+      )
+
+      eachMountable({})
+      expect(mounted).toEqual([1])
+
+      items[0] = { id: 2 }
+      runtime.triggerWatchers()
+
+      expect(unmounted).toEqual([1])
+      expect(mounted).toEqual([1, 2])
     })
   })
 

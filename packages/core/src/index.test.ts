@@ -32,6 +32,7 @@ function createMockReactiveRuntime(): ReactiveRuntime {
   }> = []
 
   const refs = new WeakSet<{ value: unknown }>()
+  const reactiveObjects = new WeakSet<object>()
 
   const runtime: ReactiveRuntime = {
     ref: <T>(value: T): Ref<T> => {
@@ -88,6 +89,10 @@ function createMockReactiveRuntime(): ReactiveRuntime {
 
     isRef: (value: unknown): boolean => {
       return value !== null && typeof value === 'object' && refs.has(value as { value: unknown })
+    },
+
+    isReactive: <T extends object>(value: T): boolean => {
+      return reactiveObjects.has(value)
     }
   }
 

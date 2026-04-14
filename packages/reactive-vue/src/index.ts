@@ -12,6 +12,7 @@ import {
   computed as vueComputed,
   unref as vueUnref,
   isRef,
+  isReactive as vueIsReactive,
   type WatchStopHandle,
   type WatchOptions,
   type Ref as VueRef,
@@ -74,6 +75,10 @@ export function createReactiveRuntime(): ReactiveRuntime {
         typeof value === 'object' &&
         (RASEN_REF_SYMBOL in value || isRef(value))
       )
+    },
+
+    isReactive<T extends object>(value: T): boolean {
+      return vueIsReactive(value)
     }
   }
 }

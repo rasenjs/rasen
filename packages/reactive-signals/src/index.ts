@@ -166,6 +166,10 @@ export function createReactiveRuntime(): ReactiveRuntime {
         typeof value === 'object' &&
         RASEN_REF_SYMBOL in value
       )
+    },
+
+    isReactive<T extends object>(_value: T): boolean {
+      return false
     }
   }
 }

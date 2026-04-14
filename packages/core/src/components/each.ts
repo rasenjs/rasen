@@ -295,13 +295,27 @@ const eachImpl = com(
       updateList()
 
       // 监听变化（由 com 自动清理）
-      runtime.watch(config.items, () => {
-        console.log('[Rasen] each items changed, triggering updateList')
-        updateList()
-      }, { deep: false })
+      // 使用嵌套 watch：
+      // 外层 watch 监听数组引用变化（整体替换）
+      // 内层 watch 监听数组内部变化（push/pop/splice/替换 item）
+      const scope = runtime.effectScope()
+      scope.run(() => {
+        runtime.watch(
+          config.items,
+          (newItems) => {
+            updateList()
+            // 每次数组变化时，重新 watch 新数组的内部变化
+            if (Array.isArray(newItems)) {
+              runtime.watch(newItems as any, updateList, { deep: false })
+            }
+          },
+          { deep: false, immediate: true }
+        )
+      })
 
       // unmount
       return () => {
+        scope.stop()
         for (const item of currentItems) {
           removeInstance(item)
         }
@@ -461,10 +475,27 @@ const repeatImpl = com(
       updateList()
 
       // 监听变化（由 com 自动清理）
-      runtime.watch(config.items, updateList, { deep: false })
+      // 使用嵌套 watch：
+      // 外层 watch 监听数组引用变化（整体替换）
+      // 内层 watch 监听数组内部变化（push/pop/splice/替换 item）
+      const scope = runtime.effectScope()
+      scope.run(() => {
+        runtime.watch(
+          config.items,
+          (newItems) => {
+            updateList()
+            // 每次数组变化时，重新 watch 新数组的内部变化
+            if (Array.isArray(newItems)) {
+              runtime.watch(newItems as any, updateList, { deep: false })
+            }
+          },
+          { deep: false, immediate: true }
+        )
+      })
 
       // unmount
       return () => {
+        scope.stop()
         for (const instance of instances) {
           instance.unmount?.()
           if (config.removeNode && instance.node != null) {

@@ -86,6 +86,11 @@ export interface ReactiveRuntime {
    * 判断是否为响应式引用
    */
   isRef(value: unknown): boolean
+
+  /**
+   * 判断对象是否是 reactive 创建的响应式代理
+   */
+  isReactive<T extends object>(value: T): boolean
 }
 
 /**

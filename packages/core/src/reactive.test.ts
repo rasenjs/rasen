@@ -59,7 +59,9 @@ describe('reactive', () => {
           typeof value === 'object' &&
           refs.has(value as { value: unknown })
         )
-      }
+      },
+
+      isReactive: <T extends object>(_value: T): boolean => false
     }
   }
 
