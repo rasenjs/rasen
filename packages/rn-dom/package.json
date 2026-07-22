@@ -1,0 +1,23 @@
+{
+  "name": "@rasenjs/rn-dom",
+  "version": "0.1.0",
+  "description": "React Native DOM abstraction layer for rasen",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --external react-native",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --external react-native --watch"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-native": "^0.76.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "tsup": "^8.0.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-native": "^0.76.0"
+  }
+}
