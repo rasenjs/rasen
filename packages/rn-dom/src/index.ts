@@ -88,74 +88,23 @@ function prepareFabricProps(
 }
 
 /**
- * Build a Fabric payload from current props. Unlike React Native's
- * `createAttributePayload`, we DO NOT call `process` callbacks for color
- * fields — Fabric's PropsParser will run them itself. Calling them twice
- * would re-rotate color bytes and ship a transparent / wrong color to the
- * native view.
+ * Build a Fabric-compatible payload from component props.
  *
- * Behavior for non-color fields mirrors RN's `addProperties`:
- *   - top-level keys: forwarded as-is (functions → true)
- *   - nested `style`: each style key is forwarded (color strings stay
- *     as strings, primitives stay as primitives)
+ * Delegates to RN's `createAttributePayload` which flattens `style` into
+ * individual top-level keys and runs `processCallbacks` (e.g. `processColor`
+ * on colour strings), producing the number values Fabric's C++ layer expects.
  *
- * Fabric's PropsParser still does the real per-prop processing (running
- * `processColor` once on strings, diffs for layout, etc.). We deliberately
- * skip the JS-side round-trip that `createAttributePayload` performs.
+ * Returns `null` when no props changed (so callers skip the cloneNode call).
  */
 function buildFabricPayload(
   props: Record<string, unknown>,
   validAttrs: Record<string, unknown>,
-): Record<string, unknown> {
-  const payload: Record<string, unknown> = {}
-
-  for (const key in props) {
-    const value = props[key]
-    const attrCfg = validAttrs[key]
-
-    if (typeof value === 'function') {
-      // Mirror RN behavior: event handlers → true.
-      if (attrCfg !== undefined) payload[key] = true
-      continue
-    }
-
-    if (attrCfg === undefined) {
-      // Unknown top-level key — let Fabric decide (mostly it'll be dropped).
-      continue
-    }
-
-    if (key === 'style' && value && typeof value === 'object' && !Array.isArray(value)) {
-      // Flatten style and forward each key as a separate prop.
-      // If the style key's attribute config has a `process` function
-      // (e.g. backgroundColor → processColor), call it on string values
-      // to avoid double-processing — RN's createAttributePayload would
-      // process once and Fabric's PropsParser would process again,
-      // giving a wrong color.
-      const styleObj = value as Record<string, unknown>
-      for (const sk in styleObj) {
-        const sa = attrCfg as Record<string, unknown>
-        const styleAttrCfg = sa[sk]
-        if (styleAttrCfg === undefined) continue
-        
-        if (
-          typeof styleObj[sk] === 'string' &&
-          styleAttrCfg &&
-          typeof styleAttrCfg === 'object' &&
-          typeof (styleAttrCfg as { process?: unknown }).process === 'function'
-        ) {
-          const processFn = (styleAttrCfg as { process: (v: string) => unknown }).process
-          payload[sk] = processFn(styleObj[sk] as string)
-        } else {
-          payload[sk] = styleObj[sk]
-        }
-      }
-      continue
-    }
-
-    payload[key] = value
-  }
-
-  return payload
+): Record<string, unknown> | null {
+  const result = ReactNativePrivateInterface.createAttributePayload(
+    props,
+    validAttrs,
+  )
+  return result ?? null
 }
 
 function getFabricUIManager(): FabricUIManager {
@@ -338,29 +287,22 @@ export class RNDocument {
     }
     
     const validAttrs = viewConfig?.validAttributes || {}
-    const fabricProps = prepareFabricProps(resolvedProps)
-    const updatePayload = buildFabricPayload(fabricProps, validAttrs)
-
-    const instanceHandle: InstanceHandle = { tag, stateNode: null }
-
-    const fabricNode = getFabricUIManager().createNode(
-      tag,
-      nativeName,
-      this._rnRootTag,
-      updatePayload,
-      instanceHandle
-    )
-
+    
+    // Defer Fabric node creation to _getFabricNode (first mount), so the
+    // initial createNode call gets the COMPLETE payload from currentProps
+    // including any setAttribute calls made before the node enters the tree.
+    // This avoids cloneNode* issues with nodes created from empty props.
     const node = new RNNode(
-      fabricNode,
+      null as unknown as FabricNode,  // placeholder; replaced in _getFabricNode
       tag,
       tagName,
       resolvedProps,
       this
     )
-    instanceHandle.stateNode = node
-    
-    // Register for event system
+    node._nativeName = nativeName
+    node._lastValidAttrs = validAttrs
+    // Also store the instance handle for createNode
+    node._instanceHandle = { tag, stateNode: node }
     getInstanceMap().set(tag, node)
     
     return node
@@ -506,12 +448,21 @@ export class RNNode {
   // =========================================================================
   // Internal state (accessible by component.ts internals)
   // =========================================================================
+  /** Flag: true once node has been committed to Fabric via createNode. */
+  _mounted = false
+  /** Native component name used for Fabric createNode (e.g. 'RCTView'). */
+  _nativeName: string = ''
+  /** Instance handle for Fabric createNode. Set in createElement. */
+  _instanceHandle: InstanceHandle | null = null
   _propsDirty = false
   _childrenDirty = false
   _propsSnapshot: Props = {}
   _dirtyPropsKeys: Set<string> = new Set()
   _children: (RNNode | RNTextNode | RNCommentNode)[] = []
   _listeners: Map<string, Set<EventListenerOrEventListenerObject>> = new Map()
+
+  /** Last validAttributes (needed for children-only updates on mounted nodes). */
+  _lastValidAttrs: Record<string, unknown> | null = null
 
   // =========================================================================
   // Constructor
@@ -578,7 +529,9 @@ export class RNNode {
 
   /** @internal - Request update (used by style object) */
   _requestUpdate(): void {
-    this._markDirty('props', 'style')
+    if (this._mounted) {
+      this._markDirty('props', 'style')
+    }
   }
 
   // =========================================================================
@@ -615,21 +568,23 @@ export class RNNode {
 
   setAttribute(name: string, value: unknown): void {
     this.currentProps = { ...this.currentProps, [name]: value }
-    this._markDirty('props', name)
+    // Only mark dirty if the node is already mounted in the Fabric tree.
+    // Pre-mount nodes accumulate props via currentProps and get a full
+    // init on first _getFabricNode call, avoiding incremental cloneNode
+    // issues with partial payloads.
+    if (this._mounted) {
+      this._markDirty('props', name)
+    }
   }
 
   appendChild(child: RNNode | RNTextNode | RNCommentNode): void {
     child.parentNode = this
     this._children.push(child)
-    // Re-register the subtree in the event system — removeChild calls
-    // unregisterFromInstanceMap, so re-adding needs to restore it.
     registerInInstanceMap(child)
-    // Mark the subtree as needing a full Fabric re-process so both props
-    // (styles, event handlers) and children are applied afresh. Without
-    // this, a node removed and re-added (e.g. during tab switching)
-    // keeps stale dirty flags and Fabric skips the re-mount.
     this._markSubtreeDirty(child)
-    this._markChildrenDirty()
+    if (this._mounted) {
+      this._markChildrenDirty()
+    }
   }
 
   removeChild(child: RNNode | RNTextNode | RNCommentNode): void {
@@ -637,7 +592,9 @@ export class RNNode {
     const idx = this._children.indexOf(child)
     if (idx !== -1) this._children.splice(idx, 1)
     unregisterFromInstanceMap(child)
-    this._markChildrenDirty()
+    if (this._mounted) {
+      this._markChildrenDirty()
+    }
   }
 
   insertBefore(child: RNNode | RNTextNode | RNCommentNode, ref?: RNNode | RNTextNode | RNCommentNode): void {
@@ -654,22 +611,28 @@ export class RNNode {
     }
     registerInInstanceMap(child)
     this._markSubtreeDirty(child)
-    this._markChildrenDirty()
+    if (this._mounted) {
+      this._markChildrenDirty()
+    }
   }
 
-  /** @internal - Mark a node and all its descendants as needing a full
-   *  Fabric reprocess (props + children). Used when a subtree is
-   *  re-inserted after removal (e.g. tab switching). When the subtree
-   *  comes back, its old Fabric handles may be stale, so we force a
-   *  complete re-process from the root on the next flush. */
+  /** @internal - Recursively mark a subtree as needing a full Fabric
+   *  reprocess (props + children). Used when a subtree is re-inserted
+   *  after removal (e.g. tab switching). When the subtree comes back,
+   *  its old Fabric handles may be stale, so we force a complete
+   *  re-process from the root on the next flush.
+   *
+   *  Unlike `_mounted` (which is only for first-time createNode deferral),
+   *  this does NOT set `_mounted = false` — re-inserted nodes keep their
+   *  existing Fabric handle and get updated via cloneNode* in the mounted
+   *  incremental path, which avoids leaking Fabric nodes.
+   */
   private _markSubtreeDirty(node: RNNode | RNTextNode | RNCommentNode): void {
     if (node.nodeType === 8) return
     if (node.nodeType === 3) return
     const n = node as RNNode
     n._propsDirty = true
     n._childrenDirty = true
-    // We reach into internal state; these are always present on RNNode.
-    // _dirtyPropsKeys is initialized in the constructor as a Set.
     if (n._dirtyPropsKeys) {
       n._dirtyPropsKeys.add('style')
       n._dirtyPropsKeys.add('onTouchEnd')
@@ -692,7 +655,9 @@ export class RNNode {
     const next = { ...this.currentProps }
     delete next[name]
     this.currentProps = next
-    this._markDirty('props', name)
+    if (this._mounted) {
+      this._markDirty('props', name)
+    }
   }
 
   replaceChild(newChild: RNNode | RNTextNode | RNCommentNode, oldChild: RNNode | RNTextNode | RNCommentNode): void {
@@ -702,7 +667,10 @@ export class RNNode {
     unregisterFromInstanceMap(oldChild)
     newChild.parentNode = this
     this._children[idx] = newChild
-    this._markChildrenDirty()
+    this._markSubtreeDirty(newChild)
+    if (this._mounted) {
+      this._markChildrenDirty()
+    }
   }
 
   contains(node: RNNode | RNTextNode | RNCommentNode): boolean {
@@ -896,8 +864,61 @@ export class RNBody extends RNNode {
 
     let fabricNode = child[FABRIC_NODE]
     const fabricUIManager = getFabricUIManager()
+    let childSet: unknown = null
 
-    // Handle props changes first — cloneNodeWithNewChildren inherits updated props
+    // ── UNMOUNTED NODE: fresh createNode with full currentProps ─────
+    // Nodes that have never been committed to Fabric (or were re-inserted
+    // after removal) get a fresh createNode with the COMPLETE payload
+    // from currentProps. This avoids cloneNode* issues where incremental
+    // updates lose or misapply style props.
+    if (!child._mounted) {
+      const nativeName = child._nativeName
+      const rootTag = this[FABRIC_NODE_ID]
+      const validAttrs = child._lastValidAttrs ?? {}
+      const fabricProps = prepareFabricProps(child.currentProps)
+      const fullPayload = buildFabricPayload(fabricProps, validAttrs)
+      const instanceHandle = child._instanceHandle ?? { tag: child[FABRIC_NODE_ID], stateNode: child }
+
+      // Create a fresh Fabric node with all current props applied.
+      fabricNode = (fabricUIManager as any).createNode(
+        child[FABRIC_NODE_ID],
+        nativeName,
+        rootTag,
+        fullPayload ?? {},
+        instanceHandle,
+      )
+      child[FABRIC_NODE] = fabricNode
+
+      child._propsSnapshot = { ...fabricProps }
+      child._dirtyPropsKeys.clear()
+      child._propsDirty = false
+
+      if (child._children.length > 0) {
+        childSet = fabricUIManager.createChildSet()
+        for (const subChild of child._children) {
+          const subFabricNode = this._getFabricNode(subChild)
+          if (subFabricNode) {
+            fabricUIManager.appendChildToSet(childSet, subFabricNode)
+          }
+        }
+        child._childrenDirty = false
+
+        // Apply children via cloneNodeWithNewChildren on the fresh node.
+        fabricNode = (fabricUIManager as any).cloneNodeWithNewChildren(fabricNode, childSet)
+        child[FABRIC_NODE] = fabricNode
+      } else {
+        child._childrenDirty = false
+      }
+
+      child._mounted = true
+      child._lastValidAttrs = validAttrs
+      return fabricNode
+    }
+
+    // ── MOUNTED NODE: incremental dirty-flag-based update ────────────
+    let updatePayload: Record<string, unknown> | null = null
+    childSet = null
+
     if (child._propsDirty && child._hasPropsChanged()) {
       const nativeName = child.tagName.startsWith('RCT') || child.tagName.startsWith('Android')
         ? child.tagName
@@ -911,41 +932,53 @@ export class RNBody extends RNNode {
 
       const validAttrs = viewConfig?.validAttributes || {}
       const fabricProps = prepareFabricProps(child.currentProps)
-      let updatePayload
       try {
-        // We deliberately skip React Native's createAttributePayload for
-        // color-bearing styles. That helper auto-runs the processColor
-        // function for `backgroundColor` / `color` / etc., and Fabric's
-        // PropsParser then runs it again — the byte-rotation in
-        // processColor shifts the channels and the color lands as the
-        // wrong int (often transparent) on the native side. Our
-        // buildFabricPayload forwards the original color string and lets
-        // Fabric process it exactly once.
         updatePayload = buildFabricPayload(fabricProps, validAttrs)
       } catch (e: any) {
         throw e
       }
-      fabricNode = fabricUIManager.cloneNodeWithNewProps(fabricNode, updatePayload)
-      child[FABRIC_NODE] = fabricNode
+      child._lastValidAttrs = validAttrs
       child._propsSnapshot = { ...fabricProps }
       child._dirtyPropsKeys.clear()
       child._propsDirty = false
     }
 
-    // Handle children changes — only when actually dirty
     if (child._childrenDirty && child._children.length > 0) {
-      const childSet = fabricUIManager.createChildSet()
-
+      childSet = fabricUIManager.createChildSet()
       for (const subChild of child._children) {
         const subFabricNode = this._getFabricNode(subChild)
         if (subFabricNode) {
           fabricUIManager.appendChildToSet(childSet, subFabricNode)
         }
       }
+    }
+    // Always clear the dirty flag (even when there were no children) so
+    // the next appendChild/removeChild correctly propagates up the tree.
+    child._childrenDirty = false
 
-      fabricNode = fabricUIManager.cloneNodeWithNewChildren(fabricNode, childSet)
+    const hasChildren = childSet !== null
+    const hasProps = updatePayload !== null
+
+    if (hasProps && hasChildren) {
+      fabricNode = (fabricUIManager as any).cloneNodeWithNewChildrenAndProps(fabricNode, childSet, updatePayload)
+    } else if (hasProps) {
+      fabricNode = (fabricUIManager as any).cloneNodeWithNewProps(fabricNode, updatePayload)
+    } else if (hasChildren) {
+      // Children-only update: cloneNodeWithNewChildren drops rawProps, so
+      // we re-build the full payload from current props (i.e. all style,
+      // layout, event markers) and use the combined call instead.
+      const currentFabricProps = prepareFabricProps(child.currentProps)
+      const va = child._lastValidAttrs ?? {}
+      const fullPayload = buildFabricPayload(currentFabricProps, va)
+      if (fullPayload) {
+        fabricNode = (fabricUIManager as any).cloneNodeWithNewChildrenAndProps(fabricNode, childSet, fullPayload)
+      } else {
+        fabricNode = (fabricUIManager as any).cloneNodeWithNewChildren(fabricNode, childSet)
+      }
+    }
+
+    if (hasChildren || hasProps) {
       child[FABRIC_NODE] = fabricNode
-      child._childrenDirty = false
     }
 
     return fabricNode
