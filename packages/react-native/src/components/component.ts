@@ -35,29 +35,12 @@ export type Child =
   | undefined
 
 // ============================================================================
-// Component Name Mapping
-// ============================================================================
-
-const NATIVE_TYPE_MAP: Record<string, string> = {
-  'View': 'RCTView',
-  'Text': 'RCTText',
-  'TextInput': 'AndroidTextInput',
-  'Image': 'RCTImageView',
-  'ScrollView': 'RCTScrollView',
-  'TouchableOpacity': 'RCTView',
-}
-
-function getNativeType(type: string): string {
-  return NATIVE_TYPE_MAP[type] || type
-}
-
-// ============================================================================
 // Core Component Function
 // ============================================================================
 
 /**
  * Create a component using DOM-like API
- * 
+ *
  * @param type - Component type ('View', 'Text', etc.)
  * @param props - Component props
  * @returns Mountable function
@@ -67,13 +50,13 @@ export function component(
   props: ComponentProps = {}
 ): Mountable<Host> {
   const { children, ...restProps } = props
-  const nativeType = getNativeType(type)
   const runtime = getReactiveRuntime()
-  
+
   // Return mount function
   return (host: Host) => {
     // Create element using ownerDocument from parent node
-    const element = host.ownerDocument.createElement(nativeType, restProps)
+    // Note: createElement will auto-prepend 'RCT' prefix internally
+    const element = host.ownerDocument.createElement(type, restProps)
     
     // Append to parent node (host is the parent node)
     host.appendChild(element)
@@ -109,10 +92,17 @@ export function component(
           reactiveProps.push(stop)
         } else if (typeof value === 'object' && value !== null) {
           // Plain object style - watch each property with watchObjectProps
+          // Also handle function values as lazy getters
           const stop = watchObjectProps(
             value as Record<string, unknown>,
             (styleKey, newValue) => {
-              if (newValue === null || newValue === undefined) {
+              if (typeof newValue === 'function') {
+                // Function value - watch it for changes
+                const stopFunc = runtime.watch(newValue as () => unknown, (result) => {
+                  element.style.setProperty(styleKey, result)
+                })
+                reactiveProps.push(stopFunc)
+              } else if (newValue === null || newValue === undefined) {
                 element.style.removeProperty(styleKey)
               } else {
                 element.style.setProperty(styleKey, newValue)
@@ -138,6 +128,13 @@ export function component(
     const cleanup = () => {
       // Cleanup all watchers
       reactiveProps.forEach(unwatch => unwatch())
+      
+      // Cleanup all child unmounts
+      const parentAny = element as any
+      if (parentAny._unmounts) {
+        parentAny._unmounts.forEach((unmount: () => void) => unmount())
+        parentAny._unmounts = []
+      }
       
       // Remove from parent
       if (element.parentNode) {
@@ -201,7 +198,10 @@ function renderChild(
     // Mountable component - pass parent directly as host
     const unmount = child(parent)
     if (unmount) {
-      // Store unmount for cleanup
+      // Store unmount for cleanup - component.ts needs to track these
+      const parentAny = parent as any
+      if (!parentAny._unmounts) parentAny._unmounts = []
+      parentAny._unmounts.push(unmount)
     }
   }
 }
@@ -250,6 +250,36 @@ export interface ScrollViewProps extends ComponentProps {
   contentContainerStyle?: Props
   onScroll?: (event: unknown) => void
   onMomentumScrollEnd?: (event: unknown) => void
+}
+
+export interface TextInputProps extends ComponentProps {
+  value?: unknown
+  text?: unknown
+  placeholder?: string
+  placeholderTextColor?: string
+  autoFocus?: boolean
+  editable?: boolean
+  multiline?: boolean
+  numberOfLines?: number
+  secureTextEntry?: boolean
+  keyboardType?: string
+  returnKeyType?: string
+  onChangeText?: (text: string) => void
+  onFocus?: (event: unknown) => void
+  onBlur?: (event: unknown) => void
+  onSubmitEditing?: (event: unknown) => void
+  onKeyPress?: (event: unknown) => void
+}
+
+export interface ImageProps extends ComponentProps {
+  source?: { uri?: string } | number
+  resizeMode?: 'cover' | 'contain' | 'stretch' | 'center' | 'repeat'
+  defaultSource?: { uri?: string } | number
+  loadingIndicatorSource?: { uri?: string }
+  onLoad?: (event: unknown) => void
+  onError?: (event: unknown) => void
+  onLoadStart?: (event: unknown) => void
+  onLoadEnd?: (event: unknown) => void
 }
 
 export default component

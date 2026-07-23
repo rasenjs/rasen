@@ -5,6 +5,8 @@
  * 使用 component() 工厂函数创建，支持响应式更新
  */
 
+import 'react-native/Libraries/Components/TextInput/AndroidTextInputNativeComponent'
+
 import { component, type TextInputProps, type RNMountable } from './component'
 
 /**
@@ -28,13 +30,12 @@ import { component, type TextInputProps, type RNMountable } from './component'
 export function textInput(props: TextInputProps = {}): RNMountable {
   const { value, ...restProps } = props
 
-  // TextInput 使用 'text' 属性而不是 'value'
   const textInputProps: Record<string, unknown> = {
     ...restProps,
     ...(value !== undefined && { text: value }),
   }
 
-  return component('TextInput', textInputProps)
+  return component('AndroidTextInput', textInputProps)
 }
 
 export type { TextInputProps }

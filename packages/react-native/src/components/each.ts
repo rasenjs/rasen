@@ -2,8 +2,6 @@
  * each - 列表渲染组件
  */
 
-import 'react-native/Libraries/Text/TextNativeComponent'
-
 import { eachImpl, type EachImplConfig } from '@rasenjs/core'
 import type { Mountable } from '@rasenjs/core'
 import type { Ref } from '@rasenjs/core'

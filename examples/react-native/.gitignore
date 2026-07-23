@@ -82,3 +82,11 @@ ios/build/
 
 # React Native upgrade helper
 .react-native-upgrade-info.json
+
+# Media files (screenshots, demos, etc.)
+*.mp4
+*.webp
+*.gif
+
+# Bundled assets
+android/app/src/main/assets/

@@ -203,3 +203,136 @@ code {
 .legend p:last-child {
   margin-bottom: 0;
 }
+
+/* Million Rects Benchmark Styles */
+.benchmark-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.phase-indicator {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  color: white;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.phase-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.phase-dot::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.phase-dot.idle::before {
+  background: #9ca3af;
+}
+
+.phase-dot.creating::before {
+  background: #fbbf24;
+  animation: pulse 1s infinite;
+}
+
+.phase-dot.ready::before {
+  background: #4ade80;
+}
+
+.phase-dot.dragging::before {
+  background: #60a5fa;
+  animation: pulse 0.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+.benchmark-btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  min-width: 120px;
+}
+
+.benchmark-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.benchmark-table {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 1200px;
+}
+
+.benchmark-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.benchmark-table th,
+.benchmark-table td {
+  padding: 1rem;
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.benchmark-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.benchmark-table td:first-child {
+  text-align: left;
+  font-weight: 500;
+  color: #111827;
+}
+
+.benchmark-table tr:last-child td {
+  border-bottom: none;
+}
+
+.benchmark-table tr:hover {
+  background: #f9fafb;
+}
+
+.result-cell {
+  font-weight: 600;
+}
+
+.loading {
+  color: #f59e0b;
+  font-style: italic;
+}
+
+.canvas-wrapper {
+  background: white;
+  padding: 1rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 100%;
+  overflow: auto;
+}
+
+.canvas-wrapper canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  cursor: crosshair;
+}

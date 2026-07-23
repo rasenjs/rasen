@@ -1,14 +1,27 @@
 /**
- * Rasen React Native Example - Complex Todo App
- * 展示: computed, each, touchableOpacity, scrollView, 响应式状态
+ * Rasen React Native Example - Todo App with Routing
+ * 展示: 路由、match、响应式状态
  */
 
-import { registerApp, view, text, each, touchableOpacity } from '@rasenjs/react-native';
+import { registerApp, view, text, each, touchableOpacity, when } from '@rasenjs/react-native';
+import { createRouter, createMemoryHistory, route, template } from '@rasenjs/router';
+import { createRouterView } from '@rasenjs/react-native-router';
+import { z } from 'zod';
 import { ref, computed } from '@vue/reactivity';
 import { useReactiveRuntime } from '@rasenjs/reactive-vue';
 
-// 初始化响应式运行时
 useReactiveRuntime();
+
+// ============================================================================
+// 路由配置
+// ============================================================================
+
+const history = createMemoryHistory('/home')
+const router = createRouter({
+  home: route(),
+  detail: route(template`/detail/${ { id: z.string() } }`),
+  add: route('/add'),
+}, { history })
 
 // ============================================================================
 // 响应式状态
@@ -24,22 +37,10 @@ const todos = ref([
 
 const nextId = ref(6)
 const newTodoText = ref('')
-const filter = ref('all') // 'all' | 'active' | 'completed'
 
 // ============================================================================
 // 计算属性
 // ============================================================================
-
-const filteredTodos = computed(() => {
-  const list = todos.value
-  if (filter.value === 'active') {
-    return list.filter(t => !t.done)
-  }
-  if (filter.value === 'completed') {
-    return list.filter(t => t.done)
-  }
-  return list
-})
 
 const todoStats = computed(() => {
   const total = todos.value.length
@@ -48,15 +49,8 @@ const todoStats = computed(() => {
   return { total, completed, active }
 })
 
-const progress = computed(() => {
-  if (todoStats.value.total === 0) return 0
-  return Math.round((todoStats.value.completed / todoStats.value.total) * 100)
-})
-
-const priorityColor = (priority) => {
-  if (priority === 'high') return '#e74c3c'
-  if (priority === 'medium') return '#f39c12'
-  return '#2ecc71'
+const getTodoById = (id) => {
+  return todos.value.find(t => t.id === parseInt(id))
 }
 
 // ============================================================================
@@ -86,255 +80,402 @@ const addTodo = () => {
   ]
   nextId.value++
   newTodoText.value = ''
-}
-
-const setFilter = (newFilter) => {
-  filter.value = newFilter
+  router.push(router.routes.home)
 }
 
 // ============================================================================
-// 组件定义
+// 页面组件
 // ============================================================================
 
-// Filter Tab 组件
-const FilterTab = ({ label, activeFilter, currentFilter, onPress }) => {
-  const isActive = computed(() => activeFilter === currentFilter)
-  
-  return touchableOpacity({
-    onPress,
+// Home - Todo 列表
+const HomePage = () => {
+  return view({
     style: {
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 20,
-      backgroundColor: computed(() => isActive.value ? '#2196F3' : 'transparent'),
-      marginHorizontal: 4,
-    },
-    children: text({
-      style: {
-        fontSize: 14,
-        fontWeight: computed(() => isActive.value ? 'bold' : 'normal'),
-        color: computed(() => isActive.value ? 'white' : '#666'),
-      },
-      children: label,
-    }),
-  })
-}
-
-// Todo Item 组件
-const TodoItem = ({ todo }) => {
-  const isDone = computed(() => todo.done)
-  
-  return touchableOpacity({
-    onPress: () => toggleTodo(todo.id),
-    style: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee',
-      backgroundColor: 'white',
+      flex: 1,
+      backgroundColor: '#f5f5f5',
     },
     children: [
-      // Checkbox
+      // Header
       view({
         style: {
-          width: 28,
-          height: 28,
-          borderRadius: 14,
-          borderWidth: 2,
-          borderColor: computed(() => isDone.value ? '#4CAF50' : '#ccc'),
-          backgroundColor: computed(() => isDone.value ? '#4CAF50' : 'transparent'),
-          marginRight: 14,
-          justifyContent: 'center',
-          alignItems: 'center',
+          backgroundColor: '#2196F3',
+          paddingTop: 50,
+          paddingBottom: 20,
+          paddingHorizontal: 20,
         },
-        children: text({
-          style: {
-            color: 'white',
-            fontSize: 16,
-            fontWeight: 'bold',
-          },
-          children: computed(() => isDone.value ? '✓' : ''),
-        }),
+        children: [
+          text({
+            style: {
+              fontSize: 28,
+              fontWeight: 'bold',
+              color: 'white',
+            },
+            children: '📝 My Tasks',
+          }),
+          view({
+            style: { flexDirection: 'row', marginTop: 8 },
+            children: [
+              text({
+                style: { fontSize: 14, color: 'rgba(255,255,255,0.9)' },
+                children: computed(() => `${todoStats.value.completed}/${todoStats.value.total} completed`),
+              }),
+            ],
+          }),
+        ],
       }),
       
-      // Priority indicator
+      // Todo List
       view({
         style: {
-          width: 4,
-          height: 40,
-          borderRadius: 2,
-          backgroundColor: priorityColor(todo.priority),
-          marginRight: 12,
+          flex: 1,
+          backgroundColor: 'white',
+          marginHorizontal: 16,
+          marginTop: 16,
+          borderRadius: 10,
+          overflow: 'hidden',
         },
+        children: each(todos, (todo) =>
+          view({
+            style: {
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: '#eee',
+            },
+            children: [
+              // Checkbox - 单独处理点击
+              touchableOpacity({
+                onPress: () => toggleTodo(todo.id),
+                style: {
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  borderWidth: 2,
+                  borderColor: todo.done ? '#4CAF50' : '#ccc',
+                  backgroundColor: todo.done ? '#4CAF50' : 'transparent',
+                  marginRight: 14,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                },
+                children: text({
+                  style: { color: 'white', fontSize: 16 },
+                  children: todo.done ? '✓' : '',
+                }),
+              }),
+              // Text - 点击进入详情
+              touchableOpacity({
+                onPress: () => router.push(router.routes.detail, { params: { id: todo.id.toString() } }),
+                style: { flex: 1 },
+                children: text({
+                  style: {
+                    fontSize: 16,
+                    color: () => todo.done ? '#999' : '#333',
+                    textDecorationLine: () => todo.done ? 'line-through' : 'none',
+                  },
+                  children: todo.text,
+                }),
+              }),
+            ],
+          })
+        ),
       }),
       
-      // Text content
-      view({
-        style: { flex: 1 },
-        children: text({
-          style: {
-            fontSize: 16,
-            color: computed(() => isDone.value ? '#999' : '#333'),
-            textDecorationLine: computed(() => isDone.value ? 'line-through' : 'none'),
-          },
-          children: todo.text,
-        }),
-      }),
-      
-      // Delete button
+      // Add button
       touchableOpacity({
-        onPress: () => deleteTodo(todo.id),
+        onPress: () => router.push(router.routes.add),
         style: {
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: '#fee',
+          position: 'absolute',
+          right: 20,
+          bottom: 30,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: '#2196F3',
           justifyContent: 'center',
           alignItems: 'center',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 4,
+          elevation: 5,
         },
         children: text({
-          style: {
-            fontSize: 18,
-            color: '#e74c3c',
-          },
-          children: '×',
+          style: { fontSize: 28, color: 'white', fontWeight: 'bold' },
+          children: '+',
         }),
       }),
     ],
   })
 }
 
-// Progress Bar 组件
-const ProgressBar = ({ progress }) => {
+// Detail - Todo 详情
+const DetailPage = ({ params, router }) => {
+  const todo = computed(() => getTodoById(params.id))
+  
   return view({
     style: {
-      height: 8,
-      backgroundColor: '#eee',
-      borderRadius: 4,
-      marginTop: 12,
-      overflow: 'hidden',
+      flex: 1,
+      backgroundColor: '#f5f5f5',
     },
-    children: view({
-      style: {
-        width: computed(() => `${progress.value}%`),
-        height: 8,
-        backgroundColor: computed(() => progress.value >= 100 ? '#4CAF50' : '#2196F3'),
-        borderRadius: 4,
-      },
-    }),
+    children: [
+      // Header
+      view({
+        style: {
+          backgroundColor: '#2196F3',
+          paddingTop: 50,
+          paddingBottom: 20,
+          paddingHorizontal: 20,
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        children: [
+          touchableOpacity({
+            onPress: () => router.back(),
+            style: { padding: 8, marginRight: 8 },
+            children: text({
+              style: { fontSize: 24, color: 'white' },
+              children: '←',
+            }),
+          }),
+          text({
+            style: { fontSize: 24, fontWeight: 'bold', color: 'white' },
+            children: 'Task Detail',
+          }),
+        ],
+      }),
+      
+      // Content
+      view({
+        style: {
+          flex: 1,
+          backgroundColor: 'white',
+          margin: 16,
+          borderRadius: 10,
+          padding: 20,
+        },
+        children: when({
+          condition: () => !!todo.value,
+          then: () => view({
+            style: { flex: 1 },
+            children: [
+              text({
+                style: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 16 },
+                children: todo.value.text,
+              }),
+              view({
+                style: {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                },
+                children: [
+                  text({
+                    style: { fontSize: 14, color: '#666', marginRight: 8 },
+                    children: 'Status:',
+                  }),
+                  when({
+                    condition: () => todo.value?.done ?? false,
+                    then: () => text({
+                      style: { fontSize: 14, color: '#4CAF50', fontWeight: 'bold' },
+                      children: 'Completed',
+                    }),
+                    else: () => text({
+                      style: { fontSize: 14, color: '#f39c12', fontWeight: 'bold' },
+                      children: 'Active',
+                    }),
+                  }),
+                ],
+              }),
+              view({
+                style: {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 24,
+                },
+                children: [
+                  text({
+                    style: { fontSize: 14, color: '#666', marginRight: 8 },
+                    children: 'Priority:',
+                  }),
+                  text({
+                    style: { fontSize: 14, fontWeight: 'bold' },
+                    children: todo.value.priority.toUpperCase(),
+                  }),
+                ],
+              }),
+              when({
+                condition: () => todo.value?.done ?? false,
+                then: () => touchableOpacity({
+                  onPress: () => {
+                    if (todo.value) toggleTodo(todo.value.id)
+                  },
+                  style: {
+                    backgroundColor: '#f39c12',
+                    paddingVertical: 14,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                  },
+                  children: text({
+                    style: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+                    children: 'Mark as Active',
+                  }),
+                }),
+                else: () => touchableOpacity({
+                  onPress: () => {
+                    if (todo.value) toggleTodo(todo.value.id)
+                  },
+                  style: {
+                    backgroundColor: '#4CAF50',
+                    paddingVertical: 14,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                  },
+                  children: text({
+                    style: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+                    children: 'Mark as Done',
+                  }),
+                }),
+              }),
+              touchableOpacity({
+                onPress: () => {
+                  deleteTodo(todo.value.id)
+                  router.back()
+                },
+                style: {
+                  backgroundColor: '#e74c3c',
+                  paddingVertical: 14,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  marginTop: 12,
+                },
+                children: text({
+                  style: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+                  children: 'Delete Task',
+                }),
+              }),
+            ],
+          }),
+          else: () => text({
+            style: { fontSize: 18, color: '#999', textAlign: 'center', marginTop: 50 },
+            children: 'Task not found',
+          }),
+        }),
+      }),
+    ],
   })
 }
 
-// Main App
-const App = () => view({
-  style: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  children: [
-    // Header
-    view({
-      style: {
-        backgroundColor: '#2196F3',
-        paddingTop: 50,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
-      },
-      children: [
-        text({
-          style: {
-            fontSize: 28,
-            fontWeight: 'bold',
-            color: 'white',
-          },
-          children: '📝 My Tasks',
-        }),
-        
-        // Stats
-        view({
-          style: {
-            flexDirection: 'row',
-            marginTop: 8,
-          },
-          children: [
-            text({
-              style: {
-                fontSize: 14,
-                color: 'rgba(255,255,255,0.9)',
-              },
-              children: computed(() => `${todoStats.value.completed}/${todoStats.value.total} completed`),
-            }),
-            text({
-              style: {
-                fontSize: 14,
-                color: 'rgba(255,255,255,0.7)',
-                marginLeft: 12,
-              },
-              children: computed(() => `${todoStats.value.active} remaining`),
-            }),
-          ],
-        }),
-        
-        // Progress bar
-        ProgressBar({ progress }),
-      ],
-    }),
-    
-    // Filter tabs
-    view({
-      style: {
-        flexDirection: 'row',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        backgroundColor: 'white',
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-      },
-      children: [
-        FilterTab({ label: 'All', activeFilter: filter, currentFilter: 'all', onPress: () => setFilter('all') }),
-        FilterTab({ label: 'Active', activeFilter: filter, currentFilter: 'active', onPress: () => setFilter('active') }),
-        FilterTab({ label: 'Done', activeFilter: filter, currentFilter: 'completed', onPress: () => setFilter('completed') }),
-      ],
-    }),
-    
-    // Todo List
-    view({
-      style: {
-        flex: 1,
-        backgroundColor: 'white',
-        marginHorizontal: 16,
-        marginTop: 16,
-        borderRadius: 10,
-        overflow: 'hidden',
-      },
-      children: each(filteredTodos, (todo) => TodoItem({ todo })),
-    }),
-    
-    // Footer with count
-    view({
-      style: {
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        backgroundColor: 'white',
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-      },
-      children: text({
+// Add - 添加新 Todo
+const AddPage = () => {
+  return view({
+    style: {
+      flex: 1,
+      backgroundColor: '#f5f5f5',
+    },
+    children: [
+      // Header
+      view({
         style: {
-          fontSize: 12,
-          color: '#999',
-          textAlign: 'center',
+          backgroundColor: '#2196F3',
+          paddingTop: 50,
+          paddingBottom: 20,
+          paddingHorizontal: 20,
+          flexDirection: 'row',
+          alignItems: 'center',
         },
-        children: computed(() => {
-          if (progress.value >= 100) return '🎉 All tasks completed!'
-          return 'Keep going!'
-        }),
+        children: [
+          touchableOpacity({
+            onPress: () => router.back(),
+            style: { padding: 8, marginRight: 8 },
+            children: text({
+              style: { fontSize: 24, color: 'white' },
+              children: '←',
+            }),
+          }),
+          text({
+            style: { fontSize: 24, fontWeight: 'bold', color: 'white' },
+            children: 'Add Task',
+          }),
+        ],
       }),
-    }),
-  ],
+      
+      // Form
+      view({
+        style: {
+          flex: 1,
+          backgroundColor: 'white',
+          margin: 16,
+          borderRadius: 10,
+          padding: 20,
+        },
+        children: [
+          text({
+            style: { fontSize: 16, color: '#666', marginBottom: 8 },
+            children: 'Task Name',
+          }),
+          touchableOpacity({
+            onPress: () => newTodoText.value = newTodoText.value + '1',
+            style: {
+              borderWidth: 1,
+              borderColor: '#ddd',
+              borderRadius: 8,
+              padding: 14,
+              marginBottom: 20,
+            },
+            children: text({
+              style: { fontSize: 16, color: newTodoText.value ? '#333' : '#999' },
+              children: newTodoText.value || 'Tap to add task...',
+            }),
+          }),
+          touchableOpacity({
+            onPress: addTodo,
+            style: {
+              backgroundColor: '#2196F3',
+              paddingVertical: 16,
+              borderRadius: 8,
+              alignItems: 'center',
+            },
+            children: text({
+              style: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+              children: 'Add Task',
+            }),
+          }),
+        ],
+      }),
+    ],
+  })
+}
+
+// ============================================================================
+// RouterView
+// ============================================================================
+
+const RouterView = createRouterView(router, {
+  home: () => HomePage(),
+  detail: (params) => DetailPage({ params, router }),
+  add: () => AddPage(),
+}, {
+  default: () => view({
+    style: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    children: [
+      text({ style: { fontSize: 18, color: '#f00' }, children: 'Page not found' }),
+      text({ style: { fontSize: 14, color: '#666' }, children: `Current: ${router.current?.route?.fullPath || 'null'}` }),
+      text({ style: { fontSize: 14, color: '#666' }, children: `History path: ${history.getPath()}` }),
+    ],
+  }),
 })
 
-// 注册应用
+
+
+// ============================================================================
+// App
+// ============================================================================
+
+const App = () => view({
+  style: { flex: 1 },
+  children: RouterView(),
+})
+
 registerApp('RasenExample', App)

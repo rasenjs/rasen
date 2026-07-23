@@ -24,16 +24,10 @@ import { component, type TouchableOpacityProps, type RNMountable } from './compo
  * ```
  */
 export function touchableOpacity(props: TouchableOpacityProps = {}): RNMountable {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { activeOpacity = 0.8, ...restProps } = props
-
-  return component('TouchableOpacity', {
-    ...restProps,
-    // TouchableOpacity 特有属性
+  return component('View', {
+    ...props,
     accessible: true,
     accessibilityRole: 'button',
-    // activeOpacity 通过触摸事件处理实现
-    // 这里暂时只设置基础属性，完整的触摸反馈需要事件系统支持
   })
 }
 

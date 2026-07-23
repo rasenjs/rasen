@@ -12,8 +12,9 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "types": ["react-native"]
+    "types": ["react-native"],
+    "allowJs": true
   },
-  "include": ["src/**/*", "*.ts", "*.tsx"],
+  "include": ["index.js"],
   "exclude": ["node_modules", "android", "ios"]
 }

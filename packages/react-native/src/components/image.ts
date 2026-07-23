@@ -5,6 +5,8 @@
  * 使用 component() 工厂函数创建，支持响应式更新
  */
 
+import 'react-native/Libraries/Image/ImageViewNativeComponent'
+
 import { component, type ImageProps, type RNMountable } from './component'
 
 /**

@@ -20,9 +20,13 @@ const config = {
       path.resolve(monorepoRoot, 'node_modules'),
     ],
     extraNodeModules: {
-      '@rasenjs/core': path.resolve(monorepoRoot, 'packages/core'),
-      '@rasenjs/react-native': path.resolve(monorepoRoot, 'packages/react-native'),
-      '@rasenjs/reactive-vue': path.resolve(monorepoRoot, 'packages/reactive-vue'),
+      '@rasenjs/core': path.resolve(monorepoRoot, 'packages/core/dist'),
+      '@rasenjs/core/utils': path.resolve(monorepoRoot, 'packages/core/dist/utils.js'),
+      '@rasenjs/router': path.resolve(monorepoRoot, 'packages/router/dist'),
+      '@rasenjs/router/components': path.resolve(monorepoRoot, 'packages/router/dist/components/index.js'),
+      '@rasenjs/react-native': path.resolve(monorepoRoot, 'packages/react-native/dist'),
+      '@rasenjs/react-native-router': path.resolve(monorepoRoot, 'packages/react-native-router/dist'),
+      '@rasenjs/reactive-vue': path.resolve(monorepoRoot, 'packages/reactive-vue/dist'),
     },
   },
   transformer: {

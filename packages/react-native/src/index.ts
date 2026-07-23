@@ -24,7 +24,15 @@ import type { Host } from './components/component'
 import type { Mountable } from '@rasenjs/core'
 
 // 导出组件
-export { view, text, each, touchable, touchableOpacity } from './components'
+export { view, text, each, touchable, touchableOpacity, match, when } from './components'
+export type { ViewProps, TextProps, TouchableProps, TouchableOpacityProps, ScrollViewProps, ComponentProps, Child } from './components'
+
+// 导出 Host 类型
+export type { Host, RNMountable } from './components/component'
+
+// 导出 hostHooks
+export { hostHooks } from './host-hooks'
+export type { HostHooks } from './host-hooks'
 
 export type AppComponent = () => Mountable<Host>
 
