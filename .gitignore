@@ -59,6 +59,21 @@ Thumbs.db
 .cache
 .temp
 
+# Screenshots / debug images
+*.png
+*.jpg
+
+# Example build outputs
+examples/*/android/.gradle/
+examples/*/android/app/build/
+examples/*/android/build/
+examples/*/android/local.properties
+examples/*/android/.cxx/
+examples/*/node_modules/
+
+# Package build outputs
+packages/*/dist/
+
 # React Native
 examples/react-native/ios/Pods/
 examples/react-native/ios/Podfile.lock

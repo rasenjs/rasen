@@ -31,6 +31,8 @@ export interface FabricUIManager {
   ) => void
   removeChild?: (parentNode: FabricNode, child: FabricNode) => void
   setNativeProps?: (node: FabricNode, props: Props) => void
+  dispatchCommand?: (shadowNode: FabricNode, commandName: string, args: unknown[]) => void
+  findShadowNodeByTag_DEPRECATED?: (reactTag: number) => FabricNode | null
 }
 
 declare global {

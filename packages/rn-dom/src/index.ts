@@ -88,23 +88,55 @@ function prepareFabricProps(
 }
 
 /**
- * Build a Fabric-compatible payload from component props.
- *
+ * Build a FULL Fabric payload from component props (first-time init).
  * Delegates to RN's `createAttributePayload` which flattens `style` into
- * individual top-level keys and runs `processCallbacks` (e.g. `processColor`
- * on colour strings), producing the number values Fabric's C++ layer expects.
+ * individual top-level keys and runs `processCallbacks` (e.g. `processColor`).
  *
- * Returns `null` when no props changed (so callers skip the cloneNode call).
+ * Event handlers (onXxx) are stored in currentProps as functions but sent to
+ * Fabric as boolean `true` markers. `createAttributePayload` handles this
+ * for known attributes, but we also inject any missing onXxx markers to
+ * ensure Fabric dispatches events back to JS.
  */
 function buildFabricPayload(
   props: Record<string, unknown>,
   validAttrs: Record<string, unknown>,
 ): Record<string, unknown> | null {
-  const result = ReactNativePrivateInterface.createAttributePayload(
-    props,
-    validAttrs,
-  )
-  return result ?? null
+  const result = ReactNativePrivateInterface.createAttributePayload(props, validAttrs)
+  const payload = injectEventMarkers(props, result ?? {})
+  const r = Object.keys(payload).length > 0 ? payload : null
+  return r
+}
+
+/** Ensure all onXxx props appear as boolean `true` markers in the payload. */
+function injectEventMarkers(
+  props: Record<string, unknown>,
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  for (const key in props) {
+    if (key.length > 2 && key.charCodeAt(0) === 111 && key.charCodeAt(1) === 110) {
+      if (!(key in payload)) {
+        payload[key] = true
+      }
+    }
+  }
+  return payload
+}
+
+/**
+ * Build an INCREMENTAL Fabric payload by diffing prevProps vs currentProps.
+ * Only properties that actually changed are included, matching React's own
+ * commit path. Callers MUST update `_propsSnapshot` after applying.
+ */
+function diffFabricPayload(
+  prevProps: Record<string, unknown>,
+  nextProps: Record<string, unknown>,
+  validAttrs: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const result = ReactNativePrivateInterface.diffAttributePayloads(prevProps, nextProps, validAttrs)
+  // If a new event handler was added between prev and next, ensure the marker
+  // survives even if the event key isn't in validAttributes.
+  const payload = injectEventMarkers(nextProps, result ?? {})
+  return Object.keys(payload).length > 0 ? payload : null
 }
 
 function getFabricUIManager(): FabricUIManager {
@@ -824,11 +856,11 @@ export class RNBody extends RNNode {
     this._flushScheduled = true
     const gen = ++this._flushGeneration
 
-    setTimeout(() => {
+    queueMicrotask(() => {
       if (this._flushGeneration !== gen) return // cancelled by completeFabric
       this._flushScheduled = false
       this._submitToRoot()
-    }, 0)
+    })
   }
 
   /**
@@ -878,6 +910,7 @@ export class RNBody extends RNNode {
       const fabricProps = prepareFabricProps(child.currentProps)
       const fullPayload = buildFabricPayload(fabricProps, validAttrs)
       const instanceHandle = child._instanceHandle ?? { tag: child[FABRIC_NODE_ID], stateNode: child }
+
 
       // Create a fresh Fabric node with all current props applied.
       fabricNode = (fabricUIManager as any).createNode(
@@ -932,8 +965,10 @@ export class RNBody extends RNNode {
 
       const validAttrs = viewConfig?.validAttributes || {}
       const fabricProps = prepareFabricProps(child.currentProps)
+      const prevProps = child._propsSnapshot
       try {
-        updatePayload = buildFabricPayload(fabricProps, validAttrs)
+        // Diff-based: only send changed props, like React does.
+        updatePayload = diffFabricPayload(prevProps, fabricProps, validAttrs)
       } catch (e: any) {
         throw e
       }
@@ -1117,30 +1152,82 @@ const FABRIC_TO_DOM_EVENT: Record<string, string> = {
   topClick: 'click',
 }
 
+const FOCUSABLE_COMPONENTS = new Set(['AndroidTextInput', 'AndroidEditText'])
+
+/** Track the currently focused node for blur-on-tap-outside behavior. */
+let _focusedNode: RNNode | null = null
+
+/** Helper: blur the currently focused node (if any) via Fabric dispatchCommand. */
+function _blurFocusedNode(): void {
+  if (!_focusedNode) return
+  try {
+    const uim = getFabricUIManager()
+    if (typeof uim.dispatchCommand === 'function' && typeof uim.findShadowNodeByTag_DEPRECATED === 'function') {
+      const tag = _focusedNode[FABRIC_NODE_ID]
+      const shadowNode = uim.findShadowNodeByTag_DEPRECATED(tag)
+      if (shadowNode) {
+        uim.dispatchCommand(shadowNode, 'blur', [])
+      }
+    }
+  } catch (_) { /* dispatchCommand may not be available */ }
+  _focusedNode = null
+}
+
+/** Helper: focus a node via Fabric dispatchCommand. */
+function _focusNode(node: RNNode): void {
+  try {
+    const uim = getFabricUIManager()
+    if (typeof uim.dispatchCommand === 'function' && typeof uim.findShadowNodeByTag_DEPRECATED === 'function') {
+      const tag = node[FABRIC_NODE_ID]
+      const shadowNode = uim.findShadowNodeByTag_DEPRECATED(tag)
+      if (shadowNode) {
+        uim.dispatchCommand(shadowNode, 'focus', [])
+      }
+    }
+  } catch (_) { /* dispatchCommand may not be available */ }
+  _focusedNode = node
+}
+
 function dispatchEventWithBubble(
   instanceHandle: object,
   type: string,
   nativeEvent: Record<string, unknown>
 ): void {
-  // In RN 0.76.9 Fabric, the target tag is passed via nativeEvent.target.
-  // The instanceHandle is a JSI HostObject whose properties may not be
-  // directly accessible via enum keys or dot notation.
   const targetTag = (nativeEvent as any)?.target
   if (targetTag == null || typeof targetTag !== 'number') return
 
   const instanceMap = getInstanceMap()
   let current: RNNode | null = instanceMap.get(targetTag) || null
-  // Fallback: use stateNode from instanceHandle if available
-  const stateNode = (instanceHandle as any)?.stateNode
-  if (!current && stateNode) {
-    current = stateNode
+
+  if (!current) {
+    try {
+      current = ((instanceHandle as any).stateNode as RNNode) ?? null
+    } catch (_) { /* ignore */ }
+  }
+  if (!current) return
+
+  // Blur check: if tapping a non-focusable area while something is focused,
+  // blur it. Runs BEFORE bubbling so JS handlers see blur already applied.
+  if (type === 'topTouchEnd' && _focusedNode) {
+    const targetNode = instanceMap.get(targetTag)
+    if (targetNode && targetNode[FABRIC_NODE_ID] !== _focusedNode[FABRIC_NODE_ID]) {
+      if (!FOCUSABLE_COMPONENTS.has(targetNode._nativeName)) {
+        _blurFocusedNode()
+      } else {
+        // Switching between two focusable components — blur the old one
+        // first; the auto-focus block below will focus the new one.
+        _blurFocusedNode()
+      }
+    }
   }
 
   const basePropName = 'on' + type.replace(/^top/, '')
   const domEventType = FABRIC_TO_DOM_EVENT[type] || type
 
+  let depth = 0
   // Bubble up the parent chain
-  while (current) {
+  while (current && depth < 20) {
+    depth++
     // 1. Check props-based handler (onTouchEnd, onPress, etc.)
     const props = current.currentProps
     let handler = props[basePropName]
@@ -1177,6 +1264,15 @@ function dispatchEventWithBubble(
     }
 
     current = current.parentNode
+  }
+
+  // Auto-focus focusable components on touch when no JS handler claims the
+  // event. This mirrors browser behavior where tapping <input> focuses it.
+  if (type === 'topTouchEnd') {
+    const targetNode = instanceMap.get(targetTag)
+    if (targetNode && FOCUSABLE_COMPONENTS.has(targetNode._nativeName)) {
+      _focusNode(targetNode)
+    }
   }
 }
 

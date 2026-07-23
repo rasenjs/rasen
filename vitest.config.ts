@@ -4,8 +4,14 @@ import path from 'path'
 export default defineConfig({
   resolve: {
     alias: {
-      '@rasenjs/core/test-utils': path.resolve(__dirname, 'packages/core/src/test-utils.ts'),
-      '@rasenjs/core/utils': path.resolve(__dirname, 'packages/core/src/utils/index.ts'),
+      '@rasenjs/core/test-utils': path.resolve(
+        __dirname,
+        'packages/core/src/test-utils.ts'
+      ),
+      '@rasenjs/core/utils': path.resolve(
+        __dirname,
+        'packages/core/src/utils/index.ts'
+      ),
       '@rasenjs/core': path.resolve(__dirname, 'packages/core/src/index.ts'),
       '@rasenjs/dom': path.resolve(__dirname, 'packages/dom/src/index.ts'),
       '@rasenjs/reactive-vue': path.resolve(
@@ -16,7 +22,9 @@ export default defineConfig({
         __dirname,
         'packages/reactive-signals/src/index.ts'
       ),
-      '@rasenjs/webgl': path.resolve(__dirname, 'packages/webgl/src/index.ts')
+      '@rasenjs/webgl': path.resolve(__dirname, 'packages/webgl/src/index.ts'),
+      '@rasenjs/rota': path.resolve(__dirname, 'packages/rota/src/index.ts'),
+      '@rasenjs/html': path.resolve(__dirname, 'packages/html/src/index.ts')
     }
   },
   test: {
