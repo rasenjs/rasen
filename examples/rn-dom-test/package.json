@@ -1,0 +1,27 @@
+{
+  "name": "@rasenjs/rn-dom-test",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "test:android": "react-native run-android --mode release",
+    "bundle": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res",
+    "build:android": "cd android && ./gradlew assembleRelease && cd ..",
+    "test:run": "cd android && ./gradlew connectedAndroidTest && cd .."
+  },
+  "dependencies": {
+    "@rasenjs/rn-dom": "workspace:*",
+    "react-native": "0.76.9"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0",
+    "@babel/runtime": "^7.23.0",
+    "@react-native/babel-preset": "0.76.9",
+    "@react-native/metro-config": "0.76.9",
+    "@react-native/typescript-config": "0.76.9",
+    "@types/react-native": "^0.73.0",
+    "typescript": "^5.3.3"
+  }
+}

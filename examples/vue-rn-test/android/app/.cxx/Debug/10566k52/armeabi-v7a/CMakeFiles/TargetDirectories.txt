@@ -1,0 +1,3 @@
+/Users/wuhaofeng/Projects/@rasen/examples/vue-rn-test/android/app/.cxx/Debug/10566k52/armeabi-v7a/CMakeFiles/appmodules.dir
+/Users/wuhaofeng/Projects/@rasen/examples/vue-rn-test/android/app/.cxx/Debug/10566k52/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/wuhaofeng/Projects/@rasen/examples/vue-rn-test/android/app/.cxx/Debug/10566k52/armeabi-v7a/CMakeFiles/rebuild_cache.dir

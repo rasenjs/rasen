@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>rn-dom Reference</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Helvetica Neue', 'Segoe UI', Roboto, sans-serif; }
+  #root { min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// ============================================================
+// Theme
+// ============================================================
+const THEMES = {
+  dark: {
+    bg: '#0f0f1a',
+    surface: '#1a1a2e',
+    surfaceAlt: '#2a2a3e',
+    text: '#e0e0ee',
+    textMuted: '#888899',
+    textDim: '#666688',
+    accent: '#16c79a',
+    danger: '#e94560',
+    border: '#3a3a4e',
+  },
+  light: {
+    bg: '#f5f5f7',
+    surface: '#ffffff',
+    surfaceAlt: '#eeeeef',
+    text: '#1a1a2e',
+    textMuted: '#666677',
+    textDim: '#999999',
+    accent: '#0a8c6a',
+    danger: '#c8253a',
+    border: '#d0d0d5',
+  },
+}
+
+let themeName = 'dark'
+const t = () => THEMES[themeName]
+
+const state = {
+  activeTab: 'home',
+  items: [],
+  nextId: 1,
+  counter: 0,
+}
+
+// ============================================================
+// Root
+// ============================================================
+const root = document.getElementById('root')
+root.style.cssText = `
+  flex: 1;
+  background: ${t().bg};
+  padding: 60px 20px;
+  min-height: 100vh;
+`
+
+// ============================================================
+// Header
+// ============================================================
+const header = document.createElement('div')
+header.style.marginBottom = '24px'
+
+const headerTitle = document.createElement('div')
+headerTitle.style.cssText = `font-size: 28px; color: ${t().text}; font-weight: bold; margin-bottom: 4px;`
+headerTitle.textContent = 'rn-dom Complex Demo'
+
+const headerSub = document.createElement('div')
+headerSub.style.cssText = `font-size: 13px; color: ${t().textMuted};`
+headerSub.textContent = 'Tabs · List · Theme — no React, no JSX'
+
+header.appendChild(headerTitle)
+header.appendChild(headerSub)
+root.appendChild(header)
+
+// ============================================================
+// Tab bar
+// ============================================================
+const TABS = [
+  { id: 'home',     label: 'Home' },
+  { id: 'list',     label: 'List' },
+  { id: 'settings', label: 'Settings' },
+]
+
+const tabBar = document.createElement('div')
+tabBar.style.cssText = `
+  display: flex; flex-direction: row;
+  background: ${t().surface};
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border: 1px solid ${t().border};
+`
+
+const tabNodes = {}
+const mkTab = (tab) => {
+  const isActive = state.activeTab === tab.id
+  const tabNode = document.createElement('div')
+  tabNode.style.cssText = `
+    flex: 1; padding: 10px 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px;
+    background: ${isActive ? t().accent : 'transparent'};
+    cursor: pointer;
+  `
+  const tabLabel = document.createElement('div')
+  tabLabel.style.cssText = `
+    font-size: 14px; font-weight: bold;
+    color: ${isActive ? '#ffffff' : t().textMuted};
+  `
+  tabLabel.textContent = tab.label
+  tabNode.appendChild(tabLabel)
+
+  tabNode.addEventListener('click', () => {
+    if (state.activeTab === tab.id) return
+    console.log('[ref] switch tab ->', tab.id)
+    state.activeTab = tab.id
+    renderTabs()
+    renderContent()
+  })
+
+  tabBar.appendChild(tabNode)
+  tabNodes[tab.id] = { container: tabNode, label: tabLabel }
+}
+TABS.forEach(mkTab)
+
+function renderTabs() {
+  TABS.forEach((tab) => {
+    const n = tabNodes[tab.id]
+    const isActive = state.activeTab === tab.id
+    n.container.style.cssText = `
+      flex: 1; padding: 10px 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 8px;
+      background: ${isActive ? t().accent : 'transparent'};
+      cursor: pointer;
+    `
+    n.label.style.cssText = `
+      font-size: 14px; font-weight: bold;
+      color: ${isActive ? '#ffffff' : t().textMuted};
+    `
+  })
+}
+
+root.appendChild(tabBar)
+
+// ============================================================
+// Content area
+// ============================================================
+const contentArea = document.createElement('div')
+contentArea.style.cssText = `flex: 1; width: 100%;`
+root.appendChild(contentArea)
+
+// ============================================================
+// HOME TAB
+// ============================================================
+const homeView = document.createElement('div')
+homeView.style.cssText = `flex: 1;`
+
+// Welcome card
+const homeCard = document.createElement('div')
+homeCard.style.cssText = `
+  background: ${t().surface};
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid ${t().border};
+`
+const homeTitle = document.createElement('div')
+homeTitle.style.cssText = `font-size: 18px; font-weight: bold; color: ${t().text}; margin-bottom: 8px;`
+homeTitle.textContent = 'Welcome 👋'
+const homeBody = document.createElement('div')
+homeBody.style.cssText = `font-size: 14px; color: ${t().textMuted}; line-height: 20px;`
+homeBody.textContent = 'This UI is built directly against Fabric, without React. Every node is a DOM-like element created via doc.createElement, every event handler is attached as a prop, and updates flush through body.completeFabric().'
+homeCard.appendChild(homeTitle)
+homeCard.appendChild(homeBody)
+homeView.appendChild(homeCard)
+
+// Counter card
+const counterCard = document.createElement('div')
+counterCard.style.cssText = `
+  background: ${t().surface};
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid ${t().border};
+  display: flex; flex-direction: column; align-items: center;
+`
+const counterLabelEl = document.createElement('div')
+counterLabelEl.style.cssText = `font-size: 13px; color: ${t().textMuted}; margin-bottom: 8px;`
+counterLabelEl.textContent = 'Counter'
+const counterValue = document.createElement('div')
+counterValue.style.cssText = `font-size: 48px; font-weight: bold; color: ${t().accent}; margin-bottom: 12px;`
+counterValue.textContent = '0'
+
+const counterRow = document.createElement('div')
+counterRow.style.cssText = `display: flex; flex-direction: row; gap: 8px;`
+
+const mkBtn = (label, onClick, color) => {
+  const b = document.createElement('div')
+  b.style.cssText = `
+    background: ${color};
+    padding: 10px 20px;
+    border-radius: 8px;
+    min-width: 60px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  `
+  const tx = document.createElement('div')
+  tx.style.cssText = `color: #ffffff; font-weight: bold; font-size: 16px;`
+  tx.textContent = label
+  b.appendChild(tx)
+  b.addEventListener('click', onClick)
+  return b
+}
+
+counterRow.appendChild(mkBtn('−', () => {
+  state.counter--
+  refreshCounter()
+}, t().danger))
+counterRow.appendChild(mkBtn('+', () => {
+  state.counter++
+  refreshCounter()
+}, t().accent))
+counterRow.appendChild(mkBtn('0', () => {
+  state.counter = 0
+  refreshCounter()
+}, t().textDim))
+
+function refreshCounter() {
+  counterValue.textContent = String(state.counter)
+}
+
+counterCard.appendChild(counterLabelEl)
+counterCard.appendChild(counterValue)
+counterCard.appendChild(counterRow)
+homeView.appendChild(counterCard)
+
+// ============================================================
+// LIST TAB
+// ============================================================
+const listView = document.createElement('div')
+listView.style.cssText = `flex: 1;`
+
+const listHeader = document.createElement('div')
+listHeader.style.cssText = `
+  display: flex; flex-direction: row;
+  align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+`
+const listTitle = document.createElement('div')
+listTitle.style.cssText = `font-size: 16px; font-weight: bold; color: ${t().text};`
+listTitle.textContent = 'Items'
+const listCount = document.createElement('div')
+listCount.style.cssText = `font-size: 13px; color: ${t().textMuted};`
+listCount.textContent = '0 items'
+listHeader.appendChild(listTitle)
+listHeader.appendChild(listCount)
+listView.appendChild(listHeader)
+
+// Add button
+const addRow = document.createElement('div')
+addRow.style.cssText = `
+  background: ${t().accent};
+  border-radius: 10px;
+  padding: 12px 0;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px;
+  cursor: pointer;
+`
+const addRowText = document.createElement('div')
+addRowText.style.cssText = `color: #ffffff; font-weight: bold; font-size: 15px;`
+addRowText.textContent = '+ Add task'
+addRow.appendChild(addRowText)
+addRow.addEventListener('click', () => {
+  const id = state.nextId++
+  state.items.push({ id, label: `Task #${id}`, done: false })
+  renderItems()
+})
+listView.appendChild(addRow)
+
+// Item list
+const itemList = document.createElement('div')
+itemList.style.cssText = `width: 100%;`
+listView.appendChild(itemList)
+
+const emptyList = document.createElement('div')
+emptyList.style.cssText = `font-size: 14px; color: ${t().textDim}; text-align: center; padding-top: 24px;`
+emptyList.textContent = 'No tasks yet — tap "Add task" above.'
+
+const itemNodes = new Map()
+
+function renderItems() {
+  // Remove deleted
+  for (const id of itemNodes.keys()) {
+    if (!state.items.find((it) => it.id === id)) {
+      const n = itemNodes.get(id)
+      itemList.removeChild(n.row)
+      itemNodes.delete(id)
+    }
+  }
+  // Add/update
+  state.items.forEach((it) => {
+    if (!itemNodes.has(it.id)) {
+      itemNodes.set(it.id, createItemNode(it))
+      itemList.appendChild(itemNodes.get(it.id).row)
+    } else {
+      updateItemNode(itemNodes.get(it.id), it)
+    }
+  })
+  // Empty placeholder
+  if (state.items.length === 0) {
+    if (!itemList.contains(emptyList)) itemList.appendChild(emptyList)
+  } else {
+    if (itemList.contains(emptyList)) itemList.removeChild(emptyList)
+  }
+  // Header count
+  listCount.textContent = `${state.items.length} item${state.items.length === 1 ? '' : 's'} · ${state.items.filter((i) => i.done).length} done`
+}
+
+function createItemNode(it) {
+  const row = document.createElement('div')
+  row.style.cssText = `
+    display: flex; flex-direction: row; align-items: center;
+    background: ${t().surface};
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    border: 1px solid ${t().border};
+  `
+  // Checkbox
+  const checkbox = document.createElement('div')
+  checkbox.style.cssText = `
+    width: 24px; height: 24px; border-radius: 6px;
+    border: 2px solid ${it.done ? t().accent : t().border};
+    background: ${it.done ? t().accent : 'transparent'};
+    display: flex; align-items: center; justify-content: center;
+    margin-right: 12px;
+    cursor: pointer;
+  `
+  const check = document.createElement('div')
+  check.style.cssText = `color: #ffffff; font-size: 14px; font-weight: bold;`
+  check.textContent = it.done ? '✓' : ''
+  checkbox.appendChild(check)
+
+  checkbox.addEventListener('click', () => {
+    it.done = !it.done
+    renderItems()
+  })
+
+  // Label
+  const label = document.createElement('div')
+  label.style.cssText = `
+    flex: 1; font-size: 15px;
+    color: ${it.done ? t().textDim : t().text};
+    text-decoration: ${it.done ? 'line-through' : 'none'};
+  `
+  label.textContent = it.label
+
+  // Remove
+  const remove = document.createElement('div')
+  remove.style.cssText = `
+    background: ${t().danger};
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+  `
+  const removeTx = document.createElement('div')
+  removeTx.style.cssText = `color: #ffffff; font-weight: bold; font-size: 12px;`
+  removeTx.textContent = '×'
+  remove.appendChild(removeTx)
+
+  remove.addEventListener('click', () => {
+    const i = state.items.findIndex((x) => x.id === it.id)
+    if (i >= 0) state.items.splice(i, 1)
+    renderItems()
+  })
+
+  row.appendChild(checkbox)
+  row.appendChild(label)
+  row.appendChild(remove)
+  return { row, checkbox, label, remove }
+}
+
+function updateItemNode(n, it) {
+  n.checkbox.style.cssText = `
+    width: 24px; height: 24px; border-radius: 6px;
+    border: 2px solid ${it.done ? t().accent : t().border};
+    background: ${it.done ? t().accent : 'transparent'};
+    display: flex; align-items: center; justify-content: center;
+    margin-right: 12px;
+    cursor: pointer;
+  `
+  n.checkbox.firstChild.textContent = it.done ? '✓' : ''
+  n.label.style.cssText = `
+    flex: 1; font-size: 15px;
+    color: ${it.done ? t().textDim : t().text};
+    text-decoration: ${it.done ? 'line-through' : 'none'};
+  `
+}
+
+// ============================================================
+// SETTINGS TAB
+// ============================================================
+const settingsView = document.createElement('div')
+settingsView.style.cssText = `flex: 1;`
+
+const settingsCard = document.createElement('div')
+settingsCard.style.cssText = `
+  background: ${t().surface};
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid ${t().border};
+`
+const settingsTitle = document.createElement('div')
+settingsTitle.style.cssText = `font-size: 18px; font-weight: bold; color: ${t().text}; margin-bottom: 12px;`
+settingsTitle.textContent = 'Appearance'
+settingsCard.appendChild(settingsTitle)
+
+// Theme switcher
+const themeRow = document.createElement('div')
+themeRow.style.cssText = `
+  display: flex; flex-direction: row;
+  background: ${t().surfaceAlt};
+  border-radius: 10px;
+  padding: 4px;
+`
+const themeNodes = {}
+Object.keys(THEMES).forEach((name) => {
+  const isActive = name === themeName
+  const tn = document.createElement('div')
+  tn.style.cssText = `
+    flex: 1;
+    padding: 8px 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    background: ${isActive ? t().accent : 'transparent'};
+    cursor: pointer;
+  `
+  const tx = document.createElement('div')
+  tx.style.cssText = `
+    font-size: 14px; font-weight: bold;
+    color: ${isActive ? '#ffffff' : t().textMuted};
+  `
+  tx.textContent = name === 'dark' ? 'Dark' : 'Light'
+  tn.appendChild(tx)
+
+  tn.addEventListener('click', () => {
+    if (themeName === name) return
+    themeName = name
+    // Update theme row
+    Object.keys(THEMES).forEach((n) => {
+      const a = n === themeName
+      themeNodes[n].style.cssText = `
+        flex: 1; padding: 8px 0;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 6px;
+        background: ${a ? t().accent : 'transparent'};
+        cursor: pointer;
+      `
+      themeNodes[n].firstChild.style.cssText = `
+        font-size: 14px; font-weight: bold;
+        color: ${a ? '#ffffff' : t().textMuted};
+      `
+    })
+    // Repaint all
+    root.style.cssText = `flex: 1; background: ${t().bg}; padding: 60px 20px; min-height: 100vh;`
+    renderTabs()
+    renderItems()
+
+    // Also re-apply homeView, settingsView card styles
+    homeCard.style.cssText = `
+      background: ${t().surface};
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid ${t().border};
+    `
+    homeTitle.style.cssText = `font-size: 18px; font-weight: bold; color: ${t().text}; margin-bottom: 8px;`
+    homeBody.style.cssText = `font-size: 14px; color: ${t().textMuted}; line-height: 20px;`
+    counterCard.style.cssText = `
+      background: ${t().surface};
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid ${t().border};
+      display: flex; flex-direction: column; align-items: center;
+    `
+    counterLabelEl.style.cssText = `font-size: 13px; color: ${t().textMuted}; margin-bottom: 8px;`
+    counterValue.style.cssText = `font-size: 48px; font-weight: bold; color: ${t().accent}; margin-bottom: 12px;`
+  })
+
+  themeNodes[name] = tn
+  themeRow.appendChild(tn)
+})
+settingsCard.appendChild(themeRow)
+settingsView.appendChild(settingsCard)
+
+// Info card
+const infoCard = document.createElement('div')
+infoCard.style.cssText = `
+  background: ${t().surface};
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid ${t().border};
+`
+const infoTitle = document.createElement('div')
+infoTitle.style.cssText = `font-size: 16px; font-weight: bold; color: ${t().text}; margin-bottom: 8px;`
+infoTitle.textContent = 'About'
+const infoBody = document.createElement('div')
+infoBody.style.cssText = `font-size: 13px; color: ${t().textMuted}; line-height: 18px;`
+infoBody.textContent = 'Every visible element here is a DOM-like node created with doc.createElement. Updates use setAttribute to flip style and text, and removeChild/insertBefore for reordering. There is no virtual DOM, no JSX, no React — just direct Fabric mounting.'
+infoCard.appendChild(infoTitle)
+infoCard.appendChild(infoBody)
+settingsView.appendChild(infoCard)
+
+// ============================================================
+// Tab switching
+// ============================================================
+function renderContent() {
+  while (contentArea.firstChild) {
+    contentArea.removeChild(contentArea.firstChild)
+  }
+  if (state.activeTab === 'home') contentArea.appendChild(homeView)
+  else if (state.activeTab === 'list') {
+    contentArea.appendChild(listView)
+    renderItems()
+  } else contentArea.appendChild(settingsView)
+}
+
+// ============================================================
+// Mount
+// ============================================================
+setTimeout(() => {
+  renderContent()
+  console.log('[ref] Ready — interact with tabs, list, and theme switcher!')
+}, 0)
+</script>
+</body>
+</html>
