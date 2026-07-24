@@ -19,6 +19,7 @@ const babel = require('@babel/core')
 const { resolve: resolveCSS } = require('./resolver')
 
 const RN_BUILT_IN_TAGS = new Set(require('@rasenjs/rn-dom/tags').getAllTags())
+const { parseCSS } = require('./resolvers/css-parser')
 
 let _resolverInit = false
 let _styleMap = new Map()
@@ -131,6 +132,29 @@ async function transform(params) {
       ) + '\nexport default __sfc__'
   } else {
     combined = renderCode.replace(/^export\s+/, '') + '\n' + scriptCode + '\n__sfc__.render = render\nexport default __sfc__'
+  }
+
+  // Style module — parse <style module> blocks into __cssModules
+  // Vue's runtime proxy (`instance.type.__cssModules`) checks this via
+  // component proxy get handler, making `$style.xxx` available in templates
+  // and `useCssModule()` in scripts.
+  if (descriptor.styles && descriptor.styles.length > 0) {
+    const cssModules = {}
+    let hasModules = false
+    for (const styleBlock of descriptor.styles) {
+      if (styleBlock.module) {
+        hasModules = true
+        const moduleName = typeof styleBlock.module === 'string' ? styleBlock.module : '$style'
+        const classMap = {}
+        for (const [key, value] of parseCSS(styleBlock.content)) {
+          classMap[key] = value
+        }
+        cssModules[moduleName] = classMap
+      }
+    }
+    if (hasModules) {
+      combined += `\n__sfc__.__cssModules = ${JSON.stringify(cssModules)}`
+    }
   }
 
   // HMR — vue-rn hot module replacement

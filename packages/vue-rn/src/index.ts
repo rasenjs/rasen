@@ -15,7 +15,7 @@
  *   })
  */
 
-import { createRenderer, h, ref, reactive, computed } from '@vue/runtime-core'
+import { createRenderer, h, ref, reactive, computed, getCurrentInstance } from '@vue/runtime-core'
 import { RNDocument, parseCSS, normalizeEventName, isEvent } from '@rasenjs/rn-dom'
 import type { RNNode, RNTextNode, RNCommentNode } from '@rasenjs/rn-dom'
 
@@ -158,3 +158,32 @@ export function createApp(rootComponent: object): VueRNMountable {
 }
 
 export { RNDocument }
+
+// ---------------------------------------------------------------------------
+// useCssModule — re-exported for convenience
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the CSS module class name mapping for the current component.
+ *
+ * Use in `<script setup>`:
+ *   import { useCssModule } from '@rasenjs/vue-rn'
+ *   const style = useCssModule()       // <style module>
+ *   const foo = useCssModule('foo')    // <style module="foo">
+ *
+ * Or in templates via `$style`:
+ *   <View :style="$style.myClass" />
+ *   <View :style="$style.foo.myClass" />
+ */
+export function useCssModule(name = '$style'): Record<string, unknown> {
+  const instance = getCurrentInstance()
+  if (!instance) {
+    return {}
+  }
+  const modules = (instance.type as Record<string, unknown>).__cssModules as Record<string, unknown> | undefined
+  if (!modules) {
+    return {}
+  }
+  const mod = modules[name] as Record<string, unknown> | undefined
+  return mod ?? {}
+}

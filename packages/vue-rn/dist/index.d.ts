@@ -17,6 +17,8 @@ declare function createApp(rootComponent: object): VueRNMountable;
 
 export { type VueRNMountable, createApp };
 
+export declare function useCssModule(name?: string): Record<string, unknown>;
+
 // ── Vue template tag type declarations ──────────────────────────────────
 // IDE IntelliSense for RN built-in elements in .vue <template>.
 // TYPE-ONLY — RN tags are custom elements resolved by rn-dom at runtime.
