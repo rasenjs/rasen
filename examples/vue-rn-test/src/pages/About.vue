@@ -9,7 +9,7 @@
         This is a demo of @rasenjs/vue-rn with vue-router support.
       </Text>
       <Text :style="{ fontSize: 16, color: '#b0b0c0', lineHeight: 24, marginTop: 12 }">
-        Built with Vue 3 + TypeScript + Tailwind CSS on React Native Fabric.
+        Built with Vue 3 + TypeScript + Tailwind CSS + HMR 🔥
       </Text>
     </View>
   </View>

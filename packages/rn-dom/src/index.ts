@@ -176,23 +176,34 @@ const FABRIC_NODE = Symbol.for('fabricNode')
 const FABRIC_NODE_ID = Symbol.for('fabricNodeId')
 
 /**
- * Create a style object with setProperty and removeProperty methods
- * This provides a DOM-like style interface
+ * Create a style object with setProperty and removeProperty methods.
+ * This provides a DOM-like style interface.
+ *
+ * IMPORTANT: setProperty/removeProperty must produce a NEW style object
+ * reference each time, because _propsSnapshot stores a shallow copy of
+ * currentProps. If we mutate in-place, _propsSnapshot.style and
+ * currentProps.style point to the same object, and RN's
+ * diffAttributePayloads sees no change — skipping the Fabric update.
  */
 function createStyleObject(element: RNNode) {
   return {
     setProperty(property: string, value: unknown): void {
-      if (!element.currentProps.style) {
-        element.currentProps.style = {}
+      const oldStyle = element.currentProps.style as Record<string, unknown> | undefined
+      element.currentProps = {
+        ...element.currentProps,
+        style: { ...(oldStyle ?? {}), [property]: value },
       }
-      ;(element.currentProps.style as Record<string, unknown>)[property] = value
       element._requestUpdate()
     },
 
     removeProperty(property: string): void {
       const currentStyle = element.currentProps.style as Record<string, unknown> | undefined
       if (currentStyle && property in currentStyle) {
-        delete currentStyle[property]
+        const { [property]: _removed, ...rest } = currentStyle
+        element.currentProps = {
+          ...element.currentProps,
+          style: Object.keys(rest).length > 0 ? rest : {},
+        }
         element._requestUpdate()
       }
     },

@@ -140,23 +140,33 @@ async function transform(params) {
   }
 
   // HMR — vue-rn hot module replacement
-  // On initial load, createRecord() returns true. On HMR re-execution (detected
-  // by Metro's module.hot system), the factory runs again and createRecord()
-  // returns false, triggering reload() which updates the component in place
-  // while preserving state.
   //
-  // Inside the __d() factory, `module` is the 5th parameter (the module object)
-  // in Metro's factory signature:
-  //   function(global, require, importDefault, importAll, module, exports, depMap)
-  // We call module.hot.accept() to flag this module as an HMR accept boundary
-  // so Metro's topological sort stops bubbling instead of doing a full refresh.
+  // On initial load: createRecord() creates a record and module.hot.accept()
+  // registers the accept callback for future updates.
+  //
+  // On HMR update: Metro's runUpdatedModule() re-executes the factory, then
+  // calls module.hot._acceptCallback(). The callback calls rerender() which
+  // replaces the render function and calls instance.update() on ALL instances
+  // directly — including root components (no parent dependency).
+  //
+  // We do NOT use reload() because:
+  //   - Root components have no instance.parent, so reload can't trigger update
+  //     (it falls through to window.location.reload() which throws)
+  //   - reload() + rerender() double-trigger can leave components in dirty state
+  //   - rere render() alone handles template/style changes correctly
+  //
+  // Script-only changes (new imports, new setup variables) still need a full
+  // reload since they can't be hot-patched — Metro will fall back to full
+  // refresh when it detects the boundary can't accept the change.
   combined += `
 if (typeof __VUE_HMR_RUNTIME__ !== 'undefined') {
   __sfc__.__hmrId = "${id}"
-  if (!__VUE_HMR_RUNTIME__.createRecord(__sfc__.__hmrId, __sfc__)) {
-    __VUE_HMR_RUNTIME__.reload(__sfc__.__hmrId, __sfc__)
+  __VUE_HMR_RUNTIME__.createRecord(__sfc__.__hmrId, __sfc__)
+  if (typeof module !== 'undefined' && module.hot) {
+    module.hot.accept(function() {
+      __VUE_HMR_RUNTIME__.rerender(__sfc__.__hmrId, __sfc__.render)
+    })
   }
-  if (typeof module !== 'undefined' && module.hot) module.hot.accept()
 }`
 
   // Strip TS → RN Babel
