@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const path_1 = require("path");
 const module_1 = require("module");
@@ -11,7 +12,7 @@ function detect() {
         if ((0, fs_1.existsSync)((0, path_1.join)(nm, '@unocss', 'core', 'package.json')) && (0, fs_1.existsSync)((0, path_1.join)(nm, '@unocss', 'preset-uno', 'package.json')))
             return true;
     }
-    catch { }
+    catch { /* not found */ }
     for (const name of ['uno.config.js', 'uno.config.ts', 'unocss.config.js', 'unocss.config.ts']) {
         if ((0, fs_1.existsSync)((0, path_1.join)(root, name)))
             return true;
@@ -33,7 +34,7 @@ async function resolve() {
                 try {
                     userConfig = projectRequire(f);
                 }
-                catch { }
+                catch { /* config not found */ }
             }
         }
         const config = { ...userConfig, presets: [...(userConfig.presets || []), pre()] };
@@ -53,8 +54,8 @@ async function resolve() {
                 sm.set(k, v);
         }
     }
-    catch (e) {
-        console.warn(`[unocss] ${e.message}`);
+    catch {
+        console.warn('[unocss] CSS generation failed');
     }
     return { styleMap: sm, cssOutput: out };
 }
@@ -82,7 +83,7 @@ function scanClasses(root) {
                                 s.add(c);
                     }
                 }
-                catch { }
+                catch { /* skip unreadable */ }
             }
         }
     }
@@ -90,4 +91,4 @@ function scanClasses(root) {
     return [...s];
 }
 const resolver = { name: NAME, detect, resolve };
-module.exports = resolver;
+exports.default = resolver;

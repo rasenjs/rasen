@@ -9,16 +9,16 @@ exports.resolve = resolve;
 // Lazy-init built-in plugins (loaded on first detect/resolve).
 let _plugins = null;
 /** User-registered custom plugins (checked before built-ins). */
-let _userPlugins = [];
+const _userPlugins = [];
 function getPlugins() {
     if (!_plugins) {
         try {
             // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const tw4 = require('./plugins/tw-v4');
+            const tw4 = require('./plugins/tw-v4').default;
             // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const tw3 = require('./plugins/tw-v3');
+            const tw3 = require('./plugins/tw-v3').default;
             // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const uno = require('./plugins/unocss');
+            const uno = require('./plugins/unocss').default;
             _plugins = [tw4, tw3, uno];
         }
         catch {

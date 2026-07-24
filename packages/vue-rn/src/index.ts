@@ -15,7 +15,7 @@
  *   })
  */
 
-import { createRenderer, h, ref, reactive, computed, getCurrentInstance } from '@vue/runtime-core'
+import { createRenderer, getCurrentInstance } from '@vue/runtime-core'
 import { RNDocument, parseCSS, normalizeEventName, isEvent } from '@rasenjs/rn-dom'
 import type { RNNode, RNTextNode, RNCommentNode } from '@rasenjs/rn-dom'
 
@@ -158,6 +158,12 @@ export function createApp(rootComponent: object): VueRNMountable {
 }
 
 export { RNDocument }
+
+// ---------------------------------------------------------------------------
+// RouterLink — re-export for convenience
+// ---------------------------------------------------------------------------
+
+export { RouterLink } from './router-link'
 
 // ---------------------------------------------------------------------------
 // useCssModule — re-exported for convenience

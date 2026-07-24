@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const path_1 = require("path");
 const module_1 = require("module");
@@ -20,7 +21,7 @@ function detect() {
         if (findPackage(root, '@tailwindcss/postcss'))
             return true;
     }
-    catch { }
+    catch { /* not found */ }
     try {
         const p = findPackage(root, 'tailwindcss');
         if (p) {
@@ -29,7 +30,7 @@ function detect() {
                 return true;
         }
     }
-    catch { }
+    catch { /* version check failed */ }
     return false;
 }
 async function resolve() {
@@ -45,20 +46,21 @@ async function resolve() {
         css += `\n@source inline("${cls}");`;
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const postcss = require('postcss');
-    let tw;
-    try {
-        tw = (0, module_1.createRequire)((0, path_1.join)(root, 'package.json'))('@tailwindcss/postcss');
-    }
-    catch {
-        tw = require('tailwindcss');
-    }
+    const tw = (() => {
+        try {
+            return (0, module_1.createRequire)((0, path_1.join)(root, 'package.json'))('@tailwindcss/postcss');
+        }
+        catch {
+            return require('tailwindcss');
+        }
+    })();
     let out = '';
     try {
         const r = await postcss([tw()]).process(css, { from: entry?.filePath || (0, path_1.join)(root, 'virtual.css') });
         out = r.css;
     }
-    catch (e) {
-        console.warn(`[tw-v4] ${e.message}`);
+    catch {
+        console.warn('[tw-v4] CSS generation failed');
     }
     return { styleMap: (0, parse_1.cssToMap)(out), cssOutput: out };
 }
@@ -97,7 +99,7 @@ function scanClasses(root) {
                                 s.add(c);
                     }
                 }
-                catch { }
+                catch { /* skip unreadable */ }
             }
         }
     }
@@ -105,4 +107,4 @@ function scanClasses(root) {
     return [...s];
 }
 const resolver = { name: NAME, detect, resolve };
-module.exports = resolver;
+exports.default = resolver;

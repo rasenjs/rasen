@@ -223,7 +223,8 @@ function createStyleObject(element: RNNode) {
     removeProperty(property: string): void {
       const currentStyle = element.currentProps.style as Record<string, unknown> | undefined
       if (currentStyle && property in currentStyle) {
-        const { [property]: _removed, ...rest } = currentStyle
+        const rest = { ...currentStyle }
+      delete rest[property]
         element.currentProps = {
           ...element.currentProps,
           style: Object.keys(rest).length > 0 ? rest : {},
@@ -314,12 +315,11 @@ export class RNDocument {
     const registry = ReactNativePrivateInterface.ReactNativeViewConfigRegistry
     const result = (() => {
       // Try as-is first (third-party: RNCSafeAreaView, RNCWebView, AIRMap…)
-      try { const c = registry.get(tagName); return { name: tagName, config: c } } catch {}
-      // Fall back to RCT prefix (RN built-in: View → RCTView, Text → RCTText)
+      try { const c = registry.get(tagName); return { name: tagName, config: c } } catch { /* tag not found, try prefixed */ }
       const prefixed = tagName.startsWith('RCT') || tagName.startsWith('Android')
         ? tagName
         : `RCT${tagName}`
-      try { const c = registry.get(prefixed); return { name: prefixed, config: c } } catch {}
+      try { const c = registry.get(prefixed); return { name: prefixed, config: c } } catch { /* prefixed not found either */ }
       throw new Error(
         `[Rasen] ViewConfig not registered for "${tagName}" or "${prefixed}". ` +
         `If this is a third-party component, ensure its JS module is imported ` +
@@ -984,19 +984,15 @@ export class RNBody extends RNNode {
       let viewConfig
       try {
         viewConfig = ReactNativePrivateInterface.ReactNativeViewConfigRegistry.get(nativeName)
-      } catch (e) {
+} catch {
         viewConfig = undefined
       }
 
       const validAttrs = viewConfig?.validAttributes || {}
       const fabricProps = prepareFabricProps(child.currentProps)
       const prevProps = child._propsSnapshot
-      try {
-        // Diff-based: only send changed props, like React does.
-        updatePayload = diffFabricPayload(prevProps, fabricProps, validAttrs)
-      } catch (e: any) {
-        throw e
-      }
+      // Diff-based: only send changed props, like React does.
+      updatePayload = diffFabricPayload(prevProps, fabricProps, validAttrs)
       child._lastValidAttrs = validAttrs
       child._propsSnapshot = { ...fabricProps }
       child._dirtyPropsKeys.clear()

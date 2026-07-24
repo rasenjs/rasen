@@ -36,18 +36,23 @@ async function resolve(): Promise<{ styleMap: Map<string, Record<string, unknown
   let config: Record<string, unknown> = {}
   for (const name of ['tailwind.config.js', 'tailwind.config.ts', 'tailwind.config.cjs']) {
     const f = join(root, name)
-    if (existsSync(f)) { try { delete require.cache[f]; config = projectRequire(f) } catch {} }
+    if (existsSync(f)) {
+      delete require.cache[f]
+      try { config = projectRequire(f) } catch { /* config parse error */ }
+    }
   }
 
   const jitConfig = { ...config, content: (config.content as string[]) || [], safelist: ((config.safelist as string[]) || []).concat(classes) }
-  let tw: unknown
-  try { tw = projectRequire('tailwindcss') } catch { tw = require('tailwindcss') }
+  const tw = (() => {
+    try { return projectRequire('tailwindcss') }
+    catch { return require('tailwindcss') }
+  })() as (...args: unknown[]) => unknown
 
   let out = ''
   try {
-    const r = await (postcss as any)([(tw as any)(jitConfig)]).process('@tailwind base;\n@tailwind components;\n@tailwind utilities;', { from: join(root, 'tw.scss') })
+    const r = await postcss([tw(jitConfig)]).process('@tailwind base;\n@tailwind components;\n@tailwind utilities;', { from: join(root, 'tw.scss') })
     out = r.css
-  } catch (e: any) { console.warn(`[tw-v3] ${e.message}`) }
+  } catch { console.warn('[tw-v3] CSS generation failed') }
 
   return { styleMap: cssToMap(out), cssOutput: out }
 }
@@ -61,7 +66,7 @@ function scanClasses(root: string): string[] {
       const p = join(dir, x.name)
       if (x.isDirectory()) { if (!x.name.startsWith('.') && x.name !== 'node_modules' && x.name !== 'dist') walk(p) }
       else if (x.name.endsWith('.vue') || x.name.endsWith('.tsx') || x.name.endsWith('.jsx')) {
-        try { for (const m of readFileSync(p, 'utf8').matchAll(/class="([^"]+)"/g)) { for (const c of m[1].trim().split(/\s+/)) if (c) s.add(c) } } catch {}
+        try { for (const m of readFileSync(p, 'utf8').matchAll(/class="([^"]+)"/g)) { for (const c of m[1].trim().split(/\s+/)) if (c) s.add(c) } } catch { /* skip unreadable files */ }
       }
     }
   }
@@ -70,4 +75,4 @@ function scanClasses(root: string): string[] {
 }
 
 const resolver: ClassResolver = { name: NAME, detect, resolve }
-export = resolver
+export default resolver

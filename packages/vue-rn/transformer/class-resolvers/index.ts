@@ -22,17 +22,17 @@ export interface ClassResolver {
 let _plugins: ClassResolver[] | null = null
 
 /** User-registered custom plugins (checked before built-ins). */
-let _userPlugins: ClassResolver[] = []
+const _userPlugins: ClassResolver[] = []
 
 function getPlugins(): ClassResolver[] {
   if (!_plugins) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const tw4 = require('./plugins/tw-v4') as ClassResolver
+      const tw4: ClassResolver = require('./plugins/tw-v4').default
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const tw3 = require('./plugins/tw-v3') as ClassResolver
+      const tw3: ClassResolver = require('./plugins/tw-v3').default
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const uno = require('./plugins/unocss') as ClassResolver
+      const uno: ClassResolver = require('./plugins/unocss').default
       _plugins = [tw4, tw3, uno]
     } catch {
       _plugins = []

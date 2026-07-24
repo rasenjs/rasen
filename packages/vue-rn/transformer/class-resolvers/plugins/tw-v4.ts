@@ -18,14 +18,14 @@ function findPackage(root: string, pkgName: string): string | null {
 
 function detect(): boolean {
   const root = process.cwd()
-  try { if (findPackage(root, '@tailwindcss/postcss')) return true } catch {}
+  try { if (findPackage(root, '@tailwindcss/postcss')) return true } catch { /* not found */ }
   try {
     const p = findPackage(root, 'tailwindcss')
     if (p) {
       const { version } = JSON.parse(readFileSync(p, 'utf8'))
       if (parseInt(version.split('.')[0], 10) >= 4) return true
     }
-  } catch {}
+  } catch { /* version check failed */ }
   return false
 }
 
@@ -40,15 +40,16 @@ async function resolve(): Promise<{ styleMap: Map<string, Record<string, unknown
 
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const postcss = require('postcss')
-  let tw: unknown
-  try { tw = createRequire(join(root, 'package.json'))('@tailwindcss/postcss') }
-  catch { tw = require('tailwindcss') }
+  const tw = (() => {
+    try { return createRequire(join(root, 'package.json'))('@tailwindcss/postcss') }
+    catch { return require('tailwindcss') }
+  })() as (...args: unknown[]) => unknown
 
   let out = ''
   try {
-    const r = await (postcss as any)([(tw as any)()]).process(css, { from: entry?.filePath || join(root, 'virtual.css') })
+    const r = await postcss([tw()]).process(css, { from: entry?.filePath || join(root, 'virtual.css') })
     out = r.css
-  } catch (e: any) { console.warn(`[tw-v4] ${e.message}`) }
+  } catch { console.warn('[tw-v4] CSS generation failed') }
 
   return { styleMap: cssToMap(out), cssOutput: out }
 }
@@ -73,7 +74,7 @@ function scanClasses(root: string): string[] {
       const p = join(dir, x.name)
       if (x.isDirectory()) { if (!x.name.startsWith('.') && x.name !== 'node_modules') walk(p) }
       else if (x.name.endsWith('.vue') || x.name.endsWith('.tsx') || x.name.endsWith('.jsx')) {
-        try { for (const m of readFileSync(p, 'utf8').matchAll(/class="([^"]+)"/g)) { for (const c of m[1].trim().split(/\s+/)) if (c) s.add(c) } } catch {}
+        try { for (const m of readFileSync(p, 'utf8').matchAll(/class="([^"]+)"/g)) { for (const c of m[1].trim().split(/\s+/)) if (c) s.add(c) } } catch { /* skip unreadable */ }
       }
     }
   }
@@ -82,4 +83,4 @@ function scanClasses(root: string): string[] {
 }
 
 const resolver: ClassResolver = { name: NAME, detect, resolve }
-export = resolver
+export default resolver

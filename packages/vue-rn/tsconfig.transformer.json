@@ -6,11 +6,12 @@
     "moduleResolution": "node",
     "target": "es2020",
     "allowJs": true,
-    "checkJs": false,
     "declaration": false,
     "declarationMap": false,
     "sourceMap": false,
     "strict": false,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
     "esModuleInterop": true,
     "skipLibCheck": true
   },

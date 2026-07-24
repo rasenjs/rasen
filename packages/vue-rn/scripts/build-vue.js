@@ -19,7 +19,7 @@ esbuild.buildSync({
   target: 'es6',
   platform: 'node',
   outfile: OUT,
-  external: ['@rasenjs/rn-dom', '@vue/runtime-core', '@vue/reactivity', '@vue/shared'],
+  external: ['@rasenjs/rn-dom', '@vue/runtime-core', '@vue/reactivity', '@vue/shared', 'vue-router'],
 })
 
 const size = fs.statSync(OUT).size

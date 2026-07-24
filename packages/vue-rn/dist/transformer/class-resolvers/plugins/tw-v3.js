@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const path_1 = require("path");
 const module_1 = require("module");
@@ -35,28 +36,29 @@ async function resolve() {
     for (const name of ['tailwind.config.js', 'tailwind.config.ts', 'tailwind.config.cjs']) {
         const f = (0, path_1.join)(root, name);
         if ((0, fs_1.existsSync)(f)) {
+            delete require.cache[f];
             try {
-                delete require.cache[f];
                 config = projectRequire(f);
             }
-            catch { }
+            catch { /* config parse error */ }
         }
     }
     const jitConfig = { ...config, content: config.content || [], safelist: (config.safelist || []).concat(classes) };
-    let tw;
-    try {
-        tw = projectRequire('tailwindcss');
-    }
-    catch {
-        tw = require('tailwindcss');
-    }
+    const tw = (() => {
+        try {
+            return projectRequire('tailwindcss');
+        }
+        catch {
+            return require('tailwindcss');
+        }
+    })();
     let out = '';
     try {
         const r = await postcss([tw(jitConfig)]).process('@tailwind base;\n@tailwind components;\n@tailwind utilities;', { from: (0, path_1.join)(root, 'tw.scss') });
         out = r.css;
     }
-    catch (e) {
-        console.warn(`[tw-v3] ${e.message}`);
+    catch {
+        console.warn('[tw-v3] CSS generation failed');
     }
     return { styleMap: (0, parse_1.cssToMap)(out), cssOutput: out };
 }
@@ -84,7 +86,7 @@ function scanClasses(root) {
                                 s.add(c);
                     }
                 }
-                catch { }
+                catch { /* skip unreadable files */ }
             }
         }
     }
@@ -92,4 +94,4 @@ function scanClasses(root) {
     return [...s];
 }
 const resolver = { name: NAME, detect, resolve };
-module.exports = resolver;
+exports.default = resolver;

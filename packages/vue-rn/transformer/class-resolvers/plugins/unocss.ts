@@ -11,7 +11,7 @@ function detect(): boolean {
   const nm = join(root, 'node_modules')
   try {
     if (existsSync(join(nm, '@unocss', 'core', 'package.json')) && existsSync(join(nm, '@unocss', 'preset-uno', 'package.json'))) return true
-  } catch {}
+  } catch { /* not found */ }
   for (const name of ['uno.config.js', 'uno.config.ts', 'unocss.config.js', 'unocss.config.ts']) {
     if (existsSync(join(root, name))) return true
   }
@@ -29,7 +29,7 @@ async function resolve(): Promise<{ styleMap: Map<string, Record<string, unknown
     let userConfig: Record<string, unknown> = {}
     for (const name of ['uno.config.js', 'uno.config.ts', 'unocss.config.js', 'unocss.config.ts']) {
       const f = join(root, name)
-      if (existsSync(f)) { try { userConfig = projectRequire(f) } catch {} }
+      if (existsSync(f)) { try { userConfig = projectRequire(f) } catch { /* config not found */ } }
     }
     const config = { ...userConfig, presets: [...((userConfig.presets as unknown[]) || []), pre()] }
     const uno = await createGenerator(config)
@@ -47,7 +47,7 @@ async function resolve(): Promise<{ styleMap: Map<string, Record<string, unknown
       out += '\n' + r.css
       for (const [k, v] of cssToMap(r.css)) sm.set(k, v)
     }
-  } catch (e: any) { console.warn(`[unocss] ${e.message}`) }
+  } catch { console.warn('[unocss] CSS generation failed') }
   return { styleMap: sm, cssOutput: out }
 }
 
@@ -60,7 +60,7 @@ function scanClasses(root: string): string[] {
       const p = join(dir, x.name)
       if (x.isDirectory()) { if (!x.name.startsWith('.') && x.name !== 'node_modules' && x.name !== 'dist') walk(p) }
       else if (x.name.endsWith('.vue') || x.name.endsWith('.tsx') || x.name.endsWith('.jsx')) {
-        try { for (const m of readFileSync(p, 'utf8').matchAll(/class="([^"]+)"/g)) { for (const c of m[1].trim().split(/\s+/)) if (c) s.add(c) } } catch {}
+        try { for (const m of readFileSync(p, 'utf8').matchAll(/class="([^"]+)"/g)) { for (const c of m[1].trim().split(/\s+/)) if (c) s.add(c) } } catch { /* skip unreadable */ }
       }
     }
   }
@@ -69,4 +69,4 @@ function scanClasses(root: string): string[] {
 }
 
 const resolver: ClassResolver = { name: NAME, detect, resolve }
-export = resolver
+export default resolver
