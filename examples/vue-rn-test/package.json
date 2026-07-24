@@ -6,6 +6,7 @@
   "scripts": {
     "start": "react-native start",
     "android": "react-native run-android",
+    "ios": "react-native run-ios",
     "bundle": "react-native bundle --platform android --dev false --entry-file index.ts --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res",
     "build:android": "cd android && ./gradlew assembleRelease && cd .."
   },

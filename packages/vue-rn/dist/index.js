@@ -22,6 +22,7 @@ var index_exports = {};
 __export(index_exports, {
   RNDocument: () => import_rn_dom.RNDocument,
   createApp: () => createApp,
+  getOrCreateDocument: () => getOrCreateDocument,
   useCssModule: () => useCssModule
 });
 module.exports = __toCommonJS(index_exports);
@@ -122,6 +123,9 @@ function createApp(rootComponent) {
     }
   };
 }
+function getOrCreateDocument(rootTag) {
+  return import_rn_dom.RNDocument.getOrCreate(rootTag);
+}
 function useCssModule(name = "$style") {
   const instance = (0, import_runtime_core.getCurrentInstance)();
   if (!instance) {
@@ -138,5 +142,6 @@ function useCssModule(name = "$style") {
 0 && (module.exports = {
   RNDocument,
   createApp,
+  getOrCreateDocument,
   useCssModule
 });

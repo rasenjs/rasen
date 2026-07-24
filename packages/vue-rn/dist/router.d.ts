@@ -2,10 +2,11 @@
  * @rasenjs/vue-rn — vue-router integration
  *
  * Usage:
- *   import { RouterLink } from '@rasenjs/vue-rn/router'
+ *   import { RouterLink, createRNHistory } from '@rasenjs/vue-rn/router'
  */
 
 import { defineComponent } from 'vue'
+import type { RouterHistory } from 'vue-router'
 
 /**
  * RN-compatible RouterLink for vue-router.
@@ -20,3 +21,14 @@ import { defineComponent } from 'vue'
  *   </RouterLink>
  */
 export declare const RouterLink: ReturnType<typeof defineComponent>
+
+/**
+ * Creates an in-memory history for React Native.
+ *
+ * This is a re-branded `createMemoryHistory` from vue-router, named
+ * `createRNHistory` to leave room for future RN-specific enhancements
+ * (deep-link support, etc.) without API breakage.
+ *
+ * @param base - Optional base path (default '/')
+ */
+export declare function createRNHistory(base?: string): RouterHistory

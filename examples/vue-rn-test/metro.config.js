@@ -54,6 +54,12 @@ const config = {
           type: 'sourceFile',
         }
       }
+      if (moduleName === '@rasenjs/rn-dom/register') {
+        return {
+          filePath: path.join(rnDomPath, 'register.cjs'),
+          type: 'sourceFile',
+        }
+      }
       // Redirect 'vue' to @vue/runtime-core to avoid pulling in @vue/runtime-dom
       // (which references document.createElement etc. — crashes in Hermes).
       // vue-router imports from 'vue', so this is required for compatibility.

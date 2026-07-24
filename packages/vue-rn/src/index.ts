@@ -157,7 +157,24 @@ export function createApp(rootComponent: object): VueRNMountable {
   }
 }
 
+// Re-export RNDocument so consumers don't need a direct dep on @rasenjs/rn-dom
+// just to create a document instance.
 export { RNDocument }
+
+/**
+ * Convenience alias for `RNDocument.getOrCreate()`.
+ *
+ * Usage:
+ *   import { createVueRNApp, getOrCreateDocument } from '@rasenjs/vue-rn'
+ *
+ *   AppRegistry.registerRunnable('MyApp', ({ rootTag }) => {
+ *     const doc = getOrCreateDocument(rootTag)
+ *     createVueRNApp(App).mount(doc.body)
+ *   })
+ */
+export function getOrCreateDocument(rootTag?: number): RNDocument {
+  return RNDocument.getOrCreate(rootTag)
+}
 
 // ---------------------------------------------------------------------------
 // useCssModule — re-exported for convenience

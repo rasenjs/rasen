@@ -1,24 +1,23 @@
 /**
  * @rasenjs/vue-rn-test — Metro entry point
+ *
+ * No manual native component imports needed here.
+ * @rasenjs/rn-dom auto-registers them via _resolveNativeName.
  */
 
 if (typeof window === 'undefined') (globalThis as any).window = globalThis
 if (typeof performance === 'undefined') (globalThis as any).performance = { now: () => Date.now() }
 
 import 'react-native'
-import 'react-native/Libraries/Text/TextNativeComponent'
-import 'react-native/Libraries/Image/ImageViewNativeComponent'
-import 'react-native/Libraries/Components/TextInput/AndroidTextInputNativeComponent'
 
 import { AppRegistry } from 'react-native'
-import { RNDocument } from '@rasenjs/rn-dom'
-import { createApp } from '@rasenjs/vue-rn'
+import { createApp, getOrCreateDocument } from '@rasenjs/vue-rn'
 import App from './App.vue'
 import { router } from './router'
 
-AppRegistry.registerRunnable('RasenExample', ({ rootTag }: any) => {
+AppRegistry.registerRunnable('VueRnTest', ({ rootTag }: any) => {
   console.log('[vue-rn] Starting with rootTag:', rootTag)
-  const doc = RNDocument.getOrCreate(rootTag as number)
+  const doc = getOrCreateDocument(rootTag as number)
   const app = createApp(App)
   app.use(router)
 

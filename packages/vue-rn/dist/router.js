@@ -20,9 +20,11 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/router.ts
 var router_exports = {};
 __export(router_exports, {
-  RouterLink: () => RouterLink
+  RouterLink: () => RouterLink,
+  createRNHistory: () => createRNHistory
 });
 module.exports = __toCommonJS(router_exports);
+var import_vue_router2 = require("vue-router");
 
 // src/router-link.ts
 var import_runtime_core = require("@vue/runtime-core");
@@ -68,7 +70,13 @@ var RouterLink = /* @__PURE__ */ (0, import_runtime_core.defineComponent)({
     };
   }
 });
+
+// src/router.ts
+function createRNHistory(base) {
+  return (0, import_vue_router2.createMemoryHistory)(base);
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  RouterLink
+  RouterLink,
+  createRNHistory
 });

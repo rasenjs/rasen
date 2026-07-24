@@ -12,6 +12,11 @@ build/
 !default.mode1v3
 *.mode2v3
 
+# iOS / CocoaPods
+ios/Pods/
+ios/*.xcworkspace
+ios/build/
+
 # Android/IntelliJ
 android/.gradle/
 android/app/build/

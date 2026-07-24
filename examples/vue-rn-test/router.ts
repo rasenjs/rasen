@@ -1,4 +1,5 @@
-import { createRouter, createMemoryHistory } from 'vue-router'
+import { createRouter } from 'vue-router'
+import { createRNHistory } from '@rasenjs/vue-rn/router'
 import Home from './src/pages/Home.vue'
 import About from './src/pages/About.vue'
 
@@ -8,6 +9,6 @@ const routes = [
 ]
 
 export const router = createRouter({
-  history: createMemoryHistory(),
+  history: createRNHistory(),
   routes,
 })

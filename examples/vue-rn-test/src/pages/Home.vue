@@ -51,14 +51,13 @@ function clearDone() {
 
     <!-- Input row -->
     <View class="flex-row mb-4">
-      <AndroidTextInput
+      <TextInput
         class="flex-1"
         :style="{ backgroundColor: '#1a1a2e', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: '#e0e0ee', height: 48 }"
         :text="draft"
         placeholder="Add todo..."
         placeholderTextColor="#666"
         :editable="true"
-        :showSoftInputOnFocus="true"
         @change="onInputChange"
       />
       <View class="justify-center" :style="{ backgroundColor: '#16c79a', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12, height: 48, marginLeft: 8 }" @touchEnd="addTodo">

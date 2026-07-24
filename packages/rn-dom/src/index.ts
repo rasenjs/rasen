@@ -45,6 +45,19 @@ import {View as _RNView} from 'react-native'
 export const __ensureViewRegistered = _RNView
 import type { FabricNode, FabricUIManager } from './fabric-global'
 
+// ────────────────────────────────────────────────────────────────────────────
+// Lazy Fabric View Config Registration
+//
+// Import the ensure() function from register.cjs. This module-level import
+// compiles to `require("@rasenjs/rn-dom/register")` which Metro statically
+// traces, bundling register.cjs and all its literal require() calls.
+//
+// The require() calls inside register.cjs are wrapped in a switch function
+// and only execute when ensure() is called — i.e. on first use of each
+// component tag. This gives us lazy registration with eager bundling.
+// ────────────────────────────────────────────────────────────────────────────
+import { ensure } from '@rasenjs/rn-dom/register'
+
 /**
  * Shape of a partial view config — matches React Native's PartialViewConfig
  * (see react-native/Libraries/Renderer/shims/ReactNativeTypes.js).
@@ -315,15 +328,25 @@ export class RNDocument {
     const registry = ReactNativePrivateInterface.ReactNativeViewConfigRegistry
     const result = (() => {
       // Try as-is first (third-party: RNCSafeAreaView, RNCWebView, AIRMap…)
-      try { const c = registry.get(tagName); return { name: tagName, config: c } } catch { /* tag not found, try prefixed */ }
+      try { const c = registry.get(tagName); return { name: tagName, config: c } } catch { /* tag not found */ }
       const prefixed = tagName.startsWith('RCT') || tagName.startsWith('Android')
         ? tagName
         : `RCT${tagName}`
       try { const c = registry.get(prefixed); return { name: prefixed, config: c } } catch { /* prefixed not found either */ }
+
+      // --- Lazy auto-registration ---
+      // Load the native module's view config on first use.
+      // ensure() returns the Fabric uiViewClassName so we know what name
+      // to look up in the registry — no need for a separate TAG_ALIASES table.
+      const nativeName = ensure(tagName)
+      if (nativeName) {
+        try { const c = registry.get(nativeName); return { name: nativeName, config: c } } catch { /* registered but not yet resolvable */ }
+      }
+
       throw new Error(
-        `[Rasen] ViewConfig not registered for "${tagName}" or "${prefixed}". ` +
-        `If this is a third-party component, ensure its JS module is imported ` +
-        `(which registers the view config).`,
+        `[Rasen] ViewConfig not registered for "${tagName}" (resolved as "${nativeName ?? prefixed}"). ` +
+        `Ensure the native module is imported. For third-party components, ` +
+        `import the JS module in your entry file.`,
       )
     })()
 

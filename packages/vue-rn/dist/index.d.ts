@@ -3,6 +3,16 @@ import { RNNode } from '@rasenjs/rn-dom';
 export { RNDocument } from '@rasenjs/rn-dom';
 
 /**
+ * Convenience alias for `RNDocument.getOrCreate()`.
+ *
+ * Saves consumers from importing RNDocument directly when all they need
+ * is the document instance to mount the app.
+ *
+ * @param rootTag - Root Fabric container tag (required on first call)
+ */
+export declare function getOrCreateDocument(rootTag?: number): RNDocument;
+
+/**
  * Vue 3 Custom Renderer for React Native Fabric
  *
  * Replaces @vue/runtime-dom's DOM backend with @rasenjs/rn-dom.
