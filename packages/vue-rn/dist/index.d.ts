@@ -19,25 +19,7 @@ export { type VueRNMountable, createApp };
 
 export declare function useCssModule(name?: string): Record<string, unknown>;
 
-/**
- * RN-compatible RouterLink for vue-router.
- *
- * Default: renders touchable View wrapping your slot content.
- * Plain text content is auto-wrapped in <Text>.
- *
- * Usage:
- *   <!-- Simple text link -->
- *   <RouterLink to="/">Home</RouterLink>
- *
- *   <!-- Custom template with active state -->
- *   <RouterLink v-slot="{ isActive }" to="/about" custom>
- *     <Text :style="{ color: isActive ? '#16c79a' : '#e0e0ee' }">About</Text>
- *   </RouterLink>
- */
-export declare const RouterLink: import('vue').DefineComponent<{
-    to: { type: (StringConstructor | ObjectConstructor)[]; required: true }
-    replace: BooleanConstructor
-    custom: BooleanConstructor
+// ── Vue template tag type declarations ──────────────────────────────────
 }>
 
 // ── Vue template tag type declarations ──────────────────────────────────

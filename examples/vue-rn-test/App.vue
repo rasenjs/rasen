@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import { RouterLink } from '@rasenjs/vue-rn'
+import { RouterLink } from '@rasenjs/vue-rn/router'
 </script>
 
 <template>

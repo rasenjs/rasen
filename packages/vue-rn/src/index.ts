@@ -160,12 +160,6 @@ export function createApp(rootComponent: object): VueRNMountable {
 export { RNDocument }
 
 // ---------------------------------------------------------------------------
-// RouterLink — re-export for convenience
-// ---------------------------------------------------------------------------
-
-export { RouterLink } from './router-link'
-
-// ---------------------------------------------------------------------------
 // useCssModule — re-exported for convenience
 // ---------------------------------------------------------------------------
 

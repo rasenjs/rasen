@@ -5,6 +5,25 @@
   "description": "Vue 3 custom renderer for React Native Fabric via @rasenjs/rn-dom",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "default": "./dist/router.js"
+    },
+    "./dist/transformer/*": "./dist/transformer/*"
+  },
+  "typesVersions": {
+    "*": {
+      "router": ["./dist/router.d.ts"],
+      "dist/index": ["./dist/index.d.ts"],
+      "dist/router": ["./dist/router.d.ts"],
+      "dist/transformer/*": ["./dist/transformer/*"]
+    }
+  },
   "scripts": {
     "build": "node scripts/build-vue.js && tsc -p tsconfig.transformer.json",
     "build:transformer": "tsc -p tsconfig.transformer.json",

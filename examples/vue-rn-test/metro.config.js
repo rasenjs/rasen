@@ -11,7 +11,7 @@ const defaultConfig = getDefaultConfig(__dirname)
 
 const config = {
   transformer: {
-    babelTransformerPath: require.resolve('@rasenjs/vue-rn/dist/transformer/index'),
+    babelTransformerPath: path.join(vueRNPath, 'transformer/index'),
     getTransformOptions: async () => ({
       transform: {
         experimentalImportSupport: false,
@@ -39,6 +39,12 @@ const config = {
       if (moduleName === '@rasenjs/vue-rn') {
         return {
           filePath: path.join(vueRNPath, 'index.js'),
+          type: 'sourceFile',
+        }
+      }
+      if (moduleName === '@rasenjs/vue-rn/router') {
+        return {
+          filePath: path.join(vueRNPath, 'router.js'),
           type: 'sourceFile',
         }
       }
