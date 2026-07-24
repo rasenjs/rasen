@@ -30,8 +30,8 @@ var import_vue_router = require("vue-router");
 function isTextNode(vnode) {
   return typeof vnode.children === "string" || typeof vnode.children === "number";
 }
-function wrapText(vnodes) {
-  return vnodes.map((v) => isTextNode(v) ? (0, import_runtime_core.h)("Text", null, v.children) : v);
+function wrapText(vnodes, style) {
+  return vnodes.map((v) => isTextNode(v) ? (0, import_runtime_core.h)("Text", { style }, v.children) : v);
 }
 var RouterLink = /* @__PURE__ */ (0, import_runtime_core.defineComponent)({
   name: "RouterLink",
@@ -42,7 +42,12 @@ var RouterLink = /* @__PURE__ */ (0, import_runtime_core.defineComponent)({
      * When true, renders only the slot content without wrapping View.
      * Use this when you need full control over the touchable wrapper.
      */
-    custom: Boolean
+    custom: Boolean,
+    /**
+     * Style forwarded to the inner Text when in default (non-custom) mode.
+     * Ignored in custom mode — apply styles directly to your own elements.
+     */
+    style: [Object, Array]
   },
   setup(props, { slots }) {
     const link = (0, import_vue_router.useLink)(props);
@@ -59,7 +64,7 @@ var RouterLink = /* @__PURE__ */ (0, import_runtime_core.defineComponent)({
       if (props.custom) {
         return slotContent.length === 0 ? (0, import_runtime_core.h)("View") : slotContent;
       }
-      return (0, import_runtime_core.h)("View", { onTouchEnd: link.navigate }, wrapText(slotContent));
+      return (0, import_runtime_core.h)("View", { onTouchEnd: link.navigate }, wrapText(slotContent, props.style));
     };
   }
 });

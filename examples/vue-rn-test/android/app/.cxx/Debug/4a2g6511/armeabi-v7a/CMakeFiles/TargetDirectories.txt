@@ -1,3 +1,0 @@
-/Users/wuhaofeng/Projects/@rasen/examples/rn-dom-test/android/app/.cxx/Debug/4a2g6511/armeabi-v7a/CMakeFiles/appmodules.dir
-/Users/wuhaofeng/Projects/@rasen/examples/rn-dom-test/android/app/.cxx/Debug/4a2g6511/armeabi-v7a/CMakeFiles/edit_cache.dir
-/Users/wuhaofeng/Projects/@rasen/examples/rn-dom-test/android/app/.cxx/Debug/4a2g6511/armeabi-v7a/CMakeFiles/rebuild_cache.dir

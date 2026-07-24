@@ -17,9 +17,17 @@ android/.gradle/
 android/app/build/
 android/build/
 android/local.properties
-android/.cxx/
 android/.idea/
 *.iml
+
+# C++ build artifacts (React Native JNI)
+.cxx/
+
+# Stubs / shims (not real source)
+__stubs__/
+
+# RN Debug
+*.hprof
 
 # Metro
 .metro-health-check*

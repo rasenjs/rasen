@@ -37,8 +37,8 @@ function isTextNode(vnode: VNode): boolean {
   return typeof vnode.children === 'string' || typeof vnode.children === 'number'
 }
 
-function wrapText(vnodes: VNode[]): VNode[] {
-  return vnodes.map(v => isTextNode(v) ? h('Text', null, v.children as string) : v)
+function wrapText(vnodes: VNode[], style?: Record<string, any> | Record<string, any>[]): VNode[] {
+  return vnodes.map(v => isTextNode(v) ? h('Text', { style }, v.children as string) : v)
 }
 
 export const RouterLink = /*#__PURE__*/ defineComponent({
@@ -51,6 +51,11 @@ export const RouterLink = /*#__PURE__*/ defineComponent({
      * Use this when you need full control over the touchable wrapper.
      */
     custom: Boolean,
+    /**
+     * Style forwarded to the inner Text when in default (non-custom) mode.
+     * Ignored in custom mode — apply styles directly to your own elements.
+     */
+    style: [Object, Array] as PropType<Record<string, any> | Record<string, any>[]>,
   },
   setup(props, { slots }) {
     const link = useLink(props as Parameters<typeof useLink>[0])
@@ -70,8 +75,9 @@ export const RouterLink = /*#__PURE__*/ defineComponent({
         return slotContent.length === 0 ? h('View') : slotContent
       }
 
-      // Auto-wrap text nodes in <Text>, then wrap everything in a touchable View
-      return h('View', { onTouchEnd: link.navigate }, wrapText(slotContent))
+      // Default mode: auto-wrap text nodes in <Text> (with style passthrough),
+      // then wrap everything in a touchable View
+      return h('View', { onTouchEnd: link.navigate }, wrapText(slotContent, props.style))
     }
   },
 })

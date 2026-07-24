@@ -1,7 +1,0 @@
-# ninja log v5
-1	8	0	/Users/wuhaofeng/Projects/@rasen/examples/rn-dom-test/android/app/.cxx/Debug/4a2g6511/arm64-v8a/CMakeFiles/cmake.verify_globs	e7b7f8cc505a7180
-0	1305	1778057791274184750	CMakeFiles/appmodules.dir/Users/wuhaofeng/Projects/@rasen/examples/rn-dom-test/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	bef5be806d8d7e0f
-0	1456	1778057791423832615	CMakeFiles/appmodules.dir/OnLoad.cpp.o	d10885617585c215
-1456	1513	1778057791490019925	/Users/wuhaofeng/Projects/@rasen/examples/rn-dom-test/android/app/build/intermediates/cxx/Debug/4a2g6511/obj/arm64-v8a/libappmodules.so	de3952eb03a4cb2b
-19	45	0	/Users/wuhaofeng/Projects/@rasen/examples/rn-dom-test/android/app/.cxx/Debug/4a2g6511/arm64-v8a/CMakeFiles/cmake.verify_globs	e7b7f8cc505a7180
-9	62	0	/Users/wuhaofeng/Projects/@rasen/examples/rn-dom-test/android/app/.cxx/Debug/4a2g6511/arm64-v8a/CMakeFiles/cmake.verify_globs	e7b7f8cc505a7180
