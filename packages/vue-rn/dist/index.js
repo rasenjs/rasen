@@ -30,18 +30,12 @@ var import_runtime_core = require("@vue/runtime-core");
 var import_rn_dom = require("@rasenjs/rn-dom");
 var _doc = null;
 function patchStyle(el, prev, next) {
-  if (prev) {
-    const prevObj = typeof prev === "string" ? (0, import_rn_dom.parseCSS)(prev) : prev;
-    for (const key of Object.keys(prevObj)) {
-      el.style.removeProperty(key);
-    }
-  }
-  if (next) {
-    const nextObj = typeof next === "string" ? (0, import_rn_dom.parseCSS)(next) : next;
-    for (const [key, value] of Object.entries(nextObj)) {
-      el.style.setProperty(key, value);
-    }
-  }
+  (0, import_rn_dom.applyStylePatch)(
+    (key, value) => el.style.setProperty(key, value),
+    (key) => el.style.removeProperty(key),
+    prev,
+    next
+  );
 }
 function createVueRenderer() {
   return (0, import_runtime_core.createRenderer)({
@@ -99,9 +93,8 @@ function createVueRenderer() {
     },
     setScopeId() {
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     insertStaticContent() {
-      return null;
+      return [];
     }
   });
 }

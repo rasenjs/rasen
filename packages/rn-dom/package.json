@@ -11,19 +11,15 @@
     },
     "./elements": {
       "types": "./dist/elements.d.ts",
-      "require": "./dist/elements.js"
+      "require": "./dist/elements.cjs"
     },
     "./tags": {
       "types": "./dist/elements.d.ts",
       "require": "./dist/elements.js"
-    },
-    "./register": {
-      "types": "./register.d.ts",
-      "require": "./dist/register.cjs"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/elements.ts --format cjs,esm --dts --external react-native --external @rasenjs/rn-dom && cp register.cjs dist/register.cjs && cp register.d.ts dist/register.d.ts",
+    "build": "tsup src/index.ts --format cjs,esm --dts --external react-native --external @rasenjs/rn-dom && cp elements.cjs dist/elements.cjs && cp elements.d.ts dist/elements.d.ts",
     "dev": "tsup src/index.ts --format cjs,esm --dts --external react-native --external @rasenjs/rn-dom --watch"
   },
   "dependencies": {

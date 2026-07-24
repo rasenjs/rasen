@@ -8,24 +8,21 @@
 // can consume them from a single package.
 export { parseCSS, normalizeEventName, isEvent, applyStylePatch } from './utils'
 
-// Re-export framework-agnostic element prop types + tag registry.
-// Element types are used by framework adapters (vue-rn, etc.) to provide
-// IDE IntelliSense for RN elements in their template systems.
-export {
+// Element types and runtime values are available from @rasenjs/rn-dom/elements.
+// Re-exported here so framework adapters can import everything from one package.
+import {
   RN_BUILT_IN_TAGS,
   isRNBuiltIn,
   getAllTags,
-} from './elements'
-export type {
-  RNEvent, RNStyle, RNCommonProps, RNTouchProps,
-  RNViewProps, RNSafeAreaViewProps, RNTextProps, RNImageProps,
-  RNTextInputProps, RNAndroidTextInputProps, RNScrollViewProps,
-  RNAndroidHorizontalScrollViewProps, RNActivityIndicatorProps,
-  RNProgressBarAndroidProps, RNSwitchProps, RNAndroidSwitchProps,
-  RNRefreshControlProps, RNAndroidSwipeRefreshLayoutProps,
-  RNModalProps, RNDrawerLayoutAndroidProps, RNDebuggingOverlayProps,
-  RNElementPropMap, ElementProps, RNElementPropName,
-} from './elements'
+  type RNEvent,
+  type RNStyle,
+  type RNElementPropMap,
+  type ElementProps,
+  type RNElementPropName,
+} from '@rasenjs/rn-dom/elements'
+
+export { RN_BUILT_IN_TAGS, isRNBuiltIn, getAllTags }
+export type { RNEvent, RNStyle, RNElementPropMap, ElementProps, RNElementPropName }
 
 // ============================================================================
 // Fabric Interop
@@ -35,28 +32,21 @@ export type Container = number
 export type Props = Record<string, unknown>
 
 import ReactNativePrivateInterface from 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface'
-import type { RNElementPropMap } from './elements'
-// Touch react-native's public `View` export so its getter runs and registers
-// RCTView with Fabric's view config registry. This is the only standard,
-// non-private path RN exposes for a built-in native component; everything
-// else (Text, ScrollView, Image, …) needs its own module top-level loaded
-// by the host. See README for the per-component bring-up recipe.
-import {View as _RNView} from 'react-native'
-export const __ensureViewRegistered = _RNView
+import { Platform } from 'react-native'
 import type { FabricNode, FabricUIManager } from './fabric-global'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Lazy Fabric View Config Registration
 //
-// Import the ensure() function from register.cjs. This module-level import
-// compiles to `require("@rasenjs/rn-dom/register")` which Metro statically
-// traces, bundling register.cjs and all its literal require() calls.
+// Import the ensure() function from elements.cjs. This module-level import
+// compiles to `require("@rasenjs/rn-dom/elements")` which Metro statically
+// traces, bundling elements.cjs and all its literal require() calls.
 //
-// The require() calls inside register.cjs are wrapped in a switch function
+// The require() calls inside elements.cjs are wrapped in a switch function
 // and only execute when ensure() is called — i.e. on first use of each
 // component tag. This gives us lazy registration with eager bundling.
 // ────────────────────────────────────────────────────────────────────────────
-import { ensure } from '@rasenjs/rn-dom/register'
+import { ensure } from '@rasenjs/rn-dom/elements'
 
 /**
  * Shape of a partial view config — matches React Native's PartialViewConfig
@@ -178,7 +168,7 @@ function diffFabricPayload(
 
 function getFabricUIManager(): FabricUIManager {
   if (!nativeFabricUIManager) {
-    throw new Error('[Rasen] nativeFabricUIManager not available')
+    throw new Error('[RNDOM] nativeFabricUIManager not available')
   }
   return nativeFabricUIManager!
 }
@@ -302,7 +292,7 @@ export class RNDocument {
   static getOrCreate(rootTag?: Container): RNDocument {
     if (!RNDocument._instance) {
       if (rootTag === undefined) {
-        throw new Error('[Rasen] RNDocument.getOrCreate() requires rootTag on first call')
+        throw new Error('[RNDOM] RNDocument.getOrCreate() requires rootTag on first call')
       }
       RNDocument._instance = new RNDocument(rootTag)
     }
@@ -318,7 +308,7 @@ export class RNDocument {
 
   // Cache: tagName → nativeName registry lookup result.
   // Third-party components register with their own name (e.g. 'RNCSafeAreaView'),
-  // RN built-ins use 'RCT' prefix convention. Resolution happens once per tag.
+  // RN built-ins are resolved by ensure() which knows the exact Fabric name.
   private static _nativeNameCache = new Map<string, { name: string, config: unknown }>()
 
   private _resolveNativeName(tagName: string): { name: string, config: unknown } {
@@ -327,26 +317,20 @@ export class RNDocument {
 
     const registry = ReactNativePrivateInterface.ReactNativeViewConfigRegistry
     const result = (() => {
-      // Try as-is first (third-party: RNCSafeAreaView, RNCWebView, AIRMap…)
-      try { const c = registry.get(tagName); return { name: tagName, config: c } } catch { /* tag not found */ }
-      const prefixed = tagName.startsWith('RCT') || tagName.startsWith('Android')
-        ? tagName
-        : `RCT${tagName}`
-      try { const c = registry.get(prefixed); return { name: prefixed, config: c } } catch { /* prefixed not found either */ }
+      // 1. As-is: third-party components (RNCSafeAreaView, AIRMap…) and tags
+      //    whose JSX name already matches their Fabric name (Switch, SafeAreaView…).
+      try { const c = registry.get(tagName); return { name: tagName, config: c } } catch { /* not found */ }
 
-      // --- Lazy auto-registration ---
-      // Load the native module's view config on first use.
-      // ensure() returns the Fabric uiViewClassName so we know what name
-      // to look up in the registry — no need for a separate TAG_ALIASES table.
-      const nativeName = ensure(tagName)
+      // 2. Lazy auto-registration: ensure() knows the exact Fabric name for
+      //    every built-in RN component. No guessing with RCT prefixes needed.
+      const nativeName = ensure(tagName, Platform.OS === 'android')
       if (nativeName) {
         try { const c = registry.get(nativeName); return { name: nativeName, config: c } } catch { /* registered but not yet resolvable */ }
       }
 
       throw new Error(
-        `[Rasen] ViewConfig not registered for "${tagName}" (resolved as "${nativeName ?? prefixed}"). ` +
-        `Ensure the native module is imported. For third-party components, ` +
-        `import the JS module in your entry file.`,
+        `[RNDOM] ViewConfig not registered for "${tagName}". ` +
+        `For third-party components, import the JS module in your entry file.`,
       )
     })()
 
@@ -810,17 +794,13 @@ export class RNNode {
   // Tree traversal
   // =========================================================================
 
-  get firstChild(): RNNode | null {
-    for (const c of this._children) {
-      if (c.nodeType === 1) return c as RNNode
-    }
+  get firstChild(): RNNode | RNTextNode | RNCommentNode | null {
+    return this._children[0] ?? null
     return null
   }
 
-  get lastChild(): RNNode | null {
-    for (let i = this._children.length - 1; i >= 0; i--) {
-      if (this._children[i].nodeType === 1) return this._children[i] as RNNode
-    }
+  get lastChild(): RNNode | RNTextNode | RNCommentNode | null {
+    return this._children[this._children.length - 1] ?? null
     return null
   }
 
@@ -843,9 +823,11 @@ export class RNNode {
   }
 
   set textContent(value: string) {
-    // Remove all existing children
-    for (const child of [...this._children]) {
-      this.removeChild(child)
+    // Detach all existing children at once (avoids per-child dirty flagging)
+    const oldChildren = this._children.splice(0)
+    for (const child of oldChildren) {
+      child.parentNode = null
+      unregisterFromInstanceMap(child)
     }
     // Append a single text node if value is non-empty
     if (value) {
@@ -1116,7 +1098,7 @@ export class RNTextNode {
       try {
         fabricUIManager.setNativeProps(this[FABRIC_NODE], { text: value })
       } catch (err) {
-        console.error('[Rasen] setNativeProps error:', err)
+        console.error('[RNDOM] setNativeProps error:', err)
       }
     }
   }
@@ -1196,7 +1178,17 @@ const FABRIC_TO_DOM_EVENT: Record<string, string> = {
   topClick: 'click',
 }
 
-const FOCUSABLE_COMPONENTS = new Set(['AndroidTextInput', 'AndroidEditText'])
+type FocusableTag = 'TextInput' | 'AndroidTextInput'
+const FOCUSABLE_TAGS = new Set<FocusableTag>([
+  // Version-independent: uses rn-dom's own tagName, not Fabric _nativeName.
+  // TextInput covers both Android (AndroidTextInput) and iOS
+  // (RCTSinglelineTextInputView / RCTMultilineTextInputView) — the
+  // _resolveNativeName mapping bridges to the correct Fabric name.
+  // Focusable sub-types that need manual dispatchCommand('focus')
+  // should be listed here by tagName.
+  'TextInput',
+  'AndroidTextInput',
+])
 
 /** Track the currently focused node for blur-on-tap-outside behavior. */
 let _focusedNode: RNNode | null = null
@@ -1255,7 +1247,7 @@ function dispatchEventWithBubble(
   if (type === 'topTouchEnd' && _focusedNode) {
     const targetNode = instanceMap.get(targetTag)
     if (targetNode && targetNode[FABRIC_NODE_ID] !== _focusedNode[FABRIC_NODE_ID]) {
-      if (!FOCUSABLE_COMPONENTS.has(targetNode._nativeName)) {
+      if (!FOCUSABLE_TAGS.has(targetNode.tagName as FocusableTag)) {
         _blurFocusedNode()
       } else {
         // Switching between two focusable components — blur the old one
@@ -1314,7 +1306,7 @@ function dispatchEventWithBubble(
   // event. This mirrors browser behavior where tapping <input> focuses it.
   if (type === 'topTouchEnd') {
     const targetNode = instanceMap.get(targetTag)
-    if (targetNode && FOCUSABLE_COMPONENTS.has(targetNode._nativeName)) {
+    if (targetNode && FOCUSABLE_TAGS.has(targetNode.tagName as FocusableTag)) {
       _focusNode(targetNode)
     }
   }

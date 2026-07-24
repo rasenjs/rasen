@@ -16,7 +16,7 @@
  */
 
 import { createRenderer, getCurrentInstance } from '@vue/runtime-core'
-import { RNDocument, parseCSS, normalizeEventName, isEvent } from '@rasenjs/rn-dom'
+import { RNDocument, parseCSS, normalizeEventName, isEvent, applyStylePatch } from '@rasenjs/rn-dom'
 import type { RNNode, RNTextNode, RNCommentNode } from '@rasenjs/rn-dom'
 
 let _doc: RNDocument | null = null
@@ -30,18 +30,12 @@ function patchStyle(
   prev: string | Record<string, unknown> | null,
   next: string | Record<string, unknown> | null,
 ): void {
-  if (prev) {
-    const prevObj = typeof prev === 'string' ? parseCSS(prev) : prev
-    for (const key of Object.keys(prevObj)) {
-      el.style.removeProperty(key)
-    }
-  }
-  if (next) {
-    const nextObj = typeof next === 'string' ? parseCSS(next) : next
-    for (const [key, value] of Object.entries(nextObj)) {
-      el.style.setProperty(key, value)
-    }
-  }
+  applyStylePatch(
+    (key, value) => el.style.setProperty(key, value),
+    (key) => el.style.removeProperty(key),
+    prev,
+    next,
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -117,8 +111,7 @@ function createVueRenderer(): any {
     },
 
     setScopeId(): void {},
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    insertStaticContent(): any { return null },
+    insertStaticContent(): any { return [] },
   })
 }
 

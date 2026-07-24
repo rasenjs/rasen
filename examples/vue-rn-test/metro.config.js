@@ -54,9 +54,9 @@ const config = {
           type: 'sourceFile',
         }
       }
-      if (moduleName === '@rasenjs/rn-dom/register') {
+      if (moduleName === '@rasenjs/rn-dom/elements') {
         return {
-          filePath: path.join(rnDomPath, 'register.cjs'),
+          filePath: path.join(rnDomPath, 'elements.cjs'),
           type: 'sourceFile',
         }
       }
