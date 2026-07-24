@@ -18,7 +18,7 @@ const { createSimpleExpression } = require('@vue/compiler-core')
 const babel = require('@babel/core')
 const { resolve: resolveCSS } = require('./resolver')
 
-const RN_BUILT_IN_TAGS = new Set(require('@rasenjs/rn-dom/tags').getAllTags())
+const RN_BUILT_IN_TAGS = new Set(require('@rasenjs/rn-dom/elements').getAllTags())
 const { parseCSS } = require('./resolvers/css-parser')
 
 let _resolverInit = false

@@ -6,7 +6,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "node scripts/build-vue.js",
+    "build": "node scripts/build-vue.js && tsc -p tsconfig.transformer.json",
+    "build:transformer": "tsc -p tsconfig.transformer.json",
     "clean": "rm -rf dist"
   },
   "dependencies": {

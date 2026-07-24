@@ -8,19 +8,14 @@
 // can consume them from a single package.
 export { parseCSS, normalizeEventName, isEvent, applyStylePatch } from './utils'
 
-// Re-export tag registry for Vue transformer / strong typing.
-export {
-  RN_COMPONENT_TAGS,
-  isRNBuiltIn,
-  getNativeName,
-  getTagFromNative,
-  getAllTags,
-} from './tags'
-export type { RNComponentTag, RNComponentCategory } from './tags'
-
-// Re-export framework-agnostic element prop types.
-// Framework adapters (vue-rn, react-rn, etc.) use these to provide
+// Re-export framework-agnostic element prop types + tag registry.
+// Element types are used by framework adapters (vue-rn, etc.) to provide
 // IDE IntelliSense for RN elements in their template systems.
+export {
+  RN_BUILT_IN_TAGS,
+  isRNBuiltIn,
+  getAllTags,
+} from './elements'
 export type {
   RNEvent, RNStyle, RNCommonProps, RNTouchProps,
   RNViewProps, RNSafeAreaViewProps, RNTextProps, RNImageProps,
@@ -29,7 +24,7 @@ export type {
   RNProgressBarAndroidProps, RNSwitchProps, RNAndroidSwitchProps,
   RNRefreshControlProps, RNAndroidSwipeRefreshLayoutProps,
   RNModalProps, RNDrawerLayoutAndroidProps, RNDebuggingOverlayProps,
-  RNElementPropMap, ElementProps,
+  RNElementPropMap, ElementProps, RNElementPropName,
 } from './elements'
 
 // ============================================================================
@@ -40,6 +35,7 @@ export type Container = number
 export type Props = Record<string, unknown>
 
 import ReactNativePrivateInterface from 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface'
+import type { RNElementPropMap } from './elements'
 // Touch react-native's public `View` export so its getter runs and registers
 // RCTView with Fabric's view config registry. This is the only standard,
 // non-private path RN exposes for a built-in native component; everything
@@ -305,74 +301,63 @@ export class RNDocument {
   static reset(): void {
     RNDocument._instance = null
   }
-  
-  private _resolveProps(props: Props): Props {
-    const resolved: Props = {}
-    for (const key in props) {
-      const value = props[key]
-      if (value && typeof value === 'object' && 'value' in value) {
-        resolved[key] = (value as { value: unknown }).value
-      } else if (key === 'style' && value && typeof value === 'object') {
-        resolved.style = this._resolveStyle(value as Record<string, unknown>)
-      } else {
-        resolved[key] = value
-      }
-    }
-    return resolved
+
+  // Cache: tagName → nativeName registry lookup result.
+  // Third-party components register with their own name (e.g. 'RNCSafeAreaView'),
+  // RN built-ins use 'RCT' prefix convention. Resolution happens once per tag.
+  private static _nativeNameCache = new Map<string, { name: string, config: unknown }>()
+
+  private _resolveNativeName(tagName: string): { name: string, config: unknown } {
+    const cached = RNDocument._nativeNameCache.get(tagName)
+    if (cached) return cached
+
+    const registry = ReactNativePrivateInterface.ReactNativeViewConfigRegistry
+    const result = (() => {
+      // Try as-is first (third-party: RNCSafeAreaView, RNCWebView, AIRMap…)
+      try { const c = registry.get(tagName); return { name: tagName, config: c } } catch {}
+      // Fall back to RCT prefix (RN built-in: View → RCTView, Text → RCTText)
+      const prefixed = tagName.startsWith('RCT') || tagName.startsWith('Android')
+        ? tagName
+        : `RCT${tagName}`
+      try { const c = registry.get(prefixed); return { name: prefixed, config: c } } catch {}
+      throw new Error(
+        `[Rasen] ViewConfig not registered for "${tagName}" or "${prefixed}". ` +
+        `If this is a third-party component, ensure its JS module is imported ` +
+        `(which registers the view config).`,
+      )
+    })()
+
+    RNDocument._nativeNameCache.set(tagName, result)
+    return result
   }
 
-  private _resolveStyle(style: Record<string, unknown>): Record<string, unknown> {
-    const resolved: Record<string, unknown> = {}
-    for (const key in style) {
-      const value = style[key]
-      if (value && typeof value === 'object' && 'value' in value) {
-        resolved[key] = (value as { value: unknown }).value
-      } else {
-        resolved[key] = value
-      }
-    }
-    return resolved
-  }
-  
-  createElement(tagName: string, props: Props = {}): RNNode {
+  /**
+   * Create a Fabric element. Mirrors DOM's document.createElement(tagName).
+   *
+   * Props are set via setAttribute() / style.setProperty() after creation.
+   * On first mount, _getFabricNode builds the complete Fabric payload
+   * from the accumulated currentProps.
+   *
+   * For known RN tags, the return type provides prop autocomplete:
+   *   const v = doc.createElement('View')  // → RNNode with RNViewProps awareness
+   *   const t = doc.createElement('Text')  // → RNNode with RNTextProps awareness
+   *   const x = doc.createElement('Custom') // → RNNode (untyped fallback)
+   */
+  createElement<K extends keyof RNElementPropMap>(tagName: K): RNNode
+  createElement(tagName: string): RNNode
+  createElement(tagName: string): RNNode {
     const tag = allocateTag()
-    // Auto-prepend 'RCT' prefix unless already has platform prefix (e.g., 'AndroidTextInput')
-    const nativeName = tagName.startsWith('RCT') || tagName.startsWith('Android')
-      ? tagName
-      : `RCT${tagName}`
-    
-    const resolvedProps = this._resolveProps(props)
-    
-    // Resolve view config from registry. Host (example) must call
-    // `registerComponent(name, partialViewConfig)` before mounting, otherwise
-    // Fabric will fail to find this native component.
-    let viewConfig
-    try {
-      const registry = ReactNativePrivateInterface.ReactNativeViewConfigRegistry
-      viewConfig = registry.get(nativeName)
-    } catch (e) {
-      throw new Error(
-        `[Rasen] ViewConfig not registered for "${nativeName}". ` +
-        `Call registerComponent('${nativeName}', partialViewConfig) in your entry file.`,
-      )
-    }
-    
-    const validAttrs = viewConfig?.validAttributes || {}
-    
-    // Defer Fabric node creation to _getFabricNode (first mount), so the
-    // initial createNode call gets the COMPLETE payload from currentProps
-    // including any setAttribute calls made before the node enters the tree.
-    // This avoids cloneNode* issues with nodes created from empty props.
+    const { name: nativeName, config: viewConfig } = this._resolveNativeName(tagName)
+    const validAttrs = (viewConfig as Record<string, unknown>)?.validAttributes as Record<string, unknown> ?? {}
     const node = new RNNode(
       null as unknown as FabricNode,  // placeholder; replaced in _getFabricNode
       tag,
       tagName,
-      resolvedProps,
+      {},
       this
     )
     node._nativeName = nativeName
     node._lastValidAttrs = validAttrs
-    // Also store the instance handle for createNode
     node._instanceHandle = { tag, stateNode: node }
     getInstanceMap().set(tag, node)
     
@@ -846,7 +831,8 @@ export class RNNode {
   }
 
   cloneNode(deep: boolean = false): RNNode {
-    const clone = this.ownerDocument.createElement(this.tagName, { ...this.currentProps })
+    const clone = this.ownerDocument.createElement(this.tagName)
+    clone.currentProps = { ...this.currentProps }
     if (deep) {
       for (const child of this._children) {
         if ('cloneNode' in child && typeof (child as any).cloneNode === 'function') {

@@ -276,3 +276,42 @@ export interface RNElementPropMap {
 
 /** Lookup the prop type for a given element tag name. */
 export type ElementProps<T extends keyof RNElementPropMap> = RNElementPropMap[T]
+
+// ============================================================================
+// Runtime tag list — used by Vue SFC transformer to distinguish RN primitives
+// ============================================================================
+
+/** All known React Native built-in element tag names. */
+export const RN_BUILT_IN_TAGS: (keyof RNElementPropMap)[] = [
+  'View', 'SafeAreaView',
+  'Text',
+  'Image',
+  'TextInput', 'AndroidTextInput',
+  'ScrollView', 'AndroidHorizontalScrollView',
+  'ActivityIndicator', 'ProgressBarAndroid',
+  'Switch', 'AndroidSwitch',
+  'RefreshControl', 'AndroidSwipeRefreshLayout',
+  'Modal',
+  'DrawerLayoutAndroid',
+  'DebuggingOverlay',
+]
+
+const TAG_SET = new Set<string>(RN_BUILT_IN_TAGS)
+
+/** Check if a tag is a known RN built-in (transformer use). */
+export function isRNBuiltIn(tag: string): boolean {
+  return TAG_SET.has(tag)
+}
+
+/** Get all known RN tag names (transformer use). */
+export function getAllTags(): string[] {
+  return [...TAG_SET]
+}
+
+// ============================================================================
+// All known prop keys — for strict setAttribute typing on RNNode
+// ============================================================================
+
+/** Union of all possible RN element prop names. */
+type _UnionOf<T> = T extends Record<string, unknown> ? keyof T : never
+export type RNElementPropName = _UnionOf<RNElementPropMap[keyof RNElementPropMap]> & string
