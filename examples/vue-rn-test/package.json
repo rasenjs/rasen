@@ -13,7 +13,6 @@
   "dependencies": {
     "@rasenjs/rn-dom": "workspace:*",
     "@rasenjs/vue-rn": "workspace:*",
-    "@rasenjs/vue-rn-router-components": "workspace:*",
     "@vue/reactivity": "3.5.40",
     "@vue/runtime-core": "3.5.40",
     "@vue/shared": "3.5.40",

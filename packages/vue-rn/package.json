@@ -18,14 +18,22 @@
   },
   "typesVersions": {
     "*": {
-      "router": ["./dist/router.d.ts"],
-      "dist/index": ["./dist/index.d.ts"],
-      "dist/router": ["./dist/router.d.ts"],
-      "dist/transformer/*": ["./dist/transformer/*"]
+      "router": [
+        "./dist/router.d.ts"
+      ],
+      "dist/index": [
+        "./dist/index.d.ts"
+      ],
+      "dist/router": [
+        "./dist/router.d.ts"
+      ],
+      "dist/transformer/*": [
+        "./dist/transformer/*"
+      ]
     }
   },
   "scripts": {
-    "build": "node scripts/build-vue.js && tsc -p tsconfig.transformer.json",
+    "build": "tsup && tsc -p tsconfig.transformer.json",
     "build:transformer": "tsc -p tsconfig.transformer.json",
     "clean": "rm -rf dist"
   },
@@ -38,6 +46,7 @@
     "vue-router": "^4.0.0"
   },
   "devDependencies": {
+    "tsup": "^8.0.0",
     "typescript": "^5.3.3"
   },
   "files": [

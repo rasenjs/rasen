@@ -887,7 +887,7 @@ export class RNBody extends RNNode {
     const gen = ++this._flushGeneration
 
     queueMicrotask(() => {
-      if (this._flushGeneration !== gen) return // cancelled by completeFabric
+      if (this._flushGeneration !== gen) return // superseded by newer flush
       this._flushScheduled = false
       this._submitToRoot()
     })
@@ -1045,15 +1045,6 @@ export class RNBody extends RNNode {
     return fabricNode
   }
 
-  /**
-   * Synchronously commit the current tree to Fabric.
-   * Cancels any pending async flush.
-   */
-  completeFabric(): void {
-    this._flushGeneration++ // cancel pending async flush
-    this._flushScheduled = false
-    this._submitToRoot()
-  }
 }
 
 // ============================================================================

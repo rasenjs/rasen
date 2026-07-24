@@ -18,14 +18,15 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.ts
-var index_exports = {};
-__export(index_exports, {
+var src_exports = {};
+__export(src_exports, {
   RNDocument: () => import_rn_dom.RNDocument,
   createApp: () => createApp,
   getOrCreateDocument: () => getOrCreateDocument,
   useCssModule: () => useCssModule
 });
-module.exports = __toCommonJS(index_exports);
+module.exports = __toCommonJS(src_exports);
+var import_react_native = require("react-native");
 var import_runtime_core = require("@vue/runtime-core");
 var import_rn_dom = require("@rasenjs/rn-dom");
 var _doc = null;
@@ -40,11 +41,10 @@ function patchStyle(el, prev, next) {
 function createVueRenderer() {
   return (0, import_runtime_core.createRenderer)({
     insert(child, parent, anchor) {
-      parent.insertBefore(child, anchor != null ? anchor : void 0);
+      parent.insertBefore(child, anchor ?? void 0);
     },
     remove(child) {
-      var _a;
-      (_a = child.parentNode) == null ? void 0 : _a.removeChild(child);
+      child.parentNode?.removeChild(child);
     },
     createElement(tag) {
       return _doc.createElement(tag);
@@ -66,8 +66,7 @@ function createVueRenderer() {
       return node.parentNode;
     },
     nextSibling(node) {
-      var _a;
-      return (_a = node.nextSibling) != null ? _a : null;
+      return node.nextSibling ?? null;
     },
     patchProp(el, key, prevValue, nextValue) {
       if (key === "class") return;
@@ -102,17 +101,20 @@ function createApp(rootComponent) {
   const renderer = createVueRenderer();
   const app = renderer.createApp(rootComponent);
   return {
-    mount(container) {
-      _doc = container.ownerDocument;
-      app.mount(container);
-      _doc.body.completeFabric();
-    },
     unmount() {
       app.unmount();
     },
     use(plugin, ...options) {
       app.use(plugin, ...options);
       return this;
+    },
+    register(appName, setup) {
+      import_react_native.AppRegistry.registerRunnable(appName, ({ rootTag }) => {
+        const doc = getOrCreateDocument(rootTag);
+        setup?.();
+        _doc = doc;
+        app.mount(doc.body);
+      });
     }
   };
 }
@@ -129,7 +131,7 @@ function useCssModule(name = "$style") {
     return {};
   }
   const mod = modules[name];
-  return mod != null ? mod : {};
+  return mod ?? {};
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
@@ -138,3 +140,4 @@ function useCssModule(name = "$style") {
   getOrCreateDocument,
   useCssModule
 });
+//# sourceMappingURL=index.js.map

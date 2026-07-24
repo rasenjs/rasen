@@ -15,8 +15,9 @@
  *   })
  */
 
+import { AppRegistry } from 'react-native'
 import { createRenderer, getCurrentInstance } from '@vue/runtime-core'
-import { RNDocument, parseCSS, normalizeEventName, isEvent, applyStylePatch } from '@rasenjs/rn-dom'
+import { RNDocument, normalizeEventName, isEvent, applyStylePatch } from '@rasenjs/rn-dom'
 import type { RNNode, RNTextNode, RNCommentNode } from '@rasenjs/rn-dom'
 
 let _doc: RNDocument | null = null
@@ -120,9 +121,9 @@ function createVueRenderer(): any {
 // ---------------------------------------------------------------------------
 
 export interface VueRNMountable {
-  mount(container: RNNode): void
   unmount(): void
   use(plugin: any, ...options: any[]): VueRNMountable
+  register(appName: string, setup?: () => void): void
 }
 
 export function createApp(rootComponent: object): VueRNMountable {
@@ -130,15 +131,6 @@ export function createApp(rootComponent: object): VueRNMountable {
   const app = renderer.createApp(rootComponent)
 
   return {
-    mount(container: RNNode) {
-      _doc = container.ownerDocument
-      app.mount(container)
-      // Synchronously flush the initial tree to Fabric.
-      // Without this, Fabric would wait for the next microtask, leaving
-      // the first frame blank.
-      _doc.body.completeFabric()
-    },
-
     unmount() {
       app.unmount()
     },
@@ -146,6 +138,15 @@ export function createApp(rootComponent: object): VueRNMountable {
     use(plugin: any, ...options: any[]) {
       app.use(plugin, ...options)
       return this
+    },
+
+    register(appName: string, setup?: () => void) {
+      AppRegistry.registerRunnable(appName, ({ rootTag }: any) => {
+        const doc = getOrCreateDocument(rootTag as number)
+        setup?.()
+        _doc = doc
+        app.mount(doc.body)
+      })
     },
   }
 }

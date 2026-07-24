@@ -54,7 +54,6 @@ var RouterLink = /* @__PURE__ */ (0, import_runtime_core.defineComponent)({
   setup(props, { slots }) {
     const link = (0, import_vue_router.useLink)(props);
     return () => {
-      var _a, _b;
       const scope = {
         route: link.route,
         href: link.href,
@@ -62,7 +61,7 @@ var RouterLink = /* @__PURE__ */ (0, import_runtime_core.defineComponent)({
         isExactActive: link.isExactActive,
         navigate: link.navigate
       };
-      const slotContent = (_b = (_a = slots.default) == null ? void 0 : _a.call(slots, scope)) != null ? _b : [];
+      const slotContent = slots.default?.(scope) ?? [];
       if (props.custom) {
         return slotContent.length === 0 ? (0, import_runtime_core.h)("View") : slotContent;
       }
@@ -80,3 +79,4 @@ function createRNHistory(base) {
   RouterLink,
   createRNHistory
 });
+//# sourceMappingURL=router.js.map
