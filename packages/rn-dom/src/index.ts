@@ -871,6 +871,9 @@ export class RNBody extends RNNode {
       {},
       ownerDocument
     )
+    // Body is the root container — always "mounted" so children additions
+    // trigger _scheduleFlush() → _submitToRoot() → Fabric completeRoot.
+    this._mounted = true
   }
 
   // Use inherited _markChildrenDirty / removeChild from RNNode.

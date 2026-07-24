@@ -29,6 +29,13 @@ const config = {
           type: 'sourceFile',
         }
       }
+      // Force single vue-router module so Symbol('router') matches everywhere.
+      if (moduleName === 'vue-router') {
+        return {
+          filePath: path.join(monorepoRoot, 'node_modules/vue-router/dist/vue-router.cjs'),
+          type: 'sourceFile',
+        }
+      }
       if (moduleName === 'react-native' || moduleName.startsWith('react-native/')) {
         const subPath = moduleName === 'react-native' ? 'index.js' : moduleName.slice('react-native/'.length) + '.js'
         return {

@@ -43,7 +43,7 @@
   "peerDependencies": {
     "@rasenjs/rn-dom": "workspace:*",
     "vue": "^3.4.0",
-    "vue-router": "^4.0.0"
+    "vue-router": "^4.0.0 || ^5.0.0"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
