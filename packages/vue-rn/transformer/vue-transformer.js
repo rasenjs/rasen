@@ -18,13 +18,7 @@ const { createSimpleExpression } = require('@vue/compiler-core')
 const babel = require('@babel/core')
 const { resolve: resolveCSS } = require('./resolver')
 
-const RN_BUILT_IN_TAGS = new Set([
-  'View', 'Text', 'AndroidTextInput', 'Image', 'ScrollView',
-  'RCTView', 'RCTText', 'RCTScrollView', 'RCTImage',
-  'ActivityIndicator', 'Switch', 'ProgressBar',
-  'TouchableOpacity', 'TouchableHighlight', 'TouchableWithoutFeedback',
-  'Modal', 'RefreshControl', 'SafeAreaView', 'KeyboardAvoidingView',
-])
+const RN_BUILT_IN_TAGS = new Set(require('@rasenjs/rn-dom/tags').getAllTags())
 
 let _resolverInit = false
 let _styleMap = new Map()

@@ -4,9 +4,19 @@
   "description": "React Native DOM abstraction layer for rasen",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
+    },
+    "./tags": {
+      "require": "./tags.cjs"
+    }
+  },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --external react-native",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --external react-native --watch"
+    "build": "node scripts/generate-tags.cjs && tsup src/index.ts --format cjs,esm --dts --external react-native",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --external react-native --watch",
+    "gen-tags": "node scripts/generate-tags.cjs"
   },
   "dependencies": {
     "react": "^19.0.0",

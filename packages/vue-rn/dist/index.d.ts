@@ -1,0 +1,52 @@
+export { computed, h, reactive, ref } from '@vue/runtime-core';
+import { RNNode } from '@rasenjs/rn-dom';
+export { RNDocument } from '@rasenjs/rn-dom';
+
+/**
+ * Vue 3 Custom Renderer for React Native Fabric
+ *
+ * Replaces @vue/runtime-dom's DOM backend with @rasenjs/rn-dom.
+ */
+
+interface VueRNMountable {
+    mount(container: RNNode): void;
+    unmount(): void;
+    use(plugin: any, ...options: any[]): VueRNMountable;
+}
+declare function createApp(rootComponent: object): VueRNMountable;
+
+export { type VueRNMountable, createApp };
+
+// ── Vue template tag type declarations ──────────────────────────────────
+// IDE IntelliSense for RN built-in elements in .vue <template>.
+// TYPE-ONLY — RN tags are custom elements resolved by rn-dom at runtime.
+//
+// Imported automatically when your env.d.ts references the package:
+//   /// <reference types="@rasenjs/vue-rn" />
+
+import type { DefineComponent } from 'vue'
+
+interface _RNEvent { nativeEvent: Record<string, unknown> }
+interface _RNStyle { [key: string]: unknown }
+
+declare module 'vue' {
+  export interface GlobalComponents {
+    View: DefineComponent<Record<string, unknown>>
+    SafeAreaView: DefineComponent<Record<string, unknown>>
+    Text: DefineComponent<Record<string, unknown>>
+    Image: DefineComponent<Record<string, unknown>>
+    TextInput: DefineComponent<Record<string, unknown>>
+    AndroidTextInput: DefineComponent<Record<string, unknown>>
+    ScrollView: DefineComponent<Record<string, unknown>>
+    AndroidHorizontalScrollView: DefineComponent<Record<string, unknown>>
+    ActivityIndicator: DefineComponent<Record<string, unknown>>
+    ProgressBarAndroid: DefineComponent<Record<string, unknown>>
+    Switch: DefineComponent<Record<string, unknown>>
+    AndroidSwitch: DefineComponent<Record<string, unknown>>
+    RefreshControl: DefineComponent<Record<string, unknown>>
+    AndroidSwipeRefreshLayout: DefineComponent<Record<string, unknown>>
+    Modal: DefineComponent<Record<string, unknown>>
+    DrawerLayoutAndroid: DefineComponent<Record<string, unknown>>
+    DebuggingOverlay: DefineComponent<Record<string, unknown>>
+  }
+}

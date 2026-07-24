@@ -4,6 +4,34 @@
  * Provides a DOM-like API for React Native Fabric rendering
  */
 
+// Re-export shared utilities so framework adapters (Vue, etc.)
+// can consume them from a single package.
+export { parseCSS, normalizeEventName, isEvent, applyStylePatch } from './utils'
+
+// Re-export tag registry for Vue transformer / strong typing.
+export {
+  RN_COMPONENT_TAGS,
+  isRNBuiltIn,
+  getNativeName,
+  getTagFromNative,
+  getAllTags,
+} from './tags'
+export type { RNComponentTag, RNComponentCategory } from './tags'
+
+// Re-export framework-agnostic element prop types.
+// Framework adapters (vue-rn, react-rn, etc.) use these to provide
+// IDE IntelliSense for RN elements in their template systems.
+export type {
+  RNEvent, RNStyle, RNCommonProps, RNTouchProps,
+  RNViewProps, RNSafeAreaViewProps, RNTextProps, RNImageProps,
+  RNTextInputProps, RNAndroidTextInputProps, RNScrollViewProps,
+  RNAndroidHorizontalScrollViewProps, RNActivityIndicatorProps,
+  RNProgressBarAndroidProps, RNSwitchProps, RNAndroidSwitchProps,
+  RNRefreshControlProps, RNAndroidSwipeRefreshLayoutProps,
+  RNModalProps, RNDrawerLayoutAndroidProps, RNDebuggingOverlayProps,
+  RNElementPropMap, ElementProps,
+} from './elements'
+
 // ============================================================================
 // Fabric Interop
 // ============================================================================

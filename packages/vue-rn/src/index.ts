@@ -16,29 +16,10 @@
  */
 
 import { createRenderer, h, ref, reactive, computed } from '@vue/runtime-core'
-import { RNDocument } from '@rasenjs/rn-dom'
+import { RNDocument, parseCSS, normalizeEventName, isEvent } from '@rasenjs/rn-dom'
 import type { RNNode, RNTextNode, RNCommentNode } from '@rasenjs/rn-dom'
 
 let _doc: RNDocument | null = null
-
-// ---------------------------------------------------------------------------
-// CSS string → object parser
-// ---------------------------------------------------------------------------
-
-function parseCSS(css: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  for (const decl of css.split(';')) {
-    const colon = decl.indexOf(':')
-    if (colon === -1) continue
-    const key = decl.slice(0, colon).trim()
-    const value = decl.slice(colon + 1).trim()
-    if (!key || !value) continue
-    const camelKey = key.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
-    const num = Number(value)
-    result[camelKey] = Number.isNaN(num) ? value : num
-  }
-  return result
-}
 
 // ---------------------------------------------------------------------------
 // patchStyle
@@ -62,38 +43,6 @@ function patchStyle(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Event name normalisation
-// ---------------------------------------------------------------------------
-
-const EVENT_ALIAS: Record<string, string> = {
-  onclick: 'onTouchEnd',
-  ontouchend: 'onTouchEnd',
-  ontouchstart: 'onTouchStart',
-  ontouchmove: 'onTouchMove',
-  ontouchcancel: 'onTouchCancel',
-  oninput: 'onChange',
-}
-
-function normalizeEventName(key: string): string {
-  const lower = key.toLowerCase()
-  if (EVENT_ALIAS[lower]) return EVENT_ALIAS[lower]
-  if (key.startsWith('on:')) {
-    const event = key.slice(3)
-    return 'on' + event.charAt(0).toUpperCase() + event.slice(1)
-  }
-  if (key.charCodeAt(0) === 111 /* o */ && key.charCodeAt(1) === 110 /* n */) {
-    return key.slice(0, 2) + key.charAt(2).toUpperCase() + key.slice(3)
-  }
-  return key
-}
-
-/** Check if a string looks like a Vue event binding (starts with "on") */
-const isEvent = (key: string): boolean =>
-  key.length > 2 &&
-  key.charCodeAt(0) === 111 /* o */ &&
-  key.charCodeAt(1) === 110 /* n */
 
 // ---------------------------------------------------------------------------
 // DOM operations for Vue renderer
@@ -174,10 +123,6 @@ function createVueRenderer(): any {
 }
 
 // ---------------------------------------------------------------------------
-// patchProp
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // createApp
 // ---------------------------------------------------------------------------
 
@@ -195,6 +140,9 @@ export function createApp(rootComponent: object): VueRNMountable {
     mount(container: RNNode) {
       _doc = container.ownerDocument
       app.mount(container)
+      // Synchronously flush the initial tree to Fabric.
+      // Without this, Fabric would wait for the next microtask, leaving
+      // the first frame blank.
       _doc.body.completeFabric()
     },
 

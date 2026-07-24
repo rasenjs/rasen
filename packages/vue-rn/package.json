@@ -21,6 +21,7 @@
   },
   "files": [
     "dist",
-    "transformer"
+    "transformer",
+    "tags.d.ts"
   ]
 }
