@@ -128,11 +128,36 @@ async function transform(params) {
   // Merge
   let combined
   if (isScriptSetup) {
+    // For <script setup>, rewrite the export default into a const so __sfc__
+    // is available for HMR injection below.
     combined = renderCode.replace(/^export\s+/, '') + '\n' +
-      scriptCode.replace(/export\s+default\s+\/\*@__PURE__\*\/_defineComponent\(\{/, 'export default /*@__PURE__*/_defineComponent({render: render,\n')
+      scriptCode.replace(
+        /export\s+default\s+\/\*@__PURE__\*\/_defineComponent\(\{/,
+        'const __sfc__ = /*@__PURE__*/_defineComponent({render: render,\n'
+      ) + '\nexport default __sfc__'
   } else {
     combined = renderCode.replace(/^export\s+/, '') + '\n' + scriptCode + '\n__sfc__.render = render\nexport default __sfc__'
   }
+
+  // HMR — vue-rn hot module replacement
+  // On initial load, createRecord() returns true. On HMR re-execution (detected
+  // by Metro's module.hot system), the factory runs again and createRecord()
+  // returns false, triggering reload() which updates the component in place
+  // while preserving state.
+  //
+  // Inside the __d() factory, `module` is the 5th parameter (the module object)
+  // in Metro's factory signature:
+  //   function(global, require, importDefault, importAll, module, exports, depMap)
+  // We call module.hot.accept() to flag this module as an HMR accept boundary
+  // so Metro's topological sort stops bubbling instead of doing a full refresh.
+  combined += `
+if (typeof __VUE_HMR_RUNTIME__ !== 'undefined') {
+  __sfc__.__hmrId = "${id}"
+  if (!__VUE_HMR_RUNTIME__.createRecord(__sfc__.__hmrId, __sfc__)) {
+    __VUE_HMR_RUNTIME__.reload(__sfc__.__hmrId, __sfc__)
+  }
+  if (typeof module !== 'undefined' && module.hot) module.hot.accept()
+}`
 
   // Strip TS → RN Babel
   const stripped = babel.transformSync(combined, {
