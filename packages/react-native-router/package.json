@@ -1,0 +1,43 @@
+{
+  "name": "@rasenjs/react-native-router",
+  "version": "0.1.0",
+  "description": "React Native Router based on @rasenjs/router - Zero dependencies",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/react-native": "workspace:*",
+    "@rasenjs/router": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-native": ">=0.76.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    }
+  }
+}

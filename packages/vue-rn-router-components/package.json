@@ -1,0 +1,18 @@
+{
+  "name": "@rasenjs/vue-rn-router-components",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RN-compatible RouterLink for vue-router — renders View instead of <a>",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "scripts": {
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0",
+    "vue-router": "^4.0.0"
+  },
+  "files": [
+    "src"
+  ]
+}

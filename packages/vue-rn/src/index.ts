@@ -184,6 +184,7 @@ function createVueRenderer(): any {
 export interface VueRNMountable {
   mount(container: RNNode): void
   unmount(): void
+  use(plugin: any, ...options: any[]): VueRNMountable
 }
 
 export function createApp(rootComponent: object): VueRNMountable {
@@ -199,6 +200,11 @@ export function createApp(rootComponent: object): VueRNMountable {
 
     unmount() {
       app.unmount()
+    },
+
+    use(plugin: any, ...options: any[]) {
+      app.use(plugin, ...options)
+      return this
     },
   }
 }

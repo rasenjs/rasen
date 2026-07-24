@@ -12,11 +12,13 @@
   "dependencies": {
     "@rasenjs/rn-dom": "workspace:*",
     "@rasenjs/vue-rn": "workspace:*",
+    "@rasenjs/vue-rn-router-components": "workspace:*",
     "@vue/reactivity": "3.5.40",
     "@vue/runtime-core": "3.5.40",
     "@vue/shared": "3.5.40",
     "react-native": "0.76.9",
-    "vue": "^3.4.0"
+    "vue": "^3.4.0",
+    "vue-router": "^4.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.23.0",

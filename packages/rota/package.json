@@ -1,0 +1,79 @@
+{
+  "name": "@rasenjs/rota",
+  "version": "0.1.0-alpha",
+  "description": "Rota - Headless UI components for Rasen framework",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./dom": {
+      "types": "./dist/dom.d.ts",
+      "import": "./dist/dom.js",
+      "require": "./dist/dom.cjs"
+    },
+    "./html": {
+      "types": "./dist/html.d.ts",
+      "import": "./dist/html.js",
+      "require": "./dist/html.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "test": "../../node_modules/.bin/vitest --run",
+    "test:watch": "../../node_modules/.bin/vitest",
+    "test:coverage": "../../node_modules/.bin/vitest --run --coverage",
+    "typecheck": "../../node_modules/.bin/tsc --noEmit",
+    "lint": "../../node_modules/.bin/eslint src --ext .ts,.tsx",
+    "lint:fix": "../../node_modules/.bin/eslint src --ext .ts,.tsx --fix",
+    "clean": "rm -rf dist",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:debug": "playwright test --debug"
+  },
+  "keywords": [
+    "rasen",
+    "headless",
+    "ui",
+    "components",
+    "accessible",
+    "a11y"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/rota"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/rota",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT",
+  "peerDependencies": {
+    "@rasenjs/core": "workspace:^",
+    "@rasenjs/dom": "workspace:^",
+    "@rasenjs/html": "workspace:^"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@testing-library/dom": "^10.0.0",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/user-event": "^14.5.0",
+    "jsdom": "^24.0.0",
+    "vitest": "^1.0.4"
+  }
+}

@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rota E2E Test App</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      h1 {
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+      }
+      h2 {
+        margin-top: 30px;
+      }
+      section {
+        margin-bottom: 40px;
+        padding: 20px;
+        border: 1px solid #eee;
+        border-radius: 8px;
+      }
+
+      /* Separator */
+      .separator {
+        border: none;
+        margin: 15px 0;
+        background-color: #ccc;
+      }
+      .separator[data-orientation='horizontal'] {
+        width: auto;
+        height: 1px;
+      }
+      .separator[data-orientation='vertical'] {
+        width: 1px;
+        height: auto;
+      }
+
+      /* AspectRatio */
+      .aspect-ratio {
+        position: relative;
+        width: 100%;
+      }
+      .aspect-ratio img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      /* Avatar */
+      .avatar {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: #eee;
+      }
+      .avatar img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .avatar-fallback {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+      }
+
+      /* Collapsible */
+      .collapsible {
+        border: 1px solid #eee;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .collapsible-trigger {
+        width: 100%;
+        padding: 12px 16px;
+        background: #f5f5f5;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+      }
+      .collapsible-content {
+        padding: 16px;
+      }
+      .collapsible-content[data-state='closed'] {
+        display: none;
+      }
+      .collapsible-content[data-state='open'] {
+        display: block;
+      }
+
+      /* Progress */
+      .progress {
+        position: relative;
+        overflow: hidden;
+        background: #eee;
+        border-radius: 9999px;
+        width: 100%;
+        height: 20px;
+      }
+      .progress-indicator {
+        background: #3b82f6;
+        height: 100%;
+        transition: width 0.3s;
+      }
+
+      /* Tabs */
+      .tabs {
+        width: 100%;
+      }
+      .tabs-list {
+        display: flex;
+        border-bottom: 2px solid #eee;
+      }
+      .tabs-trigger {
+        padding: 12px 24px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+      }
+      .tabs-trigger[data-state='active'] {
+        border-bottom-color: #3b82f6;
+        color: #3b82f6;
+      }
+      .tabs-trigger[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .tabs-content {
+        padding: 16px 0;
+      }
+      .tabs-content[data-state='inactive'] {
+        display: none;
+      }
+
+      /* Checkbox */
+      .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .checkbox-root {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ccc;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .checkbox-root[data-state='checked'] {
+        background: #3b82f6;
+        border-color: #3b82f6;
+      }
+      .checkbox-root[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .checkbox-indicator {
+        color: white;
+        font-size: 14px;
+      }
+
+      /* Switch */
+      .switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        background: #ccc;
+        border-radius: 9999px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .switch[data-state='checked'] {
+        background: #3b82f6;
+      }
+      .switch[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .switch-thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 20px;
+        height: 20px;
+        background: white;
+        border-radius: 50%;
+        transition: transform 0.2s;
+      }
+      .switch[data-state='checked'] .switch-thumb {
+        transform: translateX(20px);
+      }
+
+      /* Accordion */
+      .accordion {
+        border: 1px solid #eee;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .accordion-item {
+        border-bottom: 1px solid #eee;
+      }
+      .accordion-item:last-child {
+        border-bottom: none;
+      }
+      .accordion-header {
+        margin: 0;
+      }
+      .accordion-trigger {
+        width: 100%;
+        padding: 12px 16px;
+        background: #f5f5f5;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .accordion-trigger[data-state='open'] {
+        background: #e5e7eb;
+      }
+      .accordion-trigger[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .accordion-content {
+        padding: 16px;
+      }
+      .accordion-content[data-state='closed'] {
+        display: none;
+      }
+      .accordion-content[data-state='open'] {
+        display: block;
+      }
+
+      /* AlertDialog */
+      .alert-dialog-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 50;
+      }
+      .alert-dialog-overlay[data-state='closed'] {
+        display: none;
+      }
+      .alert-dialog-content {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        z-index: 51;
+        min-width: 300px;
+      }
+      .alert-dialog-content[hidden] {
+        display: none;
+      }
+      .alert-dialog-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 16px;
+      }
+
+      /* NumberField */
+      .numberfield {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .numberfield-input {
+        width: 80px;
+        padding: 8px;
+        border: none;
+        text-align: center;
+        font-size: 14px;
+      }
+      .numberfield-button {
+        padding: 8px 12px;
+        border: none;
+        background: #f5f5f5;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      .numberfield-button:hover {
+        background: #e5e5e5;
+      }
+      .numberfield-button[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* TagsInput */
+      .tagsinput {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        min-height: 40px;
+      }
+      .tagsinput-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: #e5e7eb;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .tagsinput-item[data-selected] {
+        background: #3b82f6;
+        color: white;
+      }
+      .tagsinput-item-delete {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        padding: 0;
+        color: inherit;
+      }
+      .tagsinput-input {
+        flex: 1;
+        min-width: 100px;
+        border: none;
+        outline: none;
+        font-size: 14px;
+        padding: 4px;
+      }
+
+      /* PinInput */
+      .pininput {
+        display: flex;
+        gap: 8px;
+      }
+      .pininput-input {
+        width: 48px;
+        height: 48px;
+        text-align: center;
+        font-size: 24px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      .pininput-input:focus {
+        border-color: #3b82f6;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      }
+      .pininput-input[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Rota Components E2E Tests</h1>
+
+    <!-- Separator -->
+    <section id="separator-section">
+      <h2>Separator</h2>
+      <div id="separator-h"></div>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span>Left</span>
+        <div id="separator-v"></div>
+        <span>Right</span>
+      </div>
+      <div id="separator-decorative"></div>
+    </section>
+
+    <!-- AspectRatio -->
+    <section id="aspect-ratio-section">
+      <h2>AspectRatio</h2>
+      <div style="width: 300px">
+        <div id="aspect-ratio-16-9"></div>
+      </div>
+    </section>
+
+    <!-- Avatar -->
+    <section id="avatar-section">
+      <h2>Avatar</h2>
+      <div id="avatar-with-image"></div>
+      <div id="avatar-with-fallback"></div>
+    </section>
+
+    <!-- Collapsible -->
+    <section id="collapsible-section">
+      <h2>Collapsible</h2>
+      <div id="collapsible"></div>
+    </section>
+
+    <!-- Progress -->
+    <section id="progress-section">
+      <h2>Progress</h2>
+      <div id="progress-50"></div>
+      <div id="progress-0"></div>
+    </section>
+
+    <!-- Tabs -->
+    <section id="tabs-section">
+      <h2>Tabs</h2>
+      <div id="tabs"></div>
+    </section>
+
+    <!-- Checkbox -->
+    <section id="checkbox-section">
+      <h2>Checkbox</h2>
+      <label id="checkbox-unchecked" class="checkbox">
+        <div id="checkbox-root-1"></div>
+        <span>Unchecked</span>
+      </label>
+      <label id="checkbox-checked" class="checkbox">
+        <div id="checkbox-root-2"></div>
+        <span>Checked</span>
+      </label>
+      <label id="checkbox-disabled" class="checkbox">
+        <div id="checkbox-root-3"></div>
+        <span>Disabled</span>
+      </label>
+    </section>
+
+    <!-- Switch -->
+    <section id="switch-section">
+      <h2>Switch</h2>
+      <div id="switch-off"></div>
+      <div id="switch-on"></div>
+      <div id="switch-disabled"></div>
+    </section>
+
+    <!-- Accordion Single -->
+    <section id="accordion-single-section">
+      <h2>Accordion (Single)</h2>
+      <div id="accordion-single"></div>
+    </section>
+
+    <!-- Accordion Multiple -->
+    <section id="accordion-multiple-section">
+      <h2>Accordion (Multiple)</h2>
+      <div id="accordion-multiple"></div>
+    </section>
+
+    <!-- AlertDialog -->
+    <section id="alert-dialog-section">
+      <h2>AlertDialog</h2>
+      <div id="alert-dialog"></div>
+    </section>
+
+    <!-- NumberField -->
+    <section id="numberfield-section">
+      <h2>NumberField</h2>
+      <div id="numberfield-default"></div>
+      <div id="numberfield-with-value"></div>
+      <div id="numberfield-with-range"></div>
+      <div id="numberfield-disabled"></div>
+    </section>
+
+    <!-- TagsInput -->
+    <section id="tagsinput-section">
+      <h2>TagsInput</h2>
+      <div id="tagsinput-default"></div>
+      <div id="tagsinput-with-default"></div>
+      <div id="tagsinput-max"></div>
+      <div id="tagsinput-disabled"></div>
+    </section>
+
+    <!-- PinInput -->
+    <section id="pininput-section">
+      <h2>PinInput</h2>
+      <div id="pininput-default"></div>
+      <div id="pininput-with-value"></div>
+      <div id="pininput-numeric"></div>
+      <div id="pininput-disabled"></div>
+    </section>
+
+    <script type="module">
+      // Import Rota components from the built dist
+      import {
+        separator,
+        hseparator,
+        vseparator,
+        aspectRatio,
+        avatar,
+        collapsible,
+        progress,
+        tabs,
+        checkbox,
+        switchRoot,
+        accordion,
+        alertDialog,
+        numberField,
+        tagsInput,
+        pinInput
+      } from '/dist/index.js'
+
+      // ==================== Separator ====================
+      hseparator({ class: 'separator' })(document.getElementById('separator-h'))
+      vseparator({ class: 'separator' })(document.getElementById('separator-v'))
+      separator({ class: 'separator' })(
+        document.getElementById('separator-decorative')
+      )
+
+      // ==================== AspectRatio ====================
+      aspectRatio({ ratio: 16 / 9, class: 'aspect-ratio' })(
+        document.getElementById('aspect-ratio-16-9')
+      )
+
+      // ==================== Avatar ====================
+      avatar({
+        src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect fill='%233b82f6' width='48' height='48'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16'%3EJD%3C/text%3E%3C/svg%3E",
+        alt: 'John Doe',
+        class: 'avatar'
+      })(document.getElementById('avatar-with-image'))
+
+      avatar({
+        fallback: 'AB',
+        class: 'avatar',
+        fallbackClass: 'avatar-fallback'
+      })(document.getElementById('avatar-with-fallback'))
+
+      // ==================== Collapsible ====================
+      collapsible({
+        class: 'collapsible',
+        triggerClass: 'collapsible-trigger',
+        contentClass: 'collapsible-content',
+        children: 'This is collapsible content.'
+      })(document.getElementById('collapsible'))
+
+      // ==================== Progress ====================
+      progress({
+        value: 50,
+        class: 'progress',
+        indicatorClass: 'progress-indicator'
+      })(document.getElementById('progress-50'))
+      progress({
+        value: 0,
+        class: 'progress',
+        indicatorClass: 'progress-indicator'
+      })(document.getElementById('progress-0'))
+
+      // ==================== Tabs ====================
+      tabs({
+        defaultValue: 'tab1',
+        class: 'tabs',
+        listClass: 'tabs-list',
+        triggerClass: 'tabs-trigger',
+        contentClass: 'tabs-content',
+        tabs: [
+          { value: 'tab1', label: 'Tab 1', content: 'Tab 1 content' },
+          { value: 'tab2', label: 'Tab 2', content: 'Tab 2 content' },
+          {
+            value: 'tab3',
+            label: 'Tab 3',
+            content: 'Tab 3 content',
+            disabled: true
+          }
+        ]
+      })(document.getElementById('tabs'))
+
+      // ==================== Checkbox ====================
+      checkbox({
+        class: 'checkbox-root',
+        indicatorClass: 'checkbox-indicator'
+      })(document.getElementById('checkbox-root-1'))
+
+      checkbox({
+        defaultChecked: true,
+        class: 'checkbox-root',
+        indicatorClass: 'checkbox-indicator'
+      })(document.getElementById('checkbox-root-2'))
+
+      checkbox({
+        disabled: true,
+        class: 'checkbox-root',
+        indicatorClass: 'checkbox-indicator'
+      })(document.getElementById('checkbox-root-3'))
+
+      // ==================== Switch ====================
+      switchRoot({
+        class: 'switch',
+        thumbClass: 'switch-thumb'
+      })(document.getElementById('switch-off'))
+
+      switchRoot({
+        defaultChecked: true,
+        class: 'switch',
+        thumbClass: 'switch-thumb'
+      })(document.getElementById('switch-on'))
+
+      switchRoot({
+        disabled: true,
+        class: 'switch',
+        thumbClass: 'switch-thumb'
+      })(document.getElementById('switch-disabled'))
+
+      // ==================== Accordion Single ====================
+      accordion({
+        type: 'single',
+        collapsible: false,
+        class: 'accordion',
+        itemClass: 'accordion-item',
+        headerClass: 'accordion-header',
+        triggerClass: 'accordion-trigger',
+        contentClass: 'accordion-content',
+        items: [
+          { value: 'item1', label: 'Item 1', content: 'Content for item 1' },
+          { value: 'item2', label: 'Item 2', content: 'Content for item 2' },
+          {
+            value: 'item3',
+            label: 'Item 3 (Disabled)',
+            content: 'Content for item 3',
+            disabled: true
+          }
+        ]
+      })(document.getElementById('accordion-single'))
+
+      // ==================== Accordion Multiple ====================
+      accordion({
+        type: 'multiple',
+        class: 'accordion',
+        itemClass: 'accordion-item',
+        headerClass: 'accordion-header',
+        triggerClass: 'accordion-trigger',
+        contentClass: 'accordion-content',
+        items: [
+          {
+            value: 'item1',
+            label: 'Multi Item 1',
+            content: 'Content for multi item 1'
+          },
+          {
+            value: 'item2',
+            label: 'Multi Item 2',
+            content: 'Content for multi item 2'
+          }
+        ]
+      })(document.getElementById('accordion-multiple'))
+
+      // ==================== AlertDialog ====================
+      alertDialog({
+        triggerText: 'Open Alert Dialog',
+        triggerClass: 'alert-dialog-trigger',
+        overlayClass: 'alert-dialog-overlay',
+        contentClass: 'alert-dialog-content',
+        titleClass: 'alert-dialog-title',
+        descriptionClass: 'alert-dialog-description',
+        actionsClass: 'alert-dialog-actions',
+        cancelClass: 'alert-dialog-cancel',
+        actionClass: 'alert-dialog-action',
+        title: 'Are you sure?',
+        description: 'This action cannot be undone.',
+        cancelText: 'Cancel',
+        confirmText: 'Confirm'
+      })(document.getElementById('alert-dialog'))
+
+      // ==================== NumberField ====================
+      numberField({
+        class: 'numberfield',
+        inputClass: 'numberfield-input',
+        incrementClass: 'numberfield-button',
+        decrementClass: 'numberfield-button',
+        incrementChildren: '+',
+        decrementChildren: '-'
+      })(document.getElementById('numberfield-default'))
+
+      numberField({
+        defaultValue: 50,
+        class: 'numberfield',
+        inputClass: 'numberfield-input',
+        incrementClass: 'numberfield-button',
+        decrementClass: 'numberfield-button',
+        incrementChildren: '+',
+        decrementChildren: '-'
+      })(document.getElementById('numberfield-with-value'))
+
+      numberField({
+        defaultValue: 5,
+        min: 0,
+        max: 10,
+        step: 1,
+        class: 'numberfield',
+        inputClass: 'numberfield-input',
+        incrementClass: 'numberfield-button',
+        decrementClass: 'numberfield-button',
+        incrementChildren: '+',
+        decrementChildren: '-'
+      })(document.getElementById('numberfield-with-range'))
+
+      numberField({
+        disabled: true,
+        class: 'numberfield',
+        inputClass: 'numberfield-input',
+        incrementClass: 'numberfield-button',
+        decrementClass: 'numberfield-button',
+        incrementChildren: '+',
+        decrementChildren: '-'
+      })(document.getElementById('numberfield-disabled'))
+
+      // ==================== TagsInput ====================
+      tagsInput({
+        class: 'tagsinput',
+        inputClass: 'tagsinput-input',
+        itemClass: 'tagsinput-item',
+        itemDeleteClass: 'tagsinput-item-delete'
+      })(document.getElementById('tagsinput-default'))
+
+      tagsInput({
+        defaultValue: ['Vue', 'React'],
+        class: 'tagsinput',
+        inputClass: 'tagsinput-input',
+        itemClass: 'tagsinput-item',
+        itemDeleteClass: 'tagsinput-item-delete'
+      })(document.getElementById('tagsinput-with-default'))
+
+      tagsInput({
+        max: 3,
+        class: 'tagsinput',
+        inputClass: 'tagsinput-input',
+        itemClass: 'tagsinput-item',
+        itemDeleteClass: 'tagsinput-item-delete'
+      })(document.getElementById('tagsinput-max'))
+
+      tagsInput({
+        disabled: true,
+        class: 'tagsinput',
+        inputClass: 'tagsinput-input',
+        itemClass: 'tagsinput-item',
+        itemDeleteClass: 'tagsinput-item-delete'
+      })(document.getElementById('tagsinput-disabled'))
+
+      // ==================== PinInput ====================
+      pinInput({
+        class: 'pininput',
+        inputClass: 'pininput-input'
+      })(document.getElementById('pininput-default'))
+
+      pinInput({
+        defaultValue: '1234',
+        class: 'pininput',
+        inputClass: 'pininput-input'
+      })(document.getElementById('pininput-with-value'))
+
+      pinInput({
+        type: 'numeric',
+        class: 'pininput',
+        inputClass: 'pininput-input'
+      })(document.getElementById('pininput-numeric'))
+
+      pinInput({
+        disabled: true,
+        class: 'pininput',
+        inputClass: 'pininput-input'
+      })(document.getElementById('pininput-disabled'))
+    </script>
+  </body>
+</html>

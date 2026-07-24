@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rota E2E Test - Separator</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 20px;
+      }
+      .separator-demo {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        max-width: 400px;
+      }
+      .separator-demo hr {
+        border: none;
+        margin: 8px 0;
+        flex-shrink: 0;
+      }
+      hr[data-orientation='horizontal'] {
+        width: auto;
+        height: 1px;
+        background-color: #ccc;
+      }
+      hr[data-orientation='vertical'] {
+        width: 1px;
+        height: auto;
+        background-color: #ccc;
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Separator Component Tests</h1>
+
+    <section class="separator-demo">
+      <h2>Semantic Separator (Horizontal)</h2>
+      <div>
+        <p>Radix Primitives</p>
+        <p>一个开源的 UI 组件库。</p>
+        <!-- Semantic separator -->
+        <hr
+          id="semantic-separator"
+          role="separator"
+          aria-orientation="horizontal"
+          data-orientation="horizontal"
+          style="
+            border: none;
+            margin: 15px 0;
+            flex-shrink: 0;
+            width: auto;
+            height: 1px;
+            background-color: #ccc;
+          "
+        />
+        <div class="nav-links">
+          <span>博客</span>
+          <span>文档</span>
+          <span>源码</span>
+        </div>
+      </div>
+
+      <h2>Decorative Separator (Horizontal)</h2>
+      <div>
+        <p>Section content</p>
+        <!-- Decorative separator -->
+        <hr
+          id="decorative-separator"
+          data-orientation="horizontal"
+          style="
+            border: none;
+            margin: 15px 0;
+            flex-shrink: 0;
+            width: auto;
+            height: 1px;
+            background-color: #ccc;
+          "
+        />
+        <p>More content</p>
+      </div>
+
+      <h2>Vertical Separator</h2>
+      <div class="nav-links">
+        <span>博客</span>
+        <hr
+          id="vertical-separator"
+          role="separator"
+          aria-orientation="vertical"
+          data-orientation="vertical"
+          style="
+            border: none;
+            margin: 0 8px;
+            flex-shrink: 0;
+            width: 1px;
+            height: auto;
+            background-color: #ccc;
+          "
+        />
+        <span>文档</span>
+        <hr
+          id="vertical-separator-2"
+          role="separator"
+          aria-orientation="vertical"
+          data-orientation="vertical"
+          style="
+            border: none;
+            margin: 0 8px;
+            flex-shrink: 0;
+            width: 1px;
+            height: auto;
+            background-color: #ccc;
+          "
+        />
+        <span>源码</span>
+      </div>
+    </section>
+  </body>
+</html>
