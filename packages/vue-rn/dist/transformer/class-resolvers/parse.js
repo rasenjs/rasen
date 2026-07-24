@@ -1,7 +1,12 @@
+"use strict";
 /**
- * Shared CSS → RN style parser.
- * Parses expanded Tailwind/UnoCSS output CSS into className → style Record map.
+ * CSS → RN style parser.
+ * Parses expanded CSS text into className → RN style Record map.
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.toRNProp = toRNProp;
+exports.toRNValue = toRNValue;
+exports.cssToMap = cssToMap;
 const RN_PROP_MAP = {
     'display': true,
     'flex': true,
@@ -97,39 +102,27 @@ function toRNProp(cssProp) {
         return cssProp;
     return mapped || cssProp.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 }
-/**
- * @param {string} value
- * @param {string} [prop] - CSS property name, for context-aware conversion
- */
 function toRNValue(value, prop) {
     value = value.replace(/\s*!important\s*$/, '');
     if ((value.startsWith('"') && value.endsWith('"')) ||
         (value.startsWith("'") && value.endsWith("'"))) {
         return value.slice(1, -1);
     }
-    // rem → px (1rem = 16px) — must run before calc()
     value = value.replace(/([\d.]+)rem\b/g, (_, num) => `${parseFloat(num) * 16}px`);
-    // Resolve calc() expressions
     value = value.replace(/calc\(([^)]+)\)/g, (_, expr) => {
         try {
-            // eslint-disable-next-line no-eval
-            const result = eval(expr.replace(/[\d.]+[a-z]+/g, m => parseFloat(m)));
+            const result = eval(expr.replace(/[\d.]+[a-z]+/g, (m) => parseFloat(m).toString()));
             return String(result) + 'px';
         }
-        catch (_) {
+        catch {
             return expr;
         }
     });
-    // 3-char hex → 6-char
     value = value.replace(/#([0-9a-fA-F]{3})\b/g, (_, hex) => {
         return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`;
     });
-    const num = parseFloat(value);
     const rawValue = value.replace(/px$/, '');
     const rawNum = parseFloat(rawValue);
-    // CSS line-height multiplier: unitless or small px values from calc() such as
-    // 1.2 or 1.2px are font-size multipliers. RN lineHeight is absolute dp, so
-    // drop these to avoid clipping text (RN would interpret 1.2 as 1.2dp).
     if (prop === 'line-height' && !isNaN(rawNum) && rawNum < 5) {
         return undefined;
     }
@@ -141,49 +134,38 @@ function toRNValue(value, prop) {
         return parseFloat(value);
     return value;
 }
-/**
- * Parse expanded CSS text into a Map of className → RN style object.
- * Also resolves CSS variables (var(--name)) from :root definitions.
- *
- * @param {string} cssText
- * @returns {Map<string, object>}
- */
-function parseCSS(cssText) {
-    // First, extract CSS variable definitions from :root and other scope blocks
+function cssToMap(cssText) {
     const cssVars = {};
     const varRegex = /--([\w-]+)\s*:\s*([^;]+);/g;
-    let varMatch;
-    while ((varMatch = varRegex.exec(cssText)) !== null) {
-        cssVars[varMatch[1]] = varMatch[2].trim();
+    let m;
+    while ((m = varRegex.exec(cssText)) !== null) {
+        cssVars[m[1]] = m[2].trim();
     }
     function resolveVar(value) {
-        // Resolve var() references, supporting nested resolution
         let prev;
         let current = value;
-        let maxDepth = 10;
+        let depth = 10;
         do {
             prev = current;
-            current = current.replace(/var\(--([\w-]+)(?:\s*,\s*([^)]+))?\)/g, (_, name, fallback) => {
-                return cssVars[name] !== undefined ? cssVars[name] : (fallback || `var(--${name})`);
+            current = current.replace(/var\(--([\w-]+)(?:\s*,\s*([^)]+))?\)/g, (_, name, fb) => {
+                return cssVars[name] !== undefined ? cssVars[name] : (fb || `var(--${name})`);
             });
-        } while (current !== prev && maxDepth-- > 0);
+        } while (current !== prev && depth-- > 0);
         return current;
     }
     const map = new Map();
     const ruleRegex = /\.(-?[_a-zA-Z][_a-zA-Z0-9-]*)\s*\{([^}]+)\}/g;
-    let match;
-    while ((match = ruleRegex.exec(cssText)) !== null) {
-        const className = match[1];
-        const body = match[2];
+    while ((m = ruleRegex.exec(cssText)) !== null) {
+        const className = m[1];
+        const body = m[2];
         const style = {};
         const declRegex = /([\w-]+)\s*:\s*([^;]+);/g;
-        let decl;
-        while ((decl = declRegex.exec(body)) !== null) {
-            const cssProp = decl[1].trim();
-            // Skip Tailwind internal properties (prefixed with -)
+        let d;
+        while ((d = declRegex.exec(body)) !== null) {
+            const cssProp = d[1].trim();
             if (cssProp.startsWith('-'))
                 continue;
-            let cssValue = decl[2].trim();
+            let cssValue = d[2].trim();
             const rnProp = toRNProp(cssProp);
             if (rnProp) {
                 cssValue = resolveVar(cssValue);
@@ -197,4 +179,3 @@ function parseCSS(cssText) {
     }
     return map;
 }
-module.exports = { parseCSS };

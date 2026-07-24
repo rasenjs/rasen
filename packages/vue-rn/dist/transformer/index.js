@@ -1,26 +1,33 @@
+"use strict";
 /**
  * @rasenjs/vue-rn Metro transformer for Vue SFC (.vue) files.
  *
- * Features:
- *   - Vue SFC compilation (script + template)
- *   - TypeScript stripping
- *   - Tailwind / UnoCSS class→style at compile time
- *
  * Usage in metro.config.js:
  *
- *   babelTransformerPath: require.resolve('@rasenjs/vue-rn/transformer/vue-transformer'),
+ *   babelTransformerPath: require.resolve('@rasenjs/vue-rn/dist/transformer/index'),
  *   resolver.sourceExts: [...getDefaultConfig(__dirname).resolver.sourceExts, 'vue']
  */
-const crypto = require('crypto');
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getCacheKey = void 0;
+exports.transform = transform;
+const crypto_1 = require("crypto");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const vueCompiler = require('@vue/compiler-sfc');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { createSimpleExpression } = require('@vue/compiler-core');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const babel = require('@babel/core');
-const { resolve: resolveCSS } = require('./resolver');
-const RN_BUILT_IN_TAGS = new Set(require('@rasenjs/rn-dom/elements').getAllTags());
-const { parseCSS } = require('./resolvers/css-parser');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { resolve: resolveCSS } = require('./class-resolvers');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { cssToMap } = require('./class-resolvers/parse');
+const parseCSS = cssToMap;
+const RN_BUILT_IN_TAGS = new Set(
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+require('@rasenjs/rn-dom/elements').getAllTags());
 let _resolverInit = false;
 let _styleMap = new Map();
-function classToStyleNT(node, _context) {
+function classToStyleNT(node) {
     if (node.type !== 1 || !node.props)
         return;
     const idx = node.props.findIndex(p => p.type === 6 && p.name === 'class');
@@ -49,14 +56,9 @@ function classToStyleNT(node, _context) {
     if (si >= 0) {
         const existing = node.props[si].exp;
         if (existing.type === 8) {
-            // CompoundExpression — children already has _ctx. prefixes applied by
-            // transformExpression. Just prepend our style into the first child string.
-            // children[0] looks like: "[{ backgroundColor: '#1a1a2e',"
-            // Replace it with:      "[({flexDirection: 'row'}), { backgroundColor: '#1a1a2e',"
             existing.children[0] = `[${expr}, ${existing.children[0].slice(1)}`;
         }
         else {
-            // SimpleExpression — no dynamic bindings, safe to create new expression
             const existingSrc = existing.content;
             if (existingSrc.trimStart().startsWith('[')) {
                 const inner = existingSrc.trim().slice(1, -1).trim();
@@ -79,6 +81,7 @@ function classToStyleNT(node, _context) {
 async function transform(params) {
     const { filename, src } = params;
     if (!filename.endsWith('.vue')) {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         return require('@react-native/metro-babel-transformer').transform(params);
     }
     if (!_resolverInit) {
@@ -86,9 +89,9 @@ async function transform(params) {
         try {
             _styleMap = (await resolveCSS({ projectRoot: process.cwd() })).styleMap;
         }
-        catch (_) { }
+        catch { /* no CSS resolver */ }
     }
-    const id = crypto.createHash('md5').update(filename).digest('hex').slice(0, 8);
+    const id = (0, crypto_1.createHash)('md5').update(filename).digest('hex').slice(0, 8);
     const { descriptor, errors } = vueCompiler.parse(src, { filename });
     if (errors.length > 0)
         throw new Error(`[vue-transformer] ${filename}: ${errors[0].message || errors[0]}`);
@@ -113,7 +116,8 @@ async function transform(params) {
         const c = vueCompiler.compileTemplate({
             source: descriptor.template.content, filename, id,
             compilerOptions: {
-                mode: 'module', bindingMetadata: scriptBindings,
+                mode: 'module',
+                bindingMetadata: scriptBindings,
                 isCustomElement: (tag) => RN_BUILT_IN_TAGS.has(tag) && !(scriptBindings && tag in scriptBindings),
                 expressionPlugins: ['typescript'],
                 nodeTransforms: _styleMap.size > 0 ? [classToStyleNT] : [],
@@ -126,8 +130,6 @@ async function transform(params) {
     // Merge
     let combined;
     if (isScriptSetup) {
-        // For <script setup>, rewrite the export default into a const so __sfc__
-        // is available for HMR injection below.
         combined = renderCode.replace(/^export\s+/, '') + '\n' +
             scriptCode.replace(/export\s+default\s+\/\*@__PURE__\*\/_defineComponent\(\{/, 'const __sfc__ = /*@__PURE__*/_defineComponent({render: render,\n') + '\nexport default __sfc__';
     }
@@ -135,9 +137,6 @@ async function transform(params) {
         combined = renderCode.replace(/^export\s+/, '') + '\n' + scriptCode + '\n__sfc__.render = render\nexport default __sfc__';
     }
     // Style module — parse <style module> blocks into __cssModules
-    // Vue's runtime proxy (`instance.type.__cssModules`) checks this via
-    // component proxy get handler, making `$style.xxx` available in templates
-    // and `useCssModule()` in scripts.
     if (descriptor.styles && descriptor.styles.length > 0) {
         const cssModules = {};
         let hasModules = false;
@@ -156,25 +155,7 @@ async function transform(params) {
             combined += `\n__sfc__.__cssModules = ${JSON.stringify(cssModules)}`;
         }
     }
-    // HMR — vue-rn hot module replacement
-    //
-    // On initial load: createRecord() creates a record and module.hot.accept()
-    // registers the accept callback for future updates.
-    //
-    // On HMR update: Metro's runUpdatedModule() re-executes the factory, then
-    // calls module.hot._acceptCallback(). The callback calls rerender() which
-    // replaces the render function and calls instance.update() on ALL instances
-    // directly — including root components (no parent dependency).
-    //
-    // We do NOT use reload() because:
-    //   - Root components have no instance.parent, so reload can't trigger update
-    //     (it falls through to window.location.reload() which throws)
-    //   - reload() + rerender() double-trigger can leave components in dirty state
-    //   - rere render() alone handles template/style changes correctly
-    //
-    // Script-only changes (new imports, new setup variables) still need a full
-    // reload since they can't be hot-patched — Metro will fall back to full
-    // refresh when it detects the boundary can't accept the change.
+    // HMR
     combined += `
 if (typeof __VUE_HMR_RUNTIME__ !== 'undefined') {
   __sfc__.__hmrId = "${id}"
@@ -189,11 +170,17 @@ if (typeof __VUE_HMR_RUNTIME__ !== 'undefined') {
     const stripped = babel.transformSync(combined, {
         filename: filename.replace(/\.vue$/, '.ts'),
         babelrc: false, configFile: false,
-        plugins: [[require('@babel/plugin-syntax-typescript'), { isTSX: true }], require('@babel/plugin-transform-typescript')],
+        plugins: [
+            [require('@babel/plugin-syntax-typescript'), { isTSX: true }],
+            require('@babel/plugin-transform-typescript'),
+        ],
         sourceMaps: false, retainLines: true,
     });
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     return require('@react-native/metro-babel-transformer').transform({
         ...params, filename: filename.replace(/\.vue$/, '.js'), src: stripped.code,
     });
 }
-module.exports = { transform, getCacheKey: require('@react-native/metro-babel-transformer').getCacheKey };
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { getCacheKey } = require('@react-native/metro-babel-transformer');
+exports.getCacheKey = getCacheKey;

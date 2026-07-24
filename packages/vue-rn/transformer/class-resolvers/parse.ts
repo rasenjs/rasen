@@ -1,9 +1,9 @@
 /**
- * Shared CSS → RN style parser.
- * Parses expanded Tailwind/UnoCSS output CSS into className → style Record map.
+ * CSS → RN style parser.
+ * Parses expanded CSS text into className → RN style Record map.
  */
 
-const RN_PROP_MAP = {
+const RN_PROP_MAP: Record<string, string | true> = {
   'display': true,
   'flex': true,
   'flex-direction': 'flexDirection',
@@ -93,98 +93,73 @@ const RN_PROP_MAP = {
   'pointer-events': 'pointerEvents',
 }
 
-function toRNProp(cssProp) {
+export function toRNProp(cssProp: string): string {
   const mapped = RN_PROP_MAP[cssProp]
   if (mapped === true) return cssProp
-  return mapped || cssProp.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
+  return mapped || cssProp.replace(/-([a-z])/g, (_: string, c: string) => c.toUpperCase())
 }
 
-/**
- * @param {string} value
- * @param {string} [prop] - CSS property name, for context-aware conversion
- */
-function toRNValue(value, prop) {
+export function toRNValue(value: string, prop?: string): string | number | undefined {
   value = value.replace(/\s*!important\s*$/, '')
   if ((value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))) {
     return value.slice(1, -1)
   }
-  // rem → px (1rem = 16px) — must run before calc()
-  value = value.replace(/([\d.]+)rem\b/g, (_, num) => `${parseFloat(num) * 16}px`)
-  // Resolve calc() expressions
-  value = value.replace(/calc\(([^)]+)\)/g, (_, expr) => {
+  value = value.replace(/([\d.]+)rem\b/g, (_: string, num: string) => `${parseFloat(num) * 16}px`)
+  value = value.replace(/calc\(([^)]+)\)/g, (_: string, expr: string) => {
     try {
-      // eslint-disable-next-line no-eval
-      const result = eval(expr.replace(/[\d.]+[a-z]+/g, m => parseFloat(m)))
+      const result = eval(expr.replace(/[\d.]+[a-z]+/g, (m: string) => parseFloat(m).toString()))
       return String(result) + 'px'
-    } catch (_) { return expr }
+    } catch { return expr }
   })
-  // 3-char hex → 6-char
-  value = value.replace(/#([0-9a-fA-F]{3})\b/g, (_, hex) => {
+  value = value.replace(/#([0-9a-fA-F]{3})\b/g, (_: string, hex: string) => {
     return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`
   })
-  const num = parseFloat(value)
   const rawValue = value.replace(/px$/, '')
   const rawNum = parseFloat(rawValue)
 
-  // CSS line-height multiplier: unitless or small px values from calc() such as
-  // 1.2 or 1.2px are font-size multipliers. RN lineHeight is absolute dp, so
-  // drop these to avoid clipping text (RN would interpret 1.2 as 1.2dp).
   if (prop === 'line-height' && !isNaN(rawNum) && rawNum < 5) {
     return undefined
   }
-
   if (value === '0') return 0
   if (/^\d+$/.test(value)) return parseInt(value, 10)
   if (/^[\d.]+(px)?$/.test(value)) return parseFloat(value)
   return value
 }
 
-/**
- * Parse expanded CSS text into a Map of className → RN style object.
- * Also resolves CSS variables (var(--name)) from :root definitions.
- *
- * @param {string} cssText
- * @returns {Map<string, object>}
- */
-function parseCSS(cssText) {
-  // First, extract CSS variable definitions from :root and other scope blocks
-  const cssVars = {}
+export function cssToMap(cssText: string): Map<string, Record<string, unknown>> {
+  const cssVars: Record<string, string> = {}
   const varRegex = /--([\w-]+)\s*:\s*([^;]+);/g
-  let varMatch
-  while ((varMatch = varRegex.exec(cssText)) !== null) {
-    cssVars[varMatch[1]] = varMatch[2].trim()
+  let m: RegExpExecArray | null
+  while ((m = varRegex.exec(cssText)) !== null) {
+    cssVars[m[1]] = m[2].trim()
   }
 
-  function resolveVar(value) {
-    // Resolve var() references, supporting nested resolution
-    let prev
+  function resolveVar(value: string): string {
+    let prev: string
     let current = value
-    let maxDepth = 10
+    let depth = 10
     do {
       prev = current
-      current = current.replace(/var\(--([\w-]+)(?:\s*,\s*([^)]+))?\)/g, (_, name, fallback) => {
-        return cssVars[name] !== undefined ? cssVars[name] : (fallback || `var(--${name})`)
+      current = current.replace(/var\(--([\w-]+)(?:\s*,\s*([^)]+))?\)/g, (_: string, name: string, fb?: string) => {
+        return cssVars[name] !== undefined ? cssVars[name] : (fb || `var(--${name})`)
       })
-    } while (current !== prev && maxDepth-- > 0)
+    } while (current !== prev && depth-- > 0)
     return current
   }
 
-  const map = new Map()
+  const map = new Map<string, Record<string, unknown>>()
   const ruleRegex = /\.(-?[_a-zA-Z][_a-zA-Z0-9-]*)\s*\{([^}]+)\}/g
-
-  let match
-  while ((match = ruleRegex.exec(cssText)) !== null) {
-    const className = match[1]
-    const body = match[2]
-    const style = {}
+  while ((m = ruleRegex.exec(cssText)) !== null) {
+    const className = m[1]
+    const body = m[2]
+    const style: Record<string, unknown> = {}
     const declRegex = /([\w-]+)\s*:\s*([^;]+);/g
-    let decl
-    while ((decl = declRegex.exec(body)) !== null) {
-      const cssProp = decl[1].trim()
-      // Skip Tailwind internal properties (prefixed with -)
+    let d: RegExpExecArray | null
+    while ((d = declRegex.exec(body)) !== null) {
+      const cssProp = d[1].trim()
       if (cssProp.startsWith('-')) continue
-      let cssValue = decl[2].trim()
+      let cssValue = d[2].trim()
       const rnProp = toRNProp(cssProp)
       if (rnProp) {
         cssValue = resolveVar(cssValue)
@@ -194,8 +169,5 @@ function parseCSS(cssText) {
     }
     if (Object.keys(style).length > 0) map.set(className, style)
   }
-
   return map
 }
-
-module.exports = { parseCSS }

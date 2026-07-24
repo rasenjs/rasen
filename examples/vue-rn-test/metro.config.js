@@ -11,7 +11,7 @@ const defaultConfig = getDefaultConfig(__dirname)
 
 const config = {
   transformer: {
-    babelTransformerPath: require.resolve('@rasenjs/vue-rn/dist/transformer/vue-transformer'),
+    babelTransformerPath: require.resolve('@rasenjs/vue-rn/dist/transformer/index'),
     getTransformOptions: async () => ({
       transform: {
         experimentalImportSupport: false,
