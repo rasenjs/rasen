@@ -4,8 +4,9 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     router: 'src/router.ts',
+    'web/index': 'src/web/index.ts',
   },
-  format: ['cjs'],
+  format: ['cjs', 'esm'],
   target: 'es2020',
   splitting: false,
   sourcemap: true,
@@ -17,5 +18,6 @@ export default defineConfig({
     '@vue/shared',
     'vue-router',
     'react-native',
+    'vue',
   ],
 })

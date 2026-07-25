@@ -8,11 +8,18 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./router": {
       "types": "./dist/router.d.ts",
-      "default": "./dist/router.js"
+      "import": "./dist/router.js",
+      "require": "./dist/router.cjs"
+    },
+    "./web": {
+      "types": "./dist/web/index.d.ts",
+      "import": "./dist/web/index.mjs",
+      "require": "./dist/web/index.js"
     },
     "./dist/transformer/*": "./dist/transformer/*"
   },
@@ -21,11 +28,17 @@
       "router": [
         "./dist/router.d.ts"
       ],
+      "web": [
+        "./dist/web/index.d.ts"
+      ],
       "dist/index": [
         "./dist/index.d.ts"
       ],
       "dist/router": [
         "./dist/router.d.ts"
+      ],
+      "dist/web/*": [
+        "./dist/web/*"
       ],
       "dist/transformer/*": [
         "./dist/transformer/*"
