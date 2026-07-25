@@ -795,6 +795,11 @@ export class RNNode {
 
   insertBefore(child: RNNode | RNTextNode | RNCommentNode, ref: RNNode | RNTextNode | RNCommentNode | null): RNNode | RNTextNode | RNCommentNode {
     child.parentNode = this
+    // Remove from old position first (DOM move semantics)
+    const existingIdx = this._children.indexOf(child)
+    if (existingIdx !== -1) {
+      this._children.splice(existingIdx, 1)
+    }
     if (!ref) {
       this._children.push(child)
     } else {
@@ -806,7 +811,11 @@ export class RNNode {
       }
     }
     registerInInstanceMap(child)
-    this._markSubtreeDirty(child)
+    // Only mark subtree dirty for fresh (unmounted) nodes.
+    // Already-mounted nodes keep their props; only the parent's child order changes.
+    if (child.nodeType === 1 && !(child as RNNode)._mounted) {
+      this._markSubtreeDirty(child as RNNode)
+    }
     if (this._mounted) {
       this._markChildrenDirty()
     }
@@ -962,13 +971,17 @@ export class RNNode {
   }
 
   set textContent(value: string) {
-    // Detach all existing children at once (avoids per-child dirty flagging)
+    // Fast path: single text child + non-empty → update in-place (no Fabric node churn)
+    if (value && this._children.length === 1 && this._children[0].nodeType === 3) {
+      ;(this._children[0] as RNTextNode).textContent = value
+      return
+    }
+    // Full replace: detach all existing children, add a new text node
     const oldChildren = this._children.splice(0)
     for (const child of oldChildren) {
       child.parentNode = null
       unregisterFromInstanceMap(child)
     }
-    // Append a single text node if value is non-empty
     if (value) {
       this.appendChild(this.ownerDocument.createTextNode(value))
     }
