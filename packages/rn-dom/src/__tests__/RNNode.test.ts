@@ -521,4 +521,100 @@ describe('RNNode', () => {
       expect((p.childNodes[0] as any).textContent).toBe('Hello World')
     })
   })
+
+  // ── classList ──────────────────────────────────────────────────
+
+  describe('classList', () => {
+    it('starts empty', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      expect(el.classList.length).toBe(0)
+      expect(el.className).toBe('')
+    })
+
+    it('add() and contains() work', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.classList.add('card')
+      expect(el.classList.contains('card')).toBe(true)
+      expect(el.classList.length).toBe(1)
+    })
+
+    it('remove() works', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.classList.add('card', 'elevated')
+      el.classList.remove('card')
+      expect(el.classList.contains('card')).toBe(false)
+      expect(el.classList.contains('elevated')).toBe(true)
+    })
+
+    it('toggle() works', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.classList.add('card')
+      el.classList.toggle('card')
+      expect(el.classList.contains('card')).toBe(false)
+      el.classList.toggle('card')
+      expect(el.classList.contains('card')).toBe(true)
+    })
+
+    it('toggle(force) works', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.classList.toggle('card', false)
+      expect(el.classList.contains('card')).toBe(false)
+      el.classList.toggle('card', true)
+      expect(el.classList.contains('card')).toBe(true)
+    })
+
+    it('className getter returns space-separated string', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.classList.add('card', 'elevated')
+      expect(el.className).toBe('card elevated')
+    })
+
+    it('className setter parses space-separated string', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.className = 'card elevated'
+      expect(el.classList.contains('card')).toBe(true)
+      expect(el.classList.contains('elevated')).toBe(true)
+      expect(el.classList.length).toBe(2)
+    })
+
+    it('item() returns token by index', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.classList.add('card', 'elevated')
+      expect(el.classList.item(0)).toBe('card')
+      expect(el.classList.item(1)).toBe('elevated')
+      expect(el.classList.item(2)).toBeNull()
+    })
+
+    it('forEach iterates tokens', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.classList.add('a', 'b')
+      const results: string[] = []
+      el.classList.forEach(t => results.push(t))
+      expect(results).toEqual(['a', 'b'])
+    })
+
+    it('replace() swaps tokens', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.classList.add('old')
+      expect(el.classList.replace('old', 'new')).toBe(true)
+      expect(el.classList.contains('old')).toBe(false)
+      expect(el.classList.contains('new')).toBe(true)
+    })
+
+    it('replace() returns false if token not found', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      expect(el.classList.replace('nonexistent', 'x')).toBe(false)
+    })
+  })
 })

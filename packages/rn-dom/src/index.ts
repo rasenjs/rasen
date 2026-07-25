@@ -201,6 +201,83 @@ const FABRIC_NODE = Symbol.for('fabricNode')
 const FABRIC_NODE_ID = Symbol.for('fabricNodeId')
 
 /**
+ * Lightweight DOMTokenList implementation backed by a Set.
+ * Used by RNNode.classList.
+ */
+class RASENTokenList {
+  _tokens: Set<string>
+  _onChange: () => void
+
+  constructor(tokens: Set<string>, onChange: () => void) {
+    this._tokens = tokens
+    this._onChange = onChange
+  }
+
+  get length(): number { return this._tokens.size }
+
+  get value(): string { return [...this._tokens].join(' ') }
+
+  contains(token: string): boolean { return this._tokens.has(token) }
+
+  add(...values: string[]): void {
+    let changed = false
+    for (const v of values) {
+      if (!this._tokens.has(v)) { this._tokens.add(v); changed = true }
+    }
+    if (changed) this._onChange()
+  }
+
+  remove(...values: string[]): void {
+    let changed = false
+    for (const v of values) { if (this._tokens.delete(v)) changed = true }
+    if (changed) this._onChange()
+  }
+
+  toggle(token: string, force?: boolean): boolean {
+    if (force !== undefined) {
+      if (force) { this._tokens.add(token); this._onChange(); return true }
+      this._tokens.delete(token); this._onChange(); return false
+    }
+    if (this._tokens.has(token)) { this._tokens.delete(token); this._onChange(); return false }
+    this._tokens.add(token); this._onChange(); return true
+  }
+
+  replace(oldToken: string, newToken: string): boolean {
+    if (!this._tokens.has(oldToken)) return false
+    this._tokens.delete(oldToken); this._tokens.add(newToken); this._onChange(); return true
+  }
+
+  item(index: number): string | null {
+    let i = 0
+    for (const t of this._tokens) { if (i++ === index) return t }
+    return null
+  }
+
+  entries(): IterableIterator<[number, string]> {
+    const arr = [...this._tokens]
+    return arr.entries() as IterableIterator<[number, string]>
+  }
+
+  keys(): IterableIterator<number> {
+    const arr = [...this._tokens]
+    return arr.keys() as IterableIterator<number>
+  }
+
+  values(): IterableIterator<string> {
+    return this._tokens[Symbol.iterator]()
+  }
+
+  forEach(fn: (value: string, key: number, parent: RASENTokenList) => void): void {
+    let i = 0
+    for (const t of this._tokens) fn(t, i++, this)
+  }
+
+  [Symbol.iterator](): IterableIterator<string> {
+    return this._tokens[Symbol.iterator]()
+  }
+}
+
+/**
  * Create a style object with setProperty and removeProperty methods.
  * This provides a DOM-like style interface.
  *
@@ -251,6 +328,8 @@ function createStyleObject(element: RNNode) {
 export class RNDocument {
   // DOM-like public API
   readonly body: RNBody
+  /** Collection of registered CSSStyleSheet entries. */
+  readonly styleSheets: StyleSheetList = new StyleSheetList()
   
   /**
    * Get React Native Private Interface
@@ -529,6 +608,36 @@ export class RNNode {
   parentNode: RNNode | null = null
 
   // =========================================================================
+  // DOM Class List API
+  // =========================================================================
+
+  /**
+   * Get the class list as a DOMTokenList-like object.
+   * Lazily allocates the underlying Set on first access.
+   */
+  get classList(): RASENTokenList {
+    if (!this._classList) this._classList = new Set()
+    return new RASENTokenList(this._classList, () => {
+      if (this._mounted) this._markDirty('props', 'class')
+    })
+  }
+
+  /**
+   * Get/set the className string (DOM-compatible alias for classList).
+   */
+  get className(): string {
+    return this._classList ? [...this._classList].join(' ') : ''
+  }
+
+  set className(value: string) {
+    const names = value.trim().split(/\s+/).filter(Boolean)
+    if (!this._classList) this._classList = new Set()
+    this._classList.clear()
+    for (const n of names) this._classList.add(n)
+    if (this._mounted) this._markDirty('props', 'class')
+  }
+
+  // =========================================================================
   // Internal state (accessible by component.ts internals)
   // =========================================================================
   /** Flag: true once node has been committed to Fabric via createNode. */
@@ -544,6 +653,8 @@ export class RNNode {
   _children: (RNNode | RNTextNode | RNCommentNode)[] = []
   // Lazily allocated on first addEventListener call (most nodes never use it).
   _listeners: Map<string, Set<EventListenerOrEventListenerObject>> | null = null
+  /** CSS class list (DOM-style, resolved at flush time via StyleSheetList). */
+  _classList: Set<string> | null = null
 
   /** Last validAttributes (needed for children-only updates on mounted nodes). */
   _lastValidAttrs: Record<string, unknown> | null = null
@@ -1099,7 +1210,12 @@ export class RNBody extends RNNode {
       const nativeName = child._nativeName
       const rootTag = this[FABRIC_NODE_ID]
       const validAttrs = child._lastValidAttrs ?? {}
-      const fabricProps = prepareFabricProps(child.currentProps)
+      // Merge class-based styles with inline style (class is baseline, inline overrides).
+      const classStyle = _resolveClassStyles(child)
+      const mergedProps = classStyle && Object.keys(classStyle).length > 0
+        ? { ...child.currentProps, style: { ...classStyle, ...((child.currentProps.style || {}) as Record<string, unknown>) } }
+        : child.currentProps
+      const fabricProps = prepareFabricProps(mergedProps)
       const fullPayload = buildFabricPayload(fabricProps, validAttrs)
       const instanceHandle = child._instanceHandle ?? { tag: child[FABRIC_NODE_ID], stateNode: child }
 
@@ -1145,7 +1261,12 @@ export class RNBody extends RNNode {
     childSet = null
 
     // Prepare props once — reused by both props and children-only paths.
-    const fabricProps = prepareFabricProps(child.currentProps)
+    // Merge class-based styles with inline style (class is baseline, inline overrides).
+    const classStyle = _resolveClassStyles(child)
+    const mergedProps = classStyle && Object.keys(classStyle).length > 0
+      ? { ...child.currentProps, style: { ...classStyle, ...((child.currentProps.style || {}) as Record<string, unknown>) } }
+      : child.currentProps
+    const fabricProps = prepareFabricProps(mergedProps)
 
     if (child._propsDirty && child._hasPropsChanged()) {
       // Use _nativeName resolved by ensure() during createElement, not a
@@ -1652,6 +1773,105 @@ export function findNodeHandle(node: unknown): number | null {
     return (node as Record<symbol, number>)[Symbol.for('fabricNodeId')]
   }
   return null
+}
+
+// ============================================================================
+// CSSStyleSheet — lightweight style rule container
+// ============================================================================
+
+export class CSSStyleSheet {
+  /** The class name this sheet defines rules for. */
+  name: string
+  /** The resolved RN style object (frozen). */
+  style: Record<string, unknown>
+  /** Empty array — matches DOM CSSRuleList shape but we don't parse CSS text. */
+  cssRules: never[] = []
+
+  constructor(name: string, style: Record<string, unknown>) {
+    this.name = name
+    this.style = Object.freeze({ ...style })
+  }
+}
+
+// ============================================================================
+// StyleSheetList — collection of CSSStyleSheet entries on document
+// ============================================================================
+
+export class StyleSheetList {
+  _sheets: CSSStyleSheet[] = []
+
+  get length(): number { return this._sheets.length }
+
+  item(index: number): CSSStyleSheet | undefined { return this._sheets[index] }
+
+  [index: number]: CSSStyleSheet | undefined
+
+  /** Internal: look up a class name across all registered sheets. */
+  _getStyle(className: string): Record<string, unknown> | undefined {
+    for (const sheet of this._sheets) {
+      if (sheet.name === className) return sheet.style
+    }
+    return undefined
+  }
+
+  [Symbol.iterator](): IterableIterator<CSSStyleSheet> {
+    return this._sheets[Symbol.iterator]()
+  }
+}
+
+// ============================================================================
+// StyleSheet — static API matching RN's StyleSheet.create()
+// ============================================================================
+
+export const StyleSheet = {
+  /**
+   * Register style rules and return the class names for use with classList.
+   *
+   * Each key becomes a CSSStyleSheet entry auto-registered on
+   * `document.styleSheets`. The returned object maps keys to class name
+   * strings that can be used with `el.classList.add(...)`.
+   *
+   * @example
+   *   const s = StyleSheet.create({ card: { flex: 1, backgroundColor: 'red' } })
+   *   el.classList.add(s.card) // s.card === 'card'
+   */
+  create<T extends Record<string, Record<string, unknown>>>(
+    styles: T,
+    doc?: RNDocument,
+  ): { [K in keyof T]: string } {
+    const result = {} as { [K in keyof T]: string }
+    const styleSheets = doc?.styleSheets
+    for (const [key, rules] of Object.entries(styles)) {
+      const sheet = new CSSStyleSheet(key, rules)
+      ;(result as any)[key] = key
+      styleSheets?._sheets.push(sheet)
+    }
+    return result
+  },
+
+  /**
+   * The hairline width (1 device pixel) — always 1 for Fabric.
+   * In web this is `1 / devicePixelRatio`.
+   */
+  hairlineWidth: 1,
+}
+
+// ============================================================================
+// Class Style Resolution (called during flush)
+// ============================================================================
+
+/** Merge class-based styles from document.styleSheets into a single object. */
+export function _resolveClassStyles(node: RNNode): Record<string, unknown> {
+  if (!node._classList || node._classList.size === 0) return {}
+  const styleSheets = node.ownerDocument.styleSheets
+  if (!styleSheets || styleSheets._sheets.length === 0) return {}
+
+  const result: Record<string, unknown> = {}
+  for (const cls of node._classList) {
+    const style = styleSheets._getStyle(cls)
+    if (style) Object.assign(result, style)
+  }
+  return result
 }
 
 export function mountToContainer(
