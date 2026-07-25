@@ -96,9 +96,10 @@ const uim = {
   appendChildToSet: vi.fn((set: any[], child: any) => { set.push(child) }),
   completeRoot: vi.fn((rootTag: number, childSet: any[]) => { roots.set(rootTag, childSet) }),
   dispatchCommand: vi.fn(),
+  sendAccessibilityEvent: vi.fn(),
   setNativeProps: vi.fn(),
   registerEventHandler: vi.fn(),
-  findShadowNodeByTag_DEPRECATED: vi.fn(() => null),
+  findShadowNodeByTag_DEPRECATED: vi.fn(() => ({ _mock: true })), // truthy return
 }
 
 ;(globalThis as any).nativeFabricUIManager = uim

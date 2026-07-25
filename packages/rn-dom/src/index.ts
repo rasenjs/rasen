@@ -855,6 +855,38 @@ export class RNNode {
     }
     return clone
   }
+
+  // =========================================================================
+  // DOM-like Native Commands
+  // =========================================================================
+
+  /**
+   * Focus the native element (maps to Fabric dispatchCommand 'focus').
+   */
+  focus(): void {
+    try {
+      const uim = getFabricUIManager()
+      if (typeof uim.dispatchCommand === 'function' && typeof uim.findShadowNodeByTag_DEPRECATED === 'function') {
+        const tag = this[FABRIC_NODE_ID]
+        const shadowNode = uim.findShadowNodeByTag_DEPRECATED(tag)
+        if (shadowNode) uim.dispatchCommand(shadowNode, 'focus', [])
+      }
+    } catch (_) { /* dispatchCommand may not be available */ }
+  }
+
+  /**
+   * Blur (unfocus) the native element (maps to Fabric dispatchCommand 'blur').
+   */
+  blur(): void {
+    try {
+      const uim = getFabricUIManager()
+      if (typeof uim.dispatchCommand === 'function' && typeof uim.findShadowNodeByTag_DEPRECATED === 'function') {
+        const tag = this[FABRIC_NODE_ID]
+        const shadowNode = uim.findShadowNodeByTag_DEPRECATED(tag)
+        if (shadowNode) uim.dispatchCommand(shadowNode, 'blur', [])
+      }
+    } catch (_) { /* dispatchCommand may not be available */ }
+  }
 }
 
 // ============================================================================
@@ -1262,13 +1294,34 @@ function dispatchEventWithBubble(
   const basePropName = 'on' + type.replace(/^top/, '')
   const domEventType = FABRIC_TO_DOM_EVENT[type] || type
 
-  // Build a shared event object with stopPropagation support
+  // Check if this event type should skip bubbling by checking viewConfig
+  // for the target node.
+  let _skipBubble = false
+  const targetConfig = (() => {
+    try {
+      return ReactNativePrivateInterface.ReactNativeViewConfigRegistry.get(current._nativeName)
+    } catch { return undefined }
+  })()
+  if (targetConfig && (targetConfig as Record<string, unknown>).bubblingEventTypes) {
+    const bubbling = (targetConfig as Record<string, unknown>).bubblingEventTypes as Record<string, unknown>
+    const eventCfg = bubbling[type] as Record<string, unknown> | undefined
+    const skip = (eventCfg?.phasedRegistrationNames as Record<string, unknown> | undefined)?.skipBubbling
+    if (skip === true) _skipBubble = true
+  }
+
+  // Build a shared event object with stopPropagation and timeStamp support
   let _stopped = false
   let _prevented = false
+  const timeStamp = (nativeEvent as Record<string, unknown>).timeStamp
+    ?? (nativeEvent as Record<string, unknown>).timestamp
+    ?? performance?.now?.()
+    ?? Date.now()
+
   const sharedEvent = {
     type: domEventType,
     target: null as unknown,
     nativeEvent,
+    timeStamp,
     get defaultPrevented() { return _prevented },
     preventDefault() { _prevented = true },
     stopPropagation() { _stopped = true },
@@ -1297,27 +1350,34 @@ function dispatchEventWithBubble(
     }
   }
 
-  // ── BUBBLE PHASE: target → root ─────────────────────────────────
-  walker = current
+  // ── BUBBLE PHASE: target → root (or target-only if skipBubbling) ─
+  // When skipBubbling is true, only process the target node
+  const bubbleWalker: RNNode[] = _skipBubble ? [current] : []
+  if (!_skipBubble) {
+    let w: RNNode | null = current
+    while (w) { bubbleWalker.push(w); w = w.parentNode }
+  }
+
   let depth = 0
-  while (walker && depth < 20 && !_stopped) {
-    depth++
-    sharedEvent.currentTarget = walker
+  for (const node of bubbleWalker) {
+    if (_stopped) break
+    if (depth++ >= 20) break
+    sharedEvent.currentTarget = node
 
     // 1. Check props-based handler (onTouchEnd, onPress, etc.)
-    const props = walker.currentProps
+    const props = node.currentProps
     let handler = props[basePropName]
     if (!handler && type === 'topTouchEnd') {
       handler = props.onPress
     }
     if (typeof handler === 'function') {
-      const eventObj = { ...nativeEvent, type: domEventType, target: walker, nativeEvent }
+      const eventObj = { ...nativeEvent, type: domEventType, target: node, nativeEvent }
       ;(handler as (event: Record<string, unknown>) => void)(eventObj)
       return
     }
 
     // 2. Check addEventListener-based handlers (bubble phase)
-    const listeners = walker._listeners?.get(domEventType)
+    const listeners = node._listeners?.get(domEventType)
     if (listeners && listeners.size > 0) {
       for (const listener of listeners) {
         if (_stopped) break
@@ -1325,8 +1385,6 @@ function dispatchEventWithBubble(
         else listener.handleEvent(sharedEvent as unknown as Event)
       }
     }
-
-    walker = walker.parentNode
   }
   if (_stopped) return
 
@@ -1376,6 +1434,67 @@ function unregisterFromInstanceMap(node: RNNode | RNTextNode | RNCommentNode): v
       unregisterFromInstanceMap(child)
     }
   }
+}
+
+// ============================================================================
+// Public Native Commands (standalone helpers for RN-specific APIs)
+// ============================================================================
+
+/**
+ * Dispatch a command to a native component (e.g. 'scrollTo', 'measure').
+ * For DOM-standard focus/blur, use node.focus() / node.blur() instead.
+ *
+ * @example
+ *   dispatchCommand(scrollViewNode, 'scrollTo', [{ x: 0, y: 100, animated: true }])
+ */
+export function dispatchCommand(
+  node: RNNode,
+  commandName: string,
+  args: unknown[],
+): void {
+  try {
+    const uim = getFabricUIManager()
+    const tag = node[FABRIC_NODE_ID]
+    const shadowNode = uim.findShadowNodeByTag_DEPRECATED?.(tag)
+    if (shadowNode && uim.dispatchCommand) {
+      uim.dispatchCommand(shadowNode, commandName, args)
+    }
+  } catch (_) { /* dispatchCommand unavailable */ }
+}
+
+/**
+ * Send an accessibility event to a native component.
+ *
+ * @example
+ *   sendAccessibilityEvent(viewNode, 'layoutChanged')
+ */
+export function sendAccessibilityEvent(
+  node: RNNode,
+  eventType: string,
+): void {
+  try {
+    const uim = getFabricUIManager()
+    const tag = node[FABRIC_NODE_ID]
+    const shadowNode = uim.findShadowNodeByTag_DEPRECATED?.(tag)
+    if (shadowNode && uim.sendAccessibilityEvent) {
+      uim.sendAccessibilityEvent(shadowNode, eventType)
+    }
+  } catch (_) { /* sendAccessibilityEvent unavailable */ }
+}
+
+/**
+ * Get the Fabric node tag (number) for a node.
+ * Mirrors React Native's findNodeHandle().
+ *
+ * @example
+ *   const tag = findNodeHandle(myView)
+ */
+export function findNodeHandle(node: unknown): number | null {
+  if (!node) return null
+  if (typeof node === 'object' && node !== null && Symbol.for('fabricNodeId') in (node as Record<symbol, unknown>)) {
+    return (node as Record<symbol, number>)[Symbol.for('fabricNodeId')]
+  }
+  return null
 }
 
 export function mountToContainer(
