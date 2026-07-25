@@ -1806,10 +1806,12 @@ export class StyleSheetList {
 
   [index: number]: CSSStyleSheet | undefined
 
-  /** Internal: look up a class name across all registered sheets. */
+  /** Internal: look up a class name across all registered sheets.
+   *  Prepends '.' to match CSS selector format (.card). */
   _getStyle(className: string): Record<string, unknown> | undefined {
+    const selector = '.' + className
     for (const sheet of this._sheets) {
-      if (sheet.name === className) return sheet.style
+      if (sheet.name === selector) return sheet.style
     }
     return undefined
   }
@@ -1828,12 +1830,14 @@ export const StyleSheet = {
    * Register style rules and return the class names for use with classList.
    *
    * Each key becomes a CSSStyleSheet entry auto-registered on
-   * `document.styleSheets`. The returned object maps keys to class name
-   * strings that can be used with `el.classList.add(...)`.
+   * `document.styleSheets`. Keys should be CSS selectors (e.g. '.card'),
+   * though bare names are auto-converted for convenience.
+   * The returned object maps keys to class name strings (without dot)
+   * that can be used with `el.classList.add(...)`.
    *
    * @example
-   *   const s = StyleSheet.create({ card: { flex: 1, backgroundColor: 'red' } })
-   *   el.classList.add(s.card) // s.card === 'card'
+   *   const s = StyleSheet.create({ '.card': { flex: 1 } })
+   *   el.classList.add(s['.card']) // 'card'
    */
   create<T extends Record<string, Record<string, unknown>>>(
     styles: T,
@@ -1842,8 +1846,9 @@ export const StyleSheet = {
     const result = {} as { [K in keyof T]: string }
     const styleSheets = doc?.styleSheets
     for (const [key, rules] of Object.entries(styles)) {
-      const sheet = new CSSStyleSheet(key, rules)
-      ;(result as any)[key] = key
+      const selector = key.startsWith('.') || key.startsWith('#') ? key : '.' + key
+      const sheet = new CSSStyleSheet(selector, rules)
+      ;(result as any)[key] = selector.startsWith('.') ? selector.slice(1) : selector
       styleSheets?._sheets.push(sheet)
     }
     return result

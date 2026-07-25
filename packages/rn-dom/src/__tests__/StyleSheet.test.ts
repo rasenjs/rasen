@@ -15,8 +15,8 @@ function createDoc(): RNDocument {
 
 describe('CSSStyleSheet', () => {
   it('stores name and frozen style', () => {
-    const sheet = new CSSStyleSheet('card', { flex: 1, backgroundColor: 'red' })
-    expect(sheet.name).toBe('card')
+    const sheet = new CSSStyleSheet('.card', { flex: 1, backgroundColor: 'red' })
+    expect(sheet.name).toBe('.card')
     expect(sheet.style).toEqual({ flex: 1, backgroundColor: 'red' })
     expect(Object.isFrozen(sheet.style)).toBe(true)
   })
@@ -35,8 +35,8 @@ describe('StyleSheetList', () => {
 
   it('item() returns sheet by index', () => {
     const doc = createDoc()
-    const s1 = new CSSStyleSheet('card', { flex: 1 })
-    const s2 = new CSSStyleSheet('text', { color: 'red' })
+    const s1 = new CSSStyleSheet('.card', { flex: 1 })
+    const s2 = new CSSStyleSheet('.text', { color: 'red' })
     doc.styleSheets._sheets.push(s1, s2)
     expect(doc.styleSheets.item(0)).toBe(s1)
     expect(doc.styleSheets.item(1)).toBe(s2)
@@ -44,18 +44,18 @@ describe('StyleSheetList', () => {
 
   it('_getStyle returns style by class name', () => {
     const doc = createDoc()
-    doc.styleSheets._sheets.push(new CSSStyleSheet('card', { flex: 1 }))
+    doc.styleSheets._sheets.push(new CSSStyleSheet('.card', { flex: 1 }))
     expect(doc.styleSheets._getStyle('card')).toEqual({ flex: 1 })
     expect(doc.styleSheets._getStyle('unknown')).toBeUndefined()
   })
 
   it('is iterable', () => {
     const doc = createDoc()
-    doc.styleSheets._sheets.push(new CSSStyleSheet('a', { flex: 1 }))
-    doc.styleSheets._sheets.push(new CSSStyleSheet('b', { color: 'red' }))
+    doc.styleSheets._sheets.push(new CSSStyleSheet('.a', { flex: 1 }))
+    doc.styleSheets._sheets.push(new CSSStyleSheet('.b', { color: 'red' }))
     const names: string[] = []
     for (const sheet of doc.styleSheets) names.push(sheet.name)
-    expect(names).toEqual(['a', 'b'])
+    expect(names).toEqual(['.a', '.b'])
   })
 })
 
@@ -63,17 +63,25 @@ describe('StyleSheet.create', () => {
   it('registers sheets and returns class name strings', () => {
     const doc = createDoc()
     const s = StyleSheet.create({
-      card: { flex: 1, backgroundColor: 'red' },
-      text: { color: 'blue' },
+      '.card': { flex: 1, backgroundColor: 'red' },
+      '.text': { color: 'blue' },
     }, doc)
-    expect(s.card).toBe('card')
-    expect(s.text).toBe('text')
+    expect(s['.card']).toBe('card')
+    expect(s['.text']).toBe('text')
     expect(doc.styleSheets.length).toBe(2)
+    expect(doc.styleSheets.item(0)!.name).toBe('.card')
+  })
+
+  it('auto-converts bare keys to .selector format', () => {
+    const doc = createDoc()
+    const s = StyleSheet.create({ card: { flex: 1 } }, doc)
+    expect(s.card).toBe('card')
+    expect(doc.styleSheets.item(0)!.name).toBe('.card')
   })
 
   it('returns frozen style objects via _getStyle', () => {
     const doc = createDoc()
-    StyleSheet.create({ card: { flex: 1 } }, doc)
+    StyleSheet.create({ '.card': { flex: 1 } }, doc)
     const style = doc.styleSheets._getStyle('card')
     expect(style).toEqual({ flex: 1 })
     expect(Object.isFrozen(style)).toBe(true)
@@ -87,9 +95,9 @@ describe('_resolveClassStyles', () => {
     expect(_resolveClassStyles(el)).toEqual({})
   })
 
-  it('resolves single class from stylesheet', () => {
+  it('resolves single class from stylesheet (with . selector)', () => {
     const doc = createDoc()
-    StyleSheet.create({ card: { flex: 1 } }, doc)
+    StyleSheet.create({ '.card': { flex: 1 } }, doc)
     const el = doc.createElement('View')
     el.classList.add('card')
     expect(_resolveClassStyles(el)).toEqual({ flex: 1 })
@@ -98,8 +106,8 @@ describe('_resolveClassStyles', () => {
   it('merges multiple classes in order', () => {
     const doc = createDoc()
     StyleSheet.create({
-      base: { flex: 1, color: 'red' },
-      theme: { color: 'blue', opacity: 0.5 },
+      '.base': { flex: 1, color: 'red' },
+      '.theme': { color: 'blue', opacity: 0.5 },
     }, doc)
     const el = doc.createElement('View')
     el.classList.add('base', 'theme')
@@ -124,7 +132,7 @@ describe('_resolveClassStyles', () => {
 describe('classList + style merge via _getFabricNode', () => {
   it('class style appears in createNode payload', () => {
     const doc = createDoc()
-    StyleSheet.create({ card: { flex: 1 } }, doc)
+    StyleSheet.create({ '.card': { flex: 1 } }, doc)
     const el = doc.createElement('View')
     el.classList.add('card')
     doc.body.appendChild(el)
@@ -138,7 +146,7 @@ describe('classList + style merge via _getFabricNode', () => {
 
   it('inline style overrides class style', () => {
     const doc = createDoc()
-    StyleSheet.create({ card: { flex: 1, color: 'red' } }, doc)
+    StyleSheet.create({ '.card': { flex: 1, color: 'red' } }, doc)
     const el = doc.createElement('View')
     el.classList.add('card')
     el.style.setProperty('color', 'blue')
@@ -152,7 +160,7 @@ describe('classList + style merge via _getFabricNode', () => {
 
   it('classList changes propagate on flush', () => {
     const doc = createDoc()
-    StyleSheet.create({ card: { flex: 1 } }, doc)
+    StyleSheet.create({ '.card': { flex: 1 } }, doc)
     const el = doc.createElement('View')
     doc.body.appendChild(el)
     doc.body._submitToRoot()
