@@ -48,12 +48,13 @@ describe('RNCommentNode', () => {
   // ── Tree operations ───────────────────────────────────────────
 
   describe('tree operations', () => {
-    it('appendChild sets parent', () => {
+    it('appendChild sets parentNode on comment', () => {
       const doc = createDoc()
       const p = doc.createElement('View')
       const c = doc.createComment('x')
-      c.appendChild = p.appendChild(c) as any
+      p.appendChild(c)
       expect(c.parentNode).toBe(p)
+      expect(p.childNodes).toContain(c)
     })
 
     it('insertBefore works', () => {

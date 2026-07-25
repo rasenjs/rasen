@@ -45,26 +45,20 @@ describe('Event System', () => {
   // ── Event dispatch (via props) ─────────────────────────────────
 
   describe('props-based dispatch', () => {
-    it('calls onTouchEnd handler from props', () => {
+    it('stores onTouchEnd handler in currentProps via setAttribute', () => {
       const doc = createDoc()
       const fn = vi.fn()
       const el = doc.createElement('View')
       el.setAttribute('onTouchEnd', fn)
-      doc.body.appendChild(el)
-
-      // We can't call dispatchEventWithBubble directly (it's internal),
-      // so we test via addEventListener dispatchEvent instead
-      el.dispatchEvent(new Event('touchend'))
-      // This tests the public API path
+      expect(el.currentProps.onTouchEnd).toBe(fn)
     })
 
-    it('fires props handler on dispatchEvent', () => {
+    it('fires addEventListener handler on dispatchEvent', () => {
       const doc = createDoc()
       const fn = vi.fn()
       const el = doc.createElement('View')
       el.addEventListener('touchend', fn)
-      const ev = new Event('touchend')
-      el.dispatchEvent(ev)
+      el.dispatchEvent(new Event('touchend'))
       expect(fn).toHaveBeenCalled()
     })
   })
@@ -303,6 +297,12 @@ describe('Event System', () => {
         expect.any(Object),
         'layoutChanged',
       )
+    })
+
+    // ── RN equivalent: should no-op if calling sendAccessibilityEvent on unmounted refs ──
+    it('no-ops when node is null (unmounted ref)', () => {
+      // Calling sendAccessibilityEvent with a null node should not throw
+      expect(() => sendAccessibilityEvent(null as any, 'focus')).not.toThrow()
     })
   })
 
