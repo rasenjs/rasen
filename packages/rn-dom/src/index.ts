@@ -696,10 +696,10 @@ export class RNNode {
     const n = node as RNNode
     n._propsDirty = true
     n._childrenDirty = true
-    if (n._dirtyPropsKeys) {
-      n._dirtyPropsKeys.add('style')
-      n._dirtyPropsKeys.add('onTouchEnd')
-    }
+    // Clear snapshot so next flush sends ALL current props (full payload).
+    // The snapshot is what diffFabricPayload diffs against — an empty
+    // object means every current prop is treated as "added". No need to
+    // seed individual dirty keys.
     n._propsSnapshot = {}
     for (const child of n._children) {
       this._markSubtreeDirty(child)
@@ -761,20 +761,24 @@ export class RNNode {
   addEventListener(
     type: string,
     handler: EventListenerOrEventListenerObject,
-    _options?: boolean | AddEventListenerOptions
+    options?: boolean | AddEventListenerOptions
   ): void {
-    if (!this._listeners.has(type)) {
-      this._listeners.set(type, new Set())
+    const capture = typeof options === 'boolean' ? options : !!options?.capture
+    const key = capture ? `__capture_${type}` : type
+    if (!this._listeners.has(key)) {
+      this._listeners.set(key, new Set())
     }
-    this._listeners.get(type)!.add(handler)
+    this._listeners.get(key)!.add(handler)
   }
 
   removeEventListener(
     type: string,
     handler: EventListenerOrEventListenerObject,
-    _options?: boolean | EventListenerOptions
+    options?: boolean | EventListenerOptions
   ): void {
-    this._listeners.get(type)?.delete(handler)
+    const capture = typeof options === 'boolean' ? options : !!options?.capture
+    const key = capture ? `__capture_${type}` : type
+    this._listeners.get(key)?.delete(handler)
   }
 
   dispatchEvent(event: Event): boolean {
@@ -796,12 +800,10 @@ export class RNNode {
 
   get firstChild(): RNNode | RNTextNode | RNCommentNode | null {
     return this._children[0] ?? null
-    return null
   }
 
   get lastChild(): RNNode | RNTextNode | RNCommentNode | null {
     return this._children[this._children.length - 1] ?? null
-    return null
   }
 
   get nextSibling(): RNNode | RNTextNode | RNCommentNode | null {
@@ -986,9 +988,10 @@ export class RNBody extends RNNode {
     childSet = null
 
     if (child._propsDirty && child._hasPropsChanged()) {
-      const nativeName = child.tagName.startsWith('RCT') || child.tagName.startsWith('Android')
-        ? child.tagName
-        : `RCT${child.tagName}`
+      // Use _nativeName resolved by ensure() during createElement, not a
+      // guessed RCT prefix — the real Fabric name may differ (e.g.
+      // 'Image' → 'RCTImageView', 'TextInput' → 'RCTSinglelineTextInputView').
+      const nativeName = child._nativeName
       let viewConfig
       try {
         viewConfig = ReactNativePrivateInterface.ReactNativeViewConfigRegistry.get(nativeName)
@@ -1254,47 +1257,73 @@ function dispatchEventWithBubble(
   const basePropName = 'on' + type.replace(/^top/, '')
   const domEventType = FABRIC_TO_DOM_EVENT[type] || type
 
+  // Build a shared event object with stopPropagation support
+  let _stopped = false
+  let _prevented = false
+  const sharedEvent = {
+    type: domEventType,
+    target: null as unknown,
+    nativeEvent,
+    get defaultPrevented() { return _prevented },
+    preventDefault() { _prevented = true },
+    stopPropagation() { _stopped = true },
+    get propagationStopped() { return _stopped },
+  } as Record<string, unknown>
+
+  // ── CAPTURE PHASE: root → target ────────────────────────────────
+  // Walk from root down to target calling capture listeners (__capture_*).
+  const captureChain: RNNode[] = []
+  let walker: RNNode | null = current
+  while (walker) {
+    if (walker.nodeType === 1) captureChain.push(walker)
+    walker = walker.parentNode
+  }
+  for (let i = captureChain.length - 1; i >= 0; i--) {
+    if (_stopped) break
+    const node = captureChain[i]
+    const capListeners = node._listeners?.get(`__capture_${domEventType}`)
+    if (capListeners) {
+      sharedEvent.currentTarget = node
+      for (const listener of capListeners) {
+        if (_stopped) break
+        if (typeof listener === 'function') listener(sharedEvent as unknown as Event)
+        else listener.handleEvent(sharedEvent as unknown as Event)
+      }
+    }
+  }
+
+  // ── BUBBLE PHASE: target → root ─────────────────────────────────
+  walker = current
   let depth = 0
-  // Bubble up the parent chain
-  while (current && depth < 20) {
+  while (walker && depth < 20 && !_stopped) {
     depth++
+    sharedEvent.currentTarget = walker
+
     // 1. Check props-based handler (onTouchEnd, onPress, etc.)
-    const props = current.currentProps
+    const props = walker.currentProps
     let handler = props[basePropName]
     if (!handler && type === 'topTouchEnd') {
       handler = props.onPress
     }
-
     if (typeof handler === 'function') {
-      const eventObj = { ...nativeEvent, type: domEventType, target: current, nativeEvent }
+      const eventObj = { ...nativeEvent, type: domEventType, target: walker, nativeEvent }
       ;(handler as (event: Record<string, unknown>) => void)(eventObj)
       return
     }
 
-    // 2. Check addEventListener-based handlers
-    const listeners = current._listeners?.get(domEventType)
+    // 2. Check addEventListener-based handlers (bubble phase)
+    const listeners = walker._listeners?.get(domEventType)
     if (listeners && listeners.size > 0) {
-      let prevented = false
-      const event: Event = {
-        type: domEventType,
-        target: current as unknown as EventTarget,
-        nativeEvent,
-        get defaultPrevented() { return prevented },
-        preventDefault() { prevented = true },
-      } as unknown as Event
       for (const listener of listeners) {
-        if (typeof listener === 'function') {
-          listener(event)
-        } else {
-          listener.handleEvent(event)
-        }
-        if (prevented) break
+        if (_stopped) break
+        if (typeof listener === 'function') listener(sharedEvent as unknown as Event)
+        else listener.handleEvent(sharedEvent as unknown as Event)
       }
-      return
     }
 
-    current = current.parentNode
+    walker = walker.parentNode
   }
+  if (_stopped) return
 
   // Auto-focus focusable components on touch when no JS handler claims the
   // event. This mirrors browser behavior where tapping <input> focuses it.
