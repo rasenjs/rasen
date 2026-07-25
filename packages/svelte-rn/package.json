@@ -1,0 +1,72 @@
+{
+  "name": "@rasenjs/svelte-rn",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Svelte 5 custom renderer for React Native Fabric via @rasenjs/rn-dom",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.ts",
+      "import": "./dist/renderer.js",
+      "require": "./dist/renderer.cjs"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "import": "./dist/router.js",
+      "require": "./dist/router.cjs"
+    },
+    "./web": {
+      "types": "./dist/web/index.d.ts",
+      "import": "./dist/web/index.mjs",
+      "require": "./dist/web/index.js"
+    },
+    "./dist/transformer/*": "./dist/transformer/*"
+  },
+  "typesVersions": {
+    "*": {
+      "renderer": [
+        "./dist/renderer.d.ts"
+      ],
+      "router": [
+        "./dist/router.d.ts"
+      ],
+      "web": [
+        "./dist/web/index.d.ts"
+      ],
+      "dist/index": [
+        "./dist/index.d.ts"
+      ],
+      "dist/renderer": [
+        "./dist/renderer.d.ts"
+      ],
+      "dist/router": [
+        "./dist/router.d.ts"
+      ],
+      "dist/web/*": [
+        "./dist/web/*"
+      ],
+      "dist/transformer/*": [
+        "./dist/transformer/*"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.transformer.json",
+    "build:transformer": "tsc -p tsconfig.transformer.json",
+    "clean": "rm -rf dist",
+    "test": "echo 'No tests yet'"
+  },
+  "dependencies": {
+    "svelte": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@rasenjs/rn-dom": "workspace:*",
+    "svelte": "^5.0.0"
+  }
+}

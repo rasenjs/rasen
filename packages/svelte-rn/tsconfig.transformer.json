@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/transformer",
+    "rootDir": "./transformer",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2020",
+    "allowJs": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "strict": false,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "transformer/**/*.js",
+    "transformer/**/*.ts"
+  ]
+}
