@@ -16,7 +16,7 @@ function createDoc(): RNDocument {
 describe('CSSStyleSheet', () => {
   it('stores name and frozen style', () => {
     const sheet = new CSSStyleSheet('.card', { flex: 1, backgroundColor: 'red' })
-    expect(sheet.name).toBe('.card')
+    expect(sheet.selectorText).toBe('.card')
     expect(sheet.style).toEqual({ flex: 1, backgroundColor: 'red' })
     expect(Object.isFrozen(sheet.style)).toBe(true)
   })
@@ -54,7 +54,7 @@ describe('StyleSheetList', () => {
     doc.styleSheets._sheets.push(new CSSStyleSheet('.a', { flex: 1 }))
     doc.styleSheets._sheets.push(new CSSStyleSheet('.b', { color: 'red' }))
     const names: string[] = []
-    for (const sheet of doc.styleSheets) names.push(sheet.name)
+    for (const sheet of doc.styleSheets) names.push(sheet.selectorText)
     expect(names).toEqual(['.a', '.b'])
   })
 })
@@ -69,14 +69,14 @@ describe('StyleSheet.create', () => {
     expect(s['.card']).toBe('card')
     expect(s['.text']).toBe('text')
     expect(doc.styleSheets.length).toBe(2)
-    expect(doc.styleSheets.item(0)!.name).toBe('.card')
+    expect(doc.styleSheets.item(0)!.selectorText).toBe('.card')
   })
 
   it('auto-converts bare keys to .selector format', () => {
     const doc = createDoc()
     const s = StyleSheet.create({ card: { flex: 1 } }, doc)
     expect(s.card).toBe('card')
-    expect(doc.styleSheets.item(0)!.name).toBe('.card')
+    expect(doc.styleSheets.item(0)!.selectorText).toBe('.card')
   })
 
   it('returns frozen style objects via _getStyle', () => {

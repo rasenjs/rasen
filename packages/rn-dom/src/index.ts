@@ -1780,15 +1780,15 @@ export function findNodeHandle(node: unknown): number | null {
 // ============================================================================
 
 export class CSSStyleSheet {
-  /** The class name this sheet defines rules for. */
-  name: string
+  /** The CSS selector this rule targets (e.g. '.card', '#header'). */
+  selectorText: string
   /** The resolved RN style object (frozen). */
   style: Record<string, unknown>
   /** Empty array — matches DOM CSSRuleList shape but we don't parse CSS text. */
   cssRules: never[] = []
 
-  constructor(name: string, style: Record<string, unknown>) {
-    this.name = name
+  constructor(selectorText: string, style: Record<string, unknown>) {
+    this.selectorText = selectorText
     this.style = Object.freeze({ ...style })
   }
 }
@@ -1811,7 +1811,7 @@ export class StyleSheetList {
   _getStyle(className: string): Record<string, unknown> | undefined {
     const selector = '.' + className
     for (const sheet of this._sheets) {
-      if (sheet.name === selector) return sheet.style
+      if (sheet.selectorText === selector) return sheet.style
     }
     return undefined
   }
