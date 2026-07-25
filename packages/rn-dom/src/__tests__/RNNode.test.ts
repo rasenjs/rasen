@@ -1,0 +1,437 @@
+/**
+ * @rasenjs/rn-dom — RNNode tests
+ *
+ * Tests the DOM-like element API: attributes, children management,
+ * tree traversal, textContent, cloneNode, and style operations.
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest'
+import { RNDocument, resetTagCounter, type RNNode } from '../index'
+import { resetFabricMocks } from './setup'
+
+function createDoc(rootTag = 1): RNDocument {
+  RNDocument.reset()
+  resetTagCounter()
+  resetFabricMocks()
+  return RNDocument.getOrCreate(rootTag)
+}
+
+describe('RNNode', () => {
+  // ── Attribute API ──────────────────────────────────────────────
+
+  describe('setAttribute / getAttribute / removeAttribute', () => {
+    it('sets and gets attributes', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.setAttribute('testID', 'my-view')
+      expect(el.getAttribute('testID')).toBe('my-view')
+    })
+
+    it('checks attribute existence', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.setAttribute('foo', 'bar')
+      expect(el.hasAttribute('foo')).toBe(true)
+      expect(el.hasAttribute('none')).toBe(false)
+    })
+
+    it('removes attributes', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.setAttribute('foo', 'bar')
+      el.removeAttribute('foo')
+      expect(el.hasAttribute('foo')).toBe(false)
+    })
+
+    it('stores in currentProps', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.setAttribute('onTouchEnd', vi.fn())
+      expect(typeof el.currentProps.onTouchEnd).toBe('function')
+    })
+
+    it('marks dirty only when mounted', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      const spy = vi.spyOn(el as any, '_markDirty')
+      el.setAttribute('foo', 'bar')
+      expect(spy).not.toHaveBeenCalled() // not mounted yet
+      spy.mockRestore()
+    })
+  })
+
+  // ── appendChild / removeChild ──────────────────────────────────
+
+  describe('appendChild / removeChild', () => {
+    it('appends a child', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const c = doc.createElement('Text')
+      p.appendChild(c)
+      expect(c.parentNode).toBe(p)
+      expect(p.childNodes).toHaveLength(1)
+      expect(p.childNodes[0]).toBe(c)
+    })
+
+    it('removes a child', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const c = doc.createElement('Text')
+      p.appendChild(c)
+      p.removeChild(c)
+      expect(c.parentNode).toBeNull()
+      expect(p.childNodes).toHaveLength(0)
+    })
+
+    it('removes child only if present', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const c = doc.createElement('Text')
+      // Should not throw
+      p.removeChild(c)
+    })
+
+    it('supports multiple children', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      p.appendChild(doc.createElement('Text'))
+      p.appendChild(doc.createElement('Image'))
+      p.appendChild(doc.createElement('ScrollView'))
+      expect(p.childNodes).toHaveLength(3)
+      expect(p.childElementCount).toBe(3)
+    })
+  })
+
+  // ── insertBefore ───────────────────────────────────────────────
+
+  describe('insertBefore', () => {
+    it('inserts before a reference child', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      p.appendChild(a)
+      p.insertBefore(b, a)
+      expect(p.childNodes[0]).toBe(b)
+      expect(p.childNodes[1]).toBe(a)
+    })
+
+    it('appends when ref is null', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      p.appendChild(a)
+      p.insertBefore(b, null)
+      expect(p.childNodes[p.childNodes.length - 1]).toBe(b)
+    })
+
+    it('appends when ref not found', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      p.appendChild(a)
+      const orphan = doc.createElement('View')
+      p.insertBefore(b, orphan) // orphan not in children
+      expect(p.childNodes).toHaveLength(2)
+    })
+  })
+
+  // ── replaceChild ───────────────────────────────────────────────
+
+  describe('replaceChild', () => {
+    it('replaces old child with new', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const old = doc.createElement('Text')
+      const nw = doc.createElement('Image')
+      p.appendChild(old)
+      p.replaceChild(nw, old)
+      expect(p.childNodes[0]).toBe(nw)
+      expect(old.parentNode).toBeNull()
+    })
+
+    it('does nothing if old child absent', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      p.replaceChild(doc.createElement('Text'), doc.createElement('Text'))
+      expect(p.childNodes).toHaveLength(0)
+    })
+  })
+
+  // ── children / childNodes / childElementCount ──────────────────
+
+  describe('children accessors', () => {
+    it('childNodes includes all node types', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      p.appendChild(doc.createElement('Text'))
+      p.appendChild(doc.createTextNode('hello'))
+      p.appendChild(doc.createComment('x'))
+      expect(p.childNodes).toHaveLength(3)
+    })
+
+    it('children filters to only elements', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      p.appendChild(doc.createElement('Text'))
+      p.appendChild(doc.createTextNode('hello'))
+      p.appendChild(doc.createComment('x'))
+      expect(p.children).toHaveLength(1)
+      expect(p.children[0].tagName).toBe('Text')
+    })
+  })
+
+  // ── firstChild / lastChild ─────────────────────────────────────
+
+  describe('firstChild / lastChild', () => {
+    it('returns null when empty', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      expect(p.firstChild).toBeNull()
+      expect(p.lastChild).toBeNull()
+    })
+
+    it('returns first and last child', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      p.appendChild(a)
+      p.appendChild(b)
+      expect(p.firstChild).toBe(a)
+      expect(p.lastChild).toBe(b)
+    })
+  })
+
+  // ── nextSibling / previousSibling ──────────────────────────────
+
+  describe('nextSibling / previousSibling', () => {
+    it('traverses siblings correctly', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      const c = doc.createElement('ScrollView')
+      p.appendChild(a)
+      p.appendChild(b)
+      p.appendChild(c)
+      expect(a.nextSibling).toBe(b)
+      expect(b.nextSibling).toBe(c)
+      expect(c.nextSibling).toBeNull()
+      expect(b.previousSibling).toBe(a)
+      expect(a.previousSibling).toBeNull()
+    })
+  })
+
+  // ── textContent ────────────────────────────────────────────────
+
+  describe('textContent', () => {
+    it('returns concatenated text', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      p.appendChild(doc.createTextNode('Hello'))
+      p.appendChild(doc.createTextNode(' '))
+      p.appendChild(doc.createTextNode('World'))
+      expect(p.textContent).toBe('Hello World')
+    })
+
+    it('sets text by replacing children', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      p.appendChild(doc.createElement('Text'))
+      p.textContent = 'new text'
+      expect(p.childNodes).toHaveLength(1)
+      expect((p.childNodes[0] as any).textContent).toBe('new text')
+    })
+
+    it('clears children when set to empty string', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      p.appendChild(doc.createTextNode('x'))
+      p.textContent = ''
+      expect(p.childNodes).toHaveLength(0)
+    })
+  })
+
+  // ── isConnected / contains ─────────────────────────────────────
+
+  describe('isConnected / contains', () => {
+    it('isConnected false when not in tree', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      expect(el.isConnected).toBe(false)
+    })
+
+    it('isConnected true when in body tree', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      doc.body.appendChild(el)
+      expect(el.isConnected).toBe(true)
+    })
+
+    it('contains checks descendants', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const c = doc.createElement('Text')
+      p.appendChild(c)
+      expect(p.contains(c)).toBe(true)
+      expect(p.contains(p)).toBe(true)
+      expect(p.contains(doc.createElement('View'))).toBe(false)
+    })
+  })
+
+  // ── cloneNode ──────────────────────────────────────────────────
+
+  describe('cloneNode', () => {
+    it('clones shallow without children', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.setAttribute('foo', 'bar')
+      const clone = el.cloneNode(false)
+      expect(clone.tagName).toBe('View')
+      expect(clone.getAttribute('foo')).toBe('bar')
+      expect(clone.childNodes).toHaveLength(0)
+    })
+
+    it('deep clone copies children', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      p.appendChild(doc.createElement('Text'))
+      const clone = p.cloneNode(true)
+      expect(clone.childNodes).toHaveLength(1)
+    })
+  })
+
+  // ── Style API ──────────────────────────────────────────────────
+
+  describe('style API', () => {
+    it('setProperty adds style', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.style.setProperty('color', 'red')
+      expect(el.currentProps.style).toEqual({ color: 'red' })
+    })
+
+    it('removeProperty deletes style', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.style.setProperty('color', 'red')
+      el.style.removeProperty('color')
+      expect(el.currentProps.style).toEqual({})
+    })
+
+    it('getPropertyValue returns style value', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.style.setProperty('color', 'red')
+      expect(el.style.getPropertyValue('color')).toBe('red')
+    })
+
+    it('replaces style on setProperty', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.style.setProperty('color', 'red')
+      el.style.setProperty('color', 'blue')
+      expect(el.style.getPropertyValue('color')).toBe('blue')
+    })
+
+    it('removeProperty does nothing for absent key', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      expect(() => el.style.removeProperty('nonexistent')).not.toThrow()
+    })
+  })
+
+  // ── Event Listener API ─────────────────────────────────────────
+
+  describe('addEventListener / dispatchEvent', () => {
+    it('adds and invokes event listener', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      const fn = vi.fn()
+      el.addEventListener('click', fn)
+      el.dispatchEvent(new Event('click'))
+      expect(fn).toHaveBeenCalled()
+    })
+
+    it('removes event listener', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      const fn = vi.fn()
+      el.addEventListener('click', fn)
+      el.removeEventListener('click', fn)
+      el.dispatchEvent(new Event('click'))
+      expect(fn).not.toHaveBeenCalled()
+    })
+
+    it('stores capture listeners separately', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      const fn = vi.fn()
+      el.addEventListener('click', fn, { capture: true })
+      // capture listeners are stored under __capture_{type} key
+      expect(el._listeners!.get('__capture_click')).toBeTruthy()
+      expect(el._listeners!.get('__capture_click')!.has(fn)).toBe(true)
+    })
+
+    it('defaultPrevented works with cancelable event', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      const ev = new Event('click', { cancelable: true })
+      const fn = vi.fn((e: Event) => e.preventDefault())
+      el.addEventListener('click', fn)
+      el.dispatchEvent(ev)
+      expect(ev.defaultPrevented).toBe(true)
+    })
+  })
+
+  // ── Dirty flag propagation ─────────────────────────────────────
+
+  describe('dirty flags', () => {
+    it('starts clean', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      expect(el._propsDirty).toBe(false)
+      expect(el._childrenDirty).toBe(false)
+      expect(el._hasPropsChanged()).toBe(false)
+    })
+
+    it('setAttribute on mounted node marks props dirty', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el._mounted = true
+      el.setAttribute('foo', 'bar')
+      expect(el._propsDirty).toBe(true)
+      expect(el._dirtyPropsCount).toBeGreaterThan(0)
+    })
+
+    it('appendChild on mounted node marks children dirty', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el._mounted = true
+      el.appendChild(doc.createElement('Text'))
+      expect(el._childrenDirty).toBe(true)
+    })
+
+    it('removeChild on mounted node marks children dirty', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      const c = doc.createElement('Text')
+      el.appendChild(c)
+      el._mounted = true
+      el._childrenDirty = false
+      el.removeChild(c)
+      expect(el._childrenDirty).toBe(true)
+    })
+
+    it('textContent setter adds single text node', () => {
+      const doc = createDoc()
+      const el = doc.createElement('View')
+      el.textContent = 'hello'
+      expect(el.childNodes).toHaveLength(1)
+      expect(el.childNodes[0].nodeType).toBe(3)
+    })
+  })
+})

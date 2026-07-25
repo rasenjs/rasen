@@ -20,7 +20,8 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --external react-native --external @rasenjs/rn-dom && cp elements.cjs dist/elements.cjs && cp elements.d.ts dist/elements.d.ts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --external react-native --external @rasenjs/rn-dom --watch"
+    "dev": "tsup src/index.ts --format cjs,esm --dts --external react-native --external @rasenjs/rn-dom --watch",
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "react": "^19.0.0",
