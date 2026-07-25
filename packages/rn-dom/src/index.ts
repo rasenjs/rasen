@@ -457,6 +457,25 @@ export class RNDocument {
         return newChild
       },
       cloneNode() { return this.ownerDocument.createComment(this.data) },
+
+      remove() { this.parentNode?.removeChild(this as unknown as RNCommentNode) },
+      after(...nodes: (RNNode | RNTextNode | RNCommentNode)[]) {
+        const parent = this.parentNode
+        if (!parent) return
+        const ref = this.nextSibling
+        for (const node of nodes) parent.insertBefore(node, ref)
+      },
+      before(...nodes: (RNNode | RNTextNode | RNCommentNode)[]) {
+        const parent = this.parentNode
+        if (!parent) return
+        for (const node of nodes) parent.insertBefore(node, this as unknown as RNCommentNode)
+      },
+      replaceWith(...nodes: (RNNode | RNTextNode | RNCommentNode)[]) {
+        const parent = this.parentNode
+        if (!parent) return
+        for (const node of nodes) parent.insertBefore(node, this as unknown as RNCommentNode)
+        parent.removeChild(this as unknown as RNCommentNode)
+      },
     }
 
     return comment as RNCommentNode
@@ -652,7 +671,7 @@ export class RNNode {
     }
   }
 
-  removeChild(child: RNNode | RNTextNode | RNCommentNode): void {
+  removeChild(child: RNNode | RNTextNode | RNCommentNode): RNNode | RNTextNode | RNCommentNode {
     child.parentNode = null
     const idx = this._children.indexOf(child)
     if (idx !== -1) this._children.splice(idx, 1)
@@ -660,9 +679,10 @@ export class RNNode {
     if (this._mounted) {
       this._markChildrenDirty()
     }
+    return child
   }
 
-  insertBefore(child: RNNode | RNTextNode | RNCommentNode, ref?: RNNode | RNTextNode | RNCommentNode): void {
+  insertBefore(child: RNNode | RNTextNode | RNCommentNode, ref: RNNode | RNTextNode | RNCommentNode | null): RNNode | RNTextNode | RNCommentNode {
     child.parentNode = this
     if (!ref) {
       this._children.push(child)
@@ -679,6 +699,7 @@ export class RNNode {
     if (this._mounted) {
       this._markChildrenDirty()
     }
+    return child
   }
 
   /** @internal - Recursively mark a subtree as needing a full Fabric
@@ -725,9 +746,9 @@ export class RNNode {
     }
   }
 
-  replaceChild(newChild: RNNode | RNTextNode | RNCommentNode, oldChild: RNNode | RNTextNode | RNCommentNode): void {
+  replaceChild(newChild: RNNode | RNTextNode | RNCommentNode, oldChild: RNNode | RNTextNode | RNCommentNode): RNNode | RNTextNode | RNCommentNode {
     const idx = this._children.indexOf(oldChild)
-    if (idx === -1) return
+    if (idx === -1) return oldChild
     oldChild.parentNode = null
     unregisterFromInstanceMap(oldChild)
     newChild.parentNode = this
@@ -736,6 +757,7 @@ export class RNNode {
     if (this._mounted) {
       this._markChildrenDirty()
     }
+    return oldChild
   }
 
   contains(node: RNNode | RNTextNode | RNCommentNode): boolean {
@@ -838,6 +860,105 @@ export class RNNode {
     // Append a single text node if value is non-empty
     if (value) {
       this.appendChild(this.ownerDocument.createTextNode(value))
+    }
+  }
+
+  // =========================================================================
+  // DOM ChildNode API
+  // =========================================================================
+
+  /**
+   * Remove this node from its parent.
+   * Standard DOM: ChildNode.remove()
+   */
+  remove(): void {
+    this.parentNode?.removeChild(this)
+  }
+
+  /**
+   * Insert nodes after this node.
+   * Standard DOM: ChildNode.after(...nodes)
+   */
+  after(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void {
+    const parent = this.parentNode
+    if (!parent) return
+    const ref = this.nextSibling
+    for (const node of nodes) {
+      parent.insertBefore(node, ref)
+    }
+  }
+
+  /**
+   * Insert nodes before this node.
+   * Standard DOM: ChildNode.before(...nodes)
+   */
+  before(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void {
+    const parent = this.parentNode
+    if (!parent) return
+    for (const node of nodes) {
+      parent.insertBefore(node, this)
+    }
+  }
+
+  /**
+   * Replace this node with the given nodes.
+   * Standard DOM: ChildNode.replaceWith(...nodes)
+   */
+  replaceWith(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void {
+    const parent = this.parentNode
+    if (!parent) return
+    for (const node of nodes) {
+      parent.insertBefore(node, this)
+    }
+    parent.removeChild(this)
+  }
+
+  // =========================================================================
+  // DOM ParentNode API
+  // =========================================================================
+
+  /**
+   * Append multiple nodes at the end.
+   * Standard DOM: ParentNode.append(...nodes)
+   */
+  append(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void {
+    for (const node of nodes) {
+      this.appendChild(node)
+    }
+  }
+
+  /**
+   * Prepend multiple nodes at the beginning.
+   * Standard DOM: ParentNode.prepend(...nodes)
+   */
+  prepend(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void {
+    const ref = this.firstChild
+    for (const node of nodes) {
+      this.insertBefore(node, ref)
+    }
+  }
+
+  /**
+   * Merge adjacent text nodes into single text nodes.
+   * Standard DOM: Node.normalize()
+   */
+  normalize(): void {
+    let i = 0
+    while (i < this._children.length) {
+      const child = this._children[i]
+      if (child.nodeType === 3) {
+        // Merge with next sibling if also text
+        while (i + 1 < this._children.length && this._children[i + 1].nodeType === 3) {
+          const next = this._children[i + 1] as RNTextNode
+          const text = (child as RNTextNode).textContent + next.textContent
+          ;(child as RNTextNode).textContent = text
+          this.removeChild(next)
+        }
+      } else if ((child as RNNode).nodeType === 1) {
+        // Recursively normalize child elements
+        ;(child as RNNode).normalize()
+      }
+      i++
     }
   }
 
@@ -1162,6 +1283,38 @@ export class RNTextNode {
   cloneNode(_deep: boolean = false): RNTextNode {
     return this.ownerDocument.createTextNode(this._textContent)
   }
+
+  // ── ChildNode API (shared with RNNode) ────────────────────────
+
+  remove(): void {
+    this.parentNode?.removeChild(this)
+  }
+
+  after(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void {
+    const parent = this.parentNode
+    if (!parent) return
+    const ref = this.nextSibling
+    for (const node of nodes) {
+      parent.insertBefore(node, ref)
+    }
+  }
+
+  before(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void {
+    const parent = this.parentNode
+    if (!parent) return
+    for (const node of nodes) {
+      parent.insertBefore(node, this)
+    }
+  }
+
+  replaceWith(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void {
+    const parent = this.parentNode
+    if (!parent) return
+    for (const node of nodes) {
+      parent.insertBefore(node, this)
+    }
+    parent.removeChild(this)
+  }
 }
 
 // ============================================================================
@@ -1187,6 +1340,10 @@ export interface RNCommentNode {
   removeChild(child: RNNode | RNTextNode | RNCommentNode): RNNode | RNTextNode | RNCommentNode
   insertBefore(newChild: RNNode | RNTextNode | RNCommentNode, refChild: RNNode | RNTextNode | RNCommentNode): RNNode | RNTextNode | RNCommentNode
   cloneNode(): RNCommentNode
+  remove(): void
+  after(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void
+  before(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void
+  replaceWith(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void
 }
 
 // ============================================================================

@@ -119,6 +119,39 @@ describe('RNTextNode', () => {
     })
   })
 
+  // ── ChildNode API on text nodes ────────────────────────────────
+
+  describe('ChildNode API', () => {
+    it('remove() removes text node from parent', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const t = doc.createTextNode('x')
+      p.appendChild(t)
+      t.remove()
+      expect(p.childNodes).toHaveLength(0)
+    })
+
+    it('after() inserts after text node', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const t = doc.createTextNode('text')
+      const v = doc.createElement('View')
+      p.appendChild(t)
+      t.after(v)
+      expect(p.childNodes[1]).toBe(v)
+    })
+
+    it('before() inserts before text node', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const t = doc.createTextNode('text')
+      const v = doc.createElement('View')
+      p.appendChild(t)
+      t.before(v)
+      expect(p.childNodes[0]).toBe(v)
+    })
+  })
+
   // ── cloneNode ──────────────────────────────────────────────────
 
   describe('cloneNode', () => {

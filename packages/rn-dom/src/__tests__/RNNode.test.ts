@@ -434,4 +434,91 @@ describe('RNNode', () => {
       expect(el.childNodes[0].nodeType).toBe(3)
     })
   })
+
+  // ── DOM ChildNode API ─────────────────────────────────────────
+
+  describe('ChildNode API', () => {
+    it('remove() removes self from parent', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const c = doc.createElement('Text')
+      p.appendChild(c)
+      c.remove()
+      expect(p.childNodes).toHaveLength(0)
+      expect(c.parentNode).toBeNull()
+    })
+
+    it('after() inserts after self', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      p.appendChild(a)
+      a.after(b)
+      expect(p.childNodes[0]).toBe(a)
+      expect(p.childNodes[1]).toBe(b)
+    })
+
+    it('before() inserts before self', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      p.appendChild(a)
+      a.before(b)
+      expect(p.childNodes[0]).toBe(b)
+      expect(p.childNodes[1]).toBe(a)
+    })
+
+    it('replaceWith() replaces self', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      p.appendChild(a)
+      a.replaceWith(b)
+      expect(p.childNodes[0]).toBe(b)
+      expect(a.parentNode).toBeNull()
+    })
+  })
+
+  // ── DOM ParentNode API ────────────────────────────────────────
+
+  describe('ParentNode API', () => {
+    it('append() adds multiple children', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      p.append(a, b)
+      expect(p.childNodes).toHaveLength(2)
+      expect(p.childNodes[0]).toBe(a)
+      expect(p.childNodes[1]).toBe(b)
+    })
+
+    it('prepend() adds at the beginning', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      const a = doc.createElement('Text')
+      const b = doc.createElement('Image')
+      p.appendChild(a)
+      p.prepend(b)
+      expect(p.childNodes[0]).toBe(b)
+      expect(p.childNodes[1]).toBe(a)
+    })
+  })
+
+  // ── normalize ─────────────────────────────────────────────────
+
+  describe('normalize', () => {
+    it('merges adjacent text nodes', () => {
+      const doc = createDoc()
+      const p = doc.createElement('View')
+      p.appendChild(doc.createTextNode('Hello '))
+      p.appendChild(doc.createTextNode('World'))
+      p.normalize()
+      expect(p.childNodes).toHaveLength(1)
+      expect((p.childNodes[0] as any).textContent).toBe('Hello World')
+    })
+  })
 })
