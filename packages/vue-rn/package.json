@@ -48,7 +48,9 @@
   "scripts": {
     "build": "tsup && tsc -p tsconfig.transformer.json",
     "build:transformer": "tsc -p tsconfig.transformer.json",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "sync-bench-rn": "node scripts/sync-bench-rn.js",
+    "bench": "node scripts/bench.js"
   },
   "dependencies": {
     "@vue/runtime-core": "^3.4.0"
