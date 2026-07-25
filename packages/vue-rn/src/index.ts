@@ -17,7 +17,7 @@
 
 import { AppRegistry } from 'react-native'
 import { createRenderer, getCurrentInstance } from '@vue/runtime-core'
-import { RNDocument, normalizeEventName, isEvent, applyStylePatch } from '@rasenjs/rn-dom'
+import { RNDocument, normalizeEventName, isEvent } from '@rasenjs/rn-dom'
 import type { RNNode, RNTextNode, RNCommentNode } from '@rasenjs/rn-dom'
 
 let _doc: RNDocument | null = null
@@ -28,15 +28,16 @@ let _doc: RNDocument | null = null
 
 function patchStyle(
   el: RNNode,
-  prev: string | Record<string, unknown> | null,
+  _prev: string | Record<string, unknown> | null,
   next: string | Record<string, unknown> | null,
 ): void {
-  applyStylePatch(
-    (key, value) => el.style.setProperty(key, value),
-    (key) => el.style.removeProperty(key),
-    prev,
-    next,
-  )
+  if (next == null) {
+    el.removeAttribute('style')
+    return
+  }
+  // Replace entire style in one shot — avoids N individual setProperty calls
+  // (each of which does spread + markDirty).
+  el.setAttribute('style', { ...(typeof next === 'object' ? next : {}) })
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +122,7 @@ function createVueRenderer(): any {
 // ---------------------------------------------------------------------------
 
 export interface VueRNMountable {
+  mount(container: any): void
   unmount(): void
   use(plugin: any, ...options: any[]): VueRNMountable
   register(appName: string, setup?: () => void): void
@@ -131,6 +133,12 @@ export function createApp(rootComponent: object): VueRNMountable {
   const app = renderer.createApp(rootComponent)
 
   return {
+    mount(container: any) {
+      // container is typically doc.body — extract the document for createElement
+      _doc = container.ownerDocument ?? container
+      app.mount(container)
+    },
+
     unmount() {
       app.unmount()
     },
