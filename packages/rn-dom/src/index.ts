@@ -107,11 +107,7 @@ export function registerComponent(
 function prepareFabricProps(
   props: Record<string, unknown>,
 ): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  for (const key in props) {
-    result[key] = props[key]
-  }
-  return result
+  return { ...props }
 }
 
 /**
@@ -129,24 +125,27 @@ function buildFabricPayload(
   validAttrs: Record<string, unknown>,
 ): Record<string, unknown> | null {
   const result = ReactNativePrivateInterface.createAttributePayload(props, validAttrs)
-  const payload = injectEventMarkers(props, result ?? {})
-  const r = Object.keys(payload).length > 0 ? payload : null
-  return r
+  const payload = result ?? {}
+  const added = injectEventMarkers(props, payload)
+  return (result !== null || added) ? payload : null
 }
 
-/** Ensure all onXxx props appear as boolean `true` markers in the payload. */
+/** Ensure all onXxx props appear as boolean `true` markers in the payload.
+ *  Returns true if any marker was added. */
 function injectEventMarkers(
   props: Record<string, unknown>,
   payload: Record<string, unknown>,
-): Record<string, unknown> {
+): boolean {
+  let added = false
   for (const key in props) {
     if (key.length > 2 && key.charCodeAt(0) === 111 && key.charCodeAt(1) === 110) {
       if (!(key in payload)) {
         payload[key] = true
+        added = true
       }
     }
   }
-  return payload
+  return added
 }
 
 /**
@@ -160,10 +159,9 @@ function diffFabricPayload(
   validAttrs: Record<string, unknown>,
 ): Record<string, unknown> | null {
   const result = ReactNativePrivateInterface.diffAttributePayloads(prevProps, nextProps, validAttrs)
-  // If a new event handler was added between prev and next, ensure the marker
-  // survives even if the event key isn't in validAttributes.
-  const payload = injectEventMarkers(nextProps, result ?? {})
-  return Object.keys(payload).length > 0 ? payload : null
+  const payload = result ?? {}
+  const added = injectEventMarkers(nextProps, payload)
+  return (result !== null || added) ? payload : null
 }
 
 function getFabricUIManager(): FabricUIManager {
@@ -228,9 +226,12 @@ function createStyleObject(element: RNNode) {
       if (currentStyle && property in currentStyle) {
         const rest = { ...currentStyle }
       delete rest[property]
+        // Manual empty-check avoids Object.keys().length array allocation
+        let empty = true
+        for (const _ in rest) { empty = false; break }
         element.currentProps = {
           ...element.currentProps,
-          style: Object.keys(rest).length > 0 ? rest : {},
+          style: empty ? {} : rest,
         }
         element._requestUpdate()
       }
@@ -520,9 +521,10 @@ export class RNNode {
   _propsDirty = false
   _childrenDirty = false
   _propsSnapshot: Props = {}
-  _dirtyPropsKeys: Set<string> = new Set()
+  _dirtyPropsCount = 0
   _children: (RNNode | RNTextNode | RNCommentNode)[] = []
-  _listeners: Map<string, Set<EventListenerOrEventListenerObject>> = new Map()
+  // Lazily allocated on first addEventListener call (most nodes never use it).
+  _listeners: Map<string, Set<EventListenerOrEventListenerObject>> | null = null
 
   /** Last validAttributes (needed for children-only updates on mounted nodes). */
   _lastValidAttrs: Record<string, unknown> | null = null
@@ -558,10 +560,10 @@ export class RNNode {
   }
 
   /** @internal - Get Fabric children for submission */
-  public _getFabricChildren(): FabricNode[] {
+  _getFabricChildren(): FabricNode[] {
     const children: FabricNode[] = []
     for (const child of this._children) {
-      children.push('node' in child ? child.node : child[FABRIC_NODE])
+      children.push(child.nodeType === 3 ? child.node : child[FABRIC_NODE])
     }
     return children
   }
@@ -569,7 +571,7 @@ export class RNNode {
   /** @internal - Mark node as dirty and propagate up */
   private _markDirty(type: 'props' | 'children', key?: string): void {
     if (type === 'props') {
-      if (key) this._dirtyPropsKeys.add(key)
+      if (key) this._dirtyPropsCount++
       if (this._propsDirty) return
       this._propsDirty = true
     } else {
@@ -587,7 +589,7 @@ export class RNNode {
 
   /** @internal - Check if props actually changed (O(1)) */
   public _hasPropsChanged(): boolean {
-    return this._dirtyPropsKeys.size > 0
+    return this._dirtyPropsCount > 0
   }
 
   /** @internal - Request update (used by style object) */
@@ -763,12 +765,13 @@ export class RNNode {
     handler: EventListenerOrEventListenerObject,
     options?: boolean | AddEventListenerOptions
   ): void {
+    if (!this._listeners) this._listeners = new Map()
     const capture = typeof options === 'boolean' ? options : !!options?.capture
     const key = capture ? `__capture_${type}` : type
-    if (!this._listeners.has(key)) {
-      this._listeners.set(key, new Set())
+    if (!this._listeners!.has(key)) {
+      this._listeners!.set(key, new Set())
     }
-    this._listeners.get(key)!.add(handler)
+    this._listeners!.get(key)!.add(handler)
   }
 
   removeEventListener(
@@ -776,13 +779,14 @@ export class RNNode {
     handler: EventListenerOrEventListenerObject,
     options?: boolean | EventListenerOptions
   ): void {
+    if (!this._listeners) return
     const capture = typeof options === 'boolean' ? options : !!options?.capture
     const key = capture ? `__capture_${type}` : type
     this._listeners.get(key)?.delete(handler)
   }
 
   dispatchEvent(event: Event): boolean {
-    const handlers = this._listeners.get(event.type)
+    const handlers = this._listeners?.get(event.type)
     if (!handlers) return true
     for (const handler of handlers) {
       if (typeof handler === 'function') {
@@ -921,8 +925,8 @@ export class RNBody extends RNNode {
    * Props changes use cloneNodeWithNewProps; children changes use cloneNodeWithNewChildren.
    */
   _getFabricNode(child: RNNode | RNTextNode | RNCommentNode): unknown {
-    if ('node' in child) {
-      return child.node
+    if (child.nodeType === 3) {
+      return (child as RNTextNode).node
     }
 
     if (child.nodeType === 8) {
@@ -958,7 +962,7 @@ export class RNBody extends RNNode {
       child[FABRIC_NODE] = fabricNode
 
       child._propsSnapshot = { ...fabricProps }
-      child._dirtyPropsKeys.clear()
+      child._dirtyPropsCount = 0
       child._propsDirty = false
 
       if (child._children.length > 0) {
@@ -987,6 +991,9 @@ export class RNBody extends RNNode {
     let updatePayload: Record<string, unknown> | null = null
     childSet = null
 
+    // Prepare props once — reused by both props and children-only paths.
+    const fabricProps = prepareFabricProps(child.currentProps)
+
     if (child._propsDirty && child._hasPropsChanged()) {
       // Use _nativeName resolved by ensure() during createElement, not a
       // guessed RCT prefix — the real Fabric name may differ (e.g.
@@ -1000,13 +1007,12 @@ export class RNBody extends RNNode {
       }
 
       const validAttrs = viewConfig?.validAttributes || {}
-      const fabricProps = prepareFabricProps(child.currentProps)
       const prevProps = child._propsSnapshot
       // Diff-based: only send changed props, like React does.
       updatePayload = diffFabricPayload(prevProps, fabricProps, validAttrs)
       child._lastValidAttrs = validAttrs
       child._propsSnapshot = { ...fabricProps }
-      child._dirtyPropsKeys.clear()
+      child._dirtyPropsCount = 0
       child._propsDirty = false
     }
 
@@ -1034,9 +1040,8 @@ export class RNBody extends RNNode {
       // Children-only update: cloneNodeWithNewChildren drops rawProps, so
       // we re-build the full payload from current props (i.e. all style,
       // layout, event markers) and use the combined call instead.
-      const currentFabricProps = prepareFabricProps(child.currentProps)
       const va = child._lastValidAttrs ?? {}
-      const fullPayload = buildFabricPayload(currentFabricProps, va)
+      const fullPayload = buildFabricPayload(fabricProps, va)
       if (fullPayload) {
         fabricNode = (fabricUIManager as any).cloneNodeWithNewChildrenAndProps(fabricNode, childSet, fullPayload)
       } else {
