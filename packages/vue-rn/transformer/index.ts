@@ -200,7 +200,10 @@ if (typeof __VUE_HMR_RUNTIME__ !== 'undefined') {
 
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require('@react-native/metro-babel-transformer').transform({
-    ...params, filename: filename.replace(/\.vue$/, '.js'), src: stripped.code as string,
+    ...params,
+    filename: filename.replace(/\.vue$/, '.js'),
+    src: stripped.code as string,
+    options: { ...params.options, hot: false },
   })
 }
 
