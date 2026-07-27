@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite'
+import { rasenHMR } from '@rasenjs/vite-plugin-rasen'
 
 export default defineConfig({
+  plugins: [rasenHMR()],
   resolve: {
     dedupe: ['@rasenjs/core']
   },

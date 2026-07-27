@@ -8,7 +8,7 @@ export { hostHooks, type HostHooks } from './host-hooks'
 export { MARKERS, isMarkerMatch, MARKER_DEBUG_MAP } from './marker-constants'
 
 import type { Mountable } from '@rasenjs/core'
-import { getReactiveRuntime } from '@rasenjs/core'
+import { mount as coreMount } from '@rasenjs/core'
 import {
   createHydrationContext,
   setHydrationContext,
@@ -77,15 +77,7 @@ export function mount<T extends Element>(
   mountable: Mountable<T>,
   container: T
 ): (() => void) | undefined {
-  const runtime = getReactiveRuntime()
-  const scope = runtime.effectScope()
-  
-  const unmount = scope.run(() => mountable(container))
-  
-  return () => {
-    unmount?.()
-    scope.stop()
-  }
+  return coreMount(mountable, container)
 }
 
 /**

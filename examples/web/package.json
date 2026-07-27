@@ -15,7 +15,9 @@
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/jsx-runtime": "workspace:*",
-    "@rasenjs/reactive-vue": "workspace:*"
+    "@rasenjs/reactive-signals": "workspace:*",
+    "@rasenjs/reactive-vue": "workspace:*",
+    "@rasenjs/vite-plugin-rasen": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

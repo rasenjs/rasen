@@ -1,0 +1,40 @@
+{
+  "name": "@rasenjs/vite-plugin-rasen",
+  "version": "0.1.0",
+  "description": "Vite plugin for Rasen HMR and development mode",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "typecheck": "../../node_modules/.bin/tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "rasen",
+    "vite-plugin",
+    "hmr"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/vite-plugin-rasen"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT",
+  "peerDependencies": {
+    "vite": "^5.0.0 || ^6.0.0"
+  }
+}
