@@ -1,4 +1,4 @@
-/// <reference types="@rasenjs/jsx-runtime/jsx" />
+/// <reference types="@rasenjs/jsx/jsx" />
 
 import { Counter } from '../components/Counter'
 

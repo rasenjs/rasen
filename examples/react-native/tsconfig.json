@@ -5,7 +5,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2020"],
-    "jsx": "react-native",
+    "jsx": "react-jsx",
+    "jsxImportSource": "@rasenjs/jsx-runtime",
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
@@ -15,6 +16,6 @@
     "types": ["react-native"],
     "allowJs": true
   },
-  "include": ["index.js"],
+  "include": ["index.js", "src"],
   "exclude": ["node_modules", "android", "ios"]
 }

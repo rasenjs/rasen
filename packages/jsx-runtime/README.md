@@ -1,17 +1,17 @@
-# @rasenjs/jsx-runtime
+# @rasenjs/jsx
 
 JSX/TSX runtime for the Rasen reactive rendering framework.
 
 ## Installation
 
 ```bash
-npm install @rasenjs/jsx-runtime @rasenjs/core @rasenjs/dom
+npm install @rasenjs/jsx @rasenjs/core @rasenjs/dom
 # or @rasenjs/html for SSR, or @rasenjs/web for isomorphic
 ```
 
 ## Overview
 
-`@rasenjs/jsx-runtime` provides the core JSX transformation logic for Rasen. It uses an **injection pattern** - you should import JSX runtime from your rendering package (`@rasenjs/dom`, `@rasenjs/html`, or `@rasenjs/web`), not directly from this package.
+`@rasenjs/jsx` provides the core JSX transformation logic for Rasen. It uses an **injection pattern** - you should import JSX runtime from your rendering package (`@rasenjs/dom`, `@rasenjs/html`, or `@rasenjs/web`), not directly from this package.
 
 ## Quick Start
 
@@ -85,7 +85,7 @@ All DOM tags are available by default:
 Configure custom tags with namespaces:
 
 ```tsx
-import { configureTags } from '@rasenjs/jsx-runtime'
+import { configureTags } from '@rasenjs/jsx'
 import * as dom from '@rasenjs/dom'
 import * as canvas2d from '@rasenjs/canvas-2d'
 
@@ -107,7 +107,7 @@ configureTags({
 Register or override a single tag:
 
 ```tsx
-import { registerTag } from '@rasenjs/jsx-runtime'
+import { registerTag } from '@rasenjs/jsx'
 import { div } from '@rasenjs/dom'
 
 // Register custom tag
@@ -122,7 +122,7 @@ registerTag('my-container', div)
 Get a registered tag component:
 
 ```tsx
-import { getTag } from '@rasenjs/jsx-runtime'
+import { getTag } from '@rasenjs/jsx'
 
 const DivComponent = getTag('div')
 ```
@@ -193,7 +193,7 @@ const items = ref(['A', 'B', 'C'])
 Configure for different rendering targets:
 
 ```tsx
-import { configureTags } from '@rasenjs/jsx-runtime'
+import { configureTags } from '@rasenjs/jsx'
 import * as rnComponents from '@rasenjs/react-native'
 
 // React Native tags
@@ -228,7 +228,7 @@ declare namespace JSX {
 Use different prefixes for different renderers:
 
 ```tsx
-import { configureTags } from '@rasenjs/jsx-runtime'
+import { configureTags } from '@rasenjs/jsx'
 import * as dom from '@rasenjs/dom'
 import * as canvas2d from '@rasenjs/canvas-2d'
 

@@ -20,6 +20,12 @@ import type {
   RefreshControlProps,
   ModalProps,
   DrawerLayoutAndroidProps,
+  PressableProps,
+  TouchableOpacityProps,
+  TouchableHighlightProps,
+  TouchableWithoutFeedbackProps,
+  KeyboardAvoidingViewProps,
+  StatusBarProps,
 } from 'react-native'
 
 export interface RNEvent {
@@ -45,6 +51,12 @@ export interface RNElementPropMap {
   AndroidSwipeRefreshLayout: RefreshControlProps
   Modal: ModalProps
   DrawerLayoutAndroid: DrawerLayoutAndroidProps
+  Pressable: PressableProps
+  TouchableOpacity: TouchableOpacityProps
+  TouchableHighlight: TouchableHighlightProps
+  TouchableWithoutFeedback: TouchableWithoutFeedbackProps
+  KeyboardAvoidingView: KeyboardAvoidingViewProps
+  StatusBar: StatusBarProps
   DebuggingOverlay: {
     testID?: string
     key?: string | number

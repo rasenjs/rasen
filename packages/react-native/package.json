@@ -3,7 +3,7 @@
   "version": "0.1.0-alpha",
   "description": "Rasen React Native renderer - Direct binding to RN Fabric architecture",
   "type": "module",
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -18,7 +18,7 @@
   ],
   "scripts": {
     "dev": "../../node_modules/.bin/tsup --watch",
-    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "build": "yarn clean && ../../node_modules/.bin/tsup src/index.ts",
     "test": "echo 'No tests configured'",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
     "clean": "rm -rf dist"

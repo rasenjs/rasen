@@ -3,7 +3,7 @@
  */
 
 export { domContext } from './dom-context'
-export { element } from './element'
+export { element, element as h, tag } from './element'
 export type { ElementProps, HTMLTagName } from './element'
 export { html } from './html'
 export { text } from './text'

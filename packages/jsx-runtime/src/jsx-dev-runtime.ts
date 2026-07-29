@@ -1,9 +1,5 @@
 /**
- * JSX Dev Runtime Entry
- * 开发模式下的 JSX 转换
- * 
- * Note: jsxDEV is used in development mode, but we also export jsx/jsxs
- * for compatibility with different transpiler configurations
+ * JSX Dev Runtime Entry — re-exports from index
+ * Used by Babel's automatic JSX transform in dev mode.
  */
-
-export { jsx, jsxs, jsx as jsxDEV, Fragment } from './index'
+export { jsx, jsxs, jsx as jsxDEV, Fragment, JSX } from './index'

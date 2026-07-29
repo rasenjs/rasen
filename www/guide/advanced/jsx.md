@@ -1,13 +1,13 @@
 # JSX Support
 
-Rasen supports JSX/TSX syntax through the `@rasenjs/jsx-runtime` package.
+Rasen supports JSX/TSX syntax through the `@rasenjs/jsx` package.
 
 ## Setup
 
 ### 1. Install the package
 
 ```bash
-npm install @rasenjs/jsx-runtime
+npm install @rasenjs/jsx
 ```
 
 ### 2. Configure TypeScript
@@ -91,7 +91,7 @@ const name = ref('World')
 ## Custom Tags
 
 ```typescript
-import { registerTag } from '@rasenjs/jsx-runtime'
+import { registerTag } from '@rasenjs/jsx'
 
 registerTag('custom-button', CustomButton)
 ```

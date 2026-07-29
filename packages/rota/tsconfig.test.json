@@ -3,7 +3,7 @@
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "@rasenjs/jsx-runtime"
+    "jsxImportSource": "@rasenjs/jsx"
   },
   "include": ["tests/**/*", "src/**/*"],
   "exclude": ["node_modules", "dist"]

@@ -47,7 +47,7 @@ pnpm add @rasenjs/core @rasenjs/dom @rasenjs/reactive-signals signal-polyfill
 ### Optional: JSX Support
 
 ```bash
-npm install @rasenjs/jsx-runtime
+npm install @rasenjs/jsx
 ```
 
 ## Basic Example

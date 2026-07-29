@@ -4609,7 +4609,6 @@ __metadata:
   resolution: "@rasenjs/dom@workspace:packages/dom"
   dependencies:
     "@rasenjs/core": "workspace:^"
-    "@rasenjs/jsx-runtime": "workspace:^"
     "@rasenjs/reactive-vue": "workspace:*"
     "@vue/reactivity": "npm:^3.5.25"
   languageName: unknown
@@ -4653,6 +4652,7 @@ __metadata:
     "@babel/preset-env": "npm:^7.23.0"
     "@babel/runtime": "npm:^7.23.0"
     "@rasenjs/core": "workspace:*"
+    "@rasenjs/jsx-runtime": "workspace:*"
     "@rasenjs/react-native": "workspace:*"
     "@rasenjs/react-native-router": "workspace:*"
     "@rasenjs/reactive-vue": "workspace:*"
@@ -4664,7 +4664,6 @@ __metadata:
     "@react-native/gradle-plugin": "npm:0.86.0"
     "@react-native/metro-config": "npm:0.86.0"
     "@react-native/typescript-config": "npm:0.86.0"
-    "@types/react": "npm:^19.2.0"
     "@vue/reactivity": "npm:^3.5.25"
     react: "npm:19.2.3"
     react-native: "npm:0.86.0"
@@ -4726,21 +4725,14 @@ __metadata:
   resolution: "@rasenjs/html@workspace:packages/html"
   dependencies:
     "@rasenjs/core": "workspace:^"
-    "@rasenjs/jsx-runtime": "workspace:^"
   languageName: unknown
   linkType: soft
 
-"@rasenjs/jsx-runtime@workspace:*, @rasenjs/jsx-runtime@workspace:^, @rasenjs/jsx-runtime@workspace:packages/jsx-runtime":
+"@rasenjs/jsx-runtime@workspace:*, @rasenjs/jsx-runtime@workspace:packages/jsx-runtime":
   version: 0.0.0-use.local
   resolution: "@rasenjs/jsx-runtime@workspace:packages/jsx-runtime"
-  dependencies:
-    "@rasenjs/core": "workspace:*"
-    "@rasenjs/web": "workspace:*"
-    tsup: "npm:^8.3.5"
-    typescript: "npm:^5.7.2"
   peerDependencies:
     "@rasenjs/core": ">=0.1.0-alpha"
-    "@rasenjs/web": ">=0.1.0-alpha"
   languageName: unknown
   linkType: soft
 

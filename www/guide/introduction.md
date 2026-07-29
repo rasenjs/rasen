@@ -56,7 +56,7 @@ Rasen provides **dual decoupling**:
 | [@rasenjs/canvas-2d](/packages/canvas-2d) | Canvas 2D rendering components |
 | [@rasenjs/react-native](/packages/react-native) | React Native Fabric renderer |
 | [@rasenjs/html](/packages/html) | HTML renderer for SSR/SSG |
-| [@rasenjs/jsx-runtime](/packages/jsx-runtime) | JSX/TSX runtime support |
+| [@rasenjs/jsx](/packages/jsx-runtime) | JSX/TSX runtime support |
 | [@rasenjs/reactive-vue](/packages/reactive-vue) | Vue 3 reactivity adapter |
 | [@rasenjs/reactive-signals](/packages/reactive-signals) | TC39 Signals adapter |
 

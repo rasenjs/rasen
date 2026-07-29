@@ -1,167 +1,97 @@
-import type { Mountable } from '@rasenjs/core'
-import { element, type ElementProps, type HTMLTagName } from './element'
-
-// ============================================================================
-// 类型工具
-// ============================================================================
-
-/** 元素组件的 Props 类型（不含 tag） */
-type Props<T extends HTMLTagName> = Omit<ElementProps<T>, 'tag'>
-
-/** 响应式值 - 带有 value 属性的对象（用于响应式文本） */
-type ReactiveValue = { value: unknown }
-
-/** Child 类型 - 支持字符串、响应式函数、响应式值、Mountable 组件 */
-type Child = string | (() => string | number) | ReactiveValue | Mountable<HTMLElement>
-
-/**
- * 创建元素组件的工厂函数
- * 简化重载：
- * - el()                       → 空元素
- * - el(child)                  → 单一子节点
- * - el(props)                  → 带 props，无子节点
- * - el(props, ...children)     → props + 多个子节点
- */
-function createElement<T extends HTMLTagName>(tag: T) {
-  // 简化为 4 个重载
-  function el(): Mountable<HTMLElement>
-  function el(child: Child): Mountable<HTMLElement>
-  function el(props: Props<T>): Mountable<HTMLElement>
-  function el(props: Props<T>, ...children: Child[]): Mountable<HTMLElement>
-  
-  // 实现（保持不变）
-  function el(
-    propsOrChild?: Props<T> | Child,
-    ...restChildren: Child[]
-  ): Mountable<HTMLElement> {
-    // 没有参数
-    if (propsOrChild === undefined) {
-      return element({ tag } as unknown as ElementProps<T>)
-    }
-
-    // 第一个参数是 string 或 function (Mountable)，当作 child
-    if (
-      typeof propsOrChild === 'string' ||
-      typeof propsOrChild === 'function'
-    ) {
-      const children = [propsOrChild, ...restChildren]
-      return element({ tag, children } as unknown as ElementProps<T>)
-    }
-
-    // 第一个参数是 props 对象
-    const props = propsOrChild as Props<T>
-    if (restChildren.length > 0) {
-      // 合并 children
-      const existingChildren = props.children
-      const children = Array.isArray(existingChildren)
-        ? [...existingChildren, ...restChildren]
-        : existingChildren !== undefined
-          ? [existingChildren as Child, ...restChildren]
-          : restChildren
-      return element({ tag, ...props, children } as unknown as ElementProps<T>)
-    }
-
-    return element({ tag, ...props } as unknown as ElementProps<T>)
-  }
-  
-  return el
-}
+import { tag } from './element'
 
 // ============================================================================
 // 通用元素组件
 // ============================================================================
 
 // 结构性元素
-export const div = createElement('div')
-export const span = createElement('span')
-export const p = createElement('p')
-export const br = createElement('br')
-export const hr = createElement('hr')
+export const div = tag('div')
+export const span = tag('span')
+export const p = tag('p')
+export const br = tag('br')
+export const hr = tag('hr')
 
 // 标题
-export const h1 = createElement('h1')
-export const h2 = createElement('h2')
-export const h3 = createElement('h3')
-export const h4 = createElement('h4')
-export const h5 = createElement('h5')
-export const h6 = createElement('h6')
+export const h1 = tag('h1')
+export const h2 = tag('h2')
+export const h3 = tag('h3')
+export const h4 = tag('h4')
+export const h5 = tag('h5')
+export const h6 = tag('h6')
 
 // 文本格式
-export const strong = createElement('strong')
-export const em = createElement('em')
-export const small = createElement('small')
-export const code = createElement('code')
-export const pre = createElement('pre')
-export const mark = createElement('mark')
-export const del = createElement('del')
-export const ins = createElement('ins')
-export const sub = createElement('sub')
-export const sup = createElement('sup')
-export const b = createElement('b')
-export const i = createElement('i')
-export const u = createElement('u')
+export const strong = tag('strong')
+export const em = tag('em')
+export const small = tag('small')
+export const code = tag('code')
+export const pre = tag('pre')
+export const mark = tag('mark')
+export const del = tag('del')
+export const ins = tag('ins')
+export const sub = tag('sub')
+export const sup = tag('sup')
+export const b = tag('b')
+export const i = tag('i')
+export const u = tag('u')
 
 // 列表
-export const ul = createElement('ul')
-export const ol = createElement('ol')
-export const li = createElement('li')
-export const dl = createElement('dl')
-export const dt = createElement('dt')
-export const dd = createElement('dd')
+export const ul = tag('ul')
+export const ol = tag('ol')
+export const li = tag('li')
+export const dl = tag('dl')
+export const dt = tag('dt')
+export const dd = tag('dd')
 
 // 链接和媒体
-export const a = createElement('a')
-export const img = createElement('img')
-export const picture = createElement('picture')
-export const source = createElement('source')
-export const audio = createElement('audio')
-export const video = createElement('video')
-export const track = createElement('track')
+export const a = tag('a')
+export const img = tag('img')
+export const picture = tag('picture')
+export const source = tag('source')
+export const audio = tag('audio')
+export const video = tag('video')
+export const track = tag('track')
 
 // 表单
-export const form = createElement('form')
-export const input = createElement('input') as (
-  propsOrChild?: Props<'input'> | Child,
-  ...children: Child[]
-) => Mountable<HTMLElement>
-export const label = createElement('label')
-export const button = createElement('button')
-export const textarea = createElement('textarea')
-export const select = createElement('select')
-export const option = createElement('option')
-export const optgroup = createElement('optgroup')
-export const fieldset = createElement('fieldset')
-export const legend = createElement('legend')
-export const datalist = createElement('datalist')
-export const output = createElement('output')
+export const form = tag('form')
+export const input = tag('input')
+export const label = tag('label')
+export const button = tag('button')
+export const textarea = tag('textarea')
+export const select = tag('select')
+export const option = tag('option')
+export const optgroup = tag('optgroup')
+export const fieldset = tag('fieldset')
+export const legend = tag('legend')
+export const datalist = tag('datalist')
+export const output = tag('output')
 
 // 表格
-export const table = createElement('table')
-export const thead = createElement('thead')
-export const tbody = createElement('tbody')
-export const tfoot = createElement('tfoot')
-export const tr = createElement('tr')
-export const td = createElement('td')
-export const th = createElement('th')
-export const caption = createElement('caption')
-export const colgroup = createElement('colgroup')
-export const col = createElement('col')
+export const table = tag('table')
+export const thead = tag('thead')
+export const tbody = tag('tbody')
+export const tfoot = tag('tfoot')
+export const tr = tag('tr')
+export const td = tag('td')
+export const th = tag('th')
+export const caption = tag('caption')
+export const colgroup = tag('colgroup')
+export const col = tag('col')
 
 // 语义化元素
-export const section = createElement('section')
-export const article = createElement('article')
-export const header = createElement('header')
-export const footer = createElement('footer')
-export const nav = createElement('nav')
-export const main = createElement('main')
-export const aside = createElement('aside')
-export const details = createElement('details')
-export const summary = createElement('summary')
-export const dialog = createElement('dialog')
+export const section = tag('section')
+export const article = tag('article')
+export const header = tag('header')
+export const footer = tag('footer')
+export const nav = tag('nav')
+export const main = tag('main')
+export const aside = tag('aside')
+export const details = tag('details')
+export const summary = tag('summary')
+export const dialog = tag('dialog')
 
 // 其他元素
-export const blockquote = createElement('blockquote')
-export const figure = createElement('figure')
-export const figcaption = createElement('figcaption')
-export const address = createElement('address')
-export const time = createElement('time')
+export const blockquote = tag('blockquote')
+export const figure = tag('figure')
+export const figcaption = tag('figcaption')
+export const address = tag('address')
+export const time = tag('time')

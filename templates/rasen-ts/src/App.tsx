@@ -1,4 +1,4 @@
-/// <reference types="@rasenjs/jsx-runtime/jsx" />
+/// <reference types="@rasenjs/jsx/jsx" />
 
 import { ref, computed, type Ref, useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { com } from '@rasenjs/core'

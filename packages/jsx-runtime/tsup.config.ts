@@ -1,19 +1,11 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: {
-    index: 'src/index.ts',
-    'jsx-runtime': 'src/jsx-runtime.ts',
-    'jsx-dev-runtime': 'src/jsx-dev-runtime.ts'
-  },
+  entry: ['src/index.ts'],
   format: ['esm', 'cjs'],
-  dts: {
-    compilerOptions: {
-      skipLibCheck: true
-    }
-  },
+  dts: true,
   clean: true,
   sourcemap: true,
-  external: ['@rasenjs/core', '@rasenjs/dom'],
+  external: ['@rasenjs/core'],
   onSuccess: 'echo "Build success"'
 })

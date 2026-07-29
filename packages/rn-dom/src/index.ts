@@ -559,7 +559,22 @@ export class RNDocument {
 
     return comment as RNCommentNode
   }
-  
+
+  /**
+   * Create a DocumentFragment-like container for batch insertion.
+   *
+   * Children appended to the fragment are registered in the instance map
+   * (unlike comment markers), and `flush` moves them to the target parent.
+   *
+   * Usage:
+   *   const frag = doc.createDocumentFragment()
+   *   frag.appendChild(child1)
+   *   frag.flush(parent, beforeNode) // moves children to parent
+   */
+  createDocumentFragment(): RNDocumentFragment {
+    return new RNDocumentFragment(this)
+  }
+
   private _rnInitEventSystem(): void {
     const g = globalThis as Record<string, unknown>
     const HANDLER_KEY = '__RASEN_EVENT_HANDLER_REGISTERED__'
@@ -1478,6 +1493,102 @@ export interface RNCommentNode {
   after(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void
   before(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void
   replaceWith(...nodes: (RNNode | RNTextNode | RNCommentNode)[]): void
+}
+
+// ============================================================================
+// RNDocumentFragment — lightweight virtual container for batch insertion
+//
+// Mirrors DOM's DocumentFragment: children can be appended/inserted/removed,
+// then flushed atomically into a real parent node. Unlike RNCommentNode,
+// children ARE registered in the instance map so event dispatch works.
+//
+// Used by eachImpl's fast path via host-hooks createFragment.
+// ============================================================================
+
+export class RNDocumentFragment {
+  readonly nodeType = 11 as const
+  readonly nodeName = '#document-fragment' as const
+  readonly nodeValue = null
+  readonly data = ''
+  textContent = ''
+  readonly ownerDocument: RNDocument
+  parentNode: RNNode | null = null
+  _children: (RNNode | RNTextNode | RNCommentNode)[] = []
+
+  constructor(ownerDocument: RNDocument) {
+    this.ownerDocument = ownerDocument
+  }
+
+  get childNodes(): (RNNode | RNTextNode | RNCommentNode)[] {
+    return this._children
+  }
+
+  appendChild(child: RNNode | RNTextNode | RNCommentNode): RNNode | RNTextNode | RNCommentNode {
+    child.parentNode = this as unknown as RNNode
+    this._children.push(child)
+    if (child.nodeType === 1) {
+      registerInInstanceMap(child as RNNode)
+    }
+    return child
+  }
+
+  removeChild(child: RNNode | RNTextNode | RNCommentNode): RNNode | RNTextNode | RNCommentNode {
+    const idx = this._children.indexOf(child)
+    if (idx >= 0) this._children.splice(idx, 1)
+    child.parentNode = null
+    if (child.nodeType === 1) {
+      unregisterFromInstanceMap(child as RNNode)
+    }
+    return child
+  }
+
+  insertBefore(
+    newChild: RNNode | RNTextNode | RNCommentNode,
+    refChild: RNNode | RNTextNode | RNCommentNode | null,
+  ): RNNode | RNTextNode | RNCommentNode {
+    newChild.parentNode = this as unknown as RNNode
+    if (!refChild) {
+      this._children.push(newChild)
+    } else {
+      const idx = this._children.indexOf(refChild)
+      if (idx >= 0) this._children.splice(idx, 0, newChild)
+      else this._children.push(newChild)
+    }
+    if (newChild.nodeType === 1) {
+      registerInInstanceMap(newChild as RNNode)
+    }
+    return newChild
+  }
+
+  /**
+   * Atomically move all children into the target host at the given position.
+   * The parent is marked dirty once after all children are transferred.
+   *
+   * @param targetHost - real parent node to receive the children
+   * @param before     - optional reference node; children inserted before it
+   */
+  flush(targetHost: RNNode, before: RNNode | RNTextNode | RNCommentNode | null): void {
+    const items = this._children.splice(0)
+    for (const child of items) {
+      child.parentNode = null
+    }
+    const refIndex = before ? targetHost._children.indexOf(before) : -1
+    for (const child of items) {
+      child.parentNode = targetHost
+    }
+    if (refIndex >= 0) {
+      targetHost._children.splice(refIndex, 0, ...items)
+    } else {
+      targetHost._children.push(...items)
+    }
+    if (targetHost._mounted) {
+      targetHost._markChildrenDirty()
+    }
+  }
+
+  cloneNode(): RNDocumentFragment {
+    return this.ownerDocument.createDocumentFragment()
+  }
 }
 
 // ============================================================================

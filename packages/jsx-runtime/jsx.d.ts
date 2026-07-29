@@ -139,6 +139,24 @@ declare global {
       svg: HTMLAttributes
       br: HTMLAttributes
       hr: HTMLAttributes
+
+      // ── React Native 标签 ────────────────────────────────────
+      View: Record<string, unknown>
+      Text: Record<string, unknown>
+      SafeAreaView: Record<string, unknown>
+      Image: Record<string, unknown>
+      TextInput: Record<string, unknown>
+      ScrollView: Record<string, unknown>
+      ActivityIndicator: Record<string, unknown>
+      Switch: Record<string, unknown>
+      Modal: Record<string, unknown>
+      RefreshControl: Record<string, unknown>
+      Pressable: Record<string, unknown>
+      TouchableOpacity: Record<string, unknown>
+      TouchableHighlight: Record<string, unknown>
+      TouchableWithoutFeedback: Record<string, unknown>
+      KeyboardAvoidingView: Record<string, unknown>
+      StatusBar: Record<string, unknown>
     }
 
     // JSX 元素类型

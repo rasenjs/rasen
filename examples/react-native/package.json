@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@rasenjs/core": "workspace:*",
+    "@rasenjs/jsx-runtime": "workspace:*",
     "@rasenjs/react-native": "workspace:*",
     "@rasenjs/react-native-router": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*",
@@ -32,7 +33,6 @@
     "@react-native/gradle-plugin": "0.86.0",
     "@react-native/metro-config": "0.86.0",
     "@react-native/typescript-config": "0.86.0",
-    "@types/react": "^19.2.0",
     "typescript": "^5.8.3"
   },
   "engines": {

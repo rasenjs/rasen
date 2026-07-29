@@ -137,16 +137,23 @@ export const match = com(
         let targetHost = host
 
         if (marker && config.insertBefore) {
-          targetHost = {
-            appendChild: (node: N) => {
-              config.insertBefore!(host, node, marker)
-              return node
+          targetHost = new Proxy(host as object, {
+            get(target, prop, receiver) {
+              if (prop === 'appendChild') {
+                return (node: N) => {
+                  config.insertBefore!(host, node, marker)
+                  return node
+                }
+              }
+              if (prop === 'insertBefore') {
+                return (node: N, ref: N | null) => {
+                  config.insertBefore!(host, node, ref || marker)
+                  return node
+                }
+              }
+              return Reflect.get(target, prop, receiver)
             },
-            insertBefore: (node: N, ref: N | null) => {
-              config.insertBefore!(host, node, ref || marker)
-              return node
-            }
-          } as unknown as Host
+          }) as Host
         }
 
         const mountable =

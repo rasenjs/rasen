@@ -462,7 +462,73 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 }
 
 // ============================================================================
+// tag 工厂 — 创建预绑定标签的快捷函数
+// ============================================================================
+
+/** 元素组件的 Props 类型（不含 tag） */
+type TagProps<T extends HTMLTagName> = Omit<ElementProps<T>, 'tag'>
+
+/** Child 类型 - 支持字符串、响应式函数、响应式值、Mountable 组件 */
+type TagChild = string | (() => string | number) | { value: unknown } | Mountable<HTMLElement>
+
+/**
+ * Tag factory — create a typed element function for any HTML tag.
+ *
+ * The returned function supports 4 call forms:
+ *   - el()               → empty element
+ *   - el(child)          → single child
+ *   - el(props)          → with props
+ *   - el(props, ...kids) → props + extra children
+ *
+ * Export so consumers can create custom tags:
+ *   const myEl = tag('my-component')
+ *
+ * For built-in HTML tags, use the named exports (div, span, button, …).
+ */
+export function tag<T extends HTMLTagName>(name: T) {
+  function el(): Mountable<HTMLElement>
+  function el(child: TagChild): Mountable<HTMLElement>
+  function el(props: TagProps<T>): Mountable<HTMLElement>
+  function el(props: TagProps<T>, ...children: TagChild[]): Mountable<HTMLElement>
+
+  function el(
+    propsOrChild?: TagProps<T> | TagChild,
+    ...restChildren: TagChild[]
+  ): Mountable<HTMLElement> {
+    if (propsOrChild === undefined) {
+      return element({ tag: name } as unknown as ElementProps<T>)
+    }
+
+    if (
+      typeof propsOrChild === 'string' ||
+      typeof propsOrChild === 'function'
+    ) {
+      const children = [propsOrChild, ...restChildren]
+      return element({ tag: name, children } as unknown as ElementProps<T>)
+    }
+
+    const props = propsOrChild as TagProps<T>
+    if (restChildren.length > 0) {
+      const existingChildren = props.children
+      const children = Array.isArray(existingChildren)
+        ? [...existingChildren, ...restChildren]
+        : existingChildren !== undefined
+          ? [existingChildren as TagChild, ...restChildren]
+          : restChildren
+      return element({ tag: name, ...props, children } as unknown as ElementProps<T>)
+    }
+
+    return element({ tag: name, ...props } as unknown as ElementProps<T>)
+  }
+
+  return el
+}
+
+// ============================================================================
 // 导出类型
 // ============================================================================
+
+// hyperscript alias
+export { element as h }
 
 export type { HTMLTagName, ElementProps, BaseElementProps }

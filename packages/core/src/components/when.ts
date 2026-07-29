@@ -100,18 +100,26 @@ export const when = com(
         let targetHost = host
 
         // 如果有 marker 和 insertBefore，创建代理 host
-        // 让子组件的 appendChild 变成 insertBefore(node, marker)
+        // 使用真正的 Proxy 透传所有宿主属性（ownerDocument 等），
+        // 只拦截 appendChild / insertBefore 重定向到 insertBefore(node, marker)。
         if (marker && config.insertBefore) {
-          targetHost = {
-            appendChild: (node: N) => {
-              config.insertBefore!(host, node, marker)
-              return node
+          targetHost = new Proxy(host as object, {
+            get(target, prop, receiver) {
+              if (prop === 'appendChild') {
+                return (node: N) => {
+                  config.insertBefore!(host, node, marker)
+                  return node
+                }
+              }
+              if (prop === 'insertBefore') {
+                return (node: N, ref: N | null) => {
+                  config.insertBefore!(host, node, ref || marker)
+                  return node
+                }
+              }
+              return Reflect.get(target, prop, receiver)
             },
-            insertBefore: (node: N, ref: N | null) => {
-              config.insertBefore!(host, node, ref || marker)
-              return node
-            }
-          } as unknown as Host
+          }) as Host
         }
 
         const mountableChild = factory()

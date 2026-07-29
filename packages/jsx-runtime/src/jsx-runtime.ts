@@ -1,6 +1,5 @@
 /**
- * JSX Runtime Entry
- * React 17+ 自动导入
+ * JSX Runtime Entry — re-exports from index
+ * Used by Babel's automatic JSX transform.
  */
-
-export { jsx, jsxs, Fragment } from './index'
+export { jsx, jsxs, Fragment, JSX } from './index'

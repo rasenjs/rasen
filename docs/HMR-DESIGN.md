@@ -1020,8 +1020,8 @@ const Form = hotBoundary('Form.tsx', com(() => {
 
 | Task | Package | Description |
 |------|---------|-------------|
-| 2.1 | `@rasenjs/jsx-runtime` | Enhanced `jsxDEV` with stack traces |
-| 2.2 | `@rasenjs/jsx-runtime` | Hot boundary validation warnings |
+| 2.1 | `@rasenjs/jsx` | Enhanced `jsxDEV` with stack traces |
+| 2.2 | `@rasenjs/jsx` | Hot boundary validation warnings |
 | 2.3 | `@rasenjs/dom` | `mountHot()` helper for root HMR |
 | 2.4 | Examples | Update all web examples to use HMR |
 | 2.5 | Docs | HMR usage guide, migration guide |
@@ -1221,7 +1221,7 @@ interface RasenHMRPluginOptions {
 |-------|------|-----|
 | **HMR Runtime** | `HotModuleRegistry`, `HotContext`, `hotBoundary()`, `hotRef()` | `@rasenjs/core/hot` |
 | **Build Plugin** | Source transformation, `import.meta.hot.accept()` injection | `@rasenjs/vite-plugin-rasen` (new) |
-| **JSX Dev Runtime** | Enhanced `jsxDEV` with component tracking, validation | `@rasenjs/jsx-runtime` (enhance) |
+| **JSX Dev Runtime** | Enhanced `jsxDEV` with component tracking, validation | `@rasenjs/jsx` (enhance) |
 | **DOM Integration** | `mountHot()` helper | `@rasenjs/dom` (enhance) |
 | **RN Integration** | Babel plugin for Metro, RN HMRClient | `@rasenjs/babel-plugin-rasen-hmr` (new) |
 

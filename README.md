@@ -61,7 +61,7 @@
 | [@rasenjs/gpui](./packages/gpui)                         | GPU-accelerated native desktop (Zed's GPUI)  | 🏗️ Under Construction |
 | [@rasenjs/lvgl](./packages/lvgl)                         | Embedded UI for ESP32/STM32 (LVGL + QuickJS) | 🏗️ Under Construction |
 | [@rasenjs/html](./packages/html)                         | HTML renderer for SSR/SSG                    | 🧪 Alpha |
-| [@rasenjs/jsx-runtime](./packages/jsx-runtime)           | JSX/TSX runtime support                      | 🧪 Alpha |
+| [@rasenjs/jsx](./packages/jsx-runtime)           | JSX/TSX runtime support                      | 🧪 Alpha |
 | [@rasenjs/reactive-vue](./packages/reactive-vue)         | Vue 3 reactivity adapter                     | 🧪 Alpha |
 | [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter                         | 🧪 Alpha |
 | [@rasenjs/reactive-nanostores](./packages/reactive-nanostores) | Nanostores reactivity adapter          | 🧪 Alpha |
@@ -132,7 +132,7 @@ npm install @rasenjs/core @rasenjs/dom @rasenjs/reactive-vue vue
 npm install @rasenjs/core @rasenjs/dom @rasenjs/reactive-signals signal-polyfill
 
 # Optional: JSX support
-npm install @rasenjs/jsx-runtime
+npm install @rasenjs/jsx
 ```
 
 ### Basic Example
@@ -540,7 +540,7 @@ Each package has detailed documentation:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Your Application                            │
 ├─────────────────────────────────────────────────────────────────────┤
-│                 @rasenjs/jsx-runtime (optional)                      │
+│                 @rasenjs/jsx (optional)                      │
 ├───────────────┬────────────────┬──────────────────┬─────────────────┤
 │ @rasenjs/dom  │@rasenjs/canvas │@rasenjs/react-   │  @rasenjs/html  │
 │               │     -2d        │    native        │   (SSR/SSG)     │

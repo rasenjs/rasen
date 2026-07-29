@@ -1,235 +1,177 @@
 /**
- * JSX Runtime for Rasen
- * 
- * Converts JSX syntax to Rasen component calls
- * 
- * Features:
- * 1. Flexible tag registration mechanism
- * 2. Supports multiple render targets (DOM, SSR, custom)
- * 3. Reactive children support
- * 4. Automatic dependency tracking
+ * @rasenjs/jsx-runtime — Self-contained JSX runtime
+ *
+ * Provides jsx(), jsxs(), Fragment with default implementations.
+ * PascalCase components (<View>) are called directly — no registration needed.
+ * Lowercase tags (<div>) need configureTags() — an optional utility exported here.
+ *
+ * Users only need:
+ * ```json
+ * // tsconfig.json
+ * { "jsx": "react-jsx", "jsxImportSource": "@rasenjs/jsx-runtime" }
+ * ```
+ *
+ * For RN: Metro resolveRequest redirects react/jsx-runtime → @rasenjs/jsx-runtime.
  */
 
 import type { Mountable } from '@rasenjs/core'
 import { getReactiveRuntime } from '@rasenjs/core'
-import { findTag } from './tag-config'
+import { findTag, configureTags } from './tag-config'
+export { registerTag, configureTags, clearTags, getRegisteredTags } from './tag-config'
+export type { TagConfig, TagComponent } from './tag-config'
 
-// Export configuration functions and types for users
-export {
-  registerTag,
-  configureTags,
-  clearTags,
-  getRegisteredTags,
-  type TagConfig,
-  type TagComponent as TagComponentType
-} from './tag-config'
+// ── Helpers ────────────────────────────────────────────────────────────
 
-/**
- * Primitive component type for text nodes
- */
-export type TextPrimitive = (props: { content: unknown }) => Mountable<unknown>
+type JSXElement = { type: unknown; props: Record<string, unknown> }
 
-/**
- * Primitive component type for fragment nodes
- */
-export type FragmentPrimitive = (props: { children?: Mountable<unknown>[] }) => Mountable<unknown>
-
-/**
- * Injected primitives - must be set by integrating packages
- */
-let textPrimitive: TextPrimitive | null = null
-let fragmentPrimitive: FragmentPrimitive | null = null
-
-/**
- * Set text primitive component
- * Should be called by integrating packages (web/dom/html)
- */
-export function setTextPrimitive(fn: TextPrimitive) {
-  textPrimitive = fn
-}
-
-/**
- * Set fragment primitive component
- * Should be called by integrating packages (web/dom/html)
- */
-export function setFragmentPrimitive(fn: FragmentPrimitive) {
-  fragmentPrimitive = fn
-}
-
-/**
- * 标签组件类型
- */
-type TagComponent = (props: Record<string, unknown>) => Mountable<unknown>
-
-/**
- * JSX 元素类型
- */
-type JSXElementType =
-  | string // HTML 标签名
-  | TagComponent // 自定义组件
-
-/**
- * JSX props 类型
- */
-interface JSXProps {
-  children?: JSXChild | JSXChild[]
-  [key: string]: unknown
-}
-
-/**
- * JSX 子元素类型
- */
 type JSXChild =
   | string
   | number
   | boolean
   | null
   | undefined
-  | Mountable
+  | Mountable<unknown>
   | JSXElement
 
-/**
- * JSX 元素类型（内部使用）
- */
-interface JSXElement {
-  type: JSXElementType
-  props: JSXProps
+function isJSXElement(v: unknown): v is JSXElement {
+  return v !== null && typeof v === 'object' && 'type' in v && 'props' in v
 }
 
-/**
- * Process children, converting to Mountable array
- */
-function processChildren(children: JSXChild | JSXChild[]): Mountable<unknown>[] {
-  if (children === null || children === undefined) {
-    return []
-  }
+function isRef(v: unknown): boolean {
+  try { return getReactiveRuntime().isRef(v) } catch { return false }
+}
 
-  const childArray = Array.isArray(children) ? children : [children]
+function processChildren(
+  children: JSXChild | JSXChild[] | undefined,
+): Mountable<unknown>[] {
+  if (children == null) return []
+  const arr = Array.isArray(children) ? children : [children]
   const result: Mountable<unknown>[] = []
-
-  for (const child of childArray) {
-    if (child === null || child === undefined || typeof child === 'boolean') {
-      continue
-    }
-
+  for (const child of arr) {
+    if (child == null || typeof child === 'boolean') continue
     if (typeof child === 'string' || typeof child === 'number') {
-      // Static text node
-      if (!textPrimitive) {
-        throw new Error('Text primitive not configured. Please use @rasenjs/web, @rasenjs/dom, or @rasenjs/html as jsxImportSource.')
-      }
-      result.push(textPrimitive({ content: child }) as Mountable<unknown>)
-    } else if (getReactiveRuntime().isRef(child)) {
-      // Reactive ref - create reactive text node
-      if (!textPrimitive) {
-        throw new Error('Text primitive not configured. Please use @rasenjs/web, @rasenjs/dom, or @rasenjs/html as jsxImportSource.')
-      }
-      const refChild = child as unknown as { value: unknown }
-      result.push(textPrimitive({ content: () => String(refChild.value) }) as Mountable<unknown>)
+      result.push(child as unknown as Mountable<unknown>)
+    } else if (isRef(child)) {
+      result.push(child as unknown as Mountable<unknown>)
     } else if (typeof child === 'function') {
-      // Function type - all functions are now Mountable
-      // Distinction: with parameters it's a getter, without parameters and returning unmount it's Mountable
-      // But we can't distinguish at runtime, so by JSX semantics:
-      // - If it's a function returned by a component (Mountable), use it directly
-      // - If it's a () => value getter, treat as dynamic text
-      // 
-      // Simplified strategy here: treat directly as Mountable
-      // If user wants to use getter, should use {() => expr} form, which will be parsed as JSX expression
       result.push(child as Mountable<unknown>)
     } else if (isJSXElement(child)) {
-      // Nested JSX element, process recursively
-      const mountFn = mountableFromJSX(child)
-      result.push(mountFn)
+      result.push(mountableFromJSX(child))
     }
   }
-
   return result
 }
 
-/**
- * 判断是否为 JSX 元素
- */
-function isJSXElement(value: unknown): value is JSXElement {
-  return value !== null && typeof value === 'object' && 'type' in value && 'props' in value
-}
-
-/**
- * 从 JSX 元素创建 Mountable
- */
-function mountableFromJSX(element: JSXElement): Mountable<unknown> {
-  const { type, props } = element
-  const { children, className, ...restProps } = props
-
-  // 处理子元素
-  const childMounts = processChildren(children)
-
-  // 转换 className -> class（JSX 风格到 HTML 风格）
-  const normalizedProps: Record<string, unknown> = { ...restProps }
-  if (className !== undefined) {
-    normalizedProps.class = className
-  }
+function mountableFromJSX(el: JSXElement): Mountable<unknown> {
+  const { type, props } = el
+  const { children, className, ...rest } = props
+  const childMounts = processChildren(children as JSXChild | JSXChild[] | undefined)
+  const normalized = className !== undefined ? { ...rest, class: className } : rest
 
   if (typeof type === 'string') {
-    // HTML 标签或配置的自定义标签
-    const tagComponent = findTag(type)
-    
+    let tagComponent = findTag(type)
+    if (!tagComponent) {
+      // First unregistered tag — try to detect host (handles ESM
+      // evaluation order where host may not have initialized yet).
+      detectAndRegisterHostSync()
+      tagComponent = findTag(type)
+    }
     if (!tagComponent) {
       throw new Error(
-        `Unknown tag: ${type}. Please configure it using configureTags().`
+        `Unknown intrinsic tag <${type}>. ` +
+        `Use PascalCase imports (<View>) for RN components, ` +
+        `or register lowercase tags via configureTags().`,
       )
     }
-
-    // 调用组件 - 返回 Mountable
     return tagComponent({
-      ...normalizedProps,
-      children: childMounts.length > 0 ? childMounts : undefined,
-    })
-  } else {
-    // 直接传入的组件函数
-    const component = type as TagComponent
-    return component({
-      ...normalizedProps,
+      ...normalized,
       children: childMounts.length > 0 ? childMounts : undefined,
     })
   }
+
+  // PascalCase component — call directly
+  const comp = type as (props: Record<string, unknown>) => Mountable<unknown>
+  return comp({
+    ...normalized,
+    children: childMounts.length > 0 ? childMounts : undefined,
+  })
 }
 
-/**
- * jsx 函数 - React 17+ 自动导入的 JSX 转换
- */
+// ── JSX Runtime ────────────────────────────────────────────────────────
+
 export function jsx(
-  type: JSXElementType,
-  props: JSXProps,
-  key?: string
+  type: unknown,
+  props: Record<string, unknown> | null,
+  _key?: string,
 ): Mountable<unknown> {
-  // 创建内部 JSX 元素表示
-  const element: JSXElement = { type, props: { ...props, key } }
-  return mountableFromJSX(element)
+  return mountableFromJSX({ type, props: { ...(props || {}), key: _key } })
 }
 
-/**
- * jsxs 函数 - 用于多个子元素的情况
- */
 export function jsxs(
-  type: JSXElementType,
-  props: JSXProps,
-  key?: string
+  type: unknown,
+  props: Record<string, unknown> | null,
+  key?: string,
 ): Mountable<unknown> {
   return jsx(type, props, key)
 }
 
 /**
- * Fragment component - used in JSX
- * 
- * JSX usage: <>hello {count} world</>
- * 
- * Uses injected fragment primitive from integrating packages
+ * jsxDEV — alias for jsx, used by Vite dev mode.
+ * Vite auto-switches to `react-jsxdev` transform in development,
+ * which imports `jsxDEV` from the jsxImportSource's main entry.
  */
-export function Fragment(props: { children?: JSXChild | JSXChild[] }): Mountable<unknown> {
-  if (!fragmentPrimitive) {
-    throw new Error('Fragment primitive not configured. Please use @rasenjs/web, @rasenjs/dom, or @rasenjs/html as jsxImportSource.')
-  }
-  // Convert JSX children to Mountable[]
-  const childMounts = processChildren(props.children)
-  // Use injected fragment primitive
-  return fragmentPrimitive({ children: childMounts }) as Mountable<unknown>
+export { jsx as jsxDEV }
+
+/**
+ * Fragment — mounts children in parallel without a wrapper element.
+ * Default implementation works for all hosts.
+ */
+export function Fragment(props: { children?: unknown }): Mountable<unknown> {
+  const childMounts = processChildren(props.children as JSXChild | JSXChild[] | undefined)
+  return ((host: unknown) => {
+    const cleanups = childMounts.map(c => (c as (h: unknown) => (() => void) | undefined)(host))
+    return () => { for (const u of cleanups) if (u) u() }
+  }) as unknown as Mountable<unknown>
 }
+
+// ── JSX Type Namespace (for jsxImportSource) ───────────────────────────
+
+export namespace JSX {
+  export interface IntrinsicElements {
+    [tag: string]: Record<string, unknown>
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  export type Element = Mountable<any>
+  export interface ElementChildrenAttribute { children: unknown }
+  export interface IntrinsicAttributes { key?: string | number }
+}
+
+// ── Host Auto-Detection ────────────────────────────────────────────────
+// Reads the host registry from @rasenjs/core.
+// Host packages register themselves as a side effect when imported.
+// This works in both browser ESM and Node.js without require().
+
+import { getHostComponents } from '@rasenjs/core'
+
+const HOST_PRIORITY = [
+  '@rasenjs/react-native',
+  '@rasenjs/web',
+  '@rasenjs/dom',
+  '@rasenjs/html',
+]
+
+let hostDetected = false
+
+function detectAndRegisterHostSync(): void {
+  if (hostDetected) return
+  
+  const components = getHostComponents(HOST_PRIORITY)
+  if (components) {
+    configureTags({ '': components })
+    hostDetected = true
+  }
+}
+
+// Try at module init — works when the host module was imported before
+// jsx-runtime in ESM evaluation order.
+detectAndRegisterHostSync()

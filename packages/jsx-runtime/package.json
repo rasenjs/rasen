@@ -1,9 +1,9 @@
 {
   "name": "@rasenjs/jsx-runtime",
   "version": "0.1.6-alpha",
-  "description": "JSX runtime for Rasen",
+  "description": "Self-contained JSX runtime with host auto-detection for Rasen",
   "type": "module",
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -13,14 +13,14 @@
       "require": "./dist/index.cjs"
     },
     "./jsx-runtime": {
-      "types": "./dist/jsx-runtime.d.ts",
-      "import": "./dist/jsx-runtime.js",
-      "require": "./dist/jsx-runtime.cjs"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./jsx-dev-runtime": {
-      "types": "./dist/jsx-dev-runtime.d.ts",
-      "import": "./dist/jsx-dev-runtime.js",
-      "require": "./dist/jsx-dev-runtime.cjs"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./jsx": {
       "types": "./jsx.d.ts"
@@ -38,8 +38,7 @@
   "keywords": [
     "rasen",
     "jsx",
-    "tsx",
-    "runtime"
+    "tsx"
   ],
   "author": "Rasen Team",
   "license": "MIT",
@@ -48,13 +47,6 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@rasenjs/core": ">=0.1.0-alpha",
-    "@rasenjs/web": ">=0.1.0-alpha"
-  },
-  "devDependencies": {
-    "@rasenjs/core": "workspace:*",
-    "@rasenjs/web": "workspace:*",
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.2"
+    "@rasenjs/core": ">=0.1.0-alpha"
   }
 }

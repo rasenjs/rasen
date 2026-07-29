@@ -37,7 +37,7 @@ export default defineConfig({
           { text: '@rasenjs/canvas-2d', link: '/packages/canvas-2d' },
           { text: '@rasenjs/react-native', link: '/packages/react-native' },
           { text: '@rasenjs/html', link: '/packages/html' },
-          { text: '@rasenjs/jsx-runtime', link: '/packages/jsx-runtime' }
+          { text: '@rasenjs/jsx', link: '/packages/jsx-runtime' }
         ]
       },
       {
@@ -118,7 +118,7 @@ export default defineConfig({
             { text: '@rasenjs/canvas-2d', link: '/packages/canvas-2d' },
             { text: '@rasenjs/react-native', link: '/packages/react-native' },
             { text: '@rasenjs/html', link: '/packages/html' },
-            { text: '@rasenjs/jsx-runtime', link: '/packages/jsx-runtime' },
+            { text: '@rasenjs/jsx', link: '/packages/jsx-runtime' },
             { text: '@rasenjs/reactive-vue', link: '/packages/reactive-vue' },
             {
               text: '@rasenjs/reactive-signals',

@@ -4,6 +4,9 @@ const path = require('path');
 // Get the monorepo root
 const monorepoRoot = path.resolve(__dirname, '../..');
 
+// Redirect react/jsx-runtime to our jsx-runtime
+const JSX_RUNTIME_PATH = path.join(monorepoRoot, 'packages/jsx-runtime', 'dist', 'index.js');
+
 /**
  * Metro configuration for Yarn Workspaces monorepo
  * https://reactnative.dev/docs/metro
@@ -19,14 +22,25 @@ const config = {
     nodeModulesPaths: [
       path.resolve(monorepoRoot, 'node_modules'),
     ],
+    resolveRequest: (context, moduleName, platform) => {
+      if (moduleName === 'react/jsx-runtime' || moduleName === 'react/jsx-dev-runtime') {
+        return {
+          filePath: JSX_RUNTIME_PATH,
+          type: 'sourceFile',
+        }
+      }
+      // Let Metro handle everything else
+      return context.resolveRequest(context, moduleName, platform)
+    },
     extraNodeModules: {
-      '@rasenjs/core': path.resolve(monorepoRoot, 'packages/core/dist'),
+      '@rasenjs/core': path.resolve(monorepoRoot, 'packages/core'),
       '@rasenjs/core/utils': path.resolve(monorepoRoot, 'packages/core/dist/utils.js'),
-      '@rasenjs/router': path.resolve(monorepoRoot, 'packages/router/dist'),
+      '@rasenjs/jsx-runtime': path.resolve(monorepoRoot, 'packages/jsx-runtime'),
+      '@rasenjs/router': path.resolve(monorepoRoot, 'packages/router'),
       '@rasenjs/router/components': path.resolve(monorepoRoot, 'packages/router/dist/components/index.js'),
-      '@rasenjs/react-native': path.resolve(monorepoRoot, 'packages/react-native/dist'),
-      '@rasenjs/react-native-router': path.resolve(monorepoRoot, 'packages/react-native-router/dist'),
-      '@rasenjs/reactive-vue': path.resolve(monorepoRoot, 'packages/reactive-vue/dist'),
+      '@rasenjs/react-native': path.resolve(monorepoRoot, 'packages/react-native'),
+      '@rasenjs/react-native-router': path.resolve(monorepoRoot, 'packages/react-native-router'),
+      '@rasenjs/reactive-vue': path.resolve(monorepoRoot, 'packages/reactive-vue'),
     },
   },
   transformer: {

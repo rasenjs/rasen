@@ -3,8 +3,6 @@
  * 使用 TSX 语法编写的计数器示例
  */
 
-/// <reference types="@rasenjs/jsx-runtime/jsx" />
-
 import { ref, computed, useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { mount } from '@rasenjs/dom'
 

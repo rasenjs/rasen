@@ -9,7 +9,7 @@ This template provides a complete setup for building **Server-Side Rendered (SSR
 - 🔄 **Server-Side Rendering (SSR)** with hydration
 - 🧭 Isomorphic routing with `@rasenjs/router` and `@rasenjs/web`
 - 📝 TypeScript with strict mode
-- ✨ JSX/TSX support via `@rasenjs/jsx-runtime`
+- ✨ JSX/TSX support via `@rasenjs/jsx`
 - 🎨 Beautiful UI with dark/light theme
 
 ## Getting Started
@@ -132,7 +132,7 @@ count.value++
 Write components using JSX syntax:
 
 ```tsx
-/// <reference types="@rasenjs/jsx-runtime/jsx" />
+/// <reference types="@rasenjs/jsx/jsx" />
 
 export const MyComponent = () => {
   const message = ref('Hello')
