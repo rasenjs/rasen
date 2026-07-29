@@ -29,7 +29,7 @@ npm install @rasenjs/rn-dom
 yarn add @rasenjs/rn-dom
 ```
 
-Requires `react-native >= 0.76.0 < 0.87.0` and `react ^19.0.0` as peer dependencies.
+Requires `react-native >= 0.76.0 < 0.87.0` as a peer dependency.
 
 ---
 
