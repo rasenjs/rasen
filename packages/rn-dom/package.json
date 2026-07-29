@@ -2,30 +2,33 @@
   "name": "@rasenjs/rn-dom",
   "version": "0.1.0",
   "description": "React Native DOM abstraction layer for rasen",
-  "main": "./dist/index.js",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./elements": {
-      "types": "./dist/elements.d.ts",
-      "require": "./dist/elements.cjs"
-    },
-    "./tags": {
-      "types": "./dist/elements.d.ts",
-      "require": "./dist/elements.js"
+      "types": "./elements.d.ts",
+      "import": "./elements.cjs",
+      "require": "./elements.cjs"
     }
   },
+  "files": [
+    "dist",
+    "elements.cjs",
+    "elements.d.ts"
+  ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --external react-native --external @rasenjs/rn-dom && cp elements.cjs dist/elements.cjs && cp elements.d.ts dist/elements.d.ts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --external react-native --external @rasenjs/rn-dom --watch",
-    "test": "vitest run --config vitest.config.ts"
-  },
-  "dependencies": {
-    "react": "^19.0.0",
-    "react-native": ">=0.76.0 <0.87.0"
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run --config vitest.config.ts",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "yarn clean && yarn build"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
@@ -34,5 +37,27 @@
   "peerDependencies": {
     "react": "^19.0.0",
     "react-native": ">=0.76.0 <0.87.0"
-  }
+  },
+  "keywords": [
+    "rasen",
+    "react-native",
+    "dom",
+    "fabric",
+    "renderer"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/rn-dom"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/rn-dom",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT"
 }
