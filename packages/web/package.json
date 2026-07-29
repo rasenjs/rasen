@@ -8,6 +8,18 @@
       "node": "./dist/html.js",
       "browser": "./dist/dom.js",
       "default": "./dist/dom.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "browser": "./dist/jsx-runtime.js",
+      "node": "./dist/jsx-runtime-ssr.js",
+      "default": "./dist/jsx-runtime.js"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "browser": "./dist/jsx-runtime.js",
+      "node": "./dist/jsx-runtime-ssr.js",
+      "default": "./dist/jsx-runtime.js"
     }
   },
   "scripts": {

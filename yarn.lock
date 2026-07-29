@@ -4652,7 +4652,6 @@ __metadata:
     "@babel/preset-env": "npm:^7.23.0"
     "@babel/runtime": "npm:^7.23.0"
     "@rasenjs/core": "workspace:*"
-    "@rasenjs/jsx-runtime": "workspace:*"
     "@rasenjs/react-native": "workspace:*"
     "@rasenjs/react-native-router": "workspace:*"
     "@rasenjs/reactive-vue": "workspace:*"
@@ -4678,7 +4677,6 @@ __metadata:
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
-    "@rasenjs/jsx-runtime": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
     "@rasenjs/reactive-vue": "workspace:*"
     "@rasenjs/vite-plugin-rasen": "workspace:*"
@@ -4725,14 +4723,6 @@ __metadata:
   resolution: "@rasenjs/html@workspace:packages/html"
   dependencies:
     "@rasenjs/core": "workspace:^"
-  languageName: unknown
-  linkType: soft
-
-"@rasenjs/jsx-runtime@workspace:*, @rasenjs/jsx-runtime@workspace:packages/jsx-runtime":
-  version: 0.0.0-use.local
-  resolution: "@rasenjs/jsx-runtime@workspace:packages/jsx-runtime"
-  peerDependencies:
-    "@rasenjs/core": ">=0.1.0-alpha"
   languageName: unknown
   linkType: soft
 

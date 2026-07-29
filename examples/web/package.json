@@ -14,7 +14,6 @@
     "@rasenjs/canvas-2d": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
-    "@rasenjs/jsx-runtime": "workspace:*",
     "@rasenjs/reactive-signals": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*",
     "@rasenjs/vite-plugin-rasen": "workspace:*"

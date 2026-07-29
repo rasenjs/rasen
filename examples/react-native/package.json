@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@rasenjs/core": "workspace:*",
-    "@rasenjs/jsx-runtime": "workspace:*",
     "@rasenjs/react-native": "workspace:*",
     "@rasenjs/react-native-router": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*",

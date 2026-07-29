@@ -210,8 +210,3 @@ export namespace JSX {
   export interface IntrinsicAttributes { key?: string | number }
 }
 
-// ── JSX Host Registration ─────────────────────────────────────────────
-// Side effect: register components for JSX auto-detection.
-import { registerHostComponents } from '@rasenjs/core'
-import * as __components from './components'
-registerHostComponents('@rasenjs/react-native', __components)

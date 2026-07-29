@@ -127,8 +127,3 @@ export function hydrate(
   }
 }
 
-// ── JSX Host Registration ─────────────────────────────────────────────
-// Side effect: register components for JSX auto-detection.
-import { registerHostComponents } from '@rasenjs/core'
-import * as __components from './components'
-registerHostComponents('@rasenjs/dom', __components)

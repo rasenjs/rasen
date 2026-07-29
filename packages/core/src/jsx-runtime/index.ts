@@ -1,22 +1,21 @@
 /**
- * @rasenjs/jsx-runtime — Self-contained JSX runtime
+ * JSX runtime — provides jsx(), jsxs(), Fragment with default implementations.
  *
- * Provides jsx(), jsxs(), Fragment with default implementations.
  * PascalCase components (<View>) are called directly — no registration needed.
- * Lowercase tags (<div>) need configureTags() — an optional utility exported here.
+ * Lowercase tags (<div>) need configureTags() — host packages do this in their
+ * own jsx-runtime.ts entry, which re-exports from here and registers their tags.
  *
- * Users only need:
- * ```json
- * // tsconfig.json
- * { "jsx": "react-jsx", "jsxImportSource": "@rasenjs/jsx-runtime" }
+ * @example
+ * ```ts
+ * // User code — no direct import of this file.
+ * // Set jsxImportSource in tsconfig.json to your host package.
+ * // tsconfig.json: { "jsxImportSource": "@rasenjs/dom" }
  * ```
- *
- * For RN: Metro resolveRequest redirects react/jsx-runtime → @rasenjs/jsx-runtime.
  */
 
-import type { Mountable } from '@rasenjs/core'
-import { getReactiveRuntime } from '@rasenjs/core'
-import { findTag, configureTags } from './tag-config'
+import type { Mountable } from '../types'
+import { getReactiveRuntime } from '../reactive'
+import { findTag } from './tag-config'
 export { registerTag, configureTags, clearTags, getRegisteredTags } from './tag-config'
 export type { TagConfig, TagComponent } from './tag-config'
 
@@ -69,13 +68,7 @@ function mountableFromJSX(el: JSXElement): Mountable<unknown> {
   const normalized = className !== undefined ? { ...rest, class: className } : rest
 
   if (typeof type === 'string') {
-    let tagComponent = findTag(type)
-    if (!tagComponent) {
-      // First unregistered tag — try to detect host (handles ESM
-      // evaluation order where host may not have initialized yet).
-      detectAndRegisterHostSync()
-      tagComponent = findTag(type)
-    }
+    const tagComponent = findTag(type)
     if (!tagComponent) {
       throw new Error(
         `Unknown intrinsic tag <${type}>. ` +
@@ -117,14 +110,11 @@ export function jsxs(
 
 /**
  * jsxDEV — alias for jsx, used by Vite dev mode.
- * Vite auto-switches to `react-jsxdev` transform in development,
- * which imports `jsxDEV` from the jsxImportSource's main entry.
  */
 export { jsx as jsxDEV }
 
 /**
  * Fragment — mounts children in parallel without a wrapper element.
- * Default implementation works for all hosts.
  */
 export function Fragment(props: { children?: unknown }): Mountable<unknown> {
   const childMounts = processChildren(props.children as JSXChild | JSXChild[] | undefined)
@@ -133,45 +123,3 @@ export function Fragment(props: { children?: unknown }): Mountable<unknown> {
     return () => { for (const u of cleanups) if (u) u() }
   }) as unknown as Mountable<unknown>
 }
-
-// ── JSX Type Namespace (for jsxImportSource) ───────────────────────────
-
-export namespace JSX {
-  export interface IntrinsicElements {
-    [tag: string]: Record<string, unknown>
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export type Element = Mountable<any>
-  export interface ElementChildrenAttribute { children: unknown }
-  export interface IntrinsicAttributes { key?: string | number }
-}
-
-// ── Host Auto-Detection ────────────────────────────────────────────────
-// Reads the host registry from @rasenjs/core.
-// Host packages register themselves as a side effect when imported.
-// This works in both browser ESM and Node.js without require().
-
-import { getHostComponents } from '@rasenjs/core'
-
-const HOST_PRIORITY = [
-  '@rasenjs/react-native',
-  '@rasenjs/web',
-  '@rasenjs/dom',
-  '@rasenjs/html',
-]
-
-let hostDetected = false
-
-function detectAndRegisterHostSync(): void {
-  if (hostDetected) return
-  
-  const components = getHostComponents(HOST_PRIORITY)
-  if (components) {
-    configureTags({ '': components })
-    hostDetected = true
-  }
-}
-
-// Try at module init — works when the host module was imported before
-// jsx-runtime in ESM evaluation order.
-detectAndRegisterHostSync()

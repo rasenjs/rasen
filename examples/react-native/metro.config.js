@@ -4,8 +4,8 @@ const path = require('path');
 // Get the monorepo root
 const monorepoRoot = path.resolve(__dirname, '../..');
 
-// Redirect react/jsx-runtime to our jsx-runtime
-const JSX_RUNTIME_PATH = path.join(monorepoRoot, 'packages/jsx-runtime', 'dist', 'index.js');
+// Redirect react/jsx-runtime to @rasenjs/react-native's jsx-runtime
+const JSX_RUNTIME_PATH = path.join(monorepoRoot, 'packages/react-native', 'dist', 'jsx-runtime.js');
 
 /**
  * Metro configuration for Yarn Workspaces monorepo
