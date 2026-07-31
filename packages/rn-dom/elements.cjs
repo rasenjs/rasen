@@ -79,10 +79,12 @@ function ensure(tagName, isAndroid) {
       return 'RCTSinglelineTextInputView'
     case 'Switch':
       require('react-native/Libraries/Components/Switch/SwitchNativeComponent')
-      return 'Switch'
+      // codegen: 'Switch' with paperComponentName 'RCTSwitch' → registered as RCTSwitch
+      return 'RCTSwitch'
     case 'ActivityIndicator':
       require('react-native/Libraries/Components/ActivityIndicator/ActivityIndicatorViewNativeComponent')
-      return 'ActivityIndicatorView'
+      // codegen: 'RCTActivityIndicatorView' → registered as RCTActivityIndicatorView
+      return 'RCTActivityIndicatorView'
     case 'ProgressBarAndroid':
       require('react-native/Libraries/Components/ProgressBarAndroid/ProgressBarAndroidNativeComponent')
       return 'AndroidProgressBar'
@@ -91,7 +93,8 @@ function ensure(tagName, isAndroid) {
       return 'DebuggingOverlay'
     case 'SafeAreaView':
       require('react-native/Libraries/Components/SafeAreaView/RCTSafeAreaViewNativeComponent')
-      return 'SafeAreaView'
+      // codegen: 'RCTSafeAreaView' → registered as RCTSafeAreaView
+      return 'RCTSafeAreaView'
     case 'AndroidHorizontalScrollView':
       require('react-native/Libraries/Components/ScrollView/AndroidHorizontalScrollContentViewNativeComponent')
       return 'AndroidHorizontalScrollContentView'
@@ -100,13 +103,16 @@ function ensure(tagName, isAndroid) {
       return 'AndroidSwitch'
     case 'RefreshControl':
       require('react-native/Libraries/Components/RefreshControl/PullToRefreshViewNativeComponent')
-      return 'PullToRefreshView'
+      // codegen: 'PullToRefreshView' with paperComponentName 'RCTRefreshControl' → RCTRefreshControl
+      return 'RCTRefreshControl'
     case 'AndroidSwipeRefreshLayout':
       require('react-native/Libraries/Components/RefreshControl/AndroidSwipeRefreshLayoutNativeComponent')
       return 'AndroidSwipeRefreshLayout'
     case 'Modal':
+    case 'RCTModalHostView':
       require('react-native/Libraries/Modal/RCTModalHostViewNativeComponent')
-      return 'ModalHostView'
+      // codegen: 'RCTModalHostView' → registered as RCTModalHostView
+      return 'RCTModalHostView'
     case 'DrawerLayoutAndroid':
       require('react-native/Libraries/Components/DrawerAndroid/AndroidDrawerLayoutNativeComponent')
       return 'AndroidDrawerLayout'

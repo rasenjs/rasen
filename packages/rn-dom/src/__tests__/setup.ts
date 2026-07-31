@@ -40,6 +40,27 @@ vi.mock('react-native/Libraries/ReactPrivate/ReactNativePrivateInterface', () =>
   },
 }))
 
+// ── Mock RCTDeviceEventEmitter (native-module events: modalDismissed etc.) ──
+// Injected on globalThis: rn-dom's event-system reads globalThis first, since
+// dynamic deep requires aren't intercepted by vi.mock in fork workers.
+
+const deviceEmitterListeners = new Map<string, Set<(e: unknown) => void>>()
+
+const deviceEventEmitterMock = {
+  addListener: (name: string, cb: (e: unknown) => void) => {
+    if (!deviceEmitterListeners.has(name)) deviceEmitterListeners.set(name, new Set())
+    deviceEmitterListeners.get(name)!.add(cb)
+    return { remove: () => deviceEmitterListeners.get(name)?.delete(cb) }
+  },
+}
+
+;(globalThis as Record<string, unknown>).__RASEN_DEVICE_EVENT_EMITTER__ = deviceEventEmitterMock
+
+/** Emit a native-module event (test helper). */
+export function emitDeviceEvent(name: string, payload: unknown): void {
+  deviceEmitterListeners.get(name)?.forEach(cb => cb(payload))
+}
+
 // ── Mock @rasenjs/rn-dom/elements ─────────────────────────────────────
 
 vi.mock('@rasenjs/rn-dom/elements', () => {
@@ -51,7 +72,7 @@ vi.mock('@rasenjs/rn-dom/elements', () => {
     View: 'RCTView', Text: 'RCTText', Image: 'RCTImageView',
     ScrollView: 'RCTScrollView', Switch: 'RCTSwitch',
     SafeAreaView: 'RCTSafeAreaView', ActivityIndicator: 'RCTActivityIndicatorView',
-    TextInput: 'RCTSinglelineTextInputView',
+    TextInput: 'RCTSinglelineTextInputView', Modal: 'ModalHostView',
   }
   return {
     RN_BUILT_IN_TAGS: TAGS,
@@ -106,8 +127,30 @@ const uim = {
 
 // ── Pre-register common view configs ──────────────────────────────────
 
-const vc = (name: string, attrs: Record<string, unknown>) =>
-  _viewConfigRegistry.register(name, { validAttributes: attrs })
+/**
+ * Register a view config. Extends with RN-style event tables so the event
+ * system's viewConfig-driven behavior resolution is exercised for real:
+ *   bubblingEventTypes  → { topXxx: { phasedRegistrationNames: { bubbled: 'onXxx' } } }
+ *   directEventTypes    → { topXxx: { registrationName: 'onXxx' } }
+ */
+const RN_BUBBLING = (names: string[]) =>
+  Object.fromEntries(
+    names.map(n => [n, { phasedRegistrationNames: { bubbled: 'on' + n.slice(3) } }]),
+  )
+
+const vc = (name: string, attrs: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+  _viewConfigRegistry.register(name, {
+    validAttributes: attrs,
+    bubblingEventTypes: {
+      ...RN_BUBBLING(['topTouchStart', 'topTouchMove', 'topTouchEnd', 'topTouchCancel', 'topPress', 'topChange', 'topFocus', 'topBlur', 'topSubmitEditing', 'topEndEditing', 'topKeyPress']),
+      ...(extra.bubbling ?? {}),
+    },
+    directEventTypes: {
+      topLayout: { registrationName: 'onLayout' },
+      ...(extra.direct ?? {}),
+    },
+    ...extra,
+  })
 
 vc('RCTView', { style: true, onTouchEnd: true })
 vc('RCTText', { style: true, onTouchEnd: true })
@@ -118,6 +161,7 @@ vc('RCTSafeAreaView', { style: true })
 vc('RCTSinglelineTextInputView', { style: true, text: true })
 vc('RCTActivityIndicatorView', { style: true, animating: true })
 vc('RCTRawText', { text: true })
+vc('ModalHostView', { style: true, identifier: true, visible: true })
 
 // ── Exports ───────────────────────────────────────────────────────────
 
@@ -129,6 +173,7 @@ export function resetFabricMocks(): void {
     if (vi.isMockFunction(v)) (v as ReturnType<typeof vi.fn>).mockClear()
   }
   roots.clear()
+  deviceEmitterListeners.clear()
   // Reset event handler registration flag so _rnInitEventSystem
   // fires on next document creation
   delete (globalThis as any).__RASEN_EVENT_HANDLER_REGISTERED__

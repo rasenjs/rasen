@@ -33,6 +33,17 @@ export interface FabricUIManager {
   setNativeProps?: (node: FabricNode, props: Props) => void
   dispatchCommand?: (shadowNode: FabricNode, commandName: string, args: unknown[]) => void
   sendAccessibilityEvent?: (shadowNode: FabricNode, eventType: string) => void
+  measure?: (
+    shadowNode: FabricNode,
+    callback: (
+      left: number,
+      top: number,
+      width: number,
+      height: number,
+      pageX: number,
+      pageY: number,
+    ) => void,
+  ) => void
   findShadowNodeByTag_DEPRECATED?: (reactTag: number) => FabricNode | null
 }
 

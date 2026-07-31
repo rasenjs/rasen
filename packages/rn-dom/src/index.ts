@@ -34,6 +34,7 @@ export type Props = Record<string, unknown>
 import ReactNativePrivateInterface from 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface'
 import { Platform } from 'react-native'
 import type { FabricNode, FabricUIManager } from './fabric-global'
+import { createDispatcher, resetPressState, resetModalBridge, registerModalNode, unregisterModalNode, type EventNode } from './event-system'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Lazy Fabric View Config Registration
@@ -191,6 +192,8 @@ function allocateTag(): number {
 
 export function resetTagCounter(): void {
   nextReactTag = 2
+  resetPressState()
+  resetModalBridge()
 }
 
 // ============================================================================
@@ -583,7 +586,20 @@ export class RNDocument {
 
     const uim = getFabricUIManager()
     if (uim.registerEventHandler) {
-      uim.registerEventHandler(dispatchEventWithBubble as unknown as (instanceHandle: object, type: string, payload: Record<string, unknown>) => void)
+      const dispatch = createDispatcher({
+        getNodeByTag: (tag) => (getInstanceMap().get(tag) ?? null) as EventNode | null,
+        focusNode: (node) => _focusNode(node as RNNode),
+        blurFocusedNode: () => _blurFocusedNode(),
+        getFocusedNode: () => _focusedNode as EventNode | null,
+        measure: (node, cb) => (node as RNNode).measure(cb),
+        getViewConfig: (node) => {
+          try {
+            return ReactNativePrivateInterface.ReactNativeViewConfigRegistry.get(node._nativeName) as Record<string, unknown>
+          } catch { return undefined }
+        },
+        getFabricUIManager,
+      })
+      uim.registerEventHandler(dispatch as (instanceHandle: object, type: string, payload: Record<string, unknown>) => void)
       g[HANDLER_KEY] = true
     }
   }
@@ -1147,6 +1163,26 @@ export class RNNode {
       }
     } catch (_) { /* dispatchCommand may not be available */ }
   }
+
+  /**
+   * Measure the native element's layout (DOM-standard; used by press-rect
+   * checks). Callback: (left, top, width, height, pageX, pageY).
+   * Falls back to zeros when Fabric measurement is unavailable — press still
+   * works, only press-rect exit checks degrade.
+   */
+  measure(callback: (left: number, top: number, width: number, height: number, pageX: number, pageY: number) => void): void {
+    try {
+      const uim = getFabricUIManager()
+      if (typeof uim.measure === 'function' && typeof uim.findShadowNodeByTag_DEPRECATED === 'function') {
+        const shadowNode = uim.findShadowNodeByTag_DEPRECATED(this[FABRIC_NODE_ID])
+        if (shadowNode) {
+          uim.measure(shadowNode, callback)
+          return
+        }
+      }
+    } catch (_) { /* fall through to zero callback */ }
+    callback(0, 0, 0, 0, 0, 0)
+  }
 }
 
 // ============================================================================
@@ -1244,6 +1280,14 @@ export class RNBody extends RNNode {
         ? { ...child.currentProps, style: { ...classStyle, ...((child.currentProps.style || {}) as Record<string, unknown>) } }
         : child.currentProps
       const fabricProps = prepareFabricProps(mergedProps)
+      // Modal: assign a native `identifier` so native `modalDismissed`
+      // events can be routed back to this node's onDismiss. Matches both
+      // the 'Modal' tag (direct createElement) and the native host name
+      // used by the Vue Modal wrapper ('RCTModalHostView').
+      if (child.tagName === 'Modal' || (nativeName ?? '').includes('ModalHostView')) {
+        const id = registerModalNode(child as unknown as EventNode, fabricProps)
+        fabricProps.identifier = id
+      }
       const fullPayload = buildFabricPayload(fabricProps, validAttrs)
       const instanceHandle = child._instanceHandle ?? { tag: child[FABRIC_NODE_ID], stateNode: child }
 
@@ -1605,27 +1649,6 @@ function getInstanceMap(): Map<number, RNNode> {
   return g[INSTANCE_MAP_KEY] as Map<number, RNNode>
 }
 
-// Mapping from Fabric event types to DOM event types
-const FABRIC_TO_DOM_EVENT: Record<string, string> = {
-  topTouchEnd: 'touchend',
-  topTouchStart: 'touchstart',
-  topTouchMove: 'touchmove',
-  topTouchCancel: 'touchcancel',
-  topClick: 'click',
-}
-
-type FocusableTag = 'TextInput' | 'AndroidTextInput'
-const FOCUSABLE_TAGS = new Set<FocusableTag>([
-  // Version-independent: uses rn-dom's own tagName, not Fabric _nativeName.
-  // TextInput covers both Android (AndroidTextInput) and iOS
-  // (RCTSinglelineTextInputView / RCTMultilineTextInputView) — the
-  // _resolveNativeName mapping bridges to the correct Fabric name.
-  // Focusable sub-types that need manual dispatchCommand('focus')
-  // should be listed here by tagName.
-  'TextInput',
-  'AndroidTextInput',
-])
-
 /** Track the currently focused node for blur-on-tap-outside behavior. */
 let _focusedNode: RNNode | null = null
 
@@ -1660,145 +1683,8 @@ function _focusNode(node: RNNode): void {
   _focusedNode = node
 }
 
-function dispatchEventWithBubble(
-  instanceHandle: object,
-  type: string,
-  nativeEvent: Record<string, unknown>
-): void {
-  const targetTag = (nativeEvent as any)?.target
-  if (targetTag == null || typeof targetTag !== 'number') return
-
-  const instanceMap = getInstanceMap()
-  let current: RNNode | null = instanceMap.get(targetTag) || null
-
-  if (!current) {
-    try {
-      current = ((instanceHandle as any).stateNode as RNNode) ?? null
-    } catch (_) { /* ignore */ }
-  }
-  if (!current) return
-
-  // Blur check: if tapping a non-focusable area while something is focused,
-  // blur it. Runs BEFORE bubbling so JS handlers see blur already applied.
-  if (type === 'topTouchEnd' && _focusedNode) {
-    const targetNode = instanceMap.get(targetTag)
-    if (targetNode && targetNode[FABRIC_NODE_ID] !== _focusedNode[FABRIC_NODE_ID]) {
-      if (!FOCUSABLE_TAGS.has(targetNode.tagName as FocusableTag)) {
-        _blurFocusedNode()
-      } else {
-        // Switching between two focusable components — blur the old one
-        // first; the auto-focus block below will focus the new one.
-        _blurFocusedNode()
-      }
-    }
-  }
-
-  const basePropName = 'on' + type.replace(/^top/, '')
-  const domEventType = FABRIC_TO_DOM_EVENT[type] || type
-
-  // Check if this event type should skip bubbling by checking viewConfig
-  // for the target node.
-  let _skipBubble = false
-  const targetConfig = (() => {
-    try {
-      return ReactNativePrivateInterface.ReactNativeViewConfigRegistry.get(current._nativeName)
-    } catch { return undefined }
-  })()
-  if (targetConfig && (targetConfig as Record<string, unknown>).bubblingEventTypes) {
-    const bubbling = (targetConfig as Record<string, unknown>).bubblingEventTypes as Record<string, unknown>
-    const eventCfg = bubbling[type] as Record<string, unknown> | undefined
-    const skip = (eventCfg?.phasedRegistrationNames as Record<string, unknown> | undefined)?.skipBubbling
-    if (skip === true) _skipBubble = true
-  }
-
-  // Build a shared event object with stopPropagation and timeStamp support
-  let _stopped = false
-  let _prevented = false
-  const timeStamp = (nativeEvent as Record<string, unknown>).timeStamp
-    ?? (nativeEvent as Record<string, unknown>).timestamp
-    ?? performance?.now?.()
-    ?? Date.now()
-
-  const sharedEvent = {
-    type: domEventType,
-    target: null as unknown,
-    nativeEvent,
-    timeStamp,
-    get defaultPrevented() { return _prevented },
-    preventDefault() { _prevented = true },
-    stopPropagation() { _stopped = true },
-    get propagationStopped() { return _stopped },
-  } as Record<string, unknown>
-
-  // ── CAPTURE PHASE: root → target ────────────────────────────────
-  // Walk from root down to target calling capture listeners (__capture_*).
-  const captureChain: RNNode[] = []
-  let walker: RNNode | null = current
-  while (walker) {
-    if (walker.nodeType === 1) captureChain.push(walker)
-    walker = walker.parentNode
-  }
-  for (let i = captureChain.length - 1; i >= 0; i--) {
-    if (_stopped) break
-    const node = captureChain[i]
-    const capListeners = node._listeners?.get(`__capture_${domEventType}`)
-    if (capListeners) {
-      sharedEvent.currentTarget = node
-      for (const listener of capListeners) {
-        if (_stopped) break
-        if (typeof listener === 'function') listener(sharedEvent as unknown as Event)
-        else listener.handleEvent(sharedEvent as unknown as Event)
-      }
-    }
-  }
-
-  // ── BUBBLE PHASE: target → root (or target-only if skipBubbling) ─
-  // When skipBubbling is true, only process the target node
-  const bubbleWalker: RNNode[] = _skipBubble ? [current] : []
-  if (!_skipBubble) {
-    let w: RNNode | null = current
-    while (w) { bubbleWalker.push(w); w = w.parentNode }
-  }
-
-  let depth = 0
-  for (const node of bubbleWalker) {
-    if (_stopped) break
-    if (depth++ >= 20) break
-    sharedEvent.currentTarget = node
-
-    // 1. Check props-based handler (onTouchEnd, onPress, etc.)
-    const props = node.currentProps
-    let handler = props[basePropName]
-    if (!handler && type === 'topTouchEnd') {
-      handler = props.onPress
-    }
-    if (typeof handler === 'function') {
-      const eventObj = { ...nativeEvent, type: domEventType, target: node, nativeEvent }
-      ;(handler as (event: Record<string, unknown>) => void)(eventObj)
-      return
-    }
-
-    // 2. Check addEventListener-based handlers (bubble phase)
-    const listeners = node._listeners?.get(domEventType)
-    if (listeners && listeners.size > 0) {
-      for (const listener of listeners) {
-        if (_stopped) break
-        if (typeof listener === 'function') listener(sharedEvent as unknown as Event)
-        else listener.handleEvent(sharedEvent as unknown as Event)
-      }
-    }
-  }
-  if (_stopped) return
-
-  // Auto-focus focusable components on touch when no JS handler claims the
-  // event. This mirrors browser behavior where tapping <input> focuses it.
-  if (type === 'topTouchEnd') {
-    const targetNode = instanceMap.get(targetTag)
-    if (targetNode && FOCUSABLE_TAGS.has(targetNode.tagName as FocusableTag)) {
-      _focusNode(targetNode)
-    }
-  }
-}
+// Event dispatch lives in src/event-system.ts (DOM-standard two-phase
+// pipeline + RN viewConfig behavior + press synthesis). See that file.
 
 // ============================================================================
 // Mount Helpers
@@ -1829,6 +1715,10 @@ function unregisterFromInstanceMap(node: RNNode | RNTextNode | RNCommentNode): v
   const map = getInstanceMap()
   if ('tagName' in node) {
     map.delete(node[FABRIC_NODE_ID])
+    // Clean up Modal identifier mapping on unmount.
+    if (node.tagName === 'Modal' || (node._nativeName ?? '').includes('ModalHostView')) {
+      unregisterModalNode(node as unknown as EventNode)
+    }
   }
   // Recurse into children
   if ('_children' in node) {
