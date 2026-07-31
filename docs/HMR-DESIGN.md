@@ -1035,7 +1035,7 @@ const Form = hotBoundary('Form.tsx', com(() => {
 | 3.1 | `@rasenjs/babel-plugin-rasen-hmr` | Babel plugin for Metro |
 | 3.2 | `@rasenjs/react-native` | Integration with RN HMRClient |
 | 3.3 | `@rasenjs/rn-dom` | `RNDocument.reset()` integration |
-| 3.4 | Examples | Update vue-rn-test and rn-dom-test |
+| 3.4 | Examples | Update rn-dom-test |
 | 3.5 | Test | RN HMR E2E testing |
 
 **Deliverable**: HMR working for React Native (with Metro bundler).
