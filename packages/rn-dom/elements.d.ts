@@ -77,6 +77,18 @@ export function isRNBuiltIn(tag: string): boolean
 
 export function getAllTags(): string[]
 
+// ── Platform-ambiguous components ────────────────────────────────────
+
+export function isPlatformAmbiguous(tag: string): boolean
+
+// ── Component prop normalization (RN JS-layer transforms) ────────────
+
+export function normalizeProps(
+  tagName: string,
+  props: Record<string, unknown> | null | undefined,
+  isAndroid?: boolean,
+): Record<string, unknown> | null | undefined
+
 // ── Lazy Fabric View Config Registration ─────────────────────────────
 
 export function ensure(tagName: string, isAndroid?: boolean): string | undefined

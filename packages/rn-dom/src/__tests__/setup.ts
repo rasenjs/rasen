@@ -74,10 +74,36 @@ vi.mock('@rasenjs/rn-dom/elements', () => {
     SafeAreaView: 'RCTSafeAreaView', ActivityIndicator: 'RCTActivityIndicatorView',
     TextInput: 'RCTSinglelineTextInputView', Modal: 'ModalHostView',
   }
+  // Must mirror the REAL elements.cjs normalization so payload assertions in
+  // tests gate the same behavior users get at runtime (gated by correctness).
+  const normalizeProps = (tagName: string, props: Record<string, unknown> | null | undefined, isAndroid?: boolean) => {
+    if (props == null) return props
+    if (tagName === 'Image') {
+      const source = props.source
+      if (source != null && typeof source === 'string') return { ...props, source: [{ uri: source }] }
+      if (source != null && typeof source === 'object' && !Array.isArray(source)) return { ...props, source: [source] }
+    }
+    if (tagName === 'ActivityIndicator' && isAndroid) {
+      const size = props.size
+      let sizeStyle: Record<string, number> | null = null
+      if (size === 'small') sizeStyle = { width: 20, height: 20 }
+      else if (size === 'large') sizeStyle = { width: 36, height: 36 }
+      else if (typeof size === 'number') sizeStyle = { width: size, height: size }
+      return {
+        ...props,
+        styleAttr: 'Normal',
+        indeterminate: true,
+        style: sizeStyle ? [props.style, sizeStyle] : props.style,
+      }
+    }
+    return props
+  }
   return {
     RN_BUILT_IN_TAGS: TAGS,
     isRNBuiltIn: (tag: string) => TAGS.includes(tag),
     getAllTags: () => [...TAGS],
+    isPlatformAmbiguous: (tag: string) => ['Switch', 'TextInput', 'ActivityIndicator'].includes(tag),
+    normalizeProps,
     ensure: (tagName: string) => ENSURE_MAP[tagName],
   }
 })

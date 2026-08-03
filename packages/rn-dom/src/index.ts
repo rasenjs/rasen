@@ -14,6 +14,8 @@ import {
   RN_BUILT_IN_TAGS,
   isRNBuiltIn,
   getAllTags,
+  normalizeProps,
+  isPlatformAmbiguous,
   type RNEvent,
   type RNStyle,
   type RNElementPropMap,
@@ -21,7 +23,7 @@ import {
   type RNElementPropName,
 } from '@rasenjs/rn-dom/elements'
 
-export { RN_BUILT_IN_TAGS, isRNBuiltIn, getAllTags }
+export { RN_BUILT_IN_TAGS, isRNBuiltIn, getAllTags, normalizeProps, isPlatformAmbiguous }
 export type { RNEvent, RNStyle, RNElementPropMap, ElementProps, RNElementPropName }
 
 // ============================================================================
@@ -106,9 +108,14 @@ export function registerComponent(
  * local.
  */
 function prepareFabricProps(
+  tagName: string,
   props: Record<string, unknown>,
 ): Record<string, unknown> {
-  return { ...props }
+  // Delegate per-component prop transforms (RN JS-layer semantics such as
+  // Image source → [{ uri }] and Android ActivityIndicator styleAttr defaults)
+  // to the elements module — the single home for component-native adaptation.
+  // Always shallow-clone so mutations stay local to this payload build.
+  return normalizeProps(tagName, { ...props }, Platform.OS === 'android')!
 }
 
 /**
@@ -401,8 +408,11 @@ export class RNDocument {
     const registry = ReactNativePrivateInterface.ReactNativeViewConfigRegistry
     const result = (() => {
       // 1. As-is: third-party components (RNCSafeAreaView, AIRMap…) and tags
-      //    whose JSX name already matches their Fabric name (Switch, SafeAreaView…).
-      try { const c = registry.get(tagName); return { name: tagName, config: c } } catch { /* not found */ }
+      //    whose JSX name already matches their Fabric name. Platform-ambiguous
+      //    built-ins are skipped so they go through ensure() below.
+      if (!isPlatformAmbiguous(tagName)) {
+        try { const c = registry.get(tagName); return { name: tagName, config: c } } catch { /* not found */ }
+      }
 
       // 2. Lazy auto-registration: ensure() knows the exact Fabric name for
       //    every built-in RN component. No guessing with RCT prefixes needed.
@@ -689,6 +699,19 @@ export class RNNode {
 
   /** Last validAttributes (needed for children-only updates on mounted nodes). */
   _lastValidAttrs: Record<string, unknown> | null = null
+
+  /**
+   * ScrollView content container (Fabric). RCTScrollView hosts exactly one
+   * child — the content view. We keep a stable container (collapsable:false so
+   * RN 0.86's C++ ViewShadowNode does not view-flatten it) and rebuild its
+   * children on content updates, so the ScrollView's own child never changes.
+   * Without this, content updates re-clone the ScrollView and RN 0.86's Fabric
+   * appends → android.widget.ScrollView's single-child addView crash.
+   */
+  _scrollContentFabric: FabricNode | null = null
+  _scrollContentFabricId: number | null = null
+  /** Last content-container children (ShadowNode refs) — for skip-if-unchanged. */
+  _scrollContentChildren: unknown[] | null = null
 
   // =========================================================================
   // Constructor
@@ -1189,6 +1212,11 @@ export class RNNode {
 // RNBody (body 是 root 的概念，继承 RNBody)
 // ============================================================================
 
+/** @internal - Is this node a ScrollView-like container (single-child host)? */
+function isScrollContainer(node: { tagName: string }): boolean {
+  return node.tagName === 'ScrollView' || node.tagName === 'AndroidHorizontalScrollView'
+}
+
 /**
  * RNBody represents the document.body which is the root container
  * It manages batched updates using dirty flag propagation
@@ -1216,20 +1244,32 @@ export class RNBody extends RNNode {
   private _flushGeneration = 0
 
   /**
-   * Schedule flush on next tick
+   * Schedule flush on next animation frame.
+   * rAF batches all updates within a frame into a single completeRoot — this is
+   * how React commits in RN (once per frame), avoiding a separate JNI round-trip
+   * per state change. Falls back to queueMicrotask when rAF is unavailable.
    */
   _scheduleFlush(): void {
     if (this._flushScheduled) return
     this._flushScheduled = true
     const gen = ++this._flushGeneration
 
-    queueMicrotask(() => {
+    const flush = () => {
       if (this._flushGeneration !== gen) return // superseded by newer flush
       this._flushScheduled = false
       this._submitToRoot()
-    })
+    }
+
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(flush)
+    } else {
+      queueMicrotask(flush)
+    }
   }
 
+  /**
+   * Submit current children to Fabric root
+   */
   /**
    * Submit current children to Fabric root
    */
@@ -1246,6 +1286,63 @@ export class RNBody extends RNNode {
     }
 
     fabricUIManager.completeRoot(this[FABRIC_NODE_ID], childSet)
+  }
+
+  /**
+   * Build (or rebuild) a ScrollView's single content container Fabric node.
+   * The container is a stable RCTView; its children are the scroll view's
+   * element children. Returning the same container instance keeps the
+   * ScrollView's own child constant across content updates — RN 0.86's Fabric
+   * appends on cloneNodeWithNewChildren for single-child ScrollViews
+   * (android.widget.ScrollView allows only one direct child), so the ScrollView
+   * child must never change.
+   */
+  _buildScrollContent(
+    node: RNNode,
+    fabricUIManager: FabricUIManager,
+    rootTag: number,
+  ): FabricNode | null {
+    let cc = node._scrollContentFabric
+    if (!cc) {
+      const ccId = node._scrollContentFabricId ?? (node._scrollContentFabricId = allocateTag())
+      const handle = { tag: ccId, stateNode: node }
+      // collapsable:false — without it the container has no formsView trait in
+      // RN 0.86's C++ ViewShadowNode (no bg/border/stacking context) and gets
+      // view-flattened, promoting the scroll content up to the ScrollView and
+      // tripping its single-child addView crash.
+      cc = (fabricUIManager as any).createNode(ccId, 'RCTView', rootTag, { collapsable: false }, handle)
+      node._scrollContentFabric = cc
+      node._scrollContentChildren = null
+    }
+    // Resolve each child's Fabric node (cheap for stable children — returns the
+    // cached ShadowNode; only dirty ones clone).
+    const curr: unknown[] = []
+    for (const subChild of node._children) {
+      const subFabricNode = this._getFabricNode(subChild)
+      if (subFabricNode) curr.push(subFabricNode)
+    }
+    // Skip the clone when every child's ShadowNode reference is unchanged —
+    // the container's child list didn't actually change. This avoids
+    // appendChildToSet + cloneNodeWithNewChildren JNI churn on unrelated
+    // subtree updates that merely propagate dirty flags to the ScrollView.
+    const prev = node._scrollContentChildren
+    if (prev !== null) {
+      let same = prev.length === curr.length
+      if (same) {
+        for (let i = 0; i < prev.length; i++) {
+          if (prev[i] !== curr[i]) { same = false; break }
+        }
+      }
+      if (same) return cc
+    }
+    const ccChildren = fabricUIManager.createChildSet()
+    for (const n of curr) {
+      fabricUIManager.appendChildToSet(ccChildren, n)
+    }
+    cc = (fabricUIManager as any).cloneNodeWithNewChildren(cc, ccChildren)
+    node._scrollContentFabric = cc
+    node._scrollContentChildren = curr
+    return cc
   }
 
   /**
@@ -1279,7 +1376,7 @@ export class RNBody extends RNNode {
       const mergedProps = classStyle && Object.keys(classStyle).length > 0
         ? { ...child.currentProps, style: { ...classStyle, ...((child.currentProps.style || {}) as Record<string, unknown>) } }
         : child.currentProps
-      const fabricProps = prepareFabricProps(mergedProps)
+      const fabricProps = prepareFabricProps(child.tagName, mergedProps)
       // Modal: assign a native `identifier` so native `modalDismissed`
       // events can be routed back to this node's onDismiss. Matches both
       // the 'Modal' tag (direct createElement) and the native host name
@@ -1308,10 +1405,21 @@ export class RNBody extends RNNode {
 
       if (child._children.length > 0) {
         childSet = fabricUIManager.createChildSet()
-        for (const subChild of child._children) {
-          const subFabricNode = this._getFabricNode(subChild)
-          if (subFabricNode) {
-            fabricUIManager.appendChildToSet(childSet, subFabricNode)
+        if (isScrollContainer(child)) {
+          // ScrollView: wrap children in a single content container (RN
+          // semantics — RCTScrollView hosts exactly one child, the content
+          // view). The container node is stable, so content updates only
+          // re-clone the container and the ScrollView's own child never
+          // changes. This avoids RN 0.86's Fabric append-on-update crash
+          // (android.widget.ScrollView allows only one direct child).
+          const cc = this._buildScrollContent(child, fabricUIManager, rootTag)
+          if (cc) fabricUIManager.appendChildToSet(childSet, cc)
+        } else {
+          for (const subChild of child._children) {
+            const subFabricNode = this._getFabricNode(subChild)
+            if (subFabricNode) {
+              fabricUIManager.appendChildToSet(childSet, subFabricNode)
+            }
           }
         }
         child._childrenDirty = false
@@ -1338,7 +1446,7 @@ export class RNBody extends RNNode {
     const mergedProps = classStyle && Object.keys(classStyle).length > 0
       ? { ...child.currentProps, style: { ...classStyle, ...((child.currentProps.style || {}) as Record<string, unknown>) } }
       : child.currentProps
-    const fabricProps = prepareFabricProps(mergedProps)
+    const fabricProps = prepareFabricProps(child.tagName, mergedProps)
 
     if (child._propsDirty && child._hasPropsChanged()) {
       // Use _nativeName resolved by ensure() during createElement, not a
@@ -1364,10 +1472,17 @@ export class RNBody extends RNNode {
 
     if (child._childrenDirty && child._children.length > 0) {
       childSet = fabricUIManager.createChildSet()
-      for (const subChild of child._children) {
-        const subFabricNode = this._getFabricNode(subChild)
-        if (subFabricNode) {
-          fabricUIManager.appendChildToSet(childSet, subFabricNode)
+      if (isScrollContainer(child)) {
+        // Rebuild the content container's children only; the ScrollView's own
+        // child (the container) stays stable → no Fabric append-on-update.
+        const cc = this._buildScrollContent(child, fabricUIManager, this[FABRIC_NODE_ID])
+        if (cc) fabricUIManager.appendChildToSet(childSet, cc)
+      } else {
+        for (const subChild of child._children) {
+          const subFabricNode = this._getFabricNode(subChild)
+          if (subFabricNode) {
+            fabricUIManager.appendChildToSet(childSet, subFabricNode)
+          }
         }
       }
     }

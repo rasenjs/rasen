@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
+import { Platform } from 'react-native'
 import { RNDocument, resetTagCounter, type RNNode } from '../index'
 import { resetFabricMocks } from './setup'
 
@@ -615,6 +616,67 @@ describe('RNNode', () => {
       const doc = createDoc()
       const el = doc.createElement('View')
       expect(el.classList.replace('nonexistent', 'x')).toBe(false)
+    })
+  })
+
+  // ── Image source normalization ────────────────────────────────
+
+  describe('Image source normalization (Fabric payload)', () => {
+    it('converts string source to [{ uri }] array', async () => {
+      const doc = createDoc()
+      const img = doc.createElement('Image')
+      img.setAttribute('source', 'https://example.com/a.png')
+      doc.body.appendChild(img)
+      await Promise.resolve()
+      const call = nativeFabricUIManager.createNode.mock.calls.at(-1)
+      expect(call[3].source).toEqual([{ uri: 'https://example.com/a.png' }])
+    })
+
+    it('leaves array source untouched', async () => {
+      const doc = createDoc()
+      const img = doc.createElement('Image')
+      const arr = [{ uri: 'https://example.com/a.png' }]
+      img.setAttribute('source', arr)
+      doc.body.appendChild(img)
+      await Promise.resolve()
+      const call = nativeFabricUIManager.createNode.mock.calls.at(-1)
+      expect(call[3].source).toBe(arr)
+    })
+
+    it('normalizes object source to [{ uri }]', async () => {
+      const doc = createDoc()
+      const img = doc.createElement('Image')
+      img.setAttribute('source', { uri: 'https://example.com/b.png' })
+      doc.body.appendChild(img)
+      await Promise.resolve()
+      const call = nativeFabricUIManager.createNode.mock.calls.at(-1)
+      expect(call[3].source).toEqual([{ uri: 'https://example.com/b.png' }])
+    })
+  })
+
+  // ── normalizeProps: RN JS-layer transforms ─────────────────────
+
+  describe('normalizeProps (RN JS-layer transforms)', () => {
+    it('injects Android ActivityIndicator styleAttr/indeterminate + size style', async () => {
+      // Platform.OS is 'ios' by default in the react-native mock; flip it to
+      // android so prepareFabricProps passes isAndroid to normalizeProps.
+      const prev = Platform.OS
+      Platform.OS = 'android'
+      try {
+        const doc = createDoc()
+        const ai = doc.createElement('ActivityIndicator')
+        ai.setAttribute('animating', true)
+        ai.setAttribute('size', 'small')
+        doc.body.appendChild(ai)
+        await Promise.resolve()
+        const call = nativeFabricUIManager.createNode.mock.calls.at(-1)
+        expect(call[3].styleAttr).toBe('Normal')
+        expect(call[3].indeterminate).toBe(true)
+        // Explicit size avoids Yoga intrinsic measure → RN ProgressBar NPE.
+        expect(call[3].style).toEqual([undefined, { width: 20, height: 20 }])
+      } finally {
+        Platform.OS = prev
+      }
     })
   })
 })
