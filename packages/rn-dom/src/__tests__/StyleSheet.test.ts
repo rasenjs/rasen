@@ -2,9 +2,13 @@
  * @rasenjs/rn-dom — CSSStyleSheet / StyleSheetList / StyleSheet.create tests
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
-import { RNDocument, resetTagCounter, CSSStyleSheet, StyleSheet, _resolveClassStyles } from '../index'
+import { describe, it, expect } from 'vitest'
+import { RNDocument, resetTagCounter, CSSStyleSheet, StyleSheet } from '../index'
+import { type RNDomInternalNode } from '../node'
+import { submitToRoot, resolveClassStyles } from '../internal'
 import { resetFabricMocks, nativeFabricUIManager } from './setup'
+
+const internal = <T,>(node: T): RNDomInternalNode => node as unknown as RNDomInternalNode
 
 function createDoc(): RNDocument {
   RNDocument.reset()
@@ -88,11 +92,11 @@ describe('StyleSheet.create', () => {
   })
 })
 
-describe('_resolveClassStyles', () => {
+describe('__RN_resolveClassStyles', () => {
   it('returns empty object when no classList', () => {
     const doc = createDoc()
     const el = doc.createElement('View')
-    expect(_resolveClassStyles(el)).toEqual({})
+    expect(resolveClassStyles(internal(el))).toEqual({})
   })
 
   it('resolves single class from stylesheet (with . selector)', () => {
@@ -100,7 +104,7 @@ describe('_resolveClassStyles', () => {
     StyleSheet.create({ '.card': { flex: 1 } }, doc)
     const el = doc.createElement('View')
     el.classList.add('card')
-    expect(_resolveClassStyles(el)).toEqual({ flex: 1 })
+    expect(resolveClassStyles(internal(el))).toEqual({ flex: 1 })
   })
 
   it('merges multiple classes in order', () => {
@@ -111,32 +115,32 @@ describe('_resolveClassStyles', () => {
     }, doc)
     const el = doc.createElement('View')
     el.classList.add('base', 'theme')
-    expect(_resolveClassStyles(el)).toEqual({ flex: 1, color: 'blue', opacity: 0.5 })
+    expect(resolveClassStyles(internal(el))).toEqual({ flex: 1, color: 'blue', opacity: 0.5 })
   })
 
   it('returns empty for unknown classes', () => {
     const doc = createDoc()
     const el = doc.createElement('View')
     el.classList.add('unknown')
-    expect(_resolveClassStyles(el)).toEqual({})
+    expect(resolveClassStyles(internal(el))).toEqual({})
   })
 
   it('returns empty when no stylesheets registered', () => {
     const doc = createDoc()
     const el = doc.createElement('View')
     el.classList.add('card')
-    expect(_resolveClassStyles(el)).toEqual({})
+    expect(resolveClassStyles(internal(el))).toEqual({})
   })
 })
 
-describe('classList + style merge via _getFabricNode', () => {
+describe('classList + style merge via __RN_getFabricNode', () => {
   it('class style appears in createNode payload', () => {
     const doc = createDoc()
     StyleSheet.create({ '.card': { flex: 1 } }, doc)
     const el = doc.createElement('View')
     el.classList.add('card')
     doc.body.appendChild(el)
-    doc.body._submitToRoot()
+    submitToRoot(internal(doc.body))
 
     const call = nativeFabricUIManager.createNode.mock.calls[0]
     // The merged style should include flex:1 from class
@@ -151,7 +155,7 @@ describe('classList + style merge via _getFabricNode', () => {
     el.classList.add('card')
     el.style.setProperty('color', 'blue')
     doc.body.appendChild(el)
-    doc.body._submitToRoot()
+    submitToRoot(internal(doc.body))
 
     const call = nativeFabricUIManager.createNode.mock.calls[0]
     expect(call[3].style).toHaveProperty('flex', 1)
@@ -163,12 +167,12 @@ describe('classList + style merge via _getFabricNode', () => {
     StyleSheet.create({ '.card': { flex: 1 } }, doc)
     const el = doc.createElement('View')
     doc.body.appendChild(el)
-    doc.body._submitToRoot()
+    submitToRoot(internal(doc.body))
     jestClearMocks()
 
     // Add class after mount
     el.classList.add('card')
-    doc.body._submitToRoot()
+    submitToRoot(internal(doc.body))
 
     // createNode should NOT be called again (node already mounted)
     expect(nativeFabricUIManager.createNode).not.toHaveBeenCalled()
@@ -177,7 +181,7 @@ describe('classList + style merge via _getFabricNode', () => {
 
 function jestClearMocks() {
   for (const key of Object.keys(nativeFabricUIManager)) {
-    const v = (nativeFabricUIManager as any)[key]
-    if (typeof v === 'function' && 'mockClear' in v) v.mockClear()
+    const v = (nativeFabricUIManager as Record<string, unknown>)[key]
+    if (typeof v === 'function' && 'mockClear' in v) (v as { mockClear: () => void }).mockClear()
   }
 }

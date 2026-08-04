@@ -2,7 +2,7 @@
  * @rasenjs/rn-dom — Shared utility tests
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { parseCSS, normalizeEventName, isEvent, applyStylePatch } from '../utils'
 
 describe('parseCSS', () => {

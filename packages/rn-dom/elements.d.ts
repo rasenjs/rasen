@@ -82,12 +82,8 @@ export function getAllTags(): string[]
 export function isPlatformAmbiguous(tag: string): boolean
 
 // ── Component prop normalization (RN JS-layer transforms) ────────────
-
-export function normalizeProps(
-  tagName: string,
-  props: Record<string, unknown> | null | undefined,
-  isAndroid?: boolean,
-): Record<string, unknown> | null | undefined
+// 已迁移至主模块:RNNode.normalizeProps()(各标签节点类 src/elements/* override)。
+// elements.cjs 不再导出 normalizeProps,如需 per-tag 转换请通过节点类。
 
 // ── Lazy Fabric View Config Registration ─────────────────────────────
 

@@ -8,6 +8,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { RNDocument, resetTagCounter } from '../index'
 import { resetFabricMocks } from './setup'
+import { FABRIC_NODE, FABRIC_NODE_ID, type RNDomInternalNode } from '../node'
+
+const internal = <T,>(node: T): RNDomInternalNode => node as unknown as RNDomInternalNode
 
 describe('RNDocument', () => {
   beforeEach(() => {
@@ -62,7 +65,7 @@ describe('RNDocument', () => {
     it('resolves nativeName via ensure()', () => {
       const doc = RNDocument.getOrCreate(1)
       const el = doc.createElement('View')
-      expect(el._nativeName).toBe('RCTView')
+      expect(internal(el).__RN_nativeName).toBe('RCTView')
     })
 
     it('allocates sequential fabric tags', () => {
@@ -70,20 +73,20 @@ describe('RNDocument', () => {
       const doc = RNDocument.getOrCreate(1)
       const v1 = doc.createElement('View')
       const v2 = doc.createElement('Text')
-      expect(v1[Symbol.for('fabricNodeId')]).toBe(2)
-      expect(v2[Symbol.for('fabricNodeId')]).toBe(4)
+      expect(internal(v1)[FABRIC_NODE_ID]).toBe(2)
+      expect(internal(v2)[FABRIC_NODE_ID]).toBe(4)
     })
 
     it('initializes with empty props', () => {
       const doc = RNDocument.getOrCreate(1)
       const el = doc.createElement('View')
-      expect(el.currentProps).toEqual({})
+      expect(internal(el).__RN_currentProps).toEqual({})
     })
 
     it('stores validAttributes from view config', () => {
       const doc = RNDocument.getOrCreate(1)
       const el = doc.createElement('View')
-      expect(el._lastValidAttrs).toBeTruthy()
+      expect(internal(el).__RN_lastValidAttrs).toBeTruthy()
     })
   })
 
@@ -119,7 +122,7 @@ describe('RNDocument', () => {
     it('has no Fabric node', () => {
       const doc = RNDocument.getOrCreate(1)
       const c = doc.createComment()
-      expect(c[Symbol.for('fabricNode')]).toBeNull()
+      expect(internal(c)[FABRIC_NODE]).toBeNull()
     })
 
     it('supports parent/child tree ops', () => {
@@ -132,21 +135,50 @@ describe('RNDocument', () => {
     })
   })
 
-  // ── resolveNativeName ──────────────────────────────────────────
+  // ── __RN_resolveNativeName ──────────────────────────────────────────
 
-  describe('_resolveNativeName', () => {
+  describe('___RN_resolveNativeName', () => {
     it('caches resolved names', () => {
       const doc = RNDocument.getOrCreate(1)
       // First call resolves, second uses cache
       const v1 = doc.createElement('View')
       const v2 = doc.createElement('View')
-      expect(v1._nativeName).toBe('RCTView')
-      expect(v2._nativeName).toBe('RCTView')
+      expect(internal(v1).__RN_nativeName).toBe('RCTView')
+      expect(internal(v2).__RN_nativeName).toBe('RCTView')
     })
 
     it('throws for unknown tag', () => {
       const doc = RNDocument.getOrCreate(1)
       expect(() => doc.createElement('NonExistent')).toThrow()
+    })
+  })
+
+  // ── Extensible (Vue host compatibility) ────────────────────────
+
+  describe('extensible nodes (Vue host compat)', () => {
+    it('element / text / comment / fragment / body are extensible', () => {
+      const doc = RNDocument.getOrCreate(1)
+      const el = doc.createElement('View')
+      const text = doc.createTextNode('x')
+      const comment = doc.createComment()
+      const frag = doc.createDocumentFragment()
+      expect(Object.isExtensible(el)).toBe(true)
+      expect(Object.isExtensible(text)).toBe(true)
+      expect(Object.isExtensible(comment)).toBe(true)
+      expect(Object.isExtensible(frag)).toBe(true)
+      expect(Object.isExtensible(doc.body)).toBe(true)
+    })
+
+    it('host 可挂运行时字段(如 Vue __vnode),内部状态可改', () => {
+      const doc = RNDocument.getOrCreate(1)
+      const el = doc.createElement('View')
+      doc.body.appendChild(el)
+      // Vue 渲染器会把 __vnode 挂到宿主元素(defineProperty 新增属性)。
+      ;(el as unknown as Record<string, unknown>).__vnode = { some: 'vnode' }
+      expect((el as unknown as Record<string, unknown>).__vnode).toEqual({ some: 'vnode' })
+      // 内部状态仍可改。
+      internal(el).__RN_mounted = true
+      expect(internal(el).__RN_mounted).toBe(true)
     })
   })
 })

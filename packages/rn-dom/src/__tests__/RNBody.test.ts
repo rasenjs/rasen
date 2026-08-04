@@ -2,13 +2,17 @@
  * @rasenjs/rn-dom — RNBody tests
  *
  * Tests the root container: flush scheduling, Fabric submission,
- * and _getFabricNode lifecycle (createNode, cloneNode, dirty diffs).
+ * and __RN_getFabricNode lifecycle (createNode, cloneNode, dirty diffs).
  * Mirrors facebook/react's Fabric renderer test patterns.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { RNDocument, resetTagCounter, type RNNode, type RNTextNode, type RNCommentNode } from '../index'
+import { describe, it, expect, vi } from 'vitest'
+import { RNDocument, resetTagCounter } from '../index'
 import { resetFabricMocks, nativeFabricUIManager } from './setup'
+import { type RNDomInternalNode } from '../node'
+import { submitToRoot, scheduleFlush, getFabricNode } from '../internal'
+
+const internal = <T,>(node: T): RNDomInternalNode => node as unknown as RNDomInternalNode
 
 function createDoc(): RNDocument {
   RNDocument.reset()
@@ -23,41 +27,37 @@ describe('RNBody', () => {
   describe('mounted state', () => {
     it('body is always mounted', () => {
       const doc = createDoc()
-      expect(doc.body._mounted).toBe(true)
+      expect(internal(doc.body).__RN_mounted).toBe(true)
     })
   })
 
   // ── Flush scheduling ───────────────────────────────────────────
 
-  describe('_scheduleFlush', () => {
+  describe('__RN_scheduleFlush', () => {
     it('schedules a microtask flush', async () => {
       const doc = createDoc()
-      const spy = vi.spyOn(doc.body as any, '_submitToRoot')
-      doc.body._scheduleFlush()
-      expect(spy).not.toHaveBeenCalled() // not yet
+      scheduleFlush(internal(doc.body))
+      expect(nativeFabricUIManager.completeRoot).not.toHaveBeenCalled() // not yet
       await new Promise(r => setTimeout(r, 0))
-      expect(spy).toHaveBeenCalled()
-      spy.mockRestore()
+      expect(nativeFabricUIManager.completeRoot).toHaveBeenCalled()
     })
 
     it('deduplicates multiple schedules', async () => {
       const doc = createDoc()
-      const spy = vi.spyOn(doc.body as any, '_submitToRoot')
-      doc.body._scheduleFlush()
-      doc.body._scheduleFlush()
-      doc.body._scheduleFlush()
+      scheduleFlush(internal(doc.body))
+      scheduleFlush(internal(doc.body))
+      scheduleFlush(internal(doc.body))
       await new Promise(r => setTimeout(r, 0))
-      expect(spy).toHaveBeenCalledTimes(1)
-      spy.mockRestore()
+      expect(nativeFabricUIManager.completeRoot).toHaveBeenCalledTimes(1)
     })
   })
 
-  // ── _submitToRoot (completeRoot) ───────────────────────────────
+  // ── __RN_submitToRoot (completeRoot) ───────────────────────────────
 
-  describe('_submitToRoot', () => {
+  describe('__RN_submitToRoot', () => {
     it('calls completeRoot with child set', () => {
       const doc = createDoc()
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
       expect(nativeFabricUIManager.completeRoot).toHaveBeenCalled()
     })
 
@@ -65,7 +65,7 @@ describe('RNBody', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
       doc.body.appendChild(view)
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
       expect(nativeFabricUIManager.createNode).toHaveBeenCalledWith(
         expect.any(Number),
         'RCTView',
@@ -79,7 +79,7 @@ describe('RNBody', () => {
       const doc = createDoc()
       doc.body.appendChild(doc.createElement('View'))
       doc.body.appendChild(doc.createElement('Text'))
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
       // completeRoot should have been called with a childSet
       const calls = nativeFabricUIManager.completeRoot.mock.calls
       expect(calls[0]).toHaveLength(2) // [rootTag, childSet]
@@ -87,23 +87,23 @@ describe('RNBody', () => {
     })
   })
 
-  // ── _getFabricNode (unmounted → createNode) ────────────────────
+  // ── __RN_getFabricNode (unmounted → createNode) ────────────────────
 
-  describe('_getFabricNode — unmounted', () => {
+  describe('__RN_getFabricNode — unmounted', () => {
     it('creates Fabric node for unmounted child', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
       view.setAttribute('style', { flex: 1 })
-      doc.body._getFabricNode(view)
+      getFabricNode(internal(doc.body), view)
       expect(nativeFabricUIManager.createNode).toHaveBeenCalled()
-      expect(view._mounted).toBe(true)
+      expect(internal(view).__RN_mounted).toBe(true)
     })
 
     it('passes props to createNode', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
       view.setAttribute('style', { flex: 1 })
-      doc.body._getFabricNode(view)
+      getFabricNode(internal(doc.body), view)
       const call = nativeFabricUIManager.createNode.mock.calls[0]
       expect(call[3]).toHaveProperty('style', { flex: 1 })
     })
@@ -111,30 +111,30 @@ describe('RNBody', () => {
     it('creates Fabric node with correct viewName', () => {
       const doc = createDoc()
       const text = doc.createElement('Text')
-      doc.body._getFabricNode(text)
+      getFabricNode(internal(doc.body), text)
       const call = nativeFabricUIManager.createNode.mock.calls[0]
       expect(call[1]).toBe('RCTText')
     })
 
-    it('sets _mounted after creation', () => {
+    it('sets __RN_mounted after creation', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
-      expect(view._mounted).toBe(false)
-      doc.body._getFabricNode(view)
-      expect(view._mounted).toBe(true)
+      expect(internal(view).__RN_mounted).toBe(false)
+      getFabricNode(internal(doc.body), view)
+      expect(internal(view).__RN_mounted).toBe(true)
     })
 
     it('returns text node directly via nodeType check', () => {
       const doc = createDoc()
       const text = doc.createTextNode('hello')
-      const result = doc.body._getFabricNode(text)
+      const result = getFabricNode(internal(doc.body), text)
       expect(result).toBe(text.node)
     })
 
     it('returns null for comment nodes', () => {
       const doc = createDoc()
       const comment = doc.createComment('x')
-      const result = doc.body._getFabricNode(comment)
+      const result = getFabricNode(internal(doc.body), comment)
       expect(result).toBeNull()
     })
 
@@ -143,26 +143,26 @@ describe('RNBody', () => {
       const view = doc.createElement('View')
       const text = doc.createElement('Text')
       view.appendChild(text)
-      doc.body._getFabricNode(view)
+      getFabricNode(internal(doc.body), view)
       // Both should have createNode called
       expect(nativeFabricUIManager.createNode).toHaveBeenCalledTimes(2)
     })
   })
 
-  // ── _getFabricNode (mounted → cloneNode) ──────────────────────
+  // ── __RN_getFabricNode (mounted → cloneNode) ──────────────────────
 
-  describe('_getFabricNode — mounted incremental', () => {
+  describe('__RN_getFabricNode — mounted incremental', () => {
     it('sends props diff for mounted node via setAttribute', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
-      doc.body._getFabricNode(view) // first — mount
+      getFabricNode(internal(doc.body), view) // first — mount
       jestClearMocks()
 
-      // Real user path: setAttribute triggers _markDirty('props')
+      // Real user path: setAttribute triggers __RN_markDirty('props')
       view.setAttribute('foo', 'bar')
-      expect(view._propsDirty).toBe(true)
+      expect(internal(view).__RN_propsDirty).toBe(true)
 
-      doc.body._getFabricNode(view) // second — should see props dirty
+      getFabricNode(internal(doc.body), view) // second — should see props dirty
       const propsCalls = nativeFabricUIManager.cloneNodeWithNewProps.mock.calls.length +
         nativeFabricUIManager.cloneNodeWithNewChildrenAndProps.mock.calls.length
       expect(propsCalls).toBeGreaterThan(0)
@@ -171,24 +171,24 @@ describe('RNBody', () => {
     it('does not call createNode again for mounted node (uses cloneNode)', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
-      doc.body._getFabricNode(view) // first — createNode
+      getFabricNode(internal(doc.body), view) // first — createNode
 
-      // After mounting, _getFabricNode should NOT call createNode again.
+      // After mounting, __RN_getFabricNode should NOT call createNode again.
       // Instead it should call cloneNode* for incremental updates.
-      doc.body._getFabricNode(view) // second — mounted, dirty=false
+      getFabricNode(internal(doc.body), view) // second — mounted, dirty=false
       expect(nativeFabricUIManager.createNode).toHaveBeenCalledTimes(1)
     })
 
     it('sends children diff for mounted node via setAttribute+appendChild', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
-      doc.body._getFabricNode(view) // first — mount
+      getFabricNode(internal(doc.body), view) // first — mount
       jestClearMocks()
 
-      // Real user path: appendChild triggers _childrenDirty
+      // Real user path: appendChild triggers __RN_childrenDirty
       view.appendChild(doc.createElement('Text'))
 
-      doc.body._getFabricNode(view) // second — should see children dirty
+      getFabricNode(internal(doc.body), view) // second — should see children dirty
       const childrenCalls =
         nativeFabricUIManager.cloneNodeWithNewChildren.mock.calls.length +
         nativeFabricUIManager.cloneNodeWithNewChildrenAndProps.mock.calls.length
@@ -198,15 +198,15 @@ describe('RNBody', () => {
     it('sends both props and children for jointly dirty node', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
-      doc.body._getFabricNode(view) // first
+      getFabricNode(internal(doc.body), view) // first
 
-      view._propsDirty = true
-      view._dirtyPropsCount = 1
+      internal(view).__RN_propsDirty = true
+      internal(view).__RN_dirtyPropsCount = 1
       view.setAttribute('foo', 'bar')
-      view._childrenDirty = true
+      internal(view).__RN_childrenDirty = true
       view.appendChild(doc.createElement('Text'))
 
-      doc.body._getFabricNode(view) // second
+      getFabricNode(internal(doc.body), view) // second
       // Should use cloneNodeWithNewChildrenAndProps (both)
       expect(nativeFabricUIManager.cloneNodeWithNewChildrenAndProps).toHaveBeenCalled()
     })
@@ -214,15 +214,15 @@ describe('RNBody', () => {
     it('clears dirty flags after processing', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
-      doc.body._getFabricNode(view) // first
+      getFabricNode(internal(doc.body), view) // first
 
-      view._propsDirty = true
-      view._dirtyPropsCount = 1
-      view._childrenDirty = true
+      internal(view).__RN_propsDirty = true
+      internal(view).__RN_dirtyPropsCount = 1
+      internal(view).__RN_childrenDirty = true
 
-      doc.body._getFabricNode(view) // second
-      expect(view._propsDirty).toBe(false)
-      expect(view._childrenDirty).toBe(false)
+      getFabricNode(internal(doc.body), view) // second
+      expect(internal(view).__RN_propsDirty).toBe(false)
+      expect(internal(view).__RN_childrenDirty).toBe(false)
     })
   })
 
@@ -235,7 +235,7 @@ describe('RNBody', () => {
       root.appendChild(doc.createElement('Text'))
       doc.body.appendChild(root)
 
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
 
       expect(nativeFabricUIManager.createNode).toHaveBeenCalled()
       expect(nativeFabricUIManager.completeRoot).toHaveBeenCalled()
@@ -250,7 +250,7 @@ describe('RNBody', () => {
       root.appendChild(child)
       doc.body.appendChild(root)
 
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
 
       expect(nativeFabricUIManager.createNode).toHaveBeenCalledTimes(3)
     })
@@ -261,11 +261,11 @@ describe('RNBody', () => {
       view.setAttribute('style', { opacity: 0.5 })
       doc.body.appendChild(view)
 
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
       expect(nativeFabricUIManager.createNode).toHaveBeenCalledTimes(1)
 
       view.setAttribute('style', { opacity: 1 })
-      doc.body._scheduleFlush()
+      scheduleFlush(internal(doc.body))
       await new Promise(r => setTimeout(r, 0))
 
       const cloneCalls = nativeFabricUIManager.cloneNodeWithNewProps.mock.calls.length +
@@ -279,11 +279,11 @@ describe('RNBody', () => {
       // RN test: 'should call complete after inserting children'
       const doc = createDoc()
       doc.body.appendChild(doc.createElement('View'))
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
       expect(nativeFabricUIManager.completeRoot).toHaveBeenCalledTimes(1)
 
       doc.body.appendChild(doc.createElement('Text'))
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
       expect(nativeFabricUIManager.completeRoot).toHaveBeenCalledTimes(2)
     })
 
@@ -295,22 +295,22 @@ describe('RNBody', () => {
       const view = doc.createElement('View')
       view.setAttribute('foo', 'a')
       doc.body.appendChild(view)
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
       jestClearMocks()
 
       // Same props set again — should NOT trigger cloneNode
-      // (setAttribute checks _mounted before marking dirty — but we
+      // (setAttribute checks __RN_mounted before marking dirty — but we
       //  test that no dirty flag is set for unchanged props)
       view.setAttribute('foo', 'a')  // same value, but stored
-      if (view._propsDirty) {
-        doc.body._getFabricNode(view)
+      if (internal(view).__RN_propsDirty) {
+        getFabricNode(internal(doc.body), view)
       }
       expect(nativeFabricUIManager.cloneNodeWithNewProps).not.toBeCalled()
 
       // New value — should trigger cloneNode
       view.setAttribute('foo', 'b')
-      expect(view._propsDirty).toBe(true)
-      doc.body._getFabricNode(view)
+      expect(internal(view).__RN_propsDirty).toBe(true)
+      getFabricNode(internal(doc.body), view)
       // Should have called at least one clone variant
       const totalClones = nativeFabricUIManager.cloneNodeWithNewProps.mock.calls.length +
         nativeFabricUIManager.cloneNodeWithNewChildrenAndProps.mock.calls.length
@@ -328,7 +328,7 @@ describe('RNBody', () => {
       parent.appendChild(a)
       parent.appendChild(b)
       doc.body.appendChild(parent)
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
 
       expect(parent.children[0].tagName).toBe('Text')
       expect(parent.children[1].tagName).toBe('Image')
@@ -349,7 +349,7 @@ describe('RNBody', () => {
       const view = doc.createElement('View')
       text.appendChild(view)
       doc.body.appendChild(text)
-      expect(() => doc.body._submitToRoot()).not.toThrow()
+      expect(() => submitToRoot(internal(doc.body))).not.toThrow()
     })
 
     // ── RN-compatible: InstanceHandle ───────────────────────────
@@ -358,10 +358,10 @@ describe('RNBody', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
       doc.body.appendChild(view)
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
       const call = nativeFabricUIManager.createNode.mock.calls[0]
       expect(call[4]).toBeTruthy() // instanceHandle
-      expect(call[4].stateNode).toBe(view)
+      expect((call[4] as { stateNode: unknown }).stateNode).toBe(view)
     })
 
     // ── RN-compatible: completeRoot after children change ──────
@@ -370,16 +370,14 @@ describe('RNBody', () => {
       const doc = createDoc()
       const view = doc.createElement('View')
       doc.body.appendChild(view)
-      doc.body._submitToRoot()
+      submitToRoot(internal(doc.body))
 
       jestClearMocks()
 
       // Add child to view
       view.appendChild(doc.createElement('Text'))
       // Flush
-      await doc.body._getRoot
-        ? new Promise(r => setTimeout(r, 0))
-        : Promise.resolve()
+      await new Promise(r => setTimeout(r, 0))
 
       // Should have called cloneNodeWithNewChildren or combined
       expect(
@@ -407,7 +405,7 @@ describe('RNBody', () => {
 
 function jestClearMocks() {
   for (const key of Object.keys(nativeFabricUIManager)) {
-    const v = (nativeFabricUIManager as any)[key]
+    const v = (nativeFabricUIManager as Record<string, unknown>)[key]
     if (vi.isMockFunction(v)) v.mockClear()
   }
 }

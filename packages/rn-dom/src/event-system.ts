@@ -45,10 +45,17 @@ export type DispatchEventFn = (
 export interface EventNode {
   nodeType: number
   tagName: string
-  _nativeName: string
+  __RN_nativeName: string
   parentNode: EventNode | null
-  currentProps: Record<string, unknown>
-  _listeners?: Map<string, Set<unknown>>
+  __RN_currentProps: Record<string, unknown>
+  __RN_listeners?: Map<string, Set<unknown>>
+  /**
+   * Per-tag native-event hook (implemented by RNNode; TextInput/Switch/
+   * ScrollView override in ./elements/*). Called when a Fabric event targets
+   * this node; return true to consume (skip generic handler dispatch).
+   * 受控记录(onChangeText/onValueChange + native 状态)也在节点类内部完成。
+   */
+  __RN_handleNativeEvent?: (type: string, event: Record<string, unknown>) => boolean | void
 }
 
 /** Fabric node id — nodes carry it under a shared symbol. */
@@ -128,7 +135,7 @@ function ensureModalBridgeSubscribed(): void {
     if (modalID == null) return
     const node = _modalBridge.modals.get(modalID)
     if (!node) return
-    const onDismiss = node.currentProps.onDismiss
+    const onDismiss = node.__RN_currentProps.onDismiss
     if (typeof onDismiss === 'function') {
       ;(onDismiss as () => void)()
     }
@@ -138,18 +145,18 @@ function ensureModalBridgeSubscribed(): void {
 }
 
 /** Register a Modal node; assigns its native `identifier` prop. */
-export function registerModalNode(node: EventNode, props: Record<string, unknown>): number {
+export function registerModalNode(node: EventNode, _props: Record<string, unknown>): number {
   ensureModalBridgeSubscribed()
   const id = _modalBridge.nextId++
-  // Store the identifier on the node so the renderer can pass it to native.
-  ;(node as unknown as Record<string, unknown>).__modalID = id
+  // 预定义字段(节点不可扩展,改值允许)——不动态加属性。
+  ;(node as unknown as { __RN_modalID: number | null }).__RN_modalID = id
   _modalBridge.modals.set(id, node)
   return id
 }
 
 /** Unregister a Modal node (called on unmount). */
 export function unregisterModalNode(node: EventNode): void {
-  const id = (node as unknown as Record<string, unknown>).__modalID as number | undefined
+  const id = (node as unknown as { __RN_modalID: number | null }).__RN_modalID
   if (id != null) _modalBridge.modals.delete(id)
 }
 
@@ -261,7 +268,7 @@ export function hasPressHandlers(props: Record<string, unknown>): boolean {
  *  onResponderTerminationRequest — returns true by default when the node has
  *  press handlers (a View with onPress is implicitly pressable). */
 function shouldClaimResponder(node: EventNode, type: string): boolean {
-  const props = node.currentProps
+  const props = node.__RN_currentProps
   if (props.disabled === true) return false
   if (typeof props.onStartShouldSetResponder === 'function') {
     return (props.onStartShouldSetResponder as () => boolean)() === true
@@ -320,7 +327,7 @@ function startPressTracking(
   node: EventNode,
   state: PressState,
 ): void {
-  const props = node.currentProps
+  const props = node.__RN_currentProps
   const delay = normalizeDelay(props.delayLongPress, DEFAULT_LONG_PRESS_DELAY_MS)
   state.timer = setTimeout(() => {
     state.isLong = true
@@ -362,7 +369,7 @@ function isTouchWithinRect(
   const touch = touchPoint(nativeEvent)
   if (!state || !touch) return true // unknown: don't cancel
 
-  const props = node.currentProps
+  const props = node.__RN_currentProps
   const hitSlop = props.hitSlop as Record<string, number> | undefined
   // pressRectOffset may be a number (applied to all sides) or an Insets
   // object, like RN Pressability.
@@ -407,7 +414,7 @@ function isTouchWithinRect(
 
 /** Fire onPressIn with delayPressIn honored (RN Pressability). */
 function firePressIn(node: EventNode, eventObj: Record<string, unknown>, state: PressState): void {
-  const props = node.currentProps
+  const props = node.__RN_currentProps
   const delay = normalizeDelay(props.delayPressIn)
   const onPressIn = props.onPressIn
   if (typeof onPressIn !== 'function') return
@@ -426,7 +433,7 @@ function firePressIn(node: EventNode, eventObj: Record<string, unknown>, state: 
 
 /** Fire onPressOut with delayPressOut + minPressDuration honored. */
 function firePressOut(node: EventNode, eventObj: Record<string, unknown>, state: PressState): void {
-  const props = node.currentProps
+  const props = node.__RN_currentProps
   const onPressOut = props.onPressOut
   if (typeof onPressOut !== 'function') return
   const minPressDuration = normalizeDelay(props.minPressDuration, 0) // RN default 130ms
@@ -456,7 +463,7 @@ export function drivePress(
   eventObj: Record<string, unknown>,
   opts: EventSystemOptions,
 ): boolean {
-  const props = node.currentProps
+  const props = node.__RN_currentProps
   const nativeEvent = eventObj.nativeEvent as Record<string, unknown>
 
   switch (type) {
@@ -565,7 +572,7 @@ export function releasePressFor(node: EventNode): void {
 function cancelPress(node: EventNode, eventObj?: Record<string, unknown>): void {
   const state = _pressStates.get(node)
   if (state && state.inFired) {
-    const onPressOut = node.currentProps.onPressOut
+    const onPressOut = node.__RN_currentProps.onPressOut
     if (typeof onPressOut === 'function') {
       ;(onPressOut as (e: Record<string, unknown>) => void)(
         eventObj ?? { nativeEvent: { timestamp: Date.now() } },
@@ -591,7 +598,7 @@ function firePropsHandler(
   eventObj: Record<string, unknown>,
   transform?: 'text' | 'value',
 ): void {
-  const handler = node.currentProps[propName]
+  const handler = node.__RN_currentProps[propName]
   if (typeof handler !== 'function') return
   if (transform === 'text') {
     // onChangeText: pass the raw text string (RN TextInput surface API).
@@ -614,7 +621,7 @@ function fireListeners(
   domType: string,
   event: Record<string, unknown>,
 ): void {
-  const listeners = node._listeners?.get(domType)
+  const listeners = node.__RN_listeners?.get(domType)
   if (!listeners) return
   for (const listener of listeners) {
     if (event.propagationStopped) return
@@ -674,14 +681,51 @@ export function createDispatcher(opts: EventSystemOptions): DispatchEventFn {
     const behavior = resolveEventBehavior(type, opts.getViewConfig(current))
     const domType = behavior.domType
 
-    // Blur check: tapping a non-focusable area while something is focused.
+    // 输入框标签判定(RN TextInputState.isTextInput 语义)。
+    const isTextInputTag = (tag: string): boolean =>
+      tag === 'TextInput' || tag === 'AndroidTextInput'
+
+    // Blur check: tapping a non-focusable area while a TextInput is focused
+    // dismisses the keyboard. RN semantics (ScrollView.js keyboardShouldPersistTaps):
+    //   - 'always'        → 永不因点击收起
+    //   - 'never'         → 立即收起,事件照常分发
+    //   - undefined/其他  → 默认 'handled':第一次 tap 只收起键盘并吞掉该次
+    //     press(第二次才传给内容)。rn-dom 无 responder capture,以
+    //     cancel 本次 press 近似"吞事件"。
     if (type === 'topTouchEnd') {
       const focused = opts.getFocusedNode()
       const focusedId = (focused as unknown as Record<symbol, number> | null)?.[FABRIC_NODE_ID]
       const currentId = (current as unknown as Record<symbol, number>)[FABRIC_NODE_ID]
-      if (focused && focusedId !== currentId) {
-        // Tapping another node: blur the old one (auto-focus below may refocus).
-        opts.blurFocusedNode()
+      // 仅当聚焦的是输入框时才涉及收起键盘(RN TextInputState.blurTextInput 语义)。
+      if (focused && focusedId !== currentId && isTextInputTag(focused.tagName)) {
+        const tapInput = isTextInputTag(current.tagName)
+        let dismiss = !tapInput
+        let handledLike = false
+        if (!tapInput) {
+          // 沿祖先找最近 ScrollView 的 keyboardShouldPersistTaps(无则默认 handled)。
+          let persist: unknown
+          let scrollFound = false
+          let w: EventNode | null = current
+          while (w) {
+            if (w.tagName === 'ScrollView' || w.tagName === 'AndroidHorizontalScrollView') {
+              persist = w.__RN_currentProps.keyboardShouldPersistTaps
+              scrollFound = true
+              break
+            }
+            w = w.parentNode
+          }
+          dismiss = persist !== 'always'
+          handledLike = scrollFound && persist !== 'never'
+        }
+        if (dismiss) {
+          // Tapping another node: blur the old one (auto-focus below may refocus).
+          opts.blurFocusedNode()
+          // 默认 'handled' 且点到非输入框 → 吞本次 press(第一次 tap 只收键盘)。
+          if (handledLike && _pressOwner) {
+            cancelPress(_pressOwner)
+            _pressOwner = null
+          }
+        }
       }
     }
 
@@ -719,7 +763,7 @@ export function createDispatcher(opts: EventSystemOptions): DispatchEventFn {
     for (const node of walk) {
       if (event.propagationStopped) break
       event.currentTarget = node
-      const props = node.currentProps
+      // 注意:props 用于 drivePress / firePropsHandler;保留 __RN_currentProps 读取。
 
       // Press synthesis (touch series → press). The press owner is the
       // nearest ancestor with press handlers; drivePress tracks it via
@@ -734,32 +778,35 @@ export function createDispatcher(opts: EventSystemOptions): DispatchEventFn {
         releasePressFor(_pressOwner)
       }
 
+      // Per-tag native-event hook:节点类(TextInput/Switch/ScrollView)的
+      // 事件专属逻辑(onChangeText 变换、onValueChange、受控记录、
+      // onContentSizeChange 转发)。返回 true 表示已消费 → 跳过通用分发。
+      const consumed = node.__RN_handleNativeEvent?.(type, event) === true
+
       // Surface handlers (from viewConfig name, RN convention or special).
-      const name = behavior.bubbledName
-      if (type === 'topChange') {
-        // RN: onChange (event) + value transforms fire together.
-        //  - TextInput: onChangeText(text: string)
-        //  - Switch:    onValueChange(value: boolean)
-        firePropsHandler(node, 'onChange', event)
-        firePropsHandler(node, 'onChangeText', event, 'text')
-        firePropsHandler(node, 'onValueChange', event, 'value')
-      } else if (name) {
-        firePropsHandler(node, name, event)
-      }
+      // 通用分发:onChange(TextInput/Switch 的 bubbling 事件)与其余 onXxx。
+      // onChangeText/onValueChange 的"变换"已由节点类 __RN_handleNativeEvent 处理。
+      if (!consumed) {
+        const name = behavior.bubbledName
+        if (type === 'topChange') {
+          firePropsHandler(node, 'onChange', event)
+        } else if (name) {
+          firePropsHandler(node, name, event)
+        }
 
-      // DOM addEventListener listeners (bubble phase).
-      fireListeners(node, domType, event)
+        // DOM addEventListener listeners (bubble phase).
+        fireListeners(node, domType, event)
 
-      // RN skipBubbling: stop after the first node that handled it.
-      if (behavior.skipBubbling && (name || type === 'topChange')) {
-        event.stopPropagation()
+        // RN skipBubbling: stop after the first node that handled it.
+        if (behavior.skipBubbling && (name || type === 'topChange')) {
+          (event.stopPropagation as () => void)()
+        }
       }
     }
 
     // Auto-focus focusable components on touch when nothing claimed the event.
     if (type === 'topTouchEnd') {
-      const focusable = new Set(['TextInput', 'AndroidTextInput'])
-      if (focusable.has(current.tagName)) {
+      if (isTextInputTag(current.tagName)) {
         opts.focusNode(current)
       }
     }

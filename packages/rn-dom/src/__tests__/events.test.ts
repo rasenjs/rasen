@@ -5,9 +5,20 @@
  * stopPropagation, focus/blur, and instance map registration.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
-import { RNDocument, resetTagCounter, dispatchCommand, sendAccessibilityEvent, findNodeHandle } from '../index'
-import { resetFabricMocks, nativeFabricUIManager, viewConfigRegistry, emitDeviceEvent } from './setup'
+import { describe, it, expect, vi } from 'vitest'
+import { RNDocument, resetTagCounter, dispatchCommand, sendAccessibilityEvent, findNodeHandle, type RNNode } from '../index'
+import { getFocusedNode } from '../node'
+import { resetFabricMocks, nativeFabricUIManager, viewConfigRegistry, emitDeviceEvent, gGlobal } from './setup'
+import { FABRIC_NODE_ID, type RNDomInternalNode } from '../node'
+import { submitToRoot } from '../internal'
+
+/**
+ * 测试专用:节点同时暴露 DOM API 与内部成员(protected 在类上不可外部访问)。
+ * RNNode & RNDomInternalNode 让测试既能 setAttribute/addEventListener,
+ * 又能读 __RN_mounted/__RN_listeners/FABRIC_NODE_ID 等内部状态。
+ */
+type TestNode = RNNode & RNDomInternalNode
+const t = (n: RNNode): TestNode => n as unknown as TestNode
 
 function createDoc(): RNDocument {
   RNDocument.reset()
@@ -22,21 +33,21 @@ describe('Event System', () => {
   describe('instance map', () => {
     it('registers elements on appendChild', () => {
       const doc = createDoc()
-      const p = doc.createElement('View')
-      const c = doc.createElement('Text')
+      const p = t(doc.createElement('View'))
+      const c = t(doc.createElement('Text'))
       p.appendChild(c)
       // Instance map is stored on globalThis under __RASEN_INSTANCE_MAP__
-      const map = (globalThis as any).__RASEN_INSTANCE_MAP__
-      expect(map.has(c[Symbol.for('fabricNodeId')])).toBe(true)
+      const map = gGlobal.__RASEN_INSTANCE_MAP__!
+      expect(map.has(c[FABRIC_NODE_ID])).toBe(true)
     })
 
     it('unregisters on removeChild', () => {
       const doc = createDoc()
-      const p = doc.createElement('View')
-      const c = doc.createElement('Text')
+      const p = t(doc.createElement('View'))
+      const c = t(doc.createElement('Text'))
       p.appendChild(c)
-      const map = (globalThis as any).__RASEN_INSTANCE_MAP__
-      const id = c[Symbol.for('fabricNodeId')]
+      const map = gGlobal.__RASEN_INSTANCE_MAP__!
+      const id = c[FABRIC_NODE_ID]
       p.removeChild(c)
       expect(map.has(id)).toBe(false)
     })
@@ -45,18 +56,18 @@ describe('Event System', () => {
   // ── Event dispatch (via props) ─────────────────────────────────
 
   describe('props-based dispatch', () => {
-    it('stores onTouchEnd handler in currentProps via setAttribute', () => {
+    it('stores onTouchEnd handler in __RN_currentProps via setAttribute', () => {
       const doc = createDoc()
       const fn = vi.fn()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       el.setAttribute('onTouchEnd', fn)
-      expect(el.currentProps.onTouchEnd).toBe(fn)
+      expect(el.__RN_currentProps.onTouchEnd).toBe(fn)
     })
 
     it('fires addEventListener handler on dispatchEvent', () => {
       const doc = createDoc()
       const fn = vi.fn()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       el.addEventListener('touchend', fn)
       el.dispatchEvent(new Event('touchend'))
       expect(fn).toHaveBeenCalled()
@@ -68,7 +79,7 @@ describe('Event System', () => {
   describe('addEventListener dispatchEvent', () => {
     it('calls registered handler', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       const fn = vi.fn()
       el.addEventListener('click', fn)
       el.dispatchEvent(new Event('click'))
@@ -77,7 +88,7 @@ describe('Event System', () => {
 
     it('notifies multiple listeners', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       const a = vi.fn()
       const b = vi.fn()
       el.addEventListener('click', a)
@@ -89,7 +100,7 @@ describe('Event System', () => {
 
     it('respects removeEventListener', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       const fn = vi.fn()
       el.addEventListener('click', fn)
       el.removeEventListener('click', fn)
@@ -99,7 +110,7 @@ describe('Event System', () => {
 
     it('handleEvent object form works', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       const handleEvent = vi.fn()
       el.addEventListener('click', { handleEvent })
       el.dispatchEvent(new Event('click'))
@@ -108,7 +119,7 @@ describe('Event System', () => {
 
     it('does not throw when no listeners', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       expect(() => el.dispatchEvent(new Event('nobody'))).not.toThrow()
     })
   })
@@ -118,27 +129,27 @@ describe('Event System', () => {
   describe('capture phase', () => {
     it('stores capture listeners separately', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       const fn = vi.fn()
       el.addEventListener('click', fn, true)
-      expect(el._listeners!.get('__capture_click')!.has(fn)).toBe(true)
+      expect(el.__RN_listeners!.get('__capture_click')!.has(fn)).toBe(true)
     })
 
     it('stores capture listener with __capture_ prefix via options', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       const fn = vi.fn()
       el.addEventListener('click', fn, { capture: true })
-      expect(el._listeners!.has('__capture_click')).toBe(true)
+      expect(el.__RN_listeners!.has('__capture_click')).toBe(true)
     })
 
     it('removes capture listener', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       const fn = vi.fn()
       el.addEventListener('click', fn, true)
       el.removeEventListener('click', fn, true)
-      expect(el._listeners!.get('__capture_click')?.has(fn)).toBeFalsy()
+      expect(el.__RN_listeners!.get('__capture_click')?.has(fn)).toBeFalsy()
     })
   })
 
@@ -147,7 +158,7 @@ describe('Event System', () => {
   describe('focus/blur tracking', () => {
     it('TextInput triggers auto-focus on touch end', () => {
       const doc = createDoc()
-      const input = doc.createElement('TextInput')
+      const input = t(doc.createElement('TextInput'))
       doc.body.appendChild(input)
       expect(input.tagName).toBe('TextInput')
     })
@@ -158,15 +169,15 @@ describe('Event System', () => {
   describe('stopPropagation', () => {
     it('supports stopPropagation in event handlers', () => {
       const doc = createDoc()
-      const p = doc.createElement('View')
-      const c = doc.createElement('Text')
+      const p = t(doc.createElement('View'))
+      const c = t(doc.createElement('Text'))
       p.appendChild(c)
       doc.body.appendChild(p)
 
       // Mark as mounted so our custom dispatch path works
-      p._mounted = true
-      c._mounted = true
-      doc.body._mounted = true
+      p.__RN_mounted = true
+      c.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
 
       const parentFn = vi.fn()
       const childFn = vi.fn()
@@ -187,7 +198,7 @@ describe('Event System', () => {
   describe('event target', () => {
     it('event listener receives the dispatched Event', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       let received: any = null
       el.addEventListener('click', (e: Event) => { received = e })
       const ev = new Event('click')
@@ -200,11 +211,13 @@ describe('Event System', () => {
   // ── RN-style: instance map for event lookup ────────────────────
 
   describe('dispatchEventWithBubble (from Fabric events)', () => {
-    it('registers event handler flag on globalThis', () => {
-      // The private _rnInitEventSystem sets a global flag after first call.
-      // It's only called once per document lifetime.
-      const flag = (globalThis as any).__RASEN_EVENT_HANDLER_REGISTERED__
-      expect(flag).toBe(true)
+    it('每次 RNDocument 都注册 registerEventHandler(无全局跳过标记)', () => {
+      // _rnInitEventSystem 现在每次 RNDocument 构造都注册(幂等,覆盖旧 handler),
+      // 不再依赖全局标记 —— 修复 Fast Refresh/二次挂载时事件到不了新上下文。
+      createDoc()
+      const calls = nativeFabricUIManager.registerEventHandler.mock.calls
+      expect(calls.length).toBeGreaterThan(0)
+      expect(typeof calls[calls.length - 1][0]).toBe('function')
     })
   })
 
@@ -213,13 +226,13 @@ describe('Event System', () => {
   describe('props-based event dispatch', () => {
     it('calls onTouchEnd from setAttribute', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       const fn = vi.fn()
       el.setAttribute('onTouchEnd', fn)
-      // dispatchEvent doesn't read props — it uses _listeners.
-      // This tests that setAttribute stores in currentProps
+      // dispatchEvent doesn't read props — it uses __RN_listeners.
+      // This tests that setAttribute stores in __RN_currentProps
       expect(typeof el.getAttribute('onTouchEnd')).toBe('function')
-      expect(el.currentProps.onTouchEnd).toBe(fn)
+      expect(el.__RN_currentProps.onTouchEnd).toBe(fn)
     })
   })
 
@@ -228,7 +241,7 @@ describe('Event System', () => {
   describe('timeStamp propagation', () => {
     it('provides timeStamp in handler nativeEvent', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       let received: any = null
       el.addEventListener('click', (e: Event) => { received = e })
       el.dispatchEvent(new Event('click', { cancelable: true }))
@@ -241,10 +254,10 @@ describe('Event System', () => {
   describe('dispatchCommand', () => {
     it('calls Fabric dispatchCommand via standalone function', () => {
       const doc = createDoc()
-      doc.body._mounted = true
-      const el = doc.createElement('TextInput')
+      t(doc.body).__RN_mounted = true
+      const el = t(doc.createElement('TextInput'))
       doc.body.appendChild(el)
-      doc.body._submitToRoot()
+      submitToRoot(t(doc.body))
 
       dispatchCommand(el, 'scrollTo', [{ x: 0, y: 100 }])
       expect(nativeFabricUIManager.dispatchCommand).toHaveBeenCalledWith(
@@ -256,9 +269,9 @@ describe('Event System', () => {
 
     it('.focus() calls dispatchCommand with focus (DOM standard)', () => {
       const doc = createDoc()
-      const el = doc.createElement('TextInput')
+      const el = t(doc.createElement('TextInput'))
       doc.body.appendChild(el)
-      doc.body._submitToRoot()
+      submitToRoot(t(doc.body))
 
       el.focus()
       expect(nativeFabricUIManager.dispatchCommand).toHaveBeenCalledWith(
@@ -270,9 +283,9 @@ describe('Event System', () => {
 
     it('.blur() calls dispatchCommand with blur (DOM standard)', () => {
       const doc = createDoc()
-      const el = doc.createElement('TextInput')
+      const el = t(doc.createElement('TextInput'))
       doc.body.appendChild(el)
-      doc.body._submitToRoot()
+      submitToRoot(t(doc.body))
 
       el.blur()
       expect(nativeFabricUIManager.dispatchCommand).toHaveBeenCalledWith(
@@ -288,9 +301,9 @@ describe('Event System', () => {
   describe('sendAccessibilityEvent', () => {
     it('calls Fabric sendAccessibilityEvent via standalone function', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
+      const el = t(doc.createElement('View'))
       doc.body.appendChild(el)
-      doc.body._submitToRoot()
+      submitToRoot(t(doc.body))
 
       sendAccessibilityEvent(el, 'layoutChanged')
       expect(nativeFabricUIManager.sendAccessibilityEvent).toHaveBeenCalledWith(
@@ -302,7 +315,7 @@ describe('Event System', () => {
     // ── RN equivalent: should no-op if calling sendAccessibilityEvent on unmounted refs ──
     it('no-ops when node is null (unmounted ref)', () => {
       // Calling sendAccessibilityEvent with a null node should not throw
-      expect(() => sendAccessibilityEvent(null as any, 'focus')).not.toThrow()
+      expect(() => sendAccessibilityEvent(null as unknown as RNNode, 'focus')).not.toThrow()
     })
   })
 
@@ -311,8 +324,8 @@ describe('Event System', () => {
   describe('findNodeHandle', () => {
     it('returns the Fabric node ID for an RNNode', () => {
       const doc = createDoc()
-      const el = doc.createElement('View')
-      expect(findNodeHandle(el)).toBe(el[Symbol.for('fabricNodeId')])
+      const el = t(doc.createElement('View'))
+      expect(findNodeHandle(el)).toBe(el[FABRIC_NODE_ID])
     })
 
     it('returns null for null/undefined', () => {
@@ -333,10 +346,10 @@ describe('Event System', () => {
       // The skipBubbling check reads viewConfig.bubblingEventTypes.
       // Since our mock viewConfig doesn't set that, default is bubble normally.
       const doc = createDoc()
-      const p = doc.createElement('View')
-      const c = doc.createElement('Text')
-      p._mounted = true
-      c._mounted = true
+      const p = t(doc.createElement('View'))
+      const c = t(doc.createElement('Text'))
+      p.__RN_mounted = true
+      c.__RN_mounted = true
       p.appendChild(c)
       doc.body.appendChild(p)
 
@@ -366,14 +379,14 @@ describe('Event System', () => {
     /** Build View > TextInput tree, mounted, returns nodes + fabric dispatcher. */
     function buildTree() {
       const doc = createDoc()
-      const view = doc.createElement('View')
-      const input = doc.createElement('TextInput')
+      const view = t(doc.createElement('View'))
+      const input = t(doc.createElement('TextInput'))
       view.appendChild(input)
       doc.body.appendChild(view)
-      view._mounted = true
-      input._mounted = true
-      doc.body._mounted = true
-      doc.body._submitToRoot()
+      view.__RN_mounted = true
+      input.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
+      submitToRoot(t(doc.body))
       return { doc, view, input, dispatch: fabricHandler() }
     }
 
@@ -383,7 +396,7 @@ describe('Event System', () => {
       const touchStart = vi.fn()
       input.setAttribute('onPressIn', pressIn)
       input.setAttribute('onTouchStart', touchStart)
-      dispatch({ stateNode: input }, 'topTouchStart', { target: input[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: input }, 'topTouchStart', { target: input[FABRIC_NODE_ID] })
       expect(pressIn).toHaveBeenCalledTimes(1)
       expect(touchStart).toHaveBeenCalledTimes(1)
     })
@@ -398,8 +411,8 @@ describe('Event System', () => {
       input.setAttribute('onPress', press)
       input.setAttribute('onTouchEnd', touchEnd)
       // Simulate press start so tracking exists
-      dispatch({ stateNode: input }, 'topTouchStart', { target: input[Symbol.for('fabricNodeId')] })
-      dispatch({ stateNode: input }, 'topTouchEnd', { target: input[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: input }, 'topTouchStart', { target: input[FABRIC_NODE_ID] })
+      dispatch({ stateNode: input }, 'topTouchEnd', { target: input[FABRIC_NODE_ID] })
       expect(order).toEqual(['pressOut', 'press', 'touchEnd'])
     })
 
@@ -411,28 +424,28 @@ describe('Event System', () => {
       input.setAttribute('onPressMove', pressMove)
       input.setAttribute('onTouchMove', touchMove)
       // Real touch sequence: start first (sets responder), then move
-      dispatch({ stateNode: input }, 'topTouchStart', { target: input[Symbol.for('fabricNodeId')] })
-      dispatch({ stateNode: input }, 'topTouchMove', { target: input[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: input }, 'topTouchStart', { target: input[FABRIC_NODE_ID] })
+      dispatch({ stateNode: input }, 'topTouchMove', { target: input[FABRIC_NODE_ID] })
       expect(pressMove).toHaveBeenCalledTimes(1)
       expect(touchMove).toHaveBeenCalledTimes(1)
     })
 
     it('onTouchEnd bubbles from target Text up through ancestor Views (RN bubbling)', () => {
       const doc = createDoc()
-      const grand = doc.createElement('View')
-      const parent = doc.createElement('View')
-      const child = doc.createElement('View')
-      const text = doc.createElement('Text')
+      const grand = t(doc.createElement('View'))
+      const parent = t(doc.createElement('View'))
+      const child = t(doc.createElement('View'))
+      const text = t(doc.createElement('Text'))
       child.appendChild(text)
       parent.appendChild(child)
       grand.appendChild(parent)
       doc.body.appendChild(grand)
-      grand._mounted = true
-      parent._mounted = true
-      child._mounted = true
-      text._mounted = true
-      doc.body._mounted = true
-      doc.body._submitToRoot()
+      grand.__RN_mounted = true
+      parent.__RN_mounted = true
+      child.__RN_mounted = true
+      text.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
+      submitToRoot(t(doc.body))
       const dispatch = fabricHandler()
       const childFn = vi.fn()
       const parentFn = vi.fn()
@@ -441,7 +454,7 @@ describe('Event System', () => {
       parent.setAttribute('onTouchEnd', parentFn)
       grand.setAttribute('onTouchEnd', grandFn)
       // Tap the innermost Text; onTouchEnd bubbles child → parent → grand
-      dispatch({ stateNode: text }, 'topTouchEnd', { target: text[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: text }, 'topTouchEnd', { target: text[FABRIC_NODE_ID] })
       expect(childFn).toHaveBeenCalledTimes(1)
       expect(parentFn).toHaveBeenCalledTimes(1)
       expect(grandFn).toHaveBeenCalledTimes(1)
@@ -455,11 +468,11 @@ describe('Event System', () => {
       input.setAttribute('onPressOut', pressOut)
       input.setAttribute('onPress', press)
       input.setAttribute('onLongPress', longPress)
-      dispatch({ stateNode: input }, 'topTouchStart', { target: input[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: input }, 'topTouchStart', { target: input[FABRIC_NODE_ID] })
       // Wait > 500ms for the long-press timer
       await new Promise(r => setTimeout(r, 550))
       expect(longPress).toHaveBeenCalledTimes(1)
-      dispatch({ stateNode: input }, 'topTouchEnd', { target: input[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: input }, 'topTouchEnd', { target: input[FABRIC_NODE_ID] })
       expect(pressOut).toHaveBeenCalledTimes(1)
       expect(press).not.toHaveBeenCalled() // suppressed by long-press
     })
@@ -470,7 +483,7 @@ describe('Event System', () => {
       const onChangeText = vi.fn()
       input.setAttribute('onChange', onChange)
       input.setAttribute('onChangeText', onChangeText)
-      dispatch({ stateNode: input }, 'topChange', { target: input[Symbol.for('fabricNodeId')], text: 'hi' })
+      dispatch({ stateNode: input }, 'topChange', { target: input[FABRIC_NODE_ID], text: 'hi' })
       expect(onChange).toHaveBeenCalledTimes(1)
       expect(onChangeText).toHaveBeenCalledTimes(1)
       expect(onChangeText).toHaveBeenCalledWith('hi')
@@ -479,14 +492,14 @@ describe('Event System', () => {
 
     it('nested pressable: inner onPress wins as responder, outer does not fire', () => {
       const doc = createDoc()
-      const outer = doc.createElement('View')
-      const inner = doc.createElement('Text')
+      const outer = t(doc.createElement('View'))
+      const inner = t(doc.createElement('Text'))
       outer.appendChild(inner)
       doc.body.appendChild(outer)
-      outer._mounted = true
-      inner._mounted = true
-      doc.body._mounted = true
-      doc.body._submitToRoot()
+      outer.__RN_mounted = true
+      inner.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
+      submitToRoot(t(doc.body))
 
       const outerPress = vi.fn()
       const innerPress = vi.fn()
@@ -495,8 +508,8 @@ describe('Event System', () => {
 
       const dispatch = fabricHandler()
       // Simulate a touch that starts+ends on the inner node
-      dispatch({ stateNode: inner }, 'topTouchStart', { target: inner[Symbol.for('fabricNodeId')] })
-      dispatch({ stateNode: inner }, 'topTouchEnd', { target: inner[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: inner }, 'topTouchStart', { target: inner[FABRIC_NODE_ID] })
+      dispatch({ stateNode: inner }, 'topTouchEnd', { target: inner[FABRIC_NODE_ID] })
 
       // Inner pressable is the responder — outer must NOT fire (RN responder).
       expect(innerPress).toHaveBeenCalledTimes(1)
@@ -505,22 +518,22 @@ describe('Event System', () => {
 
     it('touch on child with no press handler: parent onPress becomes responder', () => {
       const doc = createDoc()
-      const outer = doc.createElement('View')
-      const inner = doc.createElement('Text')
+      const outer = t(doc.createElement('View'))
+      const inner = t(doc.createElement('Text'))
       outer.appendChild(inner)
       doc.body.appendChild(outer)
-      outer._mounted = true
-      inner._mounted = true
-      doc.body._mounted = true
-      doc.body._submitToRoot()
+      outer.__RN_mounted = true
+      inner.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
+      submitToRoot(t(doc.body))
 
       const outerPress = vi.fn()
       outer.setAttribute('onPress', outerPress)
       // inner has NO press handlers — plain touch
 
       const dispatch = fabricHandler()
-      dispatch({ stateNode: inner }, 'topTouchStart', { target: inner[Symbol.for('fabricNodeId')] })
-      dispatch({ stateNode: inner }, 'topTouchEnd', { target: inner[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: inner }, 'topTouchStart', { target: inner[FABRIC_NODE_ID] })
+      dispatch({ stateNode: inner }, 'topTouchEnd', { target: inner[FABRIC_NODE_ID] })
 
       // Parent is the nearest press handler → responder, fires onPress.
       expect(outerPress).toHaveBeenCalledTimes(1)
@@ -528,17 +541,17 @@ describe('Event System', () => {
 
     it('touch events bubble to every ancestor (RN bubblingEventTypes)', () => {
       const doc = createDoc()
-      const grand = doc.createElement('View')
-      const parent = doc.createElement('View')
-      const child = doc.createElement('Text')
+      const grand = t(doc.createElement('View'))
+      const parent = t(doc.createElement('View'))
+      const child = t(doc.createElement('Text'))
       grand.appendChild(parent)
       parent.appendChild(child)
       doc.body.appendChild(grand)
-      grand._mounted = true
-      parent._mounted = true
-      child._mounted = true
-      doc.body._mounted = true
-      doc.body._submitToRoot()
+      grand.__RN_mounted = true
+      parent.__RN_mounted = true
+      child.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
+      submitToRoot(t(doc.body))
 
       const childEnd = vi.fn()
       const parentEnd = vi.fn()
@@ -548,7 +561,7 @@ describe('Event System', () => {
       grand.setAttribute('onTouchEnd', grandEnd)
 
       const dispatch = fabricHandler()
-      dispatch({ stateNode: child }, 'topTouchEnd', { target: child[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: child }, 'topTouchEnd', { target: child[FABRIC_NODE_ID] })
 
       // RN bubbling: ALL ancestors fire, not just the first handler node.
       expect(childEnd).toHaveBeenCalledTimes(1)
@@ -558,14 +571,14 @@ describe('Event System', () => {
 
     it('press owner fires pressOut/press on touchEnd even when touch bubbles', () => {
       const doc = createDoc()
-      const pressable = doc.createElement('View')
-      const inner = doc.createElement('Text')
+      const pressable = t(doc.createElement('View'))
+      const inner = t(doc.createElement('Text'))
       pressable.appendChild(inner)
       doc.body.appendChild(pressable)
-      pressable._mounted = true
-      inner._mounted = true
-      doc.body._mounted = true
-      doc.body._submitToRoot()
+      pressable.__RN_mounted = true
+      inner.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
+      submitToRoot(t(doc.body))
 
       const pressIn = vi.fn()
       const pressOut = vi.fn()
@@ -577,8 +590,8 @@ describe('Event System', () => {
       inner.setAttribute('onTouchEnd', touchEnd)
 
       const dispatch = fabricHandler()
-      dispatch({ stateNode: inner }, 'topTouchStart', { target: inner[Symbol.for('fabricNodeId')] })
-      dispatch({ stateNode: inner }, 'topTouchEnd', { target: inner[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: inner }, 'topTouchStart', { target: inner[FABRIC_NODE_ID] })
+      dispatch({ stateNode: inner }, 'topTouchEnd', { target: inner[FABRIC_NODE_ID] })
 
       // Pressable (ancestor) is the responder → press series fires on it.
       expect(pressIn).toHaveBeenCalledTimes(1)
@@ -599,16 +612,16 @@ describe('Event System', () => {
       ) => void
     }
 
-    function buildWithViewConfig(extra: Record<string, unknown>) {
+    function buildWithViewConfig(_extra: Record<string, unknown>) {
       const doc = createDoc()
-      const view = doc.createElement('View')
-      const child = doc.createElement('Text')
+      const view = t(doc.createElement('View'))
+      const child = t(doc.createElement('Text'))
       view.appendChild(child)
       doc.body.appendChild(view)
-      view._mounted = true
-      child._mounted = true
-      doc.body._mounted = true
-      doc.body._submitToRoot()
+      view.__RN_mounted = true
+      child.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
+      submitToRoot(t(doc.body))
       return { doc, view, child, dispatch: fabricHandler() }
     }
 
@@ -618,7 +631,7 @@ describe('Event System', () => {
       const viewLayout = vi.fn()
       child.setAttribute('onLayout', childLayout)
       view.setAttribute('onLayout', viewLayout)
-      dispatch({ stateNode: child }, 'topLayout', { target: child[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: child }, 'topLayout', { target: child[FABRIC_NODE_ID] })
       expect(childLayout).toHaveBeenCalledTimes(1)
       expect(viewLayout).not.toHaveBeenCalled() // direct: no bubble
     })
@@ -629,7 +642,7 @@ describe('Event System', () => {
       const viewFocus = vi.fn()
       child.setAttribute('onFocus', childFocus)
       view.setAttribute('onFocus', viewFocus)
-      dispatch({ stateNode: child }, 'topFocus', { target: child[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: child }, 'topFocus', { target: child[FABRIC_NODE_ID] })
       expect(childFocus).toHaveBeenCalledTimes(1)
       expect(viewFocus).toHaveBeenCalledTimes(1)
     })
@@ -650,21 +663,21 @@ describe('Event System', () => {
           },
         },
       })
-      const view = doc.createElement('View')
-      const child = doc.createElement('Text')
+      const view = t(doc.createElement('View'))
+      const child = t(doc.createElement('Text'))
       view.appendChild(child)
       doc.body.appendChild(view)
-      view._mounted = true
-      child._mounted = true
-      doc.body._mounted = true
-      doc.body._submitToRoot()
+      view.__RN_mounted = true
+      child.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
+      submitToRoot(t(doc.body))
 
       const childEnd = vi.fn()
       const viewEnd = vi.fn()
       child.setAttribute('onTouchEnd', childEnd)
       view.setAttribute('onTouchEnd', viewEnd)
       const dispatch = fabricHandler()
-      dispatch({ stateNode: child }, 'topTouchEnd', { target: child[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: child }, 'topTouchEnd', { target: child[FABRIC_NODE_ID] })
       expect(childEnd).toHaveBeenCalledTimes(1)
       expect(viewEnd).not.toHaveBeenCalled() // skipBubbling stopped it
 
@@ -694,7 +707,7 @@ describe('Event System', () => {
       view.setAttribute('onPress', viewPress)
       // topPress bubbles (from the shared bubbling table) — child has no
       // handler, so it bubbles to view's onPress.
-      dispatch({ stateNode: child }, 'topPress', { target: child[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: child }, 'topPress', { target: child[FABRIC_NODE_ID] })
       expect(viewPress).toHaveBeenCalledTimes(1)
     })
   })
@@ -711,21 +724,21 @@ describe('Event System', () => {
 
     function build() {
       const doc = createDoc()
-      const view = doc.createElement('View')
-      const btn = doc.createElement('Text')
+      const view = t(doc.createElement('View'))
+      const btn = t(doc.createElement('Text'))
       view.appendChild(btn)
       doc.body.appendChild(view)
-      view._mounted = true
-      btn._mounted = true
-      doc.body._mounted = true
-      doc.body._submitToRoot()
+      view.__RN_mounted = true
+      btn.__RN_mounted = true
+      t(doc.body).__RN_mounted = true
+      submitToRoot(t(doc.body))
       return { doc, view, btn, dispatch: fabricHandler() }
     }
 
     /** Touch events carry pageX/pageY for press-rect checks. */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const touchPayload = (node: any, x: number, y: number) => ({
-      target: node[Symbol.for('fabricNodeId')],
+      target: node[FABRIC_NODE_ID],
       pageX: x,
       pageY: y,
     })
@@ -738,7 +751,7 @@ describe('Event System', () => {
       btn.setAttribute('onPressIn', pressIn)
       btn.setAttribute('onPressOut', pressOut)
       btn.setAttribute('onPress', press)
-      dispatch({ stateNode: btn }, 'topTouchStart', { target: btn[Symbol.for('fabricNodeId')], pageX: 100, pageY: 100 })
+      dispatch({ stateNode: btn }, 'topTouchStart', { target: btn[FABRIC_NODE_ID], pageX: 100, pageY: 100 })
       // Move far outside the press rect (offset default 20)
       dispatch({ stateNode: btn }, 'topTouchMove', touchPayload(btn, 500, 500))
       // pressOut fired on leaving the rect
@@ -774,10 +787,12 @@ describe('Event System', () => {
     })
 
     it('topChange fires onValueChange with boolean (Switch)', () => {
-      const { btn, dispatch } = build()
+      const { doc, dispatch } = build()
+      const sw = t(doc.createElement('Switch'))
+      doc.body.appendChild(sw)
       const onValueChange = vi.fn()
-      btn.setAttribute('onValueChange', onValueChange)
-      dispatch({ stateNode: btn }, 'topChange', { target: btn[Symbol.for('fabricNodeId')], value: true })
+      sw.setAttribute('onValueChange', onValueChange)
+      dispatch({ stateNode: sw }, 'topChange', { target: sw[FABRIC_NODE_ID], value: true })
       expect(onValueChange).toHaveBeenCalledWith(true)
     })
 
@@ -787,7 +802,7 @@ describe('Event System', () => {
       btn.setAttribute('onPress', press)
       dispatch({ stateNode: btn }, 'topTouchStart', touchPayload(btn, 100, 100))
       // Scroll event (direct, target = scrollview ancestor) releases the press
-      dispatch({ stateNode: btn }, 'topScroll', { target: btn[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: btn }, 'topScroll', { target: btn[FABRIC_NODE_ID] })
       dispatch({ stateNode: btn }, 'topTouchEnd', touchPayload(btn, 100, 100))
       expect(press).not.toHaveBeenCalled()
     })
@@ -803,7 +818,7 @@ describe('Event System', () => {
       dispatch({ stateNode: btn }, 'topTouchStart', touchPayload(btn, 100, 100))
       expect(pressIn).toHaveBeenCalledTimes(1)
       // ScrollView steals the responder → cancel fires pressOut immediately
-      dispatch({ stateNode: btn }, 'topScroll', { target: btn[Symbol.for('fabricNodeId')] })
+      dispatch({ stateNode: btn }, 'topScroll', { target: btn[FABRIC_NODE_ID] })
       expect(pressOut).toHaveBeenCalledTimes(1)
       expect(press).not.toHaveBeenCalled()
     })
@@ -875,20 +890,230 @@ describe('Event System', () => {
     })
   })
 
+  // ── tap-to-dismiss:keyboardShouldPersistTaps(ScrollView.js) ──
+
+  describe('tap-to-dismiss keyboard (keyboardShouldPersistTaps)', () => {
+    function fabricHandler() {
+      const calls = nativeFabricUIManager.registerEventHandler.mock.calls
+      return calls[calls.length - 1][0] as (
+        instanceHandle: object, type: string, payload: Record<string, unknown>
+      ) => void
+    }
+
+    /** ScrollView > content View,内含 TextInput + Pressable 按钮。 */
+    function build() {
+      const doc = createDoc()
+      const sv = t(doc.createElement('ScrollView'))
+      const content = t(doc.createElement('View'))
+      const input = t(doc.createElement('TextInput'))
+      const btn = t(doc.createElement('Pressable'))
+      content.appendChild(input)
+      content.appendChild(btn)
+      sv.appendChild(content)
+      doc.body.appendChild(sv)
+      submitToRoot(t(doc.body))
+      return { doc, sv, content, input, btn, dispatch: fabricHandler() }
+    }
+
+    /** 模拟点输入框使其聚焦(auto-focus)。 */
+    function focusInput(b: ReturnType<typeof build>): void {
+      b.dispatch({ stateNode: b.input }, 'topTouchEnd', { target: b.input[FABRIC_NODE_ID] })
+    }
+
+    it('tap 外部:blur + 默认 handled 吞掉 press(第一次 tap 只收键盘)', () => {
+      const b = build()
+      const pressIn = vi.fn()
+      const press = vi.fn()
+      const pressOut = vi.fn()
+      b.btn.setAttribute('onPressIn', pressIn)
+      b.btn.setAttribute('onPress', press)
+      b.btn.setAttribute('onPressOut', pressOut)
+      focusInput(b)
+      expect(getFocusedNode()).toBe(b.input)
+      b.dispatch({ stateNode: b.btn }, 'topTouchStart', { target: b.btn[FABRIC_NODE_ID] })
+      expect(pressIn).toHaveBeenCalledTimes(1)
+      b.dispatch({ stateNode: b.btn }, 'topTouchEnd', { target: b.btn[FABRIC_NODE_ID] })
+      // 键盘收起(blur)+ 吞掉本次 press(handled 默认:第一次 tap 收键盘)
+      expect(getFocusedNode()).toBeNull()
+      expect(press).not.toHaveBeenCalled()
+      expect(pressOut).toHaveBeenCalledTimes(1) // cancel 触发 pressOut
+    })
+
+    it("keyboardShouldPersistTaps='always' → 不 blur、press 正常触发", () => {
+      const b = build()
+      b.sv.setAttribute('keyboardShouldPersistTaps', 'always')
+      const press = vi.fn()
+      b.btn.setAttribute('onPress', press)
+      focusInput(b)
+      b.dispatch({ stateNode: b.btn }, 'topTouchStart', { target: b.btn[FABRIC_NODE_ID] })
+      b.dispatch({ stateNode: b.btn }, 'topTouchEnd', { target: b.btn[FABRIC_NODE_ID] })
+      expect(getFocusedNode()).toBe(b.input)
+      expect(press).toHaveBeenCalledTimes(1)
+    })
+
+    it("keyboardShouldPersistTaps='never' → blur 但不吞 press", () => {
+      const b = build()
+      b.sv.setAttribute('keyboardShouldPersistTaps', 'never')
+      const press = vi.fn()
+      b.btn.setAttribute('onPress', press)
+      focusInput(b)
+      b.dispatch({ stateNode: b.btn }, 'topTouchStart', { target: b.btn[FABRIC_NODE_ID] })
+      b.dispatch({ stateNode: b.btn }, 'topTouchEnd', { target: b.btn[FABRIC_NODE_ID] })
+      expect(getFocusedNode()).toBeNull()
+      expect(press).toHaveBeenCalledTimes(1)
+    })
+
+    it('无 ScrollView 祖先:blur 但不吞 press', () => {
+      const doc = createDoc()
+      const view = t(doc.createElement('View'))
+      const input = t(doc.createElement('TextInput'))
+      const btn = t(doc.createElement('Pressable'))
+      view.appendChild(input)
+      view.appendChild(btn)
+      doc.body.appendChild(view)
+      submitToRoot(t(doc.body))
+      const dispatch = fabricHandler()
+      const press = vi.fn()
+      btn.setAttribute('onPress', press)
+      dispatch({ stateNode: input }, 'topTouchEnd', { target: input[FABRIC_NODE_ID] })
+      dispatch({ stateNode: btn }, 'topTouchStart', { target: btn[FABRIC_NODE_ID] })
+      dispatch({ stateNode: btn }, 'topTouchEnd', { target: btn[FABRIC_NODE_ID] })
+      expect(getFocusedNode()).toBeNull()
+      expect(press).toHaveBeenCalledTimes(1)
+    })
+
+    it('点另一个输入框:转移焦点、不吞', () => {
+      const doc = createDoc()
+      const view = t(doc.createElement('View'))
+      const a = t(doc.createElement('TextInput'))
+      const b2 = t(doc.createElement('TextInput'))
+      view.appendChild(a)
+      view.appendChild(b2)
+      doc.body.appendChild(view)
+      submitToRoot(t(doc.body))
+      const dispatch = fabricHandler()
+      dispatch({ stateNode: a }, 'topTouchEnd', { target: a[FABRIC_NODE_ID] })
+      expect(getFocusedNode()).toBe(a)
+      dispatch({ stateNode: b2 }, 'topTouchEnd', { target: b2[FABRIC_NODE_ID] })
+      expect(getFocusedNode()).toBe(b2)
+    })
+  })
+
+  // ── RefreshControl / DrawerLayoutAndroid events ──
+
+  describe('RefreshControl / DrawerLayoutAndroid events', () => {
+    function fabricHandler() {
+      const calls = nativeFabricUIManager.registerEventHandler.mock.calls
+      return calls[calls.length - 1][0] as (
+        instanceHandle: object, type: string, payload: Record<string, unknown>
+      ) => void
+    }
+
+    it('topRefresh → onRefresh;refreshing 未跟上 → setNativeRefreshing(false) 强制回退', () => {
+      const doc = createDoc()
+      const rc = t(doc.createElement('RefreshControl'))
+      doc.body.appendChild(rc)
+      submitToRoot(t(doc.body))
+      const dispatch = fabricHandler()
+      const onRefresh = vi.fn()
+      rc.setAttribute('onRefresh', onRefresh)
+      rc.setAttribute('refreshing', false)
+      ;(nativeFabricUIManager.dispatchCommand as unknown as { mockClear: () => void }).mockClear()
+      dispatch({ stateNode: rc }, 'topRefresh', { target: rc[FABRIC_NODE_ID] })
+      expect(onRefresh).toHaveBeenCalledTimes(1)
+      // 用户没把 refreshing 设 true → 指示器强制回退(RN 受控)。
+      expect(nativeFabricUIManager.dispatchCommand).toHaveBeenCalledWith(
+        expect.anything(), 'setNativeRefreshing', [false],
+      )
+    })
+
+    it('topRefresh + refreshing=true(已受控)→ 不强制回退', () => {
+      const doc = createDoc()
+      const rc = t(doc.createElement('RefreshControl'))
+      doc.body.appendChild(rc)
+      submitToRoot(t(doc.body))
+      const dispatch = fabricHandler()
+      const onRefresh = vi.fn()
+      rc.setAttribute('onRefresh', onRefresh)
+      rc.setAttribute('refreshing', true)
+      ;(nativeFabricUIManager.dispatchCommand as unknown as { mockClear: () => void }).mockClear()
+      dispatch({ stateNode: rc }, 'topRefresh', { target: rc[FABRIC_NODE_ID] })
+      expect(onRefresh).toHaveBeenCalledTimes(1)
+      expect(nativeFabricUIManager.dispatchCommand).not.toHaveBeenCalled()
+    })
+
+    function buildDrawer() {
+      const doc = createDoc()
+      const drawer = t(doc.createElement('DrawerLayoutAndroid'))
+      const nav = t(doc.createElement('View'))
+      const main = t(doc.createElement('View'))
+      drawer.appendChild(nav)
+      drawer.appendChild(main)
+      doc.body.appendChild(drawer)
+      submitToRoot(t(doc.body))
+      return { drawer, dispatch: fabricHandler() }
+    }
+
+    it('topDrawerOpen → onDrawerOpen + drawer pointerEvents auto', () => {
+      const { drawer, dispatch } = buildDrawer()
+      const onOpen = vi.fn()
+      drawer.setAttribute('onDrawerOpen', onOpen)
+      ;(nativeFabricUIManager.cloneNodeWithNewProps as unknown as { mockClear: () => void }).mockClear()
+      dispatch({ stateNode: drawer }, 'topDrawerOpen', { target: drawer[FABRIC_NODE_ID] })
+      expect(onOpen).toHaveBeenCalledTimes(1)
+      expect((drawer as unknown as { __RN_drawerOpened: boolean }).__RN_drawerOpened).toBe(true)
+      expect(nativeFabricUIManager.cloneNodeWithNewProps).toHaveBeenCalledWith(
+        expect.anything(), { pointerEvents: 'auto' },
+      )
+    })
+
+    it('topDrawerClose → onDrawerClose + pointerEvents none', () => {
+      const { drawer, dispatch } = buildDrawer()
+      const onClose = vi.fn()
+      drawer.setAttribute('onDrawerClose', onClose)
+      dispatch({ stateNode: drawer }, 'topDrawerOpen', { target: drawer[FABRIC_NODE_ID] })
+      ;(nativeFabricUIManager.cloneNodeWithNewProps as unknown as { mockClear: () => void }).mockClear()
+      dispatch({ stateNode: drawer }, 'topDrawerClose', { target: drawer[FABRIC_NODE_ID] })
+      expect(onClose).toHaveBeenCalledTimes(1)
+      expect((drawer as unknown as { __RN_drawerOpened: boolean }).__RN_drawerOpened).toBe(false)
+      expect(nativeFabricUIManager.cloneNodeWithNewProps).toHaveBeenCalledWith(
+        expect.anything(), { pointerEvents: 'none' },
+      )
+    })
+
+    it('topDrawerStateChanged → onDrawerStateChanged 字符串映射', () => {
+      const { drawer, dispatch } = buildDrawer()
+      const onState = vi.fn()
+      drawer.setAttribute('onDrawerStateChanged', onState)
+      dispatch({ stateNode: drawer }, 'topDrawerStateChanged', {
+        target: drawer[FABRIC_NODE_ID], drawerState: 1,
+      })
+      expect(onState).toHaveBeenCalledWith('Dragging')
+    })
+
+    it('topDrawerSlide → onDrawerSlide', () => {
+      const { drawer, dispatch } = buildDrawer()
+      const onSlide = vi.fn()
+      drawer.setAttribute('onDrawerSlide', onSlide)
+      dispatch({ stateNode: drawer }, 'topDrawerSlide', { target: drawer[FABRIC_NODE_ID], offset: 0.5 })
+      expect(onSlide).toHaveBeenCalledTimes(1)
+    })
+  })
+
   // ── Native-module event bridge (Modal onDismiss) ──
 
   describe('modalDismissed bridge', () => {
     it('routes modalDismissed to the matching Modal onDismiss', () => {
       const doc = createDoc()
-      const modal = doc.createElement('Modal')
+      const modal = t(doc.createElement('Modal'))
       doc.body.appendChild(modal)
-      doc.body._submitToRoot() // real mount path assigns the identifier
+      submitToRoot(t(doc.body)) // real mount path assigns the identifier
 
       const onDismiss = vi.fn()
       modal.setAttribute('onDismiss', onDismiss)
 
       // The renderer assigned an identifier when mounting the Modal.
-      const id = (modal as any).__modalID
+      const id = (modal as unknown as { __RN_modalID: number | null }).__RN_modalID
       expect(id).toBeGreaterThan(0)
 
       // Native emits modalDismissed with the matching modalID.
@@ -898,9 +1123,9 @@ describe('Event System', () => {
 
     it('ignores modalDismissed for unknown modalID', () => {
       const doc = createDoc()
-      const modal = doc.createElement('Modal')
+      const modal = t(doc.createElement('Modal'))
       doc.body.appendChild(modal)
-      doc.body._submitToRoot()
+      submitToRoot(t(doc.body))
 
       const onDismiss = vi.fn()
       modal.setAttribute('onDismiss', onDismiss)

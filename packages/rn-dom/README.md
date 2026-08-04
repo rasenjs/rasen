@@ -19,6 +19,9 @@
 - **Component auto-registration** — lazy Fabric view config loading via `ensure()` for all built-in RN components
 - **Custom components** — register any native RN component with `registerComponent()`
 
+> 📖 **RN 对齐记录** — 各内置标签与 React Native 0.86 的对齐状态、业务逻辑
+> 摘要、剩余差距见 [`docs/rn-alignment.md`](./docs/rn-alignment.md)。
+
 ---
 
 ## Installation

@@ -8,19 +8,57 @@
 
 import { vi } from 'vitest'
 
+/** Keyboard mock(ScrollView keyboardDismissMode 测试用)。 */
+const { mockKeyboard } = vi.hoisted(() => ({ mockKeyboard: { dismiss: vi.fn() } }))
+export { mockKeyboard }
+
+/** 类型化 globalThis 访问(替代 as any)。 */
+export const gGlobal = globalThis as unknown as {
+  __RASEN_INSTANCE_MAP__?: Map<number, unknown>
+  __RASEN_EVENT_HANDLER_REGISTERED__?: boolean
+  nativeFabricUIManager?: unknown
+}
+
+// RN 运行时 __DEV__ 是打包器注入的全局;Node 测试环境补上(RN Modal.js 等用)。
+;(globalThis as { __DEV__?: boolean }).__DEV__ = true
+
+/** Fabric mock 节点结构(替代 as any)。 */
+export interface MockFabricNode {
+  reactTag: number
+  viewName: string
+  rootTag: number
+  props: Record<string, unknown>
+  children: MockFabricNode[]
+  instanceHandle: object
+}
+
 // ── Mock react-native ─────────────────────────────────────────────────
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios', select: (s: Record<string, unknown>) => s.ios ?? s.default },
-  default: { Platform: { OS: 'ios', select: (s: Record<string, unknown>) => s.ios ?? s.default } },
+  I18nManager: { getConstants: () => ({ isRTL: false }) },
+  Keyboard: mockKeyboard,
+  default: {
+    Platform: { OS: 'ios', select: (s: Record<string, unknown>) => s.ios ?? s.default },
+    I18nManager: { getConstants: () => ({ isRTL: false }) },
+    Keyboard: mockKeyboard,
+  },
 }))
 
 // ── Mock react-native/Libraries/ReactPrivate/ReactNativePrivateInterface ──
 
+/** View config shape as read by the event system (bubbling/direct tables). */
+export interface MockViewConfig {
+  validAttributes: Record<string, unknown>
+  bubblingEventTypes?: Record<string, unknown>
+  directEventTypes?: Record<string, unknown>
+  [key: string]: unknown
+}
+
 const _viewConfigRegistry = (() => {
-  const configs = new Map<string, { validAttributes: Record<string, unknown> }>()
+  const configs = new Map<string, MockViewConfig>()
   return {
-    register: (name: string, cfg: { validAttributes: Record<string, unknown> }) => { configs.set(name, cfg) },
+    register: (name: string, cfg: MockViewConfig) => { configs.set(name, cfg) },
     get: (name: string) => { const c = configs.get(name); if (!c) throw new Error(`ViewConfig not found: ${name}`); return c },
   }
 })()
@@ -64,55 +102,40 @@ export function emitDeviceEvent(name: string, payload: unknown): void {
 // ── Mock @rasenjs/rn-dom/elements ─────────────────────────────────────
 
 vi.mock('@rasenjs/rn-dom/elements', () => {
-  const TAGS = ['View','SafeAreaView','Text','Image','TextInput','AndroidTextInput',
-    'ScrollView','AndroidHorizontalScrollView','ActivityIndicator',
-    'ProgressBarAndroid','Switch','AndroidSwitch','RefreshControl',
-    'AndroidSwipeRefreshLayout','Modal','DrawerLayoutAndroid','DebuggingOverlay']
+  // 只 mock ensure()(其 require('react-native/...') 无法在 vitest 运行)。
+  // tag 表从真实 elements.cjs 读取;__RN_normalizeProps 已迁移到主模块的节点类
+  // (src/elements/*),不再经过 elements mock。
+  const real = require('../../elements.cjs') as {
+    RN_BUILT_IN_TAGS: string[]
+  }
+  const TAGS = [...real.RN_BUILT_IN_TAGS]
   const ENSURE_MAP: Record<string, string> = {
     View: 'RCTView', Text: 'RCTText', Image: 'RCTImageView',
     ScrollView: 'RCTScrollView', Switch: 'RCTSwitch',
     SafeAreaView: 'RCTSafeAreaView', ActivityIndicator: 'RCTActivityIndicatorView',
     TextInput: 'RCTSinglelineTextInputView', Modal: 'ModalHostView',
-  }
-  // Must mirror the REAL elements.cjs normalization so payload assertions in
-  // tests gate the same behavior users get at runtime (gated by correctness).
-  const normalizeProps = (tagName: string, props: Record<string, unknown> | null | undefined, isAndroid?: boolean) => {
-    if (props == null) return props
-    if (tagName === 'Image') {
-      const source = props.source
-      if (source != null && typeof source === 'string') return { ...props, source: [{ uri: source }] }
-      if (source != null && typeof source === 'object' && !Array.isArray(source)) return { ...props, source: [source] }
-    }
-    if (tagName === 'ActivityIndicator' && isAndroid) {
-      const size = props.size
-      let sizeStyle: Record<string, number> | null = null
-      if (size === 'small') sizeStyle = { width: 20, height: 20 }
-      else if (size === 'large') sizeStyle = { width: 36, height: 36 }
-      else if (typeof size === 'number') sizeStyle = { width: size, height: size }
-      return {
-        ...props,
-        styleAttr: 'Normal',
-        indeterminate: true,
-        style: sizeStyle ? [props.style, sizeStyle] : props.style,
-      }
-    }
-    return props
+    Pressable: 'RCTView', TouchableOpacity: 'RCTView',
+    TouchableHighlight: 'RCTView', TouchableWithoutFeedback: 'RCTView',
+    TouchableNativeFeedback: 'RCTView',
+    ProgressBarAndroid: 'AndroidProgressBar',
+    RefreshControl: 'RCTRefreshControl', AndroidSwipeRefreshLayout: 'AndroidSwipeRefreshLayout',
+    DrawerLayoutAndroid: 'AndroidDrawerLayout',
+    InputAccessoryView: 'RCTInputAccessoryView',
   }
   return {
     RN_BUILT_IN_TAGS: TAGS,
     isRNBuiltIn: (tag: string) => TAGS.includes(tag),
     getAllTags: () => [...TAGS],
     isPlatformAmbiguous: (tag: string) => ['Switch', 'TextInput', 'ActivityIndicator'].includes(tag),
-    normalizeProps,
     ensure: (tagName: string) => ENSURE_MAP[tagName],
   }
 })
 
 // ── Fabric UIManager Mock ─────────────────────────────────────────────
 
-const roots = new Map<number, unknown[]>()
+const roots = new Map<number, MockFabricNode[]>()
 
-function dumpNode(node: any, indent: number): string {
+function dumpNode(node: MockFabricNode, indent: number): string {
   const sp = '  '.repeat(indent)
   let r = `${sp}${node.viewName} ${JSON.stringify(node.props)}`
   for (const c of node.children) r += '\n' + dumpNode(c, indent + 1)
@@ -125,7 +148,7 @@ const uim = {
     for (const [rt, cs] of roots) {
       if (r) r += '\n'
       r += `${rt}\n`
-      for (const c of cs as any[]) r += dumpNode(c, 1) + '\n'
+      for (const c of cs) r += dumpNode(c, 1) + '\n'
     }
     return r.trim()
   },
@@ -149,7 +172,7 @@ const uim = {
   findShadowNodeByTag_DEPRECATED: vi.fn(() => ({ _mock: true })), // truthy return
 }
 
-;(globalThis as any).nativeFabricUIManager = uim
+;(gGlobal).nativeFabricUIManager = uim
 
 // ── Pre-register common view configs ──────────────────────────────────
 
@@ -185,9 +208,27 @@ vc('RCTScrollView', { style: true })
 vc('RCTSwitch', { style: true })
 vc('RCTSafeAreaView', { style: true })
 vc('RCTSinglelineTextInputView', { style: true, text: true })
+vc('RCTMultilineTextInputView', { style: true, text: true })
+vc('RCTVirtualText', { style: true })
 vc('RCTActivityIndicatorView', { style: true, animating: true })
 vc('RCTRawText', { text: true })
 vc('ModalHostView', { style: true, identifier: true, visible: true })
+vc('AndroidProgressBar', { style: true, styleAttr: true, indeterminate: true, animating: true })
+vc('RCTRefreshControl', { style: true, refreshing: true, progressViewOffset: true }, {
+  direct: { topRefresh: { registrationName: 'onRefresh' } },
+})
+vc('AndroidSwipeRefreshLayout', { style: true, refreshing: true, enabled: true, size: true, progressViewOffset: true }, {
+  direct: { topRefresh: { registrationName: 'onRefresh' } },
+})
+vc('AndroidDrawerLayout', { style: true, drawerWidth: true, drawerPosition: true, drawerLockMode: true, drawerBackgroundColor: true, keyboardDismissMode: true }, {
+  direct: {
+    topDrawerSlide: { registrationName: 'onDrawerSlide' },
+    topDrawerOpen: { registrationName: 'onDrawerOpen' },
+    topDrawerClose: { registrationName: 'onDrawerClose' },
+    topDrawerStateChanged: { registrationName: 'onDrawerStateChanged' },
+  },
+})
+vc('RCTInputAccessoryView', { style: true })
 
 // ── Exports ───────────────────────────────────────────────────────────
 
@@ -202,7 +243,7 @@ export function resetFabricMocks(): void {
   deviceEmitterListeners.clear()
   // Reset event handler registration flag so _rnInitEventSystem
   // fires on next document creation
-  delete (globalThis as any).__RASEN_EVENT_HANDLER_REGISTERED__
+  delete gGlobal.__RASEN_EVENT_HANDLER_REGISTERED__
 }
 
 export const nativeFabricUIManager = uim

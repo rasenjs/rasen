@@ -4,15 +4,17 @@
  * This file is the single runtime entry for `@rasenjs/rn-dom/elements`.
  * Not processed by tsup — Metro statically traces all literal require() calls.
  *
- * It is the SINGLE home for per-component native adaptation:
- *  - tag → Fabric native name + lazy registration (ensure)
- *  - platform-ambiguous components (isPlatformAmbiguous)
- *  - component prop normalization replicating RN's JS-layer transforms
- *    (normalizeProps) — logic that lives OUTSIDE viewConfig.validAttributes.
+ * 职责(收缩后):
+ *  - RN_BUILT_IN_TAGS / getAllTags:tag 表(纯数据,Vue SFC transformer 用)
+ *  - isPlatformAmbiguous:平台二义组件
+ *  - ensure():tag → Fabric 原生名 + 懒 require 注册(副作用,Metro 静态追踪)
+ *
+ * 原 normalizeProps(RN JS 层 prop 转换)已迁移至主模块 src/elements/* ——
+ * 各标签节点类 override RNNode.normalizeProps()(见 src/elements/registry.ts)。
  *
  * At RUNTIME the require() calls inside ensure() only execute on first use
  * of each component. RN_BUILT_IN_TAGS / isRNBuiltIn / getAllTags /
- * isPlatformAmbiguous / normalizeProps are pure — no side effects.
+ * isPlatformAmbiguous are pure — no side effects.
  */
 
 'use strict'
@@ -32,6 +34,16 @@ var RN_BUILT_IN_TAGS = [
   'Modal',
   'DrawerLayoutAndroid',
   'DebuggingOverlay',
+  // Press-touchable tags are JS-only in RN (they render a View + Pressability);
+  // here they resolve to the plain RCTView and the press series is synthesized
+  // by rn-dom's event system (drivePress), matching RN's Pressable semantics.
+  'Pressable', 'TouchableOpacity', 'TouchableHighlight', 'TouchableWithoutFeedback',
+  // TouchableNativeFeedback:RN Android 走 TouchableNativeFeedback(ripple 需要
+  // 原生 drawable,rn-dom 不支持 ripple,作为 RCTView + press 合成;iOS 同
+  // TouchableOpacity)。
+  'TouchableNativeFeedback',
+  // InputAccessoryView:iOS 专属(RCTInputAccessoryView)。Android 渲染 null。
+  'InputAccessoryView',
 ]
 
 var TAG_SET = new Set(RN_BUILT_IN_TAGS)
@@ -61,63 +73,6 @@ var PLATFORM_AMBIGUOUS_TAGS = ['Switch', 'TextInput', 'ActivityIndicator']
 /** Check if a tag resolves to different native names per platform. */
 function isPlatformAmbiguous(tag) {
   return PLATFORM_AMBIGUOUS_TAGS.indexOf(tag) !== -1
-}
-
-// ── Component prop normalization (RN JS-layer transforms) ────────────
-
-/**
- * Normalize props before sending to Fabric, replicating the transforms RN's
- * JS-layer components (Image.android.js, Image.ios.js, ActivityIndicator.js,
- * …) apply in render() — logic that lives OUTSIDE viewConfig.validAttributes
- * and is therefore NOT covered by createAttributePayload/diffAttributePayloads.
- *
- * Returns a new props object only when a transform applies; otherwise returns
- * the input unchanged.
- *
- * @param {string} tagName
- * @param {Record<string, unknown>} props
- * @param {boolean} [isAndroid] - Platform hint (ActivityIndicator/TextInput
- *   etc. resolve to different native views per platform).
- * @returns {Record<string, unknown>}
- */
-function normalizeProps(tagName, props, isAndroid) {
-  if (props == null) return props
-  if (tagName === 'Image') {
-    // RN always sends Image source as an array `[{ uri, ... }]`:
-    //   - string (common misuse) → `[{ uri }]`
-    //   - object (e.g. `{ uri }`) → `[object]`
-    //   - array → kept as-is (already standard)
-    //   - number (require() asset id) / null → kept as-is
-    // Android Fabric's ImageViewManager expects a ReadableArray; passing a
-    // raw string/object throws a cast exception in native.
-    var source = props.source
-    if (source != null && typeof source === 'string') {
-      return Object.assign({}, props, { source: [{ uri: source }] })
-    }
-    if (source != null && typeof source === 'object' && !Array.isArray(source)) {
-      return Object.assign({}, props, { source: [source] })
-    }
-  }
-  if (tagName === 'ActivityIndicator' && isAndroid) {
-    // RN's ActivityIndicator renders ProgressBarAndroid on Android and ALWAYS
-    // injects `styleAttr: 'Normal'` + `indeterminate: true` (ActivityIndicator.js
-    // androidProps), plus an EXPLICIT size style (sizeSmall 20x20 / sizeLarge
-    // 36x36 / number → NxN). The explicit size matters: without it, Yoga calls
-    // the native intrinsic measure, and RN 0.86's ReactProgressBarViewManager.
-    // measure does a non-null assertion on localData → NPE when localData is
-    // null (before mount). With fixed dimensions Yoga never intrinsic-measures.
-    var size = props.size
-    var sizeStyle = null
-    if (size === 'small') sizeStyle = { width: 20, height: 20 }
-    else if (size === 'large') sizeStyle = { width: 36, height: 36 }
-    else if (typeof size === 'number') sizeStyle = { width: size, height: size }
-    return Object.assign({}, props, {
-      styleAttr: 'Normal',
-      indeterminate: true,
-      style: sizeStyle ? [props.style, sizeStyle] : props.style,
-    })
-  }
-  return props
 }
 
 // ── Lazy Fabric View Config Registration ─────────────────────────────
@@ -186,11 +141,21 @@ function ensure(tagName, isAndroid) {
       // codegen: 'RCTSafeAreaView' → registered as RCTSafeAreaView
       return 'RCTSafeAreaView'
     case 'AndroidHorizontalScrollView':
-      require('react-native/Libraries/Components/ScrollView/AndroidHorizontalScrollContentViewNativeComponent')
-      return 'AndroidHorizontalScrollContentView'
+      require('react-native/Libraries/Components/ScrollView/AndroidHorizontalScrollViewNativeComponent')
+      return 'AndroidHorizontalScrollView'
     case 'AndroidSwitch':
       require('react-native/Libraries/Components/Switch/AndroidSwitchNativeComponent')
       return 'AndroidSwitch'
+    // Press-touchable components render a plain View in RN (Pressable →
+    // <View collapsable={false}> + Pressability). Press synthesis lives in
+    // rn-dom's event system, so the native host is just RCTView.
+    case 'Pressable':
+    case 'TouchableOpacity':
+    case 'TouchableHighlight':
+    case 'TouchableWithoutFeedback':
+    case 'TouchableNativeFeedback':
+      require('react-native/Libraries/Components/View/ViewNativeComponent')
+      return 'RCTView'
     case 'RefreshControl':
       require('react-native/Libraries/Components/RefreshControl/PullToRefreshViewNativeComponent')
       // codegen: 'PullToRefreshView' with paperComponentName 'RCTRefreshControl' → RCTRefreshControl
@@ -201,12 +166,20 @@ function ensure(tagName, isAndroid) {
     case 'Modal':
     case 'RCTModalHostView':
       require('react-native/Libraries/Modal/RCTModalHostViewNativeComponent')
-      // codegen: 'RCTModalHostView' → registered as RCTModalHostView
+      // JS viewConfigRegistry 注册名是 'RCTModalHostView'(requireNativeComponent
+      // 用 paper 名);但 Fabric createNode 需要 C++ registry 名 'ModalHostView'
+      // (codegen 名)。因此这里返回 viewConfig 名,RNModalElement 的
+      // __RN_resolveNativeName() hook 再映射成 'ModalHostView'。
       return 'RCTModalHostView'
     case 'DrawerLayoutAndroid':
       require('react-native/Libraries/Components/DrawerAndroid/AndroidDrawerLayoutNativeComponent')
       return 'AndroidDrawerLayout'
+    case 'InputAccessoryView':
+      // iOS 专属;Android 下 RN 渲染 null(无 ViewManager)。
+      if (isAndroid) return undefined
+      require('react-native/Libraries/Components/TextInput/RCTInputAccessoryViewNativeComponent')
+      return 'RCTInputAccessoryView'
   }
 }
 
-module.exports = { ensure, normalizeProps, isPlatformAmbiguous, RN_BUILT_IN_TAGS, isRNBuiltIn, getAllTags }
+module.exports = { ensure, isPlatformAmbiguous, RN_BUILT_IN_TAGS, isRNBuiltIn, getAllTags }

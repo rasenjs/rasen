@@ -5,10 +5,14 @@
  * tree traversal, textContent, cloneNode, and style operations.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Platform } from 'react-native'
 import { RNDocument, resetTagCounter, type RNNode } from '../index'
-import { resetFabricMocks } from './setup'
+import { resetFabricMocks, nativeFabricUIManager } from './setup'
+import { type RNDomInternalNode } from '../node'
+import { hasPropsChanged } from '../internal'
+
+const internal = <T,>(node: T): RNDomInternalNode => node as unknown as RNDomInternalNode
 
 function createDoc(rootTag = 1): RNDocument {
   RNDocument.reset()
@@ -44,20 +48,19 @@ describe('RNNode', () => {
       expect(el.hasAttribute('foo')).toBe(false)
     })
 
-    it('stores in currentProps', () => {
+    it('stores in __RN_currentProps', () => {
       const doc = createDoc()
       const el = doc.createElement('View')
       el.setAttribute('onTouchEnd', vi.fn())
-      expect(typeof el.currentProps.onTouchEnd).toBe('function')
+      expect(typeof internal(el).__RN_currentProps.onTouchEnd).toBe('function')
     })
 
     it('marks dirty only when mounted', () => {
       const doc = createDoc()
       const el = doc.createElement('View')
-      const spy = vi.spyOn(el as any, '_markDirty')
       el.setAttribute('foo', 'bar')
-      expect(spy).not.toHaveBeenCalled() // not mounted yet
-      spy.mockRestore()
+      // 未挂载:仅更新 __RN_currentProps,不标记 dirty(节点不可扩展,不能 spy 实例方法)。
+      expect(internal(el).__RN_propsDirty).toBe(false)
     })
   })
 
@@ -244,7 +247,7 @@ describe('RNNode', () => {
       p.appendChild(doc.createElement('Text'))
       p.textContent = 'new text'
       expect(p.childNodes).toHaveLength(1)
-      expect((p.childNodes[0] as any).textContent).toBe('new text')
+      expect((p.childNodes[0] as RNNode).textContent).toBe('new text')
     })
 
     it('clears children when set to empty string', () => {
@@ -312,7 +315,7 @@ describe('RNNode', () => {
       const doc = createDoc()
       const el = doc.createElement('View')
       el.style.setProperty('color', 'red')
-      expect(el.currentProps.style).toEqual({ color: 'red' })
+      expect(internal(el).__RN_currentProps.style).toEqual({ color: 'red' })
     })
 
     it('removeProperty deletes style', () => {
@@ -320,7 +323,7 @@ describe('RNNode', () => {
       const el = doc.createElement('View')
       el.style.setProperty('color', 'red')
       el.style.removeProperty('color')
-      expect(el.currentProps.style).toEqual({})
+      expect(internal(el).__RN_currentProps.style).toEqual({})
     })
 
     it('getPropertyValue returns style value', () => {
@@ -373,8 +376,8 @@ describe('RNNode', () => {
       const fn = vi.fn()
       el.addEventListener('click', fn, { capture: true })
       // capture listeners are stored under __capture_{type} key
-      expect(el._listeners!.get('__capture_click')).toBeTruthy()
-      expect(el._listeners!.get('__capture_click')!.has(fn)).toBe(true)
+      expect(internal(el).__RN_listeners!.get('__capture_click')).toBeTruthy()
+      expect(internal(el).__RN_listeners!.get('__capture_click')!.has(fn)).toBe(true)
     })
 
     it('defaultPrevented works with cancelable event', () => {
@@ -394,26 +397,26 @@ describe('RNNode', () => {
     it('starts clean', () => {
       const doc = createDoc()
       const el = doc.createElement('View')
-      expect(el._propsDirty).toBe(false)
-      expect(el._childrenDirty).toBe(false)
-      expect(el._hasPropsChanged()).toBe(false)
+      expect(internal(el).__RN_propsDirty).toBe(false)
+      expect(internal(el).__RN_childrenDirty).toBe(false)
+      expect(hasPropsChanged(internal(el))).toBe(false)
     })
 
     it('setAttribute on mounted node marks props dirty', () => {
       const doc = createDoc()
       const el = doc.createElement('View')
-      el._mounted = true
+      internal(el).__RN_mounted = true
       el.setAttribute('foo', 'bar')
-      expect(el._propsDirty).toBe(true)
-      expect(el._dirtyPropsCount).toBeGreaterThan(0)
+      expect(internal(el).__RN_propsDirty).toBe(true)
+      expect(internal(el).__RN_dirtyPropsCount).toBeGreaterThan(0)
     })
 
     it('appendChild on mounted node marks children dirty', () => {
       const doc = createDoc()
       const el = doc.createElement('View')
-      el._mounted = true
+      internal(el).__RN_mounted = true
       el.appendChild(doc.createElement('Text'))
-      expect(el._childrenDirty).toBe(true)
+      expect(internal(el).__RN_childrenDirty).toBe(true)
     })
 
     it('removeChild on mounted node marks children dirty', () => {
@@ -421,10 +424,10 @@ describe('RNNode', () => {
       const el = doc.createElement('View')
       const c = doc.createElement('Text')
       el.appendChild(c)
-      el._mounted = true
-      el._childrenDirty = false
+      internal(el).__RN_mounted = true
+      internal(el).__RN_childrenDirty = false
       el.removeChild(c)
-      expect(el._childrenDirty).toBe(true)
+      expect(internal(el).__RN_childrenDirty).toBe(true)
     })
 
     it('textContent setter adds single text node', () => {
@@ -519,7 +522,7 @@ describe('RNNode', () => {
       p.appendChild(doc.createTextNode('World'))
       p.normalize()
       expect(p.childNodes).toHaveLength(1)
-      expect((p.childNodes[0] as any).textContent).toBe('Hello World')
+      expect((p.childNodes[0] as RNNode).textContent).toBe('Hello World')
     })
   })
 
@@ -628,7 +631,7 @@ describe('RNNode', () => {
       img.setAttribute('source', 'https://example.com/a.png')
       doc.body.appendChild(img)
       await Promise.resolve()
-      const call = nativeFabricUIManager.createNode.mock.calls.at(-1)
+      const call = nativeFabricUIManager.createNode.mock.calls.at(-1)!
       expect(call[3].source).toEqual([{ uri: 'https://example.com/a.png' }])
     })
 
@@ -639,7 +642,7 @@ describe('RNNode', () => {
       img.setAttribute('source', arr)
       doc.body.appendChild(img)
       await Promise.resolve()
-      const call = nativeFabricUIManager.createNode.mock.calls.at(-1)
+      const call = nativeFabricUIManager.createNode.mock.calls.at(-1)!
       expect(call[3].source).toBe(arr)
     })
 
@@ -649,17 +652,17 @@ describe('RNNode', () => {
       img.setAttribute('source', { uri: 'https://example.com/b.png' })
       doc.body.appendChild(img)
       await Promise.resolve()
-      const call = nativeFabricUIManager.createNode.mock.calls.at(-1)
+      const call = nativeFabricUIManager.createNode.mock.calls.at(-1)!
       expect(call[3].source).toEqual([{ uri: 'https://example.com/b.png' }])
     })
   })
 
-  // ── normalizeProps: RN JS-layer transforms ─────────────────────
+  // ── __RN_normalizeProps: RN JS-layer transforms ─────────────────────
 
-  describe('normalizeProps (RN JS-layer transforms)', () => {
-    it('injects Android ActivityIndicator styleAttr/indeterminate + size style', async () => {
+  describe('__RN_normalizeProps (RN JS-layer transforms)', () => {
+    it('ActivityIndicator renders container View + inner spinner (Android)', async () => {
       // Platform.OS is 'ios' by default in the react-native mock; flip it to
-      // android so prepareFabricProps passes isAndroid to normalizeProps.
+      // android so the element resolves to container + AndroidProgressBar.
       const prev = Platform.OS
       Platform.OS = 'android'
       try {
@@ -669,11 +672,17 @@ describe('RNNode', () => {
         ai.setAttribute('size', 'small')
         doc.body.appendChild(ai)
         await Promise.resolve()
-        const call = nativeFabricUIManager.createNode.mock.calls.at(-1)
-        expect(call[3].styleAttr).toBe('Normal')
-        expect(call[3].indeterminate).toBe(true)
-        // Explicit size avoids Yoga intrinsic measure → RN ProgressBar NPE.
-        expect(call[3].style).toEqual([undefined, { width: 20, height: 20 }])
+        const calls = nativeFabricUIManager.createNode.mock.calls
+        // 元素自身 = 外层容器 View(RCTView),承接用户 style/居中。
+        const container = calls.at(-2)!
+        expect(container[1]).toBe('RCTView')
+        // 内层 spinner = AndroidProgressBar,带 styleAttr/indeterminate/sizeStyle。
+        const spinner = calls.at(-1)!
+        expect(spinner[1]).toBe('AndroidProgressBar')
+        expect(spinner[3].styleAttr).toBe('Normal')
+        expect(spinner[3].indeterminate).toBe(true)
+        // 显式尺寸避免 Yoga 调原生 intrinsic measure → RN ProgressBar NPE。
+        expect(spinner[3].style).toEqual([{ width: 20, height: 20 }])
       } finally {
         Platform.OS = prev
       }

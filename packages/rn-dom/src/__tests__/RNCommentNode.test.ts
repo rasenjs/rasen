@@ -5,9 +5,13 @@
  * each/when/match markers.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { RNDocument, resetTagCounter } from '../index'
-import { resetFabricMocks, nativeFabricUIManager } from './setup'
+import { resetFabricMocks, gGlobal } from './setup'
+import { FABRIC_NODE, FABRIC_NODE_ID, type RNDomInternalNode } from '../node'
+import { getFabricNode } from '../internal'
+
+const internal = <T,>(node: T): RNDomInternalNode => node as unknown as RNDomInternalNode
 
 function createDoc(): RNDocument {
   RNDocument.reset()
@@ -33,14 +37,14 @@ describe('RNCommentNode', () => {
     it('has no Fabric backing node', () => {
       const doc = createDoc()
       const c = doc.createComment('x')
-      expect(c[Symbol.for('fabricNode')]).toBeNull()
-      expect(c[Symbol.for('fabricNodeId')]).toBe(-1)
+      expect(internal(c)[FABRIC_NODE]).toBeNull()
+      expect(internal(c)[FABRIC_NODE_ID]).toBe(-1)
     })
 
-    it('is skipped by _getFabricNode (returns null)', () => {
+    it('is skipped by __RN_getFabricNode (returns null)', () => {
       const doc = createDoc()
       const c = doc.createComment('x')
-      const result = doc.body._getFabricNode(c)
+      const result = getFabricNode(internal(doc.body), c)
       expect(result).toBeNull()
     })
   })
@@ -106,8 +110,8 @@ describe('RNCommentNode', () => {
       const c = doc.createComment('x')
       p.appendChild(c)
       // Comment nodes are not registered (nodeType 8 skip)
-      const map = (globalThis as any).__RASEN_INSTANCE_MAP__
-      expect(map.has(c[Symbol.for('fabricNodeId')])).toBe(false)
+      const map = gGlobal.__RASEN_INSTANCE_MAP__!
+      expect(map.has(internal(c)[FABRIC_NODE_ID])).toBe(false)
     })
   })
 })

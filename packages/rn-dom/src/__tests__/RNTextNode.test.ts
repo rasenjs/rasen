@@ -5,7 +5,7 @@
  * and node traversal (sibling properties).
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { RNDocument, resetTagCounter } from '../index'
 import { resetFabricMocks, nativeFabricUIManager } from './setup'
 
