@@ -87,6 +87,8 @@ export class RNActivityIndicatorElement extends RNNode {
       size: resolvedSize,
     }
     if (Platform.OS === 'ios' && color !== undefined) payload.color = color
+    // RN ActivityIndicator.js:iOS 未设 color 时无条件注入 '#999999'。
+    else if (Platform.OS === 'ios') payload.color = '#999999'
     if (Platform.OS === 'android') {
       payload.styleAttr = 'Normal'
       payload.indeterminate = true

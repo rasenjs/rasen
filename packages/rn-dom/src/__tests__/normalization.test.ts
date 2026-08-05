@@ -230,9 +230,16 @@ describe('__RN_normalizeProps — Switch (Switch.js)', () => {
     expect(out.accessibilityState).toEqual({ disabled: true, selected: true })
   })
 
-  it('android:disabled 回退 + accessibilityState 重写为 { disabled }', () => {
+  it('android:disabled 回退 + accessibilityState 保留用户字段(RN merge)', () => {
+    // 用户 state.disabled=true 与 disabled 未显式 → 原样保留(不整体替换)。
     const out = withAndroid(() => normalize('Switch', { accessibilityState: { disabled: true } }))
     expect(out.accessibilityState).toEqual({ disabled: true })
+    // 显式 disabled 与用户 state 不同步 → merge 修正,保留其他字段。
+    const out2 = withAndroid(() => normalize('Switch', { disabled: true, accessibilityState: { selected: true } }))
+    expect(out2.accessibilityState).toEqual({ disabled: true, selected: true })
+    // enabled 也回退 accessibilityState.disabled。
+    const out3 = withAndroid(() => normalize('Switch', { accessibilityState: { disabled: true } }))
+    expect(out3.enabled).toBe(false)
   })
 })
 
@@ -276,7 +283,18 @@ describe('__RN_normalizeProps — Image (Image.android.js / Image.ios.js)', () =
 
   it('srcSet splits into scale array (ImageSourceUtils)', () => {
     const out = normalize('Image', { srcSet: 'a.png 1x, b.png 2x' })
-    expect(out.source).toEqual([{ uri: 'a.png', scale: '1x' }, { uri: 'b.png', scale: '2x' }])
+    expect(out.source).toEqual([
+      { uri: 'a.png', scale: 1, headers: {} },
+      { uri: 'b.png', scale: 2, headers: {} },
+    ])
+  })
+
+  it('srcSet 无 1x 档时用 src 兜底(ImageSourceUtils)', () => {
+    const out = normalize('Image', { srcSet: 'b.png 2x', src: 'a.png' })
+    expect(out.source).toEqual([
+      { uri: 'a.png', scale: 1, headers: {} },
+      { uri: 'b.png', scale: 2, headers: {} },
+    ])
   })
 
   it('src → { uri } array', () => {
@@ -303,10 +321,11 @@ describe('__RN_normalizeProps — Image (Image.android.js / Image.ios.js)', () =
     expect(viaAcc.accessibilityLabel).toBe('desc')
   })
 
-  it('aria: aria-hidden → accessible=false, label 清除', () => {
+  it('aria: aria-hidden → accessible=false,label 保留(iOS)', () => {
     const out = normalize('Image', { 'aria-hidden': true, alt: 'desc' })
     expect(out.accessible).toBe(false)
-    expect(out.accessibilityLabel).toBeUndefined()
+    // iOS aria-hidden 保留 label(RN Image.ios.js:accessible=false 已隐藏)。
+    expect(out.accessibilityLabel).toBe('desc')
   })
 
   it('aria: android aria-hidden → importantForAccessibility no-hide-descendants', () => {
@@ -336,10 +355,14 @@ describe('__RN_normalizeProps — Text / Modal / ScrollView (Text.js / Modal.js 
     expect(normalize('Text', { allowFontScaling: false }).allowFontScaling).toBe(false)
   })
 
-  it('Text: fontWeight number → string', () => {
+  it('Text: fontWeight number → string (overflow:hidden 前缀在首)', () => {
     const out = normalize('Text', { style: { fontWeight: 700 } })
-    // Override is appended after the original style (last wins in Fabric).
-    expect(out.style).toEqual([{ fontWeight: 700 }, { fontWeight: '700' }])
+    // RN Text.js styles.default = {overflow:'hidden'} 默认注入在前,override 在末。
+    expect(out.style).toEqual([{ overflow: 'hidden' }, { fontWeight: 700 }, { fontWeight: '700' }])
+  })
+
+  it('Text: 默认注入 overflow:hidden (defaultTextToOverflowHidden=true)', () => {
+    expect(normalize('Text', {}).style).toEqual([{ overflow: 'hidden' }])
   })
 
   it('Text: accessible ios 默认 true;android 无按压默认 false (Text.js)', () => {
@@ -488,20 +511,23 @@ describe('Mount path (RNNode → Fabric)', () => {
     expect((container![3].style as unknown[])[1]).toEqual({ padding: 8 })
   })
 
-  it('Text selectable=true → iOS RCTSelectableText', () => {
+  it('Text selectable=true → iOS 默认 RCTText(enablePreparedTextLayout=false)', () => {
     const doc = createDoc()
     const t = doc.createElement('Text')
     t.setAttribute('selectable', true)
     getFabricNode(internal(doc.body), t);
-    expect(lastCreateNodeCall().viewName).toBe('RCTSelectableText')
+    // RN TextNativeComponent.js:NativeSelectableText = enablePreparedTextLayout()
+    // ? RCTSelectableText : NativeText。默认 false → RCTText(否则 iOS
+    // SelectableParagraph 未注册 → UnimplementedView 空视图)。
+    expect(lastCreateNodeCall().viewName).toBe('RCTText')
   })
 
-  it('Text with userSelect style → RCTSelectableText', () => {
+  it('Text with userSelect style → iOS 默认 RCTText(同 gating)', () => {
     const doc = createDoc()
     const t = doc.createElement('Text')
     t.setAttribute('style', { userSelect: 'text' })
     getFabricNode(internal(doc.body), t);
-    expect(lastCreateNodeCall().viewName).toBe('RCTSelectableText')
+    expect(lastCreateNodeCall().viewName).toBe('RCTText')
   })
 
   it('Modal children 直接挂 ModalHostView(无容器包装,RootNodeKind 子树容器 style 不生效)', () => {

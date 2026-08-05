@@ -25,6 +25,14 @@ const OBJECT_FIT_TO_RESIZE_MODE: Record<string, string> = {
   none: 'none',
 }
 
+/** crossOrigin / referrerPolicy → source headers(RN ImageSourceUtils.js)。 */
+function ImageHeaders(props: Record<string, unknown>): Record<string, string> {
+  const headers: Record<string, string> = {}
+  if (props.crossOrigin === 'use-credentials') headers['Access-Control-Allow-Credentials'] = 'true'
+  if (typeof props.referrerPolicy === 'string') headers['Referrer-Policy'] = props.referrerPolicy
+  return headers
+}
+
 export class RNImageElement extends RNNode {
   /**
    * @internal - RN: <Image> 不允许 children(对齐 Image.android.js / ios.js,
@@ -47,14 +55,31 @@ export class RNImageElement extends RNNode {
     // source 解析(对齐 RN ImageSourceUtils.getImageSourcesFromImageProps):
     // 优先级 srcSet > src > source(字符串/对象统一转数组);crossOrigin /
     // referrerPolicy 组装成 source 上的 headers。
+    // srcSet scale 为数字(RN parseInt('2x') → 2),非字符串;srcSet 无 1x 档时
+    // 用 src 兜底({uri:src, scale:1, headers})。
     let source = props.source
     const src = props.src
     const srcSet = props.srcSet
     if (typeof srcSet === 'string') {
-      source = srcSet.split(', ').map((entry) => {
-        const [uri, scale] = entry.split(' ')
-        return scale ? { uri, scale } : { uri }
-      })
+      const headers = ImageHeaders(props)
+      const srcList: Record<string, unknown>[] = []
+      let shouldUseSrcForDefaultScale = true
+      for (const entry of srcSet.split(', ')) {
+        const [uri, xScale = '1x'] = entry.split(' ')
+        if (!xScale.endsWith('x')) {
+          // RN warn:scale 格式不支持
+          // eslint-disable-next-line no-console
+          console.warn('The provided format for scale is not supported yet. Please use scales like 1x, 2x, etc.')
+        } else {
+          const scale = parseInt(xScale.slice(0, -1), 10)
+          if (scale === 1) shouldUseSrcForDefaultScale = false
+          srcList.push({ uri, scale, headers })
+        }
+      }
+      if (shouldUseSrcForDefaultScale && typeof src === 'string') {
+        srcList.unshift({ uri: src, scale: 1, headers })
+      }
+      source = srcList
     } else if (typeof src === 'string') {
       source = [{ uri: src }]
     } else if (source != null && typeof source === 'string') {
@@ -63,15 +88,11 @@ export class RNImageElement extends RNNode {
       source = [source]
     }
     // crossOrigin / referrerPolicy → source headers(RN ImageSourceUtils.js)。
-    if (props.crossOrigin === 'use-credentials' || typeof props.referrerPolicy === 'string') {
-      const headers: Record<string, string> = {}
-      if (props.crossOrigin === 'use-credentials') headers['Access-Control-Allow-Credentials'] = 'true'
-      if (typeof props.referrerPolicy === 'string') headers['Referrer-Policy'] = props.referrerPolicy
-      if (Array.isArray(source)) {
-        source = source.map((s) =>
-          s && typeof s === 'object' ? { ...(s as Record<string, unknown>), headers } : s,
-        )
-      }
+    const headers = ImageHeaders(props)
+    if (Object.keys(headers).length > 0 && Array.isArray(source)) {
+      source = source.map((s) =>
+        s && typeof s === 'object' ? { ...(s as Record<string, unknown>), headers } : s,
+      )
     }
 
     const imageStyle = flatStyle(props.style)
@@ -143,14 +164,18 @@ export class RNImageElement extends RNNode {
         'Please use either one or the other.',
       )
     }
-    // Image aria(alt 优先级链 alt ?? aria-label ?? accessibilityLabel;
-    // aria-hidden 时无 label;iOS/Android 统一)。通用 applyAria 之后应用,
-    // 以 alt 链覆盖通用 aria-label 映射。
+    // Image aria(对齐 RN Image.android.js / Image.ios.js):
+    //   label = aria-label ?? accessibilityLabel(aria 优先,alt 兜底)
+    //   Android:aria-hidden → importantForAccessibility='no-hide-descendants'
+    //            (不清 label);iOS:aria-hidden → accessible=false(保留 label)
+    // 通用 applyAria 之后应用,以本链覆盖。
     const result = applyAria(next)
-    const alt = props.alt ?? props['aria-label'] ?? props.accessibilityLabel
+    const label = props['aria-label'] ?? props.accessibilityLabel
+    const alt = props.alt
     const ariaHidden = props['aria-hidden']
-    result.accessibilityLabel = ariaHidden ? undefined : alt
-    result.accessible = ariaHidden ? false : (alt != null ? true : props.accessible)
+    result.accessibilityLabel =
+      ariaHidden === true ? (Platform.OS === 'android' ? label : (label ?? alt)) : (label ?? alt)
+    result.accessible = ariaHidden === true ? false : (result.accessibilityLabel != null ? true : props.accessible)
     if (Platform.OS === 'android' && ariaHidden === true) {
       result.importantForAccessibility = 'no-hide-descendants'
     }

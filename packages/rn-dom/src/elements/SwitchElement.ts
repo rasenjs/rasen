@@ -54,15 +54,21 @@ export class RNSwitchElement extends RNNode {
       delete next.onTintColor
       delete next.tintColor
       next.on = on
-      next.enabled = props.disabled !== true
+      // enabled 来源:_disabled = disabled ?? accessibilityState.disabled(RN)。
+      next.enabled = disabled !== true
       next.thumbTintColor = props.thumbColor !== undefined ? props.thumbColor : props.thumbTintColor
       next.trackColorForFalse = trackColorForFalse !== undefined ? trackColorForFalse : props.trackColorForFalse
       next.trackColorForTrue = trackColorForTrue !== undefined ? trackColorForTrue : props.trackColorForTrue
       next.trackTintColor = on
         ? (trackColorForTrue !== undefined ? trackColorForTrue : props.trackColorForTrue)
         : (trackColorForFalse !== undefined ? trackColorForFalse : props.trackColorForFalse)
-      // _disabled 回退 + accessibilityState 重写(RN Switch.js Android 分支)。
-      next.accessibilityState = disabled == null ? null : { disabled }
+      // _accessibilityState:仅当 disabled 与用户 state 不同步时 merge 修正
+      // (保留 checked/busy/expanded/selected 等用户字段,RN Switch.js Android)。
+      const userState = props.accessibilityState as Record<string, unknown> | undefined
+      next.accessibilityState =
+        props.disabled == null || userState?.disabled === props.disabled
+          ? props.accessibilityState
+          : { ...userState, disabled: props.disabled }
       return applyAria(next)
     }
 

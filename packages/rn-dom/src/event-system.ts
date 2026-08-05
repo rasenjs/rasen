@@ -371,11 +371,13 @@ function isTouchWithinRect(
 
   const props = node.__RN_currentProps
   const hitSlop = props.hitSlop as Record<string, number> | undefined
-  // pressRectOffset may be a number (applied to all sides) or an Insets
-  // object, like RN Pressability.
-  const rawOffset = typeof props.pressRectOffset === 'number'
-    ? { bottom: props.pressRectOffset, left: props.pressRectOffset, right: props.pressRectOffset, top: props.pressRectOffset }
-    : (props.pressRectOffset as Record<string, number> | null | undefined) ?? {}
+  // pressRectOffset:rn-dom 内部 prop(兼容数字/Insets)。用户侧 RN 语义是
+  // pressRetentionOffset(Pressable)/pressRectOffset(Touchable)——两者等价。
+  // 这里同时读两个,用户传 pressRetentionOffset 也生效。
+  const rawUser = props.pressRetentionOffset ?? props.pressRectOffset
+  const rawOffset = typeof rawUser === 'number'
+    ? { bottom: rawUser, left: rawUser, right: rawUser, top: rawUser }
+    : (rawUser as Record<string, number> | null | undefined) ?? {}
   const offset = {
     bottom: rawOffset.bottom ?? DEFAULT_PRESS_RECT_OFFSETS.bottom,
     left: rawOffset.left ?? DEFAULT_PRESS_RECT_OFFSETS.left,

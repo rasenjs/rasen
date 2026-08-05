@@ -10,24 +10,43 @@
 
 import { Platform } from 'react-native'
 import { RNNode } from '../node'
-import { flatStyle, appendStyleOverride, VERTICAL_ALIGN_MAP, USER_SELECT_TO_SELECTABLE, applyAria } from './shared'
+import { flatStyle, appendStyleOverride, appendStylePrefix, VERTICAL_ALIGN_MAP, USER_SELECT_TO_SELECTABLE, applyAria } from './shared'
+// RN feature flags:selectable Text 是否走 RCTSelectableText(默认 false → RCTText),
+// overflow:hidden 是否默认注入(默认 true)。对齐 RN Text.js + TextNativeComponent.js。
+// RN 源码是 Flow,测试环境(esbuild)无法解析 → try-catch + 默认值兜底。
+function rnFlag(name: string, fallback: boolean): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const flags = require('react-native/src/private/featureflags/ReactNativeFeatureFlags') as Record<string, () => boolean>
+    const fn = flags[name]
+    return typeof fn === 'function' ? fn() : fallback
+  } catch { return fallback }
+}
+const enablePreparedTextLayout = () => rnFlag('enablePreparedTextLayout', false)
+const defaultTextToOverflowHidden = () => rnFlag('defaultTextToOverflowHidden', true)
 
 export class RNTextElement extends RNNode {
   /**
    * @internal - iOS 原生名按 props/ancestry 拆分(对齐 RN Text.js):
    *  - 嵌套在 Text 内 → RCTVirtualText
    *  - selectable=true(prop 或 style.userSelect)→ RCTSelectableText
+   *    仅当 enablePreparedTextLayout()(默认 false):RN TextNativeComponent.js
+   *    NativeSelectableText = enablePreparedTextLayout() ? RCTSelectableText
+   *    : NativeText。默认走 RCTText,否则 C++ 映射 SelectableParagraph 在
+   *    iOS 未注册 → UnimplementedView 空视图。
    * Android 无这些原生名,回退 RCTText(selectable 走 prop)。
    */
   __RN_resolveNativeName(): string | null {
     if (Platform.OS !== 'ios') return null
     if (this.parentNode?.tagName === 'Text') return 'RCTVirtualText'
     // selectable:prop 或 style.userSelect(auto/text/all → true)。
-    if (this.__RN_currentProps.selectable === true) return 'RCTSelectableText'
-    const style = flatStyle(this.__RN_currentProps.style)
-    if (style && style.userSelect != null && USER_SELECT_TO_SELECTABLE[style.userSelect as string] === true) {
-      return 'RCTSelectableText'
-    }
+    const selectable =
+      this.__RN_currentProps.selectable === true ||
+      (() => {
+        const style = flatStyle(this.__RN_currentProps.style)
+        return style != null && style.userSelect != null && USER_SELECT_TO_SELECTABLE[style.userSelect as string] === true
+      })()
+    if (selectable && enablePreparedTextLayout()) return 'RCTSelectableText'
     return null
   }
 
@@ -40,6 +59,11 @@ export class RNTextElement extends RNNode {
         ellipsizeMode: props.ellipsizeMode === undefined ? 'tail' : props.ellipsizeMode,
         allowFontScaling: props.allowFontScaling !== false,
       }
+    }
+    // RN Text.js styles.default = { overflow: 'hidden' } 默认注入
+    // (defaultTextToOverflowHidden() 默认 true)。
+    if (defaultTextToOverflowHidden()) {
+      tNext = { ...tNext, style: appendStylePrefix(tNext.style, { overflow: 'hidden' }) }
     }
     // Style transforms (RN Text.js).
     const textStyle = flatStyle(props.style)
