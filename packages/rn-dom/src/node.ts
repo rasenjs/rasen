@@ -106,7 +106,7 @@ export interface InstanceHandle {
  * Lightweight DOMTokenList implementation backed by a Set.
  * Used by RNNode.classList.
  */
-class RASENTokenList {
+class RNDomTokenList {
   _tokens: Set<string>
   _onChange: () => void
 
@@ -169,7 +169,7 @@ class RASENTokenList {
     return this._tokens[Symbol.iterator]()
   }
 
-  forEach(fn: (value: string, key: number, parent: RASENTokenList) => void): void {
+  forEach(fn: (value: string, key: number, parent: RNDomTokenList) => void): void {
     let i = 0
     for (const t of this._tokens) fn(t, i++, this)
   }
@@ -177,6 +177,67 @@ class RASENTokenList {
   [Symbol.iterator](): IterableIterator<string> {
     return this._tokens[Symbol.iterator]()
   }
+}
+
+// ── Dataset (DOMStringMap) ─────────────────────────────────────────────
+const DATA_ATTR_PREFIX = 'data-'
+
+/** `data-foo-bar` → `fooBar`(dataset key);非 data-* 返回 null。 */
+function attrToDatasetKey(attr: string): string | null {
+  if (!attr.startsWith(DATA_ATTR_PREFIX)) return null
+  return attr
+    .slice(DATA_ATTR_PREFIX.length)
+    .replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase())
+}
+
+/** `fooBar` → `data-foo-bar`(ASCII 大写 → '-' + 小写,DOM dataset 反向规则)。 */
+function datasetKeyToAttr(key: string): string {
+  return DATA_ATTR_PREFIX + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
+}
+
+/**
+ * DOMStringMap backing `element.dataset`。活的映射:
+ *  - 读:`el.dataset.fooBar` ↔ `__RN_currentProps['data-foo-bar']`
+ *  - 写:`el.dataset.fooBar = v` → setAttribute('data-foo-bar', v)(不可变更新 + markDirty)
+ *  - 删:`delete el.dataset.fooBar` → removeAttribute('data-foo-bar')
+ * data-* 不在任何 validAttributes → 不进 Fabric payload,纯 JS 层元数据
+ * (事件定位 / 测试标记)。Proxy 只包 dataset 这个小对象,不 Proxy 节点本身,
+ * 与 Vue renderer 挂 __vnode、internal 的 Symbol 键互不干扰。
+ */
+function createDataset(node: RNNode): DOMStringMap {
+  const el = node as unknown as RNDomInternalNode
+  return new Proxy({} as Record<string, unknown>, {
+    get(_t, key): unknown {
+      if (typeof key !== 'string') return undefined
+      return el.__RN_currentProps[datasetKeyToAttr(key)]
+    },
+    set(_t, key, value): boolean {
+      if (typeof key === 'string') node.setAttribute(datasetKeyToAttr(key), value)
+      return true
+    },
+    deleteProperty(_t, key): boolean {
+      if (typeof key === 'string') node.removeAttribute(datasetKeyToAttr(key))
+      return true
+    },
+    has(_t, key): boolean {
+      return typeof key === 'string' && datasetKeyToAttr(key) in el.__RN_currentProps
+    },
+    ownKeys(): string[] {
+      const keys: string[] = []
+      for (const attr in el.__RN_currentProps) {
+        const k = attrToDatasetKey(attr)
+        if (k != null) keys.push(k)
+      }
+      return keys
+    },
+    getOwnPropertyDescriptor(_t, key): PropertyDescriptor | undefined {
+      if (typeof key !== 'string') return undefined
+      const value = el.__RN_currentProps[datasetKeyToAttr(key)]
+      return value === undefined
+        ? undefined
+        : { enumerable: true, configurable: true, value }
+    },
+  }) as DOMStringMap
 }
 
 /**
@@ -385,9 +446,9 @@ export class RNNode {
    * Get the class list as a DOMTokenList-like object.
    * Lazily allocates the underlying Set on first access.
    */
-  get classList(): RASENTokenList {
+  get classList(): RNDomTokenList {
     if (!this.__RN_classList) this.__RN_classList = new Set()
-    return new RASENTokenList(this.__RN_classList, () => {
+    return new RNDomTokenList(this.__RN_classList, () => {
       if (this.__RN_mounted) markDirty(this as unknown as RNDomInternalNode, 'props', 'class')
     })
   }
@@ -405,6 +466,15 @@ export class RNNode {
     this.__RN_classList.clear()
     for (const n of names) this.__RN_classList.add(n)
     if (this.__RN_mounted) markDirty(this as unknown as RNDomInternalNode, 'props', 'class')
+  }
+
+  /**
+   * Get the dataset as a live DOMStringMap (data-* attributes).
+   * Lazily allocates the Proxy on first access.
+   */
+  get dataset(): DOMStringMap {
+    if (!this.__RN_dataset) this.__RN_dataset = createDataset(this)
+    return this.__RN_dataset
   }
 
   // =========================================================================
@@ -430,6 +500,8 @@ export class RNNode {
   protected __RN_listeners: Map<string, Set<EventListenerOrEventListenerObject>> | null = null
   /** CSS class list (DOM-style, resolved at flush time via StyleSheetList). */
   protected __RN_classList: Set<string> | null = null
+  /** Lazily allocated DOMStringMap backing `element.dataset` (data-* attrs). */
+  protected __RN_dataset: DOMStringMap | null = null
 
   /** Last validAttributes (needed for children-only updates on mounted nodes). */
   protected __RN_lastValidAttrs: Record<string, unknown> | null = null

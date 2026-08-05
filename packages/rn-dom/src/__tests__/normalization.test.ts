@@ -868,3 +868,52 @@ describe('DrawerLayoutAndroid (DrawerLayoutAndroid.android.js)', () => {
     expect(d.__RN_drawerViewFabric?.props.pointerEvents).toBe('none')
   })
 })
+
+describe('dataset (DOMStringMap)', () => {
+  it('读:data-* 属性映射为 camelCase dataset key', () => {
+    const el = createElement('View')
+    el.setAttribute('data-user-id', '5')
+    el.setAttribute('data-foo-bar', 'x')
+    expect(el.dataset.userId).toBe('5')
+    expect(el.dataset.fooBar).toBe('x')
+    expect(el.dataset.nope).toBeUndefined()
+  })
+
+  it('写:dataset key 反向映射为 data-* 属性(走 setAttribute)', () => {
+    const el = createElement('View')
+    el.dataset.userId = '7'
+    el.dataset.myDataPoint = '42'
+    expect(el.getAttribute('data-user-id')).toBe('7')
+    expect(el.getAttribute('data-my-data-point')).toBe('42')
+    expect(internal(el).__RN_currentProps['data-user-id']).toBe('7')
+  })
+
+  it('删:delete dataset key → removeAttribute', () => {
+    const el = createElement('View')
+    el.setAttribute('data-user-id', '5')
+    expect(el.dataset.userId).toBe('5')
+    delete el.dataset.userId
+    expect(el.hasAttribute('data-user-id')).toBe(false)
+    expect(el.dataset.userId).toBeUndefined()
+  })
+
+  it('in 运算符反映存在性', () => {
+    const el = createElement('View')
+    el.setAttribute('data-active', true)
+    expect('active' in el.dataset).toBe(true)
+    expect('missing' in el.dataset).toBe(false)
+  })
+
+  it('ownKeys/Object.keys 只含 data-*', () => {
+    const el = createElement('View')
+    el.setAttribute('data-a', '1')
+    el.setAttribute('data-b-c', '2')
+    el.setAttribute('numberOfLines', 3) // 非 data-* 不应出现在 dataset
+    expect(Object.keys(el.dataset).sort()).toEqual(['a', 'bC'])
+  })
+
+  it('活对象:同一次访问返回同一引用', () => {
+    const el = createElement('View')
+    expect(el.dataset).toBe(el.dataset)
+  })
+})
