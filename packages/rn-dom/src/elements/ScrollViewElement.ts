@@ -90,6 +90,10 @@ export class RNScrollViewElement extends RNNode {
         : props.pagingEnabled === true && props.snapToInterval == null && props.snapToOffsets == null,
       // Native only sends momentum events when asked.
       sendMomentumEvents: props.onMomentumScrollBegin != null || props.onMomentumScrollEnd != null,
+      // Android 嵌套滚动默认开启(RN ScrollView.js L1862: `nestedScrollEnabled ??
+      // true`)。不设则原生默认 false → FlatList/VirtualizedList 嵌 ScrollView
+      // 时内层滚动被外层拦截,虚拟化窗口不更新。
+      nestedScrollEnabled: props.nestedScrollEnabled ?? true,
     }
     if (props.decelerationRate === 'normal') {
       sNext.decelerationRate = isAndroid ? 0.985 : 0.998
