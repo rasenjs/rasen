@@ -60,6 +60,7 @@ export interface RNDomInternalNode {
   __RN_instanceHandle: InstanceHandle | null
   __RN_propsDirty: boolean
   __RN_childrenDirty: boolean
+  __RN_hasHadChildren: boolean
   __RN_propsSnapshot: Props
   __RN_dirtyPropsCount: number
   __RN_children: (RNNode | RNTextNode | RNCommentNode)[]
@@ -488,6 +489,10 @@ export class RNNode {
   protected __RN_instanceHandle: InstanceHandle | null = null
   protected __RN_propsDirty = false
   protected __RN_childrenDirty = false
+  /** @internal 节点历史上是否挂载过子节点。用于区分"子节点被移除需提交空
+   *  childSet 释放原生"vs"叶子节点从未有子节点无需提交"(避免测试/边缘里
+   *  mounted 但无 FABRIC_NODE 的叶子节点走 clone 崩)。 */
+  protected __RN_hasHadChildren = false
   protected __RN_propsSnapshot: Props = {}
   protected __RN_dirtyPropsCount = 0
   protected __RN_children: (RNNode | RNTextNode | RNCommentNode)[] = []
@@ -660,6 +665,7 @@ export class RNNode {
   appendChild(child: RNNode | RNTextNode | RNCommentNode): void {
     child.parentNode = this
     this.__RN_children.push(child)
+    this.__RN_hasHadChildren = true
     registerInInstanceMap(child)
     markSubtreeDirty(child)
     if (this.__RN_mounted) {
@@ -695,6 +701,7 @@ export class RNNode {
         this.__RN_children.splice(refIndex, 0, child)
       }
     }
+    this.__RN_hasHadChildren = true
     registerInInstanceMap(child)
     // Only mark subtree dirty for fresh (unmounted) nodes.
     // Already-mounted nodes keep their props; only the parent's child order changes.

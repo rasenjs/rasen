@@ -376,7 +376,16 @@ export function getFabricNode(
       n.__RN_propsDirty = false
     }
 
-    if ((n.__RN_childrenDirty && n.__RN_children.length > 0) || n.__RN_alwaysBuildChildren) {
+    if (
+      n.__RN_childrenDirty &&
+      (n.__RN_children.length > 0 || n.__RN_hasHadChildren)
+    ) {
+      // ⚠️ 提交 childSet 必须覆盖"子节点被清空"的场景:之前 `length > 0`
+      // 守卫在子节点全移除时(如页面卸载)跳过 cloneNodeWithNewChildren →
+      // Fabric 原生不释放已移除的子节点 → Native Heap 随页面切换累积泄漏
+      // (~29MB/次)。空 childSet 让原生 diff 出子节点移除并释放。
+      // __RN_hasHadChildren 区分"曾有过子节点(清空需提交)"vs"叶子从未有
+      // 子节点(无需提交,避免 mounted 但无 FABRIC_NODE 的节点走 clone 崩)"。
       childSet = fabricUIManager.createChildSet()
       // 节点类 __RN_buildChildren hook:ScrollView 只重建 content container 的子节点,
       // 自身 child(容器)保持稳定 → 无 Fabric append-on-update。
