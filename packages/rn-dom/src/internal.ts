@@ -254,7 +254,8 @@ export function getFabricNode(
   child: RNNode | RNTextNode | RNCommentNode,
 ): unknown {
     if (child.nodeType === 3) {
-      return (child as RNTextNode).node
+      const t = child as RNTextNode
+      return t.node
     }
 
     if (child.nodeType === 8) {

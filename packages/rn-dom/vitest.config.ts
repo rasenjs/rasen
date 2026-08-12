@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@rasenjs/rn-dom': path.resolve(__dirname, 'src/index.ts'),
+      '@rasenjs/rn-dom/elements': path.resolve(__dirname, 'elements.cjs'),
     },
   },
   test: {

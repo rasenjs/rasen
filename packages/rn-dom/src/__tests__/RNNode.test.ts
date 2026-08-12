@@ -630,7 +630,7 @@ describe('RNNode', () => {
       const img = doc.createElement('Image')
       img.setAttribute('source', 'https://example.com/a.png')
       doc.body.appendChild(img)
-      await Promise.resolve()
+      await new Promise(r => setTimeout(r, 0))
       const call = nativeFabricUIManager.createNode.mock.calls.at(-1)!
       expect(call[3].source).toEqual([{ uri: 'https://example.com/a.png' }])
     })
@@ -641,7 +641,7 @@ describe('RNNode', () => {
       const arr = [{ uri: 'https://example.com/a.png' }]
       img.setAttribute('source', arr)
       doc.body.appendChild(img)
-      await Promise.resolve()
+      await new Promise(r => setTimeout(r, 0))
       const call = nativeFabricUIManager.createNode.mock.calls.at(-1)!
       expect(call[3].source).toBe(arr)
     })
@@ -651,7 +651,7 @@ describe('RNNode', () => {
       const img = doc.createElement('Image')
       img.setAttribute('source', { uri: 'https://example.com/b.png' })
       doc.body.appendChild(img)
-      await Promise.resolve()
+      await new Promise(r => setTimeout(r, 0))
       const call = nativeFabricUIManager.createNode.mock.calls.at(-1)!
       expect(call[3].source).toEqual([{ uri: 'https://example.com/b.png' }])
     })
@@ -671,7 +671,7 @@ describe('RNNode', () => {
         ai.setAttribute('animating', true)
         ai.setAttribute('size', 'small')
         doc.body.appendChild(ai)
-        await Promise.resolve()
+        await new Promise(r => setTimeout(r, 0))
         const calls = nativeFabricUIManager.createNode.mock.calls
         // 元素自身 = 外层容器 View(RCTView),承接用户 style/居中。
         const container = calls.at(-2)!

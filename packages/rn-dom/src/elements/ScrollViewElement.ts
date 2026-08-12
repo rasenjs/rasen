@@ -132,6 +132,18 @@ export class RNScrollViewElement extends RNNode {
     rootTag: number,
     getFabricNode: (node: RNNode | RNTextNode | RNCommentNode) => unknown,
   ): void {
+    // iOS:RefreshControl 是 RCTScrollView 的直接子节点,在 content container 之前
+    // (RN ScrollView.js L1838-1844:<NativeScrollView>{refreshControl}{contentContainer})。
+    // Android 不在此处理:refreshControl 由 vue-rn 用 AndroidSwipeRefreshLayout 包裹 ScrollView。
+    if (Platform.OS === 'ios') {
+      for (const child of this.__RN_children) {
+        if ((child as { tagName?: string }).tagName === 'RefreshControl') {
+          const rcFabric = getFabricNode(child as RNNode)
+          if (rcFabric) fabricUIManager.appendChildToSet(childSet, rcFabric)
+          break
+        }
+      }
+    }
     // RCTScrollView hosts exactly one child — the content container.
     const cc = this.__RN_buildScrollContent(fabricUIManager, rootTag, getFabricNode)
     if (cc) fabricUIManager.appendChildToSet(childSet, cc)
@@ -213,6 +225,14 @@ export class RNScrollViewElement extends RNNode {
     const curr: unknown[] = []
     for (let i = 0; i < this.__RN_children.length; i++) {
       const subChild = this.__RN_children[i]
+      // iOS:RefreshControl 是 ScrollView 直接子节点(由 __RN_buildChildren 处理),
+      // 不进 content container。
+      if (
+        Platform.OS === 'ios' &&
+        (subChild as { tagName?: string }).tagName === 'RefreshControl'
+      ) {
+        continue
+      }
       const subFabricNode = getFabricNode(subChild)
       if (!subFabricNode) continue
       if (isSticky(i)) {

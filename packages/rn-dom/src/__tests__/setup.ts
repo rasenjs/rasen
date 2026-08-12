@@ -1,9 +1,10 @@
 /**
- * @rasenjs/rn-dom — Vitest setup
+ * @rasenjs/rn-dom — Jest setup(原 Vitest,迁移到 @react-native/jest-preset)
  *
  * Mocks react-native modules so rn-dom can be tested in Node.
- * Follows facebook/react's pattern: all native modules are mocked,
- * nativeFabricUIManager is set on globalThis.
+ * @react-native/jest-preset 已提供 nativeFabricUIManager 空对象 + 各 RN 组件
+ * mock;这里补充 rn-dom 需要的手动 mock(fabric 方法集、viewConfigRegistry、
+ * elements、keyboard、Platform)。
  */
 
 import { vi } from 'vitest'
@@ -55,17 +56,25 @@ export interface MockViewConfig {
   [key: string]: unknown
 }
 
-const _viewConfigRegistry = (() => {
+const mockViewConfigRegistry = (() => {
   const configs = new Map<string, MockViewConfig>()
   return {
     register: (name: string, cfg: MockViewConfig) => { configs.set(name, cfg) },
     get: (name: string) => { const c = configs.get(name); if (!c) throw new Error(`ViewConfig not found: ${name}`); return c },
+    // ReactFabric 渲染器读取 registry.customBubblingEventTypes / customDirectEventTypes
+    // (EventPluginRegistry 注入)。ReactFabric 生成对照数据(fixture)时需要存在。
+    customBubblingEventTypes: {} as Record<string, unknown>,
+    customDirectEventTypes: {} as Record<string, unknown>,
   }
 })()
 
-vi.mock('react-native/Libraries/ReactPrivate/ReactNativePrivateInterface', () => ({
-  default: {
-    ReactNativeViewConfigRegistry: _viewConfigRegistry,
+// jest 需要 __esModule:true 才能让 ESM default import 拿到 factory.default;
+// 同时 ReactFabric bundle 用 require('...') 拿模块对象(属性直接可用)。
+// 返回 { ...mock, default: mock }:rn-dom default import → mock;ReactFabric
+// require → 对象本身(ReactNativeViewConfigRegistry 直接可用)。
+vi.mock('react-native/Libraries/ReactPrivate/ReactNativePrivateInterface', () => {
+  const mock = {
+    ReactNativeViewConfigRegistry: mockViewConfigRegistry,
     createAttributePayload: vi.fn((props: Record<string, unknown>) =>
       Object.keys(props).length > 0 ? { ...props } : null),
     diffAttributePayloads: vi.fn((prev: Record<string, unknown>, next: Record<string, unknown>) => {
@@ -75,8 +84,9 @@ vi.mock('react-native/Libraries/ReactPrivate/ReactNativePrivateInterface', () =>
       for (const k of Object.keys(prev)) { if (!(k in next)) { diff[k] = null; hasDiff = true } }
       return hasDiff ? diff : null
     }),
-  },
-}))
+  }
+  return { __esModule: true, ...mock, default: mock }
+})
 
 // ── Mock RCTDeviceEventEmitter (native-module events: modalDismissed etc.) ──
 // Injected on globalThis: rn-dom's event-system reads globalThis first, since
@@ -103,8 +113,8 @@ export function emitDeviceEvent(name: string, payload: unknown): void {
 
 vi.mock('@rasenjs/rn-dom/elements', () => {
   // 只 mock ensure()(其 require('react-native/...') 无法在 vitest 运行)。
-  // tag 表从真实 elements.cjs 读取;__RN_normalizeProps 已迁移到主模块的节点类
-  // (src/elements/*),不再经过 elements mock。
+  // tag 表从真实 elements.cjs 读取(普通 require 绕过 mock 避免递归);
+  // __RN_normalizeProps 已迁移到主模块的节点类(src/elements/*),不再经过 elements mock。
   const real = require('../../elements.cjs') as {
     RN_BUILT_IN_TAGS: string[]
   }
@@ -188,7 +198,7 @@ const RN_BUBBLING = (names: string[]) =>
   )
 
 const vc = (name: string, attrs: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
-  _viewConfigRegistry.register(name, {
+  mockViewConfigRegistry.register(name, {
     validAttributes: attrs,
     bubblingEventTypes: {
       ...RN_BUBBLING(['topTouchStart', 'topTouchMove', 'topTouchEnd', 'topTouchCancel', 'topPress', 'topChange', 'topFocus', 'topBlur', 'topSubmitEditing', 'topEndEditing', 'topKeyPress']),
@@ -247,4 +257,4 @@ export function resetFabricMocks(): void {
 }
 
 export const nativeFabricUIManager = uim
-export const viewConfigRegistry = _viewConfigRegistry
+export const viewConfigRegistry = mockViewConfigRegistry

@@ -435,6 +435,13 @@ export class RNNode {
   readonly ownerDocument: RNDocument
   readonly style: ReturnType<typeof createStyleObject>
 
+  // 非 plain object 标记:让 Vue 等响应式系统按真实 DOM(如 HTMLDivElement)
+  // 对待 → Object.prototype.toString 不是 [object Object] → getTargetType
+  // 返回 INVALID → 不代理。因此宿主不需要手动 markRaw。
+  get [Symbol.toStringTag](): string {
+    return 'RNNode'
+  }
+
   /** @internal 当前 props(协调/事件/样式读取,非 DOM 标准)。 */
   protected __RN_currentProps: Props
   parentNode: RNNode | null = null
@@ -1029,6 +1036,11 @@ export class RNTextNode {
   readonly ownerDocument: RNDocument
   parentNode: RNNode | null = null
 
+  // 非 plain object 标记(同 RNNode,防 Vue 代理)。
+  get [Symbol.toStringTag](): string {
+    return 'RNTextNode'
+  }
+
   private _textContent: string
 
   constructor(fabricNode: FabricNode, text: string, ownerDocument: RNDocument) {
@@ -1168,6 +1180,11 @@ export class RNDocumentFragment {
   readonly ownerDocument: RNDocument
   parentNode: RNNode | null = null
   __RN_children: (RNNode | RNTextNode | RNCommentNode)[] = []
+
+  // 非 plain object 标记(同 RNNode,防 Vue 代理)。
+  get [Symbol.toStringTag](): string {
+    return 'RNDocumentFragment'
+  }
 
   constructor(ownerDocument: RNDocument) {
     this.ownerDocument = ownerDocument

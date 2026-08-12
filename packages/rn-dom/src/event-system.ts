@@ -321,6 +321,9 @@ interface PressState {
 const _pressStates = new WeakMap<EventNode, PressState>()
 /** Current press responder (nearest ancestor with press handlers). */
 let _pressOwner: EventNode | null = null
+// 注意:onTouchEnd 是 bubbling touch 事件(对齐 RN ViewPropTypes onTouchEnd):
+// 滚动后仍触发,不做抑制/延迟。点击请用 onPress(responder 语义,滚动抢占由
+// releasePressFor 在 topScroll/topScrollBeginDrag 时取消,对齐 RN onResponderTerminate)。
 
 /** Start the long-press timer; fires onLongPress after delay. */
 function startPressTracking(
@@ -775,9 +778,12 @@ export function createDispatcher(opts: EventSystemOptions): DispatchEventFn {
       if (type === 'topTouchStart' || type === 'topTouchMove' ||
           type === 'topTouchEnd' || type === 'topTouchCancel') {
         drivePress(node, type, event, opts)
-      } else if (type === 'topScroll' && _pressOwner) {
-        // ScrollView steals the responder (RN) → cancel any active press.
-        releasePressFor(_pressOwner)
+      } else if (type === 'topScroll' || type === 'topScrollBeginDrag') {
+        // ScrollView steals the responder on drag start (RN onScrollBeginDrag)
+        // → cancel any active press so a drag-release doesn't fire onPress
+        // (对齐 RN onResponderTerminate → RESPONDER_TERMINATED → no onPress)。
+        // onTouchEnd 是 bubbling touch 事件(RN 语义),滚动后仍触发,不抑制不延迟。
+        if (_pressOwner) releasePressFor(_pressOwner)
       }
 
       // Per-tag native-event hook:节点类(TextInput/Switch/ScrollView)的
@@ -790,6 +796,9 @@ export function createDispatcher(opts: EventSystemOptions): DispatchEventFn {
       // onChangeText/onValueChange 的"变换"已由节点类 __RN_handleNativeEvent 处理。
       if (!consumed) {
         const name = behavior.bubbledName
+        // onTouchEnd 是 bubbling touch 事件(对齐 RN ViewPropTypes onTouchEnd):
+        // 滚动后仍触发,不抑制不延迟。点击请用 onPress(responder 语义,滚动
+        // 抢占由 releasePressFor 取消,对齐 RN onResponderTerminate)。
         if (type === 'topChange') {
           firePropsHandler(node, 'onChange', event)
         } else if (name) {

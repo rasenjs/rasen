@@ -9,11 +9,12 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { Platform } from 'react-native'
-import { RNDocument, resetTagCounter, type RNNode, scrollToEnd } from '../index'
+import { RNDocument, resetTagCounter, type RNNode, scrollToEnd, openDrawer, closeDrawer } from '../index'
 import { type RNDomInternalNode } from '../node'
 import { setNativeProps } from '../internal'
 import { getFabricNode, submitToRoot } from '../internal'
 import { getElementClass } from '../elements/registry'
+import { applyAria } from '../elements/shared'
 import { resetFabricMocks, nativeFabricUIManager, mockKeyboard } from './setup'
 
 /**
@@ -342,6 +343,35 @@ describe('__RN_normalizeProps — Image (Image.android.js / Image.ios.js)', () =
       spy.mockRestore()
     }
   })
+
+  it('单 source 固有宽高 → base style (RN Image: source.width ?? props.width)', () => {
+    const out = normalize('Image', { source: { uri: 'x', width: 100, height: 80 } })
+    expect((out.style as unknown[])[0]).toEqual({ overflow: 'hidden', width: 100, height: 80 })
+  })
+
+  it('单 source 无宽高 → 兜底 props.width/height', () => {
+    const out = normalize('Image', { source: { uri: 'x' }, width: 60, height: 40 })
+    expect((out.style as unknown[])[0]).toEqual({ overflow: 'hidden', width: 60, height: 40 })
+  })
+
+  it('单 source 无宽高且无 props → 仅 overflow:hidden base', () => {
+    expect((normalize('Image', { source: { uri: 'x' } }).style as unknown[])[0]).toEqual({ overflow: 'hidden' })
+  })
+
+  it('referrerPolicy → source headers Referrer-Policy (RN ImageSourceUtils)', () => {
+    const out = normalize('Image', { source: { uri: 'x' }, referrerPolicy: 'no-referrer' })
+    expect(out.source).toEqual([{ uri: 'x', headers: { 'Referrer-Policy': 'no-referrer' } }])
+  })
+
+  it('android: source[0].headers → headers prop', () => {
+    const out = withAndroid(() => normalize('Image', { source: [{ uri: 'x', headers: { a: '1' } }] }))
+    expect(out.headers).toEqual({ a: '1' })
+  })
+
+  it('iOS tintColor = prop ?? style.tintColor (Image.ios.js)', () => {
+    expect(normalize('Image', { style: { tintColor: '#abc' } }).tintColor).toBe('#abc')
+    expect(normalize('Image', { tintColor: '#111', style: { tintColor: '#abc' } }).tintColor).toBe('#111')
+  })
 })
 
 describe('__RN_normalizeProps — Text / Modal / ScrollView (Text.js / Modal.js / ScrollView.js)', () => {
@@ -390,6 +420,33 @@ describe('__RN_normalizeProps — Text / Modal / ScrollView (Text.js / Modal.js 
     expect(out.accessibilityLabel).toBe('标题')
   })
 
+  it('Text: style.userSelect → selectable + 移除 userSelect (Text.js USER_SELECT_TO_SELECTABLE)', () => {
+    const out = normalize('Text', { style: { userSelect: 'text' } })
+    expect(out.selectable).toBe(true)
+    // style:overflow 默认前缀在首;userSelect 被 override 移除(undefined)在末。
+    const styleArr = out.style as unknown[]
+    expect(styleArr[0]).toEqual({ overflow: 'hidden' })
+    expect(styleArr[styleArr.length - 1]).toEqual({ userSelect: undefined })
+  })
+
+  it('Text: style.userSelect none → selectable=false', () => {
+    expect(normalize('Text', { style: { userSelect: 'none' } }).selectable).toBe(false)
+    expect(normalize('Text', { style: { userSelect: 'contain' } }).selectable).toBe(true)
+  })
+
+  it('Text: 显式 selectable 优先于 style.userSelect (Text.js)', () => {
+    expect(normalize('Text', { selectable: false, style: { userSelect: 'text' } }).selectable).toBe(false)
+  })
+
+  it('Text: style.verticalAlign → textAlignVertical (VERTICAL_ALIGN_MAP)', () => {
+    expect(normalize('Text', { style: { verticalAlign: 'middle' } }).textAlignVertical).toBe('center')
+    expect(normalize('Text', { style: { verticalAlign: 'top' } }).textAlignVertical).toBe('top')
+    expect(normalize('Text', { style: { verticalAlign: 'bottom' } }).textAlignVertical).toBe('bottom')
+    expect(normalize('Text', { style: { verticalAlign: 'auto' } }).textAlignVertical).toBe('auto')
+    // 未知值原样透传(?? verticalAlign)。
+    expect(normalize('Text', { style: { verticalAlign: 'sub' } }).textAlignVertical).toBe('sub')
+  })
+
   it('Modal: visible defaults to true', () => {
     expect(normalize('Modal', {}).visible).toBe(true)
     expect(normalize('Modal', { visible: false }).visible).toBe(false)
@@ -402,6 +459,42 @@ describe('__RN_normalizeProps — Text / Modal / ScrollView (Text.js / Modal.js 
   it('Modal: presentationStyle default fullScreen / overFullScreen when transparent', () => {
     expect(normalize('Modal', {}).presentationStyle).toBe('fullScreen')
     expect(normalize('Modal', { transparent: true }).presentationStyle).toBe('overFullScreen')
+  })
+
+  it('Modal: hardwareAccelerated 默认 false(===true 归一)', () => {
+    expect(normalize('Modal', {}).hardwareAccelerated).toBe(false)
+    expect(normalize('Modal', { hardwareAccelerated: true }).hardwareAccelerated).toBe(true)
+  })
+
+  it('Modal: __DEV__ confirmProps 三个警告 (Modal.js)', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      // presentationStyle + transparent(非 overFullScreen)→ 警告。
+      normalize('Modal', { presentationStyle: 'pageSheet', transparent: true })
+      expect(spy).toHaveBeenCalledWith('Cannot specify "transparent" prop with "presentationStyle" prop.')
+      spy.mockClear()
+      // navigationBarTranslucent 无 statusBarTranslucent → 警告。
+      normalize('Modal', { navigationBarTranslucent: true })
+      expect(spy).toHaveBeenCalledWith('`navigationBarTranslucent` requires `statusBarTranslucent` to be set.')
+      spy.mockClear()
+      // iOS allowSwipeDismissal 无 onRequestClose → 警告。
+      normalize('Modal', { allowSwipeDismissal: true })
+      expect(spy).toHaveBeenCalledWith('Cannot specify "allowSwipeDismissal" prop without "onRequestClose" prop.')
+      // 满足条件不警告。
+      spy.mockClear()
+      normalize('Modal', { allowSwipeDismissal: true, onRequestClose: () => {} })
+      expect(spy).not.toHaveBeenCalled()
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('Modal: __RN_preparePayload 注入 native identifier (Mount)', () => {
+    const doc = createDoc()
+    const m = doc.createElement('Modal')
+    getFabricNode(internal(doc.body), m)
+    expect(lastCreateNodeCall().viewName).toBe('ModalHostView')
+    expect(typeof lastCreateNodeCall().props.identifier).toBe('number')
   })
 
   it('ScrollView: baseStyle injected', () => {
@@ -456,6 +549,48 @@ describe('__RN_normalizeProps — Text / Modal / ScrollView (Text.js / Modal.js 
   it('ScrollView: stickyHeaderIndices 非空 → scrollEventThrottle=1 (ScrollView.js)', () => {
     expect(normalize('ScrollView', { stickyHeaderIndices: [0] }).scrollEventThrottle).toBe(1)
     expect(normalize('ScrollView', {}).scrollEventThrottle).toBeUndefined()
+  })
+
+  it('ScrollView: alwaysBounceHorizontal/Vertical 默认随 horizontal (ScrollView.js)', () => {
+    expect(normalize('ScrollView', {}).alwaysBounceHorizontal).toBe(false)
+    expect(normalize('ScrollView', {}).alwaysBounceVertical).toBe(true)
+    const h = normalize('ScrollView', { horizontal: true })
+    expect(h.alwaysBounceHorizontal).toBe(true)
+    expect(h.alwaysBounceVertical).toBe(false)
+    expect(normalize('ScrollView', { alwaysBounceVertical: true }).alwaysBounceVertical).toBe(true)
+    expect(normalize('ScrollView', { horizontal: true, alwaysBounceHorizontal: false }).alwaysBounceHorizontal).toBe(false)
+  })
+
+  it('ScrollView: sendMomentumEvents 由 onMomentumScrollBegin/End 驱动 (ScrollView.js)', () => {
+    expect(normalize('ScrollView', {}).sendMomentumEvents).toBe(false)
+    expect(normalize('ScrollView', { onMomentumScrollEnd: () => {} }).sendMomentumEvents).toBe(true)
+    expect(normalize('ScrollView', { onMomentumScrollBegin: () => {} }).sendMomentumEvents).toBe(true)
+  })
+
+  it('ScrollView: decelerationRate fast → 平台数字 (ScrollView.js)', () => {
+    expect(withAndroid(() => normalize('ScrollView', { decelerationRate: 'fast' })).decelerationRate).toBe(0.9)
+    expect(normalize('ScrollView', { decelerationRate: 'fast' }).decelerationRate).toBe(0.99)
+  })
+
+  it('ScrollView: iOS pagingEnabled 需显式 true 且无 snapTo* (ScrollView.js)', () => {
+    expect(normalize('ScrollView', { pagingEnabled: true }).pagingEnabled).toBe(true)
+    expect(normalize('ScrollView', { pagingEnabled: true, snapToInterval: 100 }).pagingEnabled).toBe(false)
+    expect(normalize('ScrollView', { pagingEnabled: true, snapToOffsets: [0] }).pagingEnabled).toBe(false)
+  })
+
+  it('ScrollView: android pagingEnabled 由 snapToInterval/snapToOffsets 驱动', () => {
+    expect(withAndroid(() => normalize('ScrollView', { snapToOffsets: [0, 100] })).pagingEnabled).toBe(true)
+    expect(withAndroid(() => normalize('ScrollView', { pagingEnabled: true })).pagingEnabled).toBe(true)
+  })
+
+  it('ScrollView: keyboardShouldPersistTaps 字符串原样透传', () => {
+    expect(normalize('ScrollView', { keyboardShouldPersistTaps: 'handled' }).keyboardShouldPersistTaps).toBe('handled')
+    expect(normalize('ScrollView', { keyboardShouldPersistTaps: 'always' }).keyboardShouldPersistTaps).toBe('always')
+  })
+
+  it('ScrollView: nestedScrollEnabled 默认 true (⚠️ rn-dom 全平台;RN 仅 android+refreshControl 分支)', () => {
+    expect(normalize('ScrollView', {}).nestedScrollEnabled).toBe(true)
+    expect(normalize('ScrollView', { nestedScrollEnabled: false }).nestedScrollEnabled).toBe(false)
   })
 })
 
@@ -632,6 +767,30 @@ describe('Fabric commands (RNNode ref methods)', () => {
     )
   })
 
+  it('openDrawer dispatches openDrawer command (Android)', () => {
+    const doc = createDoc()
+    const d = doc.createElement('DrawerLayoutAndroid')
+    getFabricNode(internal(doc.body), d); // mount
+    openDrawer(d)
+    expect(nativeFabricUIManager.dispatchCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      'openDrawer',
+      [],
+    )
+  })
+
+  it('closeDrawer dispatches closeDrawer command (Android)', () => {
+    const doc = createDoc()
+    const d = doc.createElement('DrawerLayoutAndroid')
+    getFabricNode(internal(doc.body), d); // mount
+    closeDrawer(d)
+    expect(nativeFabricUIManager.dispatchCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      'closeDrawer',
+      [],
+    )
+  })
+
   it('no-op before mount (no crash)', () => {
     const doc = createDoc()
     const sv = doc.createElement('ScrollView')
@@ -681,6 +840,23 @@ describe('Controlled-component re-sync (RN controlled inputs/switches)', () => {
       'setValue',
       [false],
     )
+  })
+
+  it('Switch: android JS value diverging → setNativeValue command', () => {
+    withAndroid(() => {
+      const doc = createDoc()
+      const sw = doc.createElement('Switch')
+      getFabricNode(internal(doc.body), sw)
+      ;(nativeFabricUIManager.dispatchCommand as unknown as { mockClear: () => void }).mockClear()
+      ;(sw as unknown as SwitchInternal).__RN_switchNativeValue = true
+      sw.setAttribute('value', false)
+      // android platform → 'setNativeValue'
+      expect(nativeFabricUIManager.dispatchCommand).toHaveBeenCalledWith(
+        expect.anything(),
+        'setNativeValue',
+        [false],
+      )
+    })
   })
 })
 
@@ -915,5 +1091,146 @@ describe('dataset (DOMStringMap)', () => {
   it('活对象:同一次访问返回同一引用', () => {
     const el = createElement('View')
     expect(el.dataset).toBe(el.dataset)
+  })
+})
+
+describe('__RN_normalizeProps — ActivityIndicator (ActivityIndicator.js)', () => {
+  it('外层容器:居中 base style + 用户 style(styles.container)', () => {
+    const out = normalize('ActivityIndicator', { style: { width: 60 } })
+    expect(out.style).toEqual([
+      { alignItems: 'center', justifyContent: 'center' },
+      { width: 60 },
+    ])
+  })
+
+  it('外层容器:无 style 时 base 在前', () => {
+    expect(normalize('ActivityIndicator', {}).style).toEqual([
+      { alignItems: 'center', justifyContent: 'center' },
+      undefined,
+    ])
+  })
+
+  it('iOS spinner:默认 animating/hidesWhenStopped/size=small/color=#999999 + 20×20', () => {
+    const doc = createDoc()
+    const ai = doc.createElement('ActivityIndicator')
+    getFabricNode(internal(doc.body), ai)
+    const views = nativeFabricUIManager.createNode.mock.calls as unknown as Array<[number, string, number, Record<string, unknown>]>
+    const spinner = views.find(c => c[1] === 'RCTActivityIndicatorView')
+    expect(spinner).toBeTruthy()
+    expect(spinner![3]).toMatchObject({
+      animating: true,
+      hidesWhenStopped: true,
+      size: 'small',
+      color: '#999999', // RN GRAY: iOS 默认 #999999
+      style: [{ width: 20, height: 20 }],
+    })
+  })
+
+  it('iOS spinner:显式 animating=false + color + size=large → 36×36', () => {
+    const doc = createDoc()
+    const ai = doc.createElement('ActivityIndicator')
+    ai.setAttribute('animating', false)
+    ai.setAttribute('color', '#f00')
+    ai.setAttribute('size', 'large')
+    getFabricNode(internal(doc.body), ai)
+    const views = nativeFabricUIManager.createNode.mock.calls as unknown as Array<[number, string, number, Record<string, unknown>]>
+    const spinner = views.find(c => c[1] === 'RCTActivityIndicatorView')
+    expect(spinner![3]).toMatchObject({
+      animating: false,
+      size: 'large',
+      color: '#f00',
+      style: [{ width: 36, height: 36 }],
+    })
+  })
+
+  it('iOS spinner:size 数字 → N×N 定尺寸(⚠️ rn-dom 也把数字传 size,RN 传 sizeProp undefined)', () => {
+    const doc = createDoc()
+    const ai = doc.createElement('ActivityIndicator')
+    ai.setAttribute('size', 24)
+    getFabricNode(internal(doc.body), ai)
+    const views = nativeFabricUIManager.createNode.mock.calls as unknown as Array<[number, string, number, Record<string, unknown>]>
+    const spinner = views.find(c => c[1] === 'RCTActivityIndicatorView')
+    expect(spinner![3].style).toEqual([{ width: 24, height: 24 }])
+    // RN:size 数字时 sizeProp=undefined(style 定尺寸);rn-dom 把 24 也传给了原生 size。
+    expect(spinner![3].size).toBe(24)
+  })
+
+  it('android spinner:AndroidProgressBar + styleAttr=Normal + indeterminate=true', () => {
+    withAndroid(() => {
+      const doc = createDoc()
+      const ai = doc.createElement('ActivityIndicator')
+      getFabricNode(internal(doc.body), ai)
+      const views = nativeFabricUIManager.createNode.mock.calls as unknown as Array<[number, string, number, Record<string, unknown>]>
+      const spinner = views.find(c => c[1] === 'AndroidProgressBar')
+      expect(spinner).toBeTruthy()
+      expect(spinner![3]).toMatchObject({
+        animating: true,
+        styleAttr: 'Normal',
+        indeterminate: true,
+        size: 'small',
+      })
+    })
+  })
+
+  it('android spinner:显式 size + animating 透传', () => {
+    withAndroid(() => {
+      const doc = createDoc()
+      const ai = doc.createElement('ActivityIndicator')
+      ai.setAttribute('size', 'large')
+      ai.setAttribute('animating', false)
+      getFabricNode(internal(doc.body), ai)
+      const views = nativeFabricUIManager.createNode.mock.calls as unknown as Array<[number, string, number, Record<string, unknown>]>
+      const spinner = views.find(c => c[1] === 'AndroidProgressBar')
+      expect(spinner![3]).toMatchObject({ size: 'large', animating: false, styleAttr: 'Normal', indeterminate: true })
+      expect(spinner![3].style).toEqual([{ width: 36, height: 36 }])
+    })
+  })
+})
+
+describe('applyAria (shared.ts) — aria-* → accessibility (RN View.js 默认 JS 转换)', () => {
+  it('aria-busy/checked/disabled/expanded/selected → accessibilityState merge', () => {
+    const out = applyAria({ 'aria-busy': true, 'aria-checked': false, 'aria-disabled': true })
+    expect(out.accessibilityState).toEqual({
+      busy: true, checked: false, disabled: true, expanded: undefined, selected: undefined,
+    })
+    // 已有 accessibilityState 字段保留(merge)。
+    const merge = applyAria({ 'aria-expanded': true, accessibilityState: { selected: true } })
+    expect(merge.accessibilityState).toEqual({
+      busy: undefined, checked: undefined, disabled: undefined, expanded: true, selected: true,
+    })
+  })
+
+  it('aria-labelledby 逗号拆数组 → accessibilityLabelledBy', () => {
+    expect(applyAria({ 'aria-labelledby': 'a, b' }).accessibilityLabelledBy).toEqual(['a', 'b'])
+  })
+
+  it('aria-live → accessibilityLiveRegion(off→none)', () => {
+    expect(applyAria({ 'aria-live': 'off' }).accessibilityLiveRegion).toBe('none')
+    expect(applyAria({ 'aria-live': 'polite' }).accessibilityLiveRegion).toBe('polite')
+  })
+
+  it('aria-valuemax/min/now/text → accessibilityValue', () => {
+    const out = applyAria({ 'aria-valuemax': 10, 'aria-valuemin': 0, 'aria-valuenow': 5, 'aria-valuetext': '5' })
+    expect(out.accessibilityValue).toEqual({ max: 10, min: 0, now: 5, text: '5' })
+    // 已有 accessibilityValue 字段保留(merge)。
+    const merge = applyAria({ 'aria-valuenow': 7, accessibilityValue: { max: 100, min: 0, now: 1, text: 'x' } })
+    expect(merge.accessibilityValue).toEqual({ max: 100, min: 0, now: 7, text: 'x' })
+  })
+
+  it('aria-hidden → accessibilityElementsHidden + importantForAccessibility(no-hide-descendants)', () => {
+    const out = applyAria({ 'aria-hidden': true })
+    expect(out.accessibilityElementsHidden).toBe(true)
+    expect(out.importantForAccessibility).toBe('no-hide-descendants')
+    // aria-hidden=false 不设 importantForAccessibility。
+    expect(applyAria({ 'aria-hidden': false }).importantForAccessibility).toBeUndefined()
+  })
+
+  it('tabIndex → focusable', () => {
+    expect(applyAria({ tabIndex: 0 }).focusable).toBe(true)
+    expect(applyAria({ tabIndex: -1 }).focusable).toBe(false)
+  })
+
+  it('id → nativeID', () => {
+    expect(applyAria({ id: 'x' }).nativeID).toBe('x')
   })
 })

@@ -283,7 +283,7 @@ export class RNDocument {
       { text },
       instanceHandle
     )
-    
+
     const textNode = new RNTextNode(fabricNode, text, this)
     instanceHandle.stateNode = textNode
 
@@ -300,6 +300,8 @@ export class RNDocument {
     const comment = {
       nodeType: 8 as const,
       nodeName: '#comment' as const,
+      // 非 plain object 标记(同 RNNode,防 Vue 代理)。
+      [Symbol.toStringTag]: 'RNComment',
       nodeValue: data,
       data: data,
       textContent: data,
@@ -738,3 +740,6 @@ export function mountToContainer(
 
 // Export Host type alias
 export type Host = RNNode
+
+// re-export imperative setNativeProps (RN legacy, internal.ts module function)
+export { setNativeProps } from './internal'

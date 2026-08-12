@@ -11,19 +11,21 @@
 import { Platform } from 'react-native'
 import { RNNode } from '../node'
 import { flatStyle, appendStyleOverride, appendStylePrefix, VERTICAL_ALIGN_MAP, USER_SELECT_TO_SELECTABLE, applyAria } from './shared'
-// RN feature flags:selectable Text 是否走 RCTSelectableText(默认 false → RCTText),
-// overflow:hidden 是否默认注入(默认 true)。对齐 RN Text.js + TextNativeComponent.js。
-// RN 源码是 Flow,测试环境(esbuild)无法解析 → try-catch + 默认值兜底。
-function rnFlag(name: string, fallback: boolean): boolean {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const flags = require('react-native/src/private/featureflags/ReactNativeFeatureFlags') as Record<string, () => boolean>
-    const fn = flags[name]
-    return typeof fn === 'function' ? fn() : fallback
-  } catch { return fallback }
-}
-const enablePreparedTextLayout = () => rnFlag('enablePreparedTextLayout', false)
-const defaultTextToOverflowHidden = () => rnFlag('defaultTextToOverflowHidden', true)
+
+/**
+ * RN feature flags:selectable Text 是否走 RCTSelectableText(默认 false → RCTText),
+ * overflow:hidden 是否默认注入(默认 true)。对齐 RN Text.js + TextNativeComponent.js。
+ *
+ * 不用 require('react-native/src/private/featureflags/ReactNativeFeatureFlags'):
+ *  1. 该模块是 Flow 源码,esbuild/vitest 无法解析(jest 靠 babel-preset 编译) → 测试环境 require 必失败。
+ *  2. createNativeFlagGetter 在无原生模块时返回 defaultValue:
+ *     NativeReactNativeFeatureFlags(undefined)?.[name]?.() ?? defaultValue。
+ *     rn-dom 的 Fabric/DOM 环境无该原生模块 → 永远拿到默认值。
+ *  3. 因此直接采用 RN 默认值常量(enablePreparedTextLayout=false /
+ *     defaultTextToOverflowHidden=true),与运行期行为一致,且不引入 Flow 依赖。
+ */
+const enablePreparedTextLayout = () => false
+const defaultTextToOverflowHidden = () => true
 
 export class RNTextElement extends RNNode {
   /**
@@ -103,14 +105,35 @@ export class RNTextElement extends RNNode {
     // accessible:ios 默认 true;android 仅当有 onPress/onLongPress 才算可访问。
     const hasPress =
       props.onPress != null || props.onLongPress != null || props.onStartShouldSetResponder != null
-    const disabled = props.disabled ?? (props.accessibilityState as Record<string, unknown> | undefined)?.disabled
-    const isPressable = hasPress && disabled !== true
+    // disabled 同步(RN Text.js):_disabled = disabled ?? accessibilityState.disabled,
+    // aria-disabled 先并入 accessibilityState,再按 disabled prop 同步 accessibilityState。
+    let accState = props.accessibilityState as Record<string, unknown> | undefined
+    const ariaDisabled = props['aria-disabled'] as boolean | undefined
+    if (ariaDisabled != null && (accState == null || accState.disabled !== ariaDisabled)) {
+      accState = accState ? { ...accState, disabled: ariaDisabled } : { disabled: ariaDisabled }
+    }
+    const disabledValue = props.disabled ?? accState?.disabled
+    if (
+      disabledValue !== accState?.disabled &&
+      ((disabledValue != null && disabledValue !== false) ||
+        (accState?.disabled != null && accState?.disabled !== false))
+    ) {
+      accState = accState ? { ...accState, disabled: disabledValue } : { disabled: disabledValue }
+    }
+    const isPressable = hasPress && disabledValue !== true
     result.accessible = Platform.OS === 'ios'
       ? props.accessible !== false
       : (props.accessible == null ? isPressable : props.accessible)
     // pressable 且未显式 role/accessibilityRole → link role(RN Text.js)。
     if (isPressable && props.accessibilityRole == null && props.role == null) {
       result.accessibilityRole = 'link'
+    }
+    // 输出 disabled(同步后)与 pressable 标记(RN Text.js processedProps / PressableText)。
+    if (accState !== undefined) result.accessibilityState = accState
+    if (disabledValue !== undefined) result.disabled = disabledValue
+    if (isPressable) {
+      result.isPressable = true
+      result.isHighlighted = false
     }
     return applyAria(result)
   }
