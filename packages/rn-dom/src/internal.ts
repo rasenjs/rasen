@@ -242,6 +242,12 @@ export function submitToRoot(body: RNDomInternalNode): void {
   }
 
   fabricUIManager.completeRoot(body[FABRIC_NODE_ID], childSet)
+
+  // ⚠️ 提交完成后必须重置 body 自身的 childrenDirty。否则它一旦置 true 就
+  // 恒 true（markDirty 的去重 `if (node.__RN_childrenDirty) return` 会跳过
+  // scheduleFlush）→ 手动 appendChild / 后续变更永远不触发渲染，破坏
+  // DOM-like 语义（appendChild 后应渲染）。
+  body.__RN_childrenDirty = false
 }
 
 /**

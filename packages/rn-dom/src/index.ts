@@ -508,8 +508,10 @@ export function dispatchCommand(
   try {
     const uim = getFabricUIManager()
     const n = node as unknown as RNDomInternalNode
-    const tag = n[FABRIC_NODE_ID]
-    const shadowNode = uim.findShadowNodeByTag_DEPRECATED?.(tag)
+    // 优先用挂载节点的 shadowNode（FABRIC_NODE）。对 DebuggingOverlay 等
+    // findShadowNodeByTag_DEPRECATED 拿不到的节点（返回 null）也有效。
+    const shadowNode =
+      n[FABRIC_NODE] ?? uim.findShadowNodeByTag_DEPRECATED?.(n[FABRIC_NODE_ID])
     if (shadowNode && uim.dispatchCommand) {
       uim.dispatchCommand(shadowNode, commandName, args)
     }
