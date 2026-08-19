@@ -32,6 +32,23 @@ export * from './utils'
 // 导出path相关类型
 export type { PathPoint } from './components/path'
 
+// 组件 props 类型（供 JSX 增强、组合等场景引用实际组件属性）
+export type { RectProps } from './components/rect'
+export type { TextProps } from './components/text'
+export type { LineProps } from './components/line'
+export type { CircleProps } from './components/circle'
+export type { EllipseProps } from './components/ellipse'
+export type { ArcProps } from './components/arc'
+export type { RingProps } from './components/ring'
+export type { StarProps } from './components/star'
+export type { WedgeProps } from './components/wedge'
+export type { PolygonProps } from './components/polygon'
+export type { ArrowProps } from './components/arrow'
+export type { ImageProps } from './components/image'
+export type { SpriteProps } from './components/sprite'
+export type { PathProps } from './components/path'
+export type { GroupProps } from './components/group'
+
 // 类型导出
 export type {
   // 基础类型

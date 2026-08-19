@@ -254,10 +254,12 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
           const stop = watchObjectProps(
             styleValue as Record<string, unknown>,
             (key, value) => {
+              // setProperty only accepts kebab-case; convert camelCase keys
+              const cssKey = key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
               if (value === null || value === undefined) {
-                el.style.removeProperty(key)
+                el.style.removeProperty(cssKey)
               } else {
-                el.style.setProperty(key, String(value))
+                el.style.setProperty(cssKey, String(value))
               }
             },
             !hydrated

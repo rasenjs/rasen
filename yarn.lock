@@ -3048,6 +3048,50 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@rasenjs/examples-craft@workspace:examples/craft":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/examples-craft@workspace:examples/craft"
+  dependencies:
+    "@rasenjs/core": "workspace:*"
+    "@rasenjs/dom": "workspace:*"
+    "@rasenjs/math": "workspace:*"
+    "@rasenjs/reactive-signals": "workspace:*"
+    "@rasenjs/vite-plugin-rasen": "workspace:*"
+    "@rasenjs/webgl": "workspace:*"
+    typescript: "npm:^5.3.3"
+    vite: "npm:^5.0.7"
+  languageName: unknown
+  linkType: soft
+
+"@rasenjs/examples-fps@workspace:examples/fps":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/examples-fps@workspace:examples/fps"
+  dependencies:
+    "@rasenjs/core": "workspace:*"
+    "@rasenjs/dom": "workspace:*"
+    "@rasenjs/math": "workspace:*"
+    "@rasenjs/reactive-signals": "workspace:*"
+    "@rasenjs/vite-plugin-rasen": "workspace:*"
+    "@rasenjs/webgl": "workspace:*"
+    typescript: "npm:^5.3.3"
+    vite: "npm:^5.0.7"
+  languageName: unknown
+  linkType: soft
+
+"@rasenjs/examples-mario@workspace:examples/mario":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/examples-mario@workspace:examples/mario"
+  dependencies:
+    "@rasenjs/canvas-2d": "workspace:*"
+    "@rasenjs/core": "workspace:*"
+    "@rasenjs/dom": "workspace:*"
+    "@rasenjs/reactive-signals": "workspace:*"
+    "@rasenjs/vite-plugin-rasen": "workspace:*"
+    typescript: "npm:^5.3.3"
+    vite: "npm:^5.0.7"
+  languageName: unknown
+  linkType: soft
+
 "@rasenjs/examples-react-native@workspace:examples/react-native":
   version: 0.0.0-use.local
   resolution: "@rasenjs/examples-react-native@workspace:examples/react-native"
@@ -3152,7 +3196,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/math@workspace:^, @rasenjs/math@workspace:packages/math":
+"@rasenjs/math@workspace:*, @rasenjs/math@workspace:^, @rasenjs/math@workspace:packages/math":
   version: 0.0.0-use.local
   resolution: "@rasenjs/math@workspace:packages/math"
   languageName: unknown

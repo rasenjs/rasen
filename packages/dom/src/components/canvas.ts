@@ -1,5 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import { unrefValue } from '@rasenjs/core'
+import { getReactiveRuntime, unrefValue } from '@rasenjs/core'
 
 interface GPUAdapter {
   requestDevice: () => Promise<unknown>
@@ -15,6 +15,14 @@ interface NavigatorWithGPU extends Navigator {
  * 获取 Canvas 渲染上下文的函数类型
  */
 export type ContextGetter<Ctx> = (canvas: HTMLCanvasElement) => Ctx | null
+
+/**
+ * Canvas context options — standard WebGL attributes plus Rasen renderer
+ * options (`clearColor`) which the RenderContext reads from the canvas.
+ */
+export type CanvasContextOptions = WebGLContextAttributes & {
+  clearColor?: string
+}
 
 /**
  * 预定义的上下文获取器
@@ -95,7 +103,7 @@ export function canvas(props: {
   width: PropValue<number>
   height: PropValue<number>
   contextType: 'webgl'
-  contextOptions?: WebGLContextAttributes
+  contextOptions?: CanvasContextOptions
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
@@ -106,7 +114,7 @@ export function canvas(props: {
   width: PropValue<number>
   height: PropValue<number>
   contextType: 'webgl2'
-  contextOptions?: WebGLContextAttributes
+  contextOptions?: CanvasContextOptions
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
@@ -191,8 +199,16 @@ export function canvas<Ctx>(props: {
     } else {
       // 使用预定义的上下文类型
       const contextType = props.contextType || '2d'
-      const getter = contextGetters[contextType]
-      ctx = getter(canvasEl) as Ctx
+      if (props.contextOptions && contextType !== '2d') {
+        // Pass WebGL context attributes through (preserveDrawingBuffer, …).
+        ctx = canvasEl.getContext(
+          contextType,
+          props.contextOptions,
+        ) as Ctx
+      } else {
+        const getter = contextGetters[contextType]
+        ctx = getter(canvasEl) as Ctx
+      }
     }
 
     if (!ctx) {
@@ -208,11 +224,35 @@ export function canvas<Ctx>(props: {
       ctx2d.scale(dpr, dpr)
     }
 
+    // React to size changes: keep drawingBuffer + logical size in sync so the
+    // visible area grows with the window instead of stretching.
+    const runtime = getReactiveRuntime()
+    const stopSizeWatch = runtime.watch(
+      () => [unrefValue(props.width), unrefValue(props.height), dpr] as const,
+      ([w, h]) => {
+        canvasEl.width = w * dpr
+        canvasEl.height = h * dpr
+        canvasEl.style.width = `${w}px`
+        canvasEl.style.height = `${h}px`
+        canvasEl.dataset.logicalWidth = String(w)
+        canvasEl.dataset.logicalHeight = String(h)
+        if (contextType === '2d' && !props.getContext) {
+          // canvas.width reset clears the transform — re-apply DPR scale.
+          const ctx2d = ctx as unknown as CanvasRenderingContext2D
+          ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0)
+        }
+        // Notify renderers (RenderContext listens) so the viewport + projection
+        // are recomputed even when the aspect ratio is unchanged.
+        canvasEl.dispatchEvent(new Event('rasen:resize'))
+      },
+    )
+
     // 挂载子组件到渲染上下文
     const childUnmounts = props.children.map((child) => child(ctx))
 
     // 返回 unmount 函数
     return () => {
+      stopSizeWatch()
       childUnmounts.forEach((unmount) => unmount?.())
       canvasEl.remove()
     }

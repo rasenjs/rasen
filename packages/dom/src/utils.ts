@@ -48,7 +48,10 @@ export function setStyle(
     if (value === null || value === undefined) {
       element.style.removeProperty(key)
     } else {
-      element.style.setProperty(key, String(value))
+      // setProperty only accepts kebab-case property names; camelCase keys
+      // (flexDirection, alignItems, …) must be converted first.
+      const cssKey = key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
+      element.style.setProperty(cssKey, String(value))
     }
   }
 }

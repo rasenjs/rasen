@@ -18,7 +18,7 @@ export type { TransitionConfig } from './transition'
 export { transitionGroup, listFade, listSlide } from './transition-group'
 export type { TransitionGroupConfig } from './transition-group'
 export { canvas, contextGetters } from './canvas'
-export type { ContextGetter } from './canvas'
+export type { ContextGetter, CanvasContextOptions } from './canvas'
 export { lazy, createLazy } from './lazy'
 export type { LazyConfig, CreateLazy } from './lazy'
 export {
