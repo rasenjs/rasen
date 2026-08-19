@@ -160,13 +160,15 @@ export function createReactiveRuntime(): ReactiveRuntime {
     },
 
     unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
-      if (typeof value === 'function') {
-        return (value as () => T)()
-      }
+      // Vue 语义：只解包 ref，不调用 getter（getter 由 core 的 toValue 处理）
       if (this.isRef(value)) {
         return (value as Ref<T>).value
       }
       return value as T
+    },
+
+    setValue<T>(ref: Ref<T>, value: T): void {
+      ;(ref as { value: T }).value = value
     },
 
     isRef(value: unknown): value is Ref<unknown> | ReadonlyRef<unknown> {
@@ -175,10 +177,6 @@ export function createReactiveRuntime(): ReactiveRuntime {
         typeof value === 'object' && 
         LISTEN_SYMBOL in value
       )
-    },
-
-    isReactive<T extends object>(_value: T): boolean {
-      return false
     }
   }
 }

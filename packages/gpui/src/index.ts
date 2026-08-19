@@ -54,7 +54,7 @@ export interface TextProps {
 
 // ============ Utility Functions ============
 
-function unrefValue<T>(value: PropValue<T>): T {
+function toValue<T>(value: PropValue<T>): T {
   if (value && typeof value === 'object' && 'value' in value) {
     return (value as Ref<T>).value
   }
@@ -94,7 +94,7 @@ export const div: SyncComponent<GpuiHost, [DivProps]> = (props) => {
     
     const descriptor: ElementDescriptor = {
       type: 'div',
-      class: unrefValue(props.class) || '',
+      class: toValue(props.class) || '',
       children: [],
       handlers: {},
     }
@@ -145,8 +145,8 @@ export const text: SyncComponent<GpuiHost, [TextProps]> = (props) => {
     // === Mount Phase ===
     const descriptor: ElementDescriptor = {
       type: 'text',
-      class: unrefValue(props.class) || '',
-      text: String(unrefValue(props.children)),
+      class: toValue(props.class) || '',
+      text: String(toValue(props.children)),
     }
     
     host.appendChild(descriptor)
@@ -167,7 +167,7 @@ export const button: SyncComponent<GpuiHost, [DivProps & { label?: PropValue<str
     
     const descriptor: ElementDescriptor = {
       type: 'div',
-      class: 'cursor-pointer ' + (unrefValue(props.class) || ''),
+      class: 'cursor-pointer ' + (toValue(props.class) || ''),
       children: [],
       handlers: {},
     }

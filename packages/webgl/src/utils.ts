@@ -3,14 +3,13 @@
  */
 
 import type { Ref, ReadonlyRef, MaybeRef, Color } from './types'
+import { unref as coreUnref } from '@rasenjs/core'
 
 /**
  * Unwrap a potentially reactive value
  */
 export function unref<T>(value: MaybeRef<T>): T {
-  return typeof value === 'object' && value !== null && 'value' in value
-    ? (value as Ref<T> | ReadonlyRef<T>).value
-    : (value as T)
+  return coreUnref(value as T | Ref<T> | ReadonlyRef<T>)
 }
 
 // Color cache for frequently used colors

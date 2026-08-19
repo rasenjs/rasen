@@ -12,16 +12,12 @@ import {
   computed as vueComputed,
   unref as vueUnref,
   isRef,
-  isReactive as vueIsReactive,
   type WatchStopHandle,
   type WatchOptions,
   type Ref as VueRef,
   type ComputedRef
 } from '@vue/reactivity'
 import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
-
-// Symbol for identifying Rasen refs (Vue refs are already marked by Vue's internal implementation)
-const RASEN_REF_SYMBOL = Symbol('rasen.vue.ref')
 
 /**
  * Creates Vue reactive runtime
@@ -48,37 +44,25 @@ export function createReactiveRuntime(): ReactiveRuntime {
     },
 
     ref<T>(value: T): Ref<T> {
-      const ref = vueRef(value) as unknown as Ref<T>
-      // Mark as Rasen ref
-      Object.defineProperty(ref, RASEN_REF_SYMBOL, { value: true, enumerable: false })
-      return ref
+      return vueRef(value) as unknown as Ref<T>
     },
 
     computed<T>(getter: () => T): ReadonlyRef<T> {
-      const computed = vueComputed(getter) as unknown as ReadonlyRef<T>
-      // Mark as Rasen ref
-      Object.defineProperty(computed, RASEN_REF_SYMBOL, { value: true, enumerable: false })
-      return computed
+      return vueComputed(getter) as unknown as ReadonlyRef<T>
     },
 
     unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
-      // Check if it's a getter function
-      if (typeof value === 'function') {
-        return (value as () => T)()
-      }
+      // Vue 语义：只解包 ref，不调用 getter（getter 由 core 的 toValue 处理）
       return (isRef(value) ? vueUnref(value as VueRef<T> | ComputedRef<T>) : value) as T
     },
 
-    isRef(value: unknown): value is Ref<unknown> | ReadonlyRef<unknown> {
-      return (
-        value !== null &&
-        typeof value === 'object' &&
-        (RASEN_REF_SYMBOL in value || isRef(value))
-      )
+    setValue<T>(ref: Ref<T>, value: T): void {
+      ;(ref as VueRef<T>).value = value
     },
 
-    isReactive<T extends object>(value: T): boolean {
-      return vueIsReactive(value)
+    isRef(value: unknown): value is Ref<unknown> | ReadonlyRef<unknown> {
+      // Vue 原生 isRef 已覆盖 ref 和 computed（通过 __v_isRef 标记）
+      return isRef(value)
     }
   }
 }

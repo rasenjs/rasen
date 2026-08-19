@@ -1,4 +1,4 @@
-import { ref, type Ref } from '@rasenjs/core'
+import { ref, unref, setValue, type Ref } from '@rasenjs/core'
 import type { FrameRef, FrameOptions } from './types'
 
 const DEFAULT_FRAME_RATE = 60
@@ -44,13 +44,13 @@ function createFrameRef(options: FrameOptions): FrameRef & Ref<number> {
         } else {
           frameIndex = frames.length - 1
           isPlaying = false
-          valueRef.value = frames[frameIndex]
+          setValue(valueRef, frames[frameIndex])
           return
         }
       }
     }
 
-    valueRef.value = frames[frameIndex]
+    setValue(valueRef, frames[frameIndex])
 
     if (isPlaying) {
       rafId = requestAnimationFrame(tick)
@@ -85,7 +85,7 @@ function createFrameRef(options: FrameOptions): FrameRef & Ref<number> {
       rafId = null
     }
     
-    valueRef.value = frames[0] ?? 0
+    setValue(valueRef, frames[0] ?? 0)
   }
 
   const setFrames = (newFrames: number[], opts?: FrameOptions) => {
@@ -95,12 +95,12 @@ function createFrameRef(options: FrameOptions): FrameRef & Ref<number> {
     
     frameIndex = 0
     elapsed = 0
-    valueRef.value = frames[0] ?? 0
+    setValue(valueRef, frames[0] ?? 0)
   }
 
   const frameRef: FrameRef & Ref<number> = {
-    get value() { return valueRef.value },
-    set value(v: number) { valueRef.value = v },
+    get value() { return unref(valueRef) },
+    set value(v: number) { setValue(valueRef, v) },
     get isAnimating() { return isPlaying && !isPaused },
     get isPlaying() { return isPlaying },
     get isPaused() { return isPaused },

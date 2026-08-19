@@ -49,6 +49,10 @@ function createMockReactiveRuntime(): ReactiveRuntime {
       return value as T
     },
 
+    setValue: <T>(ref: Ref<T>, value: T): void => {
+      ;(ref as { value: T }).value = value
+    },
+
     isRef: (value: unknown): boolean => {
       return (
         value !== null &&

@@ -181,7 +181,7 @@ fn generate_builtin_gpui_module() -> String {
         
         function ref(v) { return new RefImpl(v); }
         
-        function unrefValue(v) {
+        function toValue(v) {
             if (v && typeof v === 'object' && 'value' in v) {
                 return v.value;
             }
@@ -199,7 +199,7 @@ fn generate_builtin_gpui_module() -> String {
                 runFn(); 
                 return function() {}; 
             },
-            unref: unrefValue,
+            unref: toValue,
             isRef: isRef
         };
         
@@ -228,7 +228,7 @@ fn generate_builtin_gpui_module() -> String {
                 
                 var desc = {
                     type: 'div',
-                    class: unrefValue(props.class) || '',
+                    class: toValue(props.class) || '',
                     children: [],
                     handlers: {}
                 };
@@ -264,10 +264,10 @@ fn generate_builtin_gpui_module() -> String {
         function text(props) {
             props = props || {};
             return function mount(host) {
-                var t = unrefValue(props.text);
+                var t = toValue(props.text);
                 var desc = {
                     type: 'text',
-                    class: unrefValue(props.class) || '',
+                    class: toValue(props.class) || '',
                     text: t != null ? String(t) : ''
                 };
                 host.appendChild(desc);
@@ -281,7 +281,7 @@ fn generate_builtin_gpui_module() -> String {
             for (var k in props) {
                 newProps[k] = props[k];
             }
-            newProps.class = 'cursor-pointer ' + (unrefValue(props.class) || '');
+            newProps.class = 'cursor-pointer ' + (toValue(props.class) || '');
             return div(newProps);
         }
         
@@ -334,7 +334,7 @@ fn generate_builtin_gpui_module() -> String {
             ref: ref,
             computed: __modules['@rasenjs/reactive-signals'].computed,
             watch: __modules['@rasenjs/reactive-signals'].watch,
-            unref: unrefValue,
+            unref: toValue,
             isRef: isRef,
             div: div,
             text: text,

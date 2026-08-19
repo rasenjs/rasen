@@ -31,7 +31,7 @@ export type Unmount<Node = unknown> = (() => void) & { node?: Node }
  *   const count = ref(props.initial)
  *   return (parent) => {
  *     const el = document.createElement('div')
- *     el.textContent = String(count.value)
+ *     el.textContent = String(unref(count))
  *     parent.appendChild(el)
  *
  *     const stop = watch(count, (v) => el.textContent = String(v))
@@ -97,7 +97,7 @@ export type Getter<T> = () => T
  * <div class={cls}>
  *
  * // Getter - 支持复杂表达式
- * <div class={() => `btn ${variant.value}`}>
- * <div class={() => isActive.value ? 'active' : ''}>
+ * <div class={() => `btn ${unref(variant)}`}>
+ * <div class={() => unref(isActive) ? 'active' : ''}>
  */
 export type PropValue<T = unknown> = T | Ref<T> | ReadonlyRef<T> | Getter<T>

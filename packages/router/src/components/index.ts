@@ -8,7 +8,7 @@
  * 使用 core 的 match 组件实现 RouterView
  */
 
-import { match, getReactiveRuntime, type MatchHostHooks, type Mountable } from '@rasenjs/core'
+import { match, getReactiveRuntime, unref, setValue, type MatchHostHooks, type Mountable } from '@rasenjs/core'
 import type { 
   Router, 
   Route, 
@@ -49,18 +49,18 @@ export function makeRouterReactive<TRoutes extends Record<string, any>>(
   const currentMatchRef = runtime.ref<RouteMatch | null>(null)
   
   // 初始化
-  currentMatchRef.value = router.current
+  setValue(currentMatchRef, router.current)
 
   // 监听所有路由变化
   router.afterEach((to) => {
-    currentMatchRef.value = to
+    setValue(currentMatchRef, to)
   })
 
   // 返回一个代理对象，让 current 返回响应式值
   return {
     ...router,
     get current() {
-      return currentMatchRef.value
+      return unref(currentMatchRef)
     }
   }
 }

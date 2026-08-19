@@ -1,4 +1,4 @@
-import { getReactiveRuntime, unrefValue } from '../reactive'
+import { getReactiveRuntime, toValue } from '../reactive'
 import { com } from '../com'
 import { type Mountable, type PropValue } from '../types'
 
@@ -129,12 +129,9 @@ export const when = com(
       }
 
       // 监听条件变化（由 com 自动清理）
-      // 如果 condition 是函数，直接作为 getter 传递以支持依赖追踪
-      // 否则通过 unrefValue 处理 Ref/computed
-      const conditionSource: () => boolean =
-        typeof config.condition === 'function'
-          ? config.condition
-          : () => unrefValue(config.condition)
+      // toValue 统一处理 getter / Ref / computed / 普通值，
+      // getter 在 watch 内执行以支持依赖追踪
+      const conditionSource: () => boolean = () => toValue(config.condition)
 
       runtime.watch(
         conditionSource,

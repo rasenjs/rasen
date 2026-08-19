@@ -1,4 +1,4 @@
-import type { PropValue, Ref, Mountable } from '@rasenjs/core'
+import { setValue, type PropValue, type Ref, type Mountable } from '@rasenjs/core'
 import { unref, setAttribute, setStyle, watchProp, watchObjectProps } from '../utils'
 import { warnInvalidEventCase } from '../utils/dev-warnings'
 import { getHydrationContext } from '../hydration-context'
@@ -427,7 +427,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 
     // ref - 设置元素引用
     if (props.ref) {
-      props.ref.value = el
+      setValue(props.ref, el)
     }
 
     // 只有非 hydration 模式才需要 appendChild
@@ -439,7 +439,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
     const unmount = () => {
       // 清理 ref
       if (props.ref) {
-        props.ref.value = null
+        setValue(props.ref, null)
       }
       stops.forEach((stop) => stop())
       childUnmounts.forEach((u, index) => {

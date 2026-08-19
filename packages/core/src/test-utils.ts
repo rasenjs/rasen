@@ -18,10 +18,10 @@ export function runReactiveRuntimeTests(
       it('should create a reactive reference', () => {
         const runtime = createRuntime()
         const count = runtime.ref(0)
-        expect(count.value).toBe(0)
+        expect(runtime.unref(count)).toBe(0)
         
-        count.value = 5
-        expect(count.value).toBe(5)
+        runtime.setValue(count, 5)
+        expect(runtime.unref(count)).toBe(5)
       })
     })
 
@@ -29,12 +29,12 @@ export function runReactiveRuntimeTests(
       it('should create a computed value', () => {
         const runtime = createRuntime()
         const count = runtime.ref(10)
-        const doubled = runtime.computed(() => count.value * 2)
+        const doubled = runtime.computed(() => runtime.unref(count) * 2)
         
-        expect(doubled.value).toBe(20)
+        expect(runtime.unref(doubled)).toBe(20)
         
-        count.value = 15
-        expect(doubled.value).toBe(30)
+        runtime.setValue(count, 15)
+        expect(runtime.unref(doubled)).toBe(30)
       })
     })
 
@@ -44,9 +44,9 @@ export function runReactiveRuntimeTests(
         const count = runtime.ref(0)
         const callback = vi.fn()
         
-        runtime.watch(() => count.value, callback)
+        runtime.watch(() => runtime.unref(count), callback)
         
-        count.value = 5
+        runtime.setValue(count, 5)
         
         // Wait for async callback
         await new Promise(resolve => setTimeout(resolve, 10))
@@ -63,7 +63,7 @@ export function runReactiveRuntimeTests(
         const count = runtime.ref(10)
         const callback = vi.fn()
         
-        runtime.watch(() => count.value, callback, { immediate: true })
+        runtime.watch(() => runtime.unref(count), callback, { immediate: true })
         
         await new Promise(resolve => setTimeout(resolve, 10))
         
@@ -79,16 +79,16 @@ export function runReactiveRuntimeTests(
         const count = runtime.ref(0)
         const callback = vi.fn()
         
-        const stop = runtime.watch(() => count.value, callback)
+        const stop = runtime.watch(() => runtime.unref(count), callback)
         
-        count.value = 5
+        runtime.setValue(count, 5)
         await new Promise(resolve => setTimeout(resolve, 10))
         
         expect(callback).toHaveBeenCalledTimes(1)
         
         stop()
         
-        count.value = 10
+        runtime.setValue(count, 10)
         await new Promise(resolve => setTimeout(resolve, 10))
         
         expect(callback).toHaveBeenCalledTimes(1) // Should not be called again
@@ -100,9 +100,9 @@ export function runReactiveRuntimeTests(
         const b = runtime.ref(2)
         const callback = vi.fn()
         
-        runtime.watch(() => a.value + b.value, callback)
+        runtime.watch(() => runtime.unref(a) + runtime.unref(b), callback)
         
-        a.value = 10
+        runtime.setValue(a, 10)
         await new Promise(resolve => setTimeout(resolve, 10))
         expect(callback).toHaveBeenCalledTimes(1)
         // Only check first two parameters
@@ -110,7 +110,7 @@ export function runReactiveRuntimeTests(
         expect(firstCall[0]).toBe(12)
         expect(firstCall[1]).toBe(3)
         
-        b.value = 20
+        runtime.setValue(b, 20)
         await new Promise(resolve => setTimeout(resolve, 10))
         expect(callback).toHaveBeenCalledTimes(2)
         const secondCall = callback.mock.calls[1]
@@ -125,9 +125,9 @@ export function runReactiveRuntimeTests(
         const count = runtime.ref(0)
         const callback = vi.fn()
         
-        runtime.watch(() => count.value, callback)
+        runtime.watch(() => runtime.unref(count), callback)
         
-        count.value = 5
+        runtime.setValue(count, 5)
         await new Promise(resolve => setTimeout(resolve, 10))
         
         expect(callback).toHaveBeenCalled()
@@ -144,7 +144,7 @@ export function runReactiveRuntimeTests(
         scope.run(() => {
           const count = runtime.ref(0)
           
-          runtime.watch(() => count.value, () => {
+          runtime.watch(() => runtime.unref(count), () => {
             watchCallCount++
           }, { immediate: true })
           
@@ -165,7 +165,7 @@ export function runReactiveRuntimeTests(
         scope.run(() => {
           for (let i = 0; i < watchCount; i++) {
             const state = runtime.ref(i)
-            runtime.watch(() => state.value, () => {})
+            runtime.watch(() => runtime.unref(state), () => {})
           }
         })
         
@@ -184,7 +184,7 @@ export function runReactiveRuntimeTests(
         
         outerScope.run(() => {
           const outerRef = runtime.ref(0)
-          runtime.watch(() => outerRef.value, () => {
+          runtime.watch(() => runtime.unref(outerRef), () => {
             outerWatchCalled = true
           }, { immediate: true })
 
@@ -193,7 +193,7 @@ export function runReactiveRuntimeTests(
           const innerScope = runtime.effectScope()
           innerScope.run(() => {
             const innerRef = runtime.ref(0)
-            runtime.watch(() => innerRef.value, () => {
+            runtime.watch(() => runtime.unref(innerRef), () => {
               innerWatchCalled = true
             }, { immediate: true })
             
@@ -212,14 +212,14 @@ export function runReactiveRuntimeTests(
         
         scope.run(() => {
           const ref1 = runtime.ref(0)
-          runtime.watch(() => ref1.value, () => {})
+          runtime.watch(() => runtime.unref(ref1), () => {})
         })
 
         scope.stop()
 
         const result = scope.run(() => {
           const ref2 = runtime.ref(0)
-          runtime.watch(() => ref2.value, () => {})
+          runtime.watch(() => runtime.unref(ref2), () => {})
           return 'executed'
         })
 
@@ -232,7 +232,7 @@ export function runReactiveRuntimeTests(
         
         scope.run(() => {
           const ref = runtime.ref(0)
-          runtime.watch(() => ref.value, () => {})
+          runtime.watch(() => runtime.unref(ref), () => {})
         })
 
         scope.stop()
@@ -253,7 +253,7 @@ export function runReactiveRuntimeTests(
       it('should unref a computed', () => {
         const runtime = createRuntime()
         const count = runtime.ref(10)
-        const doubled = runtime.computed(() => count.value * 2)
+        const doubled = runtime.computed(() => runtime.unref(count) * 2)
         expect(runtime.unref(doubled)).toBe(20)
       })
 

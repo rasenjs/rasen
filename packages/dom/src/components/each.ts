@@ -1,4 +1,4 @@
-import { eachImpl, repeatImpl, type Mountable, type Ref } from '@rasenjs/core'
+import { eachImpl, repeatImpl, toValue, type Mountable, type Ref, type PropValue } from '@rasenjs/core'
 import { hostHooks } from '../host-hooks'
 
 /**
@@ -21,17 +21,9 @@ export function each<T extends object>(
   items: T[] | Ref<T[]> | (() => T[]),
   render: (item: T, index: number) => Mountable<HTMLElement>
 ): Mountable<HTMLElement> {
-  // 判断是否为 Ref（有 value 属性）
-  const isRef = (v: unknown): v is Ref<T[]> =>
-    v !== null && typeof v === 'object' && 'value' in v
-
   return eachImpl<T, HTMLElement, Node>({
-    items:
-      typeof items === 'function'
-        ? items
-        : isRef(items)
-          ? () => items.value
-          : () => items, // 普通数组
+    // toValue 统一处理 getter / Ref / 普通数组
+    items: () => toValue(items),
     render,
     ...hostHooks
   })
@@ -60,8 +52,8 @@ export function repeat<T>(
 ): Mountable<HTMLElement> {
   return repeatImpl<T, HTMLElement, Node>({
     items: () => {
-      const value =
-        typeof itemsOrCount === 'function' ? itemsOrCount() : itemsOrCount.value
+      // toValue 统一处理 getter / Ref / 普通值
+      const value = toValue(itemsOrCount as PropValue<T[] | number>)
 
       if (typeof value === 'number') {
         return Array.from({ length: value }, (_, i) => i) as T[]

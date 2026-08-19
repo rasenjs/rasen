@@ -71,16 +71,16 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
       return value as T
     },
 
+    setValue: <T>(ref: Ref<T>, value: T): void => {
+      ;(ref as { value: T }).value = value
+    },
+
     isRef: (value: unknown): boolean => {
       return (
         value !== null &&
         typeof value === 'object' &&
         refs.has(value as { value: unknown })
       )
-    },
-
-    isReactive: <T extends object>(value: T): boolean => {
-      return reactiveObjects.has(value)
     },
 
     markReactive: (obj: object) => {

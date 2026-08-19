@@ -1,4 +1,4 @@
-import { ref, type Ref } from '@rasenjs/core'
+import { ref, unref, setValue, type Ref } from '@rasenjs/core'
 import type { TweenRef, TweenOptions } from './types'
 import { getEasing } from './easing'
 
@@ -27,12 +27,12 @@ function createTweenRef(initial: number): TweenRef {
     const rawProgress = Math.min(elapsed / duration, 1)
     const progress = easingFn(rawProgress)
 
-    valueRef.value = interpolate(fromValue, targetValue, progress)
+    setValue(valueRef, interpolate(fromValue, targetValue, progress))
 
     if (rawProgress < 1) {
       rafId = requestAnimationFrame(tick)
     } else {
-      valueRef.value = targetValue
+      setValue(valueRef, targetValue)
       isAnimating = false
       rafId = null
       resolve?.()
@@ -54,7 +54,7 @@ function createTweenRef(initial: number): TweenRef {
     return new Promise((r) => {
       stop()
 
-      fromValue = valueRef.value
+      fromValue = unref(valueRef)
       targetValue = target
       duration = options.duration
       easingFn = getEasing(options.easing ?? 'linear')
@@ -74,13 +74,13 @@ function createTweenRef(initial: number): TweenRef {
 
   const set = (value: number) => {
     stop()
-    valueRef.value = value
+    setValue(valueRef, value)
     fromValue = value
     targetValue = value
   }
 
   return {
-    get value() { return valueRef.value },
+    get value() { return unref(valueRef) },
     get isAnimating() { return isAnimating },
     to,
     set,

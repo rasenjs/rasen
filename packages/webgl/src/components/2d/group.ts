@@ -90,7 +90,7 @@ export const group = com(
       const rotation: Ref<number> = runtime.isRef(props.rotation) ? props.rotation as Ref<number> : runtime.ref(unref(props.rotation) ?? 0)
       const rotationX: Ref<number> = runtime.isRef(props.rotationX) ? props.rotationX as Ref<number> : runtime.ref(unref(props.rotationX) ?? 0)
       const rotationY: Ref<number> = runtime.isRef(props.rotationY) ? props.rotationY as Ref<number> : runtime.ref(unref(props.rotationY) ?? 0)
-      const rotationZ: Ref<number> = runtime.isRef(props.rotationZ) ? props.rotationZ as Ref<number> : runtime.ref(unref(props.rotationZ) ?? rotation.value)
+      const rotationZ: Ref<number> = runtime.isRef(props.rotationZ) ? props.rotationZ as Ref<number> : runtime.ref(unref(props.rotationZ) ?? unref(rotation))
       const scaleX: Ref<number> = runtime.isRef(props.scaleX) ? props.scaleX as Ref<number> : runtime.ref(unref(props.scaleX) ?? 1)
       const scaleY: Ref<number> = runtime.isRef(props.scaleY) ? props.scaleY as Ref<number> : runtime.ref(unref(props.scaleY) ?? 1)
       const scaleZ: Ref<number> = runtime.isRef(props.scaleZ) ? props.scaleZ as Ref<number> : runtime.ref(unref(props.scaleZ) ?? 1)
@@ -99,21 +99,21 @@ export const group = com(
       
       // Group's draw function - apply transform and draw children
       const drawGroup = () => {
-        if (!visible.value || opacity.value <= 0) return
+        if (!unref(visible) || unref(opacity) <= 0) return
         if (!groupContext) return
         
         renderContext.pushTransform({
-          tx: x.value,
-          ty: y.value,
-          tz: z.value,
-          rotation: rotation.value,
-          rotationX: rotationX.value,
-          rotationY: rotationY.value,
-          rotationZ: rotationZ.value,
-          scaleX: scaleX.value,
-          scaleY: scaleY.value,
-          scaleZ: scaleZ.value,
-          opacity: opacity.value
+          tx: unref(x),
+          ty: unref(y),
+          tz: unref(z),
+          rotation: unref(rotation),
+          rotationX: unref(rotationX),
+          rotationY: unref(rotationY),
+          rotationZ: unref(rotationZ),
+          scaleX: unref(scaleX),
+          scaleY: unref(scaleY),
+          scaleZ: unref(scaleZ),
+          opacity: unref(opacity)
         })
         
         // Draw all children in group's transform context
@@ -146,18 +146,18 @@ export const group = com(
       
       runtime.watch(
         () => [
-          x.value,
-          y.value,
-          z.value,
-          rotation.value,
-          rotationX.value,
-          rotationY.value,
-          rotationZ.value,
-          scaleX.value,
-          scaleY.value,
-          scaleZ.value,
-          visible.value,
-          opacity.value
+          unref(x),
+          unref(y),
+          unref(z),
+          unref(rotation),
+          unref(rotationX),
+          unref(rotationY),
+          unref(rotationZ),
+          unref(scaleX),
+          unref(scaleY),
+          unref(scaleZ),
+          unref(visible),
+          unref(opacity)
         ],
         () => {
           renderContext.markDirty()

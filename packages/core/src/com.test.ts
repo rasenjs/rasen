@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setReactiveRuntime, getReactiveRuntime } from './reactive'
+import { setReactiveRuntime, getReactiveRuntime, unref } from './reactive'
 import { createReactiveRuntime } from '@rasenjs/reactive-signals'
 import { com } from './com'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
@@ -23,7 +23,7 @@ describe('com - 内存泄漏检测', () => {
       const count = runtime.ref(0)
       
       return (_host: unknown) => {
-        runtime.watch(() => count.value, () => {})
+        runtime.watch(() => unref(count), () => {})
         
         return () => {
           cleanupCalled = true
@@ -47,7 +47,7 @@ describe('com - 内存泄漏检测', () => {
       const value = runtime.ref(index)
       
       return (_host: unknown) => {
-        runtime.watch(() => value.value, () => {})
+        runtime.watch(() => unref(value), () => {})
         
         return () => {
           cleanupFlags[index] = true
@@ -86,7 +86,7 @@ describe('com - 内存泄漏检测', () => {
       return (_host: unknown) => {
         // 为每个状态创建 watch - 由 scope 自动管理
         states.forEach(state => {
-          runtime.watch(() => state.value, () => {})
+          runtime.watch(() => unref(state), () => {})
         })
         
         return () => {
@@ -112,7 +112,7 @@ describe('com - 内存泄漏检测', () => {
       const value = runtime.ref(id)
       
       return (_host: unknown) => {
-        runtime.watch(() => value.value, () => {})
+        runtime.watch(() => unref(value), () => {})
         
         return () => {
           cleanupLog.push(`leaf-${id}`)
@@ -125,7 +125,7 @@ describe('com - 内存泄漏检测', () => {
       const state = runtime.ref(0)
       
       return (_host: unknown) => {
-        runtime.watch(() => state.value, () => {})
+        runtime.watch(() => unref(state), () => {})
         
         // 创建子组件
         const childUnmounts: Array<() => void> = []
@@ -172,7 +172,7 @@ describe('com - 内存泄漏检测', () => {
         return (_host: unknown) => {
           // 监听所有项
           items.forEach(item => {
-            runtime.watch(() => item.value, () => {})
+            runtime.watch(() => unref(item), () => {})
           })
           
           return () => {
@@ -203,11 +203,11 @@ describe('com - 内存泄漏检测', () => {
     const Component = com((id: number) => {
       const runtime = getReactiveRuntime()
       const state = runtime.ref(id)
-      const doubled = runtime.computed(() => state.value * 2)
+      const doubled = runtime.computed(() => unref(state) * 2)
       
       return (_host: unknown) => {
-        runtime.watch(() => state.value, () => {})
-        runtime.watch(() => doubled.value, () => {})
+        runtime.watch(() => unref(state), () => {})
+        runtime.watch(() => unref(doubled), () => {})
         
         return () => {
           cleanupFlags[id] = true
@@ -251,13 +251,13 @@ describe('com - 内存泄漏检测', () => {
       const setupState = runtime.ref(0)
       
       // setup 阶段创建 watch - scope.stop() 会清理
-      runtime.watch(() => setupState.value, () => {})
+      runtime.watch(() => unref(setupState), () => {})
       
       return (_host: unknown) => {
         const mountState = runtime.ref(10)
         
         // mount 阶段创建 watch - scope.stop() 也会清理
-        runtime.watch(() => mountState.value, () => {})
+        runtime.watch(() => unref(mountState), () => {})
         
         return () => {
           cleanupCalled = true
@@ -281,11 +281,11 @@ describe('com - 内存泄漏检测', () => {
       
       const runtime = getReactiveRuntime()
       const data = runtime.ref({ value: 42 })
-      const processed = runtime.computed(() => data.value.value * 2)
+      const processed = runtime.computed(() => unref(data).value * 2)
       
       return (_host: unknown) => {
-        runtime.watch(() => data.value, () => {})
-        runtime.watch(() => processed.value, () => {})
+        runtime.watch(() => unref(data), () => {})
+        runtime.watch(() => unref(processed), () => {})
         
         return () => {
           cleanupCalled = true
@@ -312,7 +312,7 @@ describe('com - 内存泄漏检测', () => {
       
       return (_host: unknown) => {
         states.forEach(state => {
-          runtime.watch(() => state.value, () => {})
+          runtime.watch(() => unref(state), () => {})
         })
         
         return () => {

@@ -243,6 +243,9 @@ export function createMockReactiveRuntime(): ReactiveRuntime {
       }
       return value
     },
+    setValue: <T>(ref: { value: T }, value: T): void => {
+      ref.value = value
+    },
     isRef: (value: unknown) => {
       return value !== null && typeof value === 'object' && 'value' in value
     }

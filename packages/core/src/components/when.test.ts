@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
+import { setReactiveRuntime, unref, setValue, type ReactiveRuntime, type Ref } from '../reactive'
 import { when } from './when'
 
 // ============================================
@@ -62,9 +62,13 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
 
     unref: <T>(value: T | Ref<T> | { readonly value: T }) => {
       if (value && typeof value === 'object' && 'value' in value) {
-        return (value as Ref<T>).value
+        return (value as { value: T }).value
       }
       return value as T
+    },
+
+    setValue: <T>(ref: Ref<T>, value: T): void => {
+      ;(ref as { value: T }).value = value
     },
 
     isRef: (value: unknown): boolean => {
@@ -178,7 +182,7 @@ describe('when', () => {
 
     it('应该支持 computed 类型的条件', () => {
       const value = runtime.ref(10)
-      const condition = runtime.computed(() => value.value > 5)
+      const condition = runtime.computed(() => unref(value) > 5)
       const thenMounted = vi.fn()
 
       const result = when({
@@ -200,7 +204,7 @@ describe('when', () => {
       const elseMounted = vi.fn()
 
       const result = when({
-        condition: () => count.value > 5,
+        condition: () => unref(count) > 5,
         then: () => (() => {
           thenMounted()
           return () => {}
@@ -216,7 +220,7 @@ describe('when', () => {
       expect(thenMounted).not.toHaveBeenCalled()
       expect(elseMounted).toHaveBeenCalled()
 
-      count.value = 10
+      setValue(count, 10)
       runtime.triggerWatchers()
 
       expect(thenMounted).toHaveBeenCalled()
@@ -230,7 +234,7 @@ describe('when', () => {
       const elseMounted = vi.fn()
 
       const result = when({
-        condition: () => a.value + b.value > 2,
+        condition: () => unref(a) + unref(b) > 2,
         then: () => (() => {
           thenMounted()
           return () => {}
@@ -245,12 +249,12 @@ describe('when', () => {
 
       expect(thenMounted).toHaveBeenCalled()
 
-      a.value = 10
+      setValue(a, 10)
       runtime.triggerWatchers()
 
       expect(thenMounted).toHaveBeenCalledTimes(1)
 
-      b.value = -20
+      setValue(b, -20)
       runtime.triggerWatchers()
 
       expect(thenMounted).toHaveBeenCalledTimes(1)
@@ -308,7 +312,7 @@ describe('when', () => {
       expect(thenUnmounted).not.toHaveBeenCalled()
       expect(elseUnmounted).not.toHaveBeenCalled()
 
-      condition.value = false
+      setValue(condition, false)
       runtime.triggerWatchers()
 
       expect(thenUnmounted).toHaveBeenCalled()
@@ -334,7 +338,7 @@ describe('when', () => {
       result({})
       expect(elseUnmounted).not.toHaveBeenCalled()
 
-      condition.value = true
+      setValue(condition, true)
       runtime.triggerWatchers()
 
       expect(elseUnmounted).toHaveBeenCalled()

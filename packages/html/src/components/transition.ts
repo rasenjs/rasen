@@ -5,7 +5,7 @@
  * when the condition is true, and render nothing when false.
  * This maintains API compatibility with the DOM version.
  */
-import { type Mountable, type PropValue, com } from '@rasenjs/core'
+import { type Mountable, type PropValue, com, toValue } from '@rasenjs/core'
 import type { StringHost } from '../types'
 
 export interface TransitionConfig {
@@ -37,11 +37,8 @@ export const transition = com((config: TransitionConfig): Mountable<StringHost> 
       }
     }
     
-    const value = typeof when === 'boolean' 
-      ? when 
-      : typeof when === 'function' 
-        ? when() 
-        : when.value
+    // toValue 统一处理 boolean / getter / Ref
+    const value = toValue(when)
     
     render(value)
     

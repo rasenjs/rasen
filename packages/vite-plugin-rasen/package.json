@@ -34,6 +34,10 @@
   },
   "author": "Rasen Contributors",
   "license": "MIT",
+  "dependencies": {
+    "@babel/parser": "^7.29.0",
+    "@babel/traverse": "^7.29.0"
+  },
   "peerDependencies": {
     "vite": "^5.0.0 || ^6.0.0"
   }

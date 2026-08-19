@@ -5,6 +5,10 @@
 
 /**
  * 可读写的响应式引用接口（ref）
+ *
+ * 结构上暴露 `.value`（保证泛型推断与外部 ref 兼容），
+ * 但框架的规范访问路径是 unref/setValue：
+ * 适配器定义具体形状，core 内部通过 unref/setValue 访问，不直接依赖 `.value`。
  */
 export interface Ref<T = unknown> {
   value: T
@@ -20,16 +24,20 @@ export interface ReadonlyRef<T = unknown> {
 import type { PropValue } from './types'
 
 /**
- * 解包响应式值
- * 先处理 Getter 函数，然后委托给响应式运行时处理 Ref/ReadonlyRef
+ * 解包响应式值（Vue 3.3+ toValue 语义）
+ * 先判断是否为 ref（尊重运行时 isRef 的权威判断），再处理 Getter 函数
  */
-export function unrefValue<T>(value: PropValue<T>): T {
-  // 先处理 Getter 函数
+export function toValue<T>(value: PropValue<T>): T {
+  // 先判断是否为 ref（尊重运行时 isRef 的权威判断）
+  if (isRef(value)) {
+    return unref(value as Ref<T> | ReadonlyRef<T>)
+  }
+  // 再处理 Getter 函数
   if (typeof value === 'function') {
     return (value as () => T)()
   }
-  // 再委托给响应式运行时处理 Ref/ReadonlyRef
-  return getReactiveRuntime().unref(value as T | Ref<T> | ReadonlyRef<T>)
+  // 普通值原样返回
+  return value as T
 }
 
 /**
@@ -77,20 +85,19 @@ export interface ReactiveRuntime {
 
   /**
    * 解包响应式引用
-   * 支持：Ref、ReadonlyRef、普通值
-   * Getter 函数由 core 的 unrefValue 处理
+   * 是 ref 则读取值，否则原样返回（不调用 getter，getter 由 core 的 toValue 处理）
    */
   unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T
+
+  /**
+   * 写入响应式引用的值（setter）
+   */
+  setValue<T>(ref: Ref<T>, value: T): void
 
   /**
    * 判断是否为响应式引用
    */
   isRef(value: unknown): boolean
-
-  /**
-   * 判断对象是否是 reactive 创建的响应式代理
-   */
-  isReactive<T extends object>(value: T): boolean
 }
 
 /**
@@ -124,6 +131,52 @@ export function getReactiveRuntime(): ReactiveRuntime {
  */
 export function ref<T>(value: T): Ref<T> {
   return getReactiveRuntime().ref(value)
+}
+
+/**
+ * Computed 包装
+ */
+export function computed<T>(getter: () => T): ReadonlyRef<T> {
+  return getReactiveRuntime().computed(getter)
+}
+
+/**
+ * 解包响应式引用
+ * 是 ref 则读取值，否则原样返回（Vue 语义，不调用 getter）
+ */
+export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
+  return getReactiveRuntime().unref(value)
+}
+
+/**
+ * 写入响应式引用的值
+ * 库代码应使用此函数而非 `.value`，实现与响应性库的解耦
+ */
+export function setValue<T>(ref: Ref<T>, value: T): void {
+  getReactiveRuntime().setValue(ref, value)
+}
+
+/**
+ * 判断是否为响应式引用
+ */
+export function isRef(value: unknown): boolean {
+  return getReactiveRuntime().isRef(value)
+}
+
+/**
+ * 为 `.value` 形状的适配器提供默认 unref/setValue 实现
+ * Vue 原生 ref、Signals 包装 ref 等可直接展开使用
+ */
+export function valueAccessors() {
+  return {
+    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>): T =>
+      value && typeof value === 'object' && 'value' in value
+        ? (value as { value: T }).value
+        : (value as T),
+    setValue: <T>(ref: Ref<T>, value: T): void => {
+      ;(ref as { value: T }).value = value
+    }
+  }
 }
 
 /**
@@ -163,7 +216,7 @@ export function watchObjectProps(
     if (runtime.isRef(value)) {
       // Ref 或 ReadonlyRef
       if (immediate) {
-        callback(key, runtime.unref(value))
+        callback(key, unref(value as Ref<unknown>))
       }
       
       const stop = runtime.watch(

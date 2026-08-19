@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   setReactiveRuntime,
   getReactiveRuntime,
-  unrefValue,
+  toValue,
   fragment,
   each,
   repeat,
@@ -32,7 +32,6 @@ function createMockReactiveRuntime(): ReactiveRuntime {
   }> = []
 
   const refs = new WeakSet<{ value: unknown }>()
-  const reactiveObjects = new WeakSet<object>()
 
   const runtime: ReactiveRuntime = {
     ref: <T>(value: T): Ref<T> => {
@@ -42,11 +41,13 @@ function createMockReactiveRuntime(): ReactiveRuntime {
     },
 
     computed: <T>(getter: () => T) => {
-      return {
+      const c = {
         get value() {
           return getter()
         }
       }
+      refs.add(c)
+      return c
     },
 
     watch: <T>(
@@ -87,12 +88,12 @@ function createMockReactiveRuntime(): ReactiveRuntime {
       return value as T
     },
 
-    isRef: (value: unknown): boolean => {
-      return value !== null && typeof value === 'object' && refs.has(value as { value: unknown })
+    setValue: <T>(ref: Ref<T>, value: T): void => {
+      ;(ref as { value: T }).value = value
     },
 
-    isReactive: <T extends object>(value: T): boolean => {
-      return reactiveObjects.has(value)
+    isRef: (value: unknown): boolean => {
+      return value !== null && typeof value === 'object' && refs.has(value as { value: unknown })
     }
   }
 
@@ -140,21 +141,21 @@ describe('@rasenjs/core', () => {
     })
   })
 
-  describe('unrefValue', () => {
+  describe('toValue', () => {
     it('应该解包 Ref 类型', () => {
       const ref = mockRuntime.ref(42)
-      expect(unrefValue(ref)).toBe(42)
+      expect(toValue(ref)).toBe(42)
     })
 
     it('应该返回普通值', () => {
-      expect(unrefValue(100)).toBe(100)
-      expect(unrefValue('hello')).toBe('hello')
+      expect(toValue(100)).toBe(100)
+      expect(toValue('hello')).toBe('hello')
     })
 
     it('应该返回 computed 的值', () => {
       const ref = mockRuntime.ref(10)
       const computed = mockRuntime.computed(() => ref.value * 2)
-      expect(unrefValue(computed)).toBe(20)
+      expect(toValue(computed)).toBe(20)
     })
   })
 

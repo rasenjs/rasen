@@ -146,17 +146,16 @@ export function createReactiveRuntime(): ReactiveRuntime {
       return computed
     },
 
-    unref: <T>(value: T | Ref<T> | ReadonlyRef<T> | (() => T)): T => {
-      // Check if it's a getter function (but exclude Ref objects, as they also have value)
-      if (typeof value === 'function') {
-        // Execute getter function
-        return (value as () => T)()
-      }
-      // Check if it has value property (Ref or ReadonlyRef)
+    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>): T => {
+      // Vue 语义：只解包 ref，不调用 getter（getter 由 core 的 toValue 处理）
       if (value && typeof value === 'object' && 'value' in value) {
         return (value as Ref<T>).value
       }
       return value as T
+    },
+
+    setValue: <T>(ref: Ref<T>, value: T): void => {
+      ;(ref as { value: T }).value = value
     },
 
     isRef: (value: unknown): boolean => {
@@ -165,10 +164,6 @@ export function createReactiveRuntime(): ReactiveRuntime {
         typeof value === 'object' &&
         RASEN_REF_SYMBOL in value
       )
-    },
-
-    isReactive<T extends object>(_value: T): boolean {
-      return false
     }
   }
 }

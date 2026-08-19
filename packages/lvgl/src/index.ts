@@ -161,7 +161,7 @@ export interface RollerProps {
 
 // ============ Utility Functions ============
 
-function unrefValue<T>(value: PropValue<T>): T {
+function toValue<T>(value: PropValue<T>): T {
   if (value && typeof value === 'object' && 'value' in value) {
     return (value as Ref<T>).value
   }
@@ -201,7 +201,7 @@ export const div: SyncComponent<LvglHost, [DivProps]> = (props) => {
 
     const descriptor: ElementDescriptor = {
       type: 'obj',
-      class: unrefValue(props.class) || '',
+      class: toValue(props.class) || '',
       children: [],
       handlers: {}
     }
@@ -246,8 +246,8 @@ export const label: SyncComponent<LvglHost, [LabelProps]> = (props) => {
     // === Mount Phase ===
     const descriptor: ElementDescriptor = {
       type: 'label',
-      class: unrefValue(props.class) || '',
-      text: String(unrefValue(props.children))
+      class: toValue(props.class) || '',
+      text: String(toValue(props.children))
     }
 
     host.appendChild(descriptor)
@@ -275,7 +275,7 @@ export const button: SyncComponent<LvglHost, [ButtonProps]> = (props) => {
 
     const descriptor: ElementDescriptor = {
       type: 'btn',
-      class: unrefValue(props.class) || '',
+      class: toValue(props.class) || '',
       children: [],
       handlers: {}
     }
@@ -315,8 +315,8 @@ export const image: SyncComponent<LvglHost, [ImageProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'img',
-      class: unrefValue(props.class) || '',
-      src: unrefValue(props.src),
+      class: toValue(props.class) || '',
+      src: toValue(props.src),
       handlers: {}
     }
 
@@ -342,8 +342,8 @@ export const slider: SyncComponent<LvglHost, [SliderProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'slider',
-      class: unrefValue(props.class) || '',
-      value: unrefValue(props.value) ?? 0,
+      class: toValue(props.class) || '',
+      value: toValue(props.value) ?? 0,
       min: props.min ?? 0,
       max: props.max ?? 100,
       handlers: {}
@@ -353,7 +353,7 @@ export const slider: SyncComponent<LvglHost, [SliderProps]> = (props) => {
 
     if (props.onChange) {
       descriptor.handlers!.change = () =>
-        props.onChange!(unrefValue(props.value) ?? 0)
+        props.onChange!(toValue(props.value) ?? 0)
       cleanups.push(host.on('change', descriptor.handlers!.change))
     }
 
@@ -372,8 +372,8 @@ export const lvSwitch: SyncComponent<LvglHost, [SwitchProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'switch',
-      class: unrefValue(props.class) || '',
-      value: unrefValue(props.checked) ? 1 : 0,
+      class: toValue(props.class) || '',
+      value: toValue(props.checked) ? 1 : 0,
       handlers: {}
     }
 
@@ -381,7 +381,7 @@ export const lvSwitch: SyncComponent<LvglHost, [SwitchProps]> = (props) => {
 
     if (props.onChange) {
       descriptor.handlers!.change = () =>
-        props.onChange!(!unrefValue(props.checked))
+        props.onChange!(!toValue(props.checked))
       cleanups.push(host.on('change', descriptor.handlers!.change))
     }
 
@@ -400,9 +400,9 @@ export const checkbox: SyncComponent<LvglHost, [CheckboxProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'checkbox',
-      class: unrefValue(props.class) || '',
-      text: unrefValue(props.label) || '',
-      value: unrefValue(props.checked) ? 1 : 0,
+      class: toValue(props.class) || '',
+      text: toValue(props.label) || '',
+      value: toValue(props.checked) ? 1 : 0,
       handlers: {}
     }
 
@@ -410,7 +410,7 @@ export const checkbox: SyncComponent<LvglHost, [CheckboxProps]> = (props) => {
 
     if (props.onChange) {
       descriptor.handlers!.change = () =>
-        props.onChange!(!unrefValue(props.checked))
+        props.onChange!(!toValue(props.checked))
       cleanups.push(host.on('change', descriptor.handlers!.change))
     }
 
@@ -429,8 +429,8 @@ export const textarea: SyncComponent<LvglHost, [TextAreaProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'textarea',
-      class: unrefValue(props.class) || '',
-      text: unrefValue(props.value) || '',
+      class: toValue(props.class) || '',
+      text: toValue(props.value) || '',
       handlers: {}
     }
 
@@ -438,7 +438,7 @@ export const textarea: SyncComponent<LvglHost, [TextAreaProps]> = (props) => {
 
     if (props.onChange) {
       descriptor.handlers!.change = () =>
-        props.onChange!(unrefValue(props.value) || '')
+        props.onChange!(toValue(props.value) || '')
       cleanups.push(host.on('change', descriptor.handlers!.change))
     }
 
@@ -457,8 +457,8 @@ export const arc: SyncComponent<LvglHost, [ArcProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'arc',
-      class: unrefValue(props.class) || '',
-      value: unrefValue(props.value) ?? 0,
+      class: toValue(props.class) || '',
+      value: toValue(props.value) ?? 0,
       min: props.min ?? 0,
       max: props.max ?? 100,
       handlers: {}
@@ -468,7 +468,7 @@ export const arc: SyncComponent<LvglHost, [ArcProps]> = (props) => {
 
     if (props.onChange) {
       descriptor.handlers!.change = () =>
-        props.onChange!(unrefValue(props.value) ?? 0)
+        props.onChange!(toValue(props.value) ?? 0)
       cleanups.push(host.on('change', descriptor.handlers!.change))
     }
 
@@ -487,8 +487,8 @@ export const bar: SyncComponent<LvglHost, [BarProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'bar',
-      class: unrefValue(props.class) || '',
-      value: unrefValue(props.value) ?? 0,
+      class: toValue(props.class) || '',
+      value: toValue(props.value) ?? 0,
       min: props.min ?? 0,
       max: props.max ?? 100
     }
@@ -506,7 +506,7 @@ export const spinner: SyncComponent<LvglHost, [SpinnerProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'spinner',
-      class: unrefValue(props.class) || ''
+      class: toValue(props.class) || ''
     }
 
     host.appendChild(descriptor)
@@ -522,9 +522,9 @@ export const dropdown: SyncComponent<LvglHost, [DropdownProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'dropdown',
-      class: unrefValue(props.class) || '',
-      options: unrefValue(props.options),
-      value: unrefValue(props.selected) ?? 0,
+      class: toValue(props.class) || '',
+      options: toValue(props.options),
+      value: toValue(props.selected) ?? 0,
       handlers: {}
     }
 
@@ -532,7 +532,7 @@ export const dropdown: SyncComponent<LvglHost, [DropdownProps]> = (props) => {
 
     if (props.onChange) {
       descriptor.handlers!.change = () =>
-        props.onChange!(unrefValue(props.selected) ?? 0)
+        props.onChange!(toValue(props.selected) ?? 0)
       cleanups.push(host.on('change', descriptor.handlers!.change))
     }
 
@@ -551,9 +551,9 @@ export const roller: SyncComponent<LvglHost, [RollerProps]> = (props) => {
   return (host: LvglHost) => {
     const descriptor: ElementDescriptor = {
       type: 'roller',
-      class: unrefValue(props.class) || '',
-      options: unrefValue(props.options),
-      value: unrefValue(props.selected) ?? 0,
+      class: toValue(props.class) || '',
+      options: toValue(props.options),
+      value: toValue(props.selected) ?? 0,
       handlers: {}
     }
 
@@ -561,7 +561,7 @@ export const roller: SyncComponent<LvglHost, [RollerProps]> = (props) => {
 
     if (props.onChange) {
       descriptor.handlers!.change = () =>
-        props.onChange!(unrefValue(props.selected) ?? 0)
+        props.onChange!(toValue(props.selected) ?? 0)
       cleanups.push(host.on('change', descriptor.handlers!.change))
     }
 

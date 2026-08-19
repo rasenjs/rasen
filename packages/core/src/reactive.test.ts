@@ -6,7 +6,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   setReactiveRuntime,
   getReactiveRuntime,
-  unrefValue,
+  toValue,
+  unref,
+  setValue,
   ref,
   type ReactiveRuntime,
   type Ref
@@ -24,11 +26,15 @@ describe('reactive', () => {
         return r
       },
 
-      computed: <T>(getter: () => T) => ({
-        get value() {
-          return getter()
+      computed: <T>(getter: () => T) => {
+        const c = {
+          get value() {
+            return getter()
+          }
         }
-      }),
+        refs.add(c)
+        return c
+      },
 
       watch: <T>(
         source: () => T,
@@ -48,9 +54,13 @@ describe('reactive', () => {
 
       unref: <T>(value: T | Ref<T> | { readonly value: T }) => {
         if (value && typeof value === 'object' && 'value' in value) {
-          return (value as Ref<T>).value
+          return (value as { value: T }).value
         }
         return value as T
+      },
+
+      setValue: <T>(ref: Ref<T>, value: T): void => {
+        ;(ref as { value: T }).value = value
       },
 
       isRef: (value: unknown): boolean => {
@@ -59,9 +69,7 @@ describe('reactive', () => {
           typeof value === 'object' &&
           refs.has(value as { value: unknown })
         )
-      },
-
-      isReactive: <T extends object>(_value: T): boolean => false
+      }
     }
   }
 
@@ -97,53 +105,53 @@ describe('reactive', () => {
     })
   })
 
-  describe('unrefValue', () => {
+  describe('toValue', () => {
     it('应该解包 Ref 类型', () => {
       const r = mockRuntime.ref(42)
-      expect(unrefValue(r)).toBe(42)
+      expect(toValue(r)).toBe(42)
     })
 
     it('应该返回普通值', () => {
-      expect(unrefValue(100)).toBe(100)
-      expect(unrefValue('hello')).toBe('hello')
-      expect(unrefValue(null)).toBe(null)
-      expect(unrefValue(undefined)).toBe(undefined)
+      expect(toValue(100)).toBe(100)
+      expect(toValue('hello')).toBe('hello')
+      expect(toValue(null)).toBe(null)
+      expect(toValue(undefined)).toBe(undefined)
     })
 
     it('应该解包 computed 值', () => {
       const r = mockRuntime.ref(10)
-      const c = mockRuntime.computed(() => r.value * 2)
-      expect(unrefValue(c)).toBe(20)
+      const c = mockRuntime.computed(() => unref(r) * 2)
+      expect(toValue(c)).toBe(20)
     })
 
     it('应该处理复杂对象', () => {
       const obj = { a: 1, b: 2 }
       const r = mockRuntime.ref(obj)
-      expect(unrefValue(r)).toBe(obj)
+      expect(toValue(r)).toBe(obj)
     })
   })
 
   describe('ref', () => {
     it('应该创建响应式引用', () => {
       const r = ref(10)
-      expect(r.value).toBe(10)
+      expect(unref(r)).toBe(10)
     })
 
     it('应该允许修改值', () => {
       const r = ref(0)
-      r.value = 5
-      expect(r.value).toBe(5)
+      setValue(r, 5)
+      expect(unref(r)).toBe(5)
     })
 
     it('应该支持任意类型', () => {
       const objRef = ref({ x: 1 })
-      expect(objRef.value).toEqual({ x: 1 })
+      expect(unref(objRef)).toEqual({ x: 1 })
 
       const arrRef = ref([1, 2, 3])
-      expect(arrRef.value).toEqual([1, 2, 3])
+      expect(unref(arrRef)).toEqual([1, 2, 3])
 
       const nullRef = ref(null)
-      expect(nullRef.value).toBe(null)
+      expect(unref(nullRef)).toBe(null)
     })
   })
 
@@ -189,11 +197,11 @@ describe('reactive', () => {
 
     it('computed 应该正确计算值', () => {
       const r = mockRuntime.ref(5)
-      const c = mockRuntime.computed(() => r.value + 10)
-      expect(c.value).toBe(15)
+      const c = mockRuntime.computed(() => unref(r) + 10)
+      expect(unref(c)).toBe(15)
 
-      r.value = 10
-      expect(c.value).toBe(20)
+      setValue(r, 10)
+      expect(unref(c)).toBe(20)
     })
   })
 })

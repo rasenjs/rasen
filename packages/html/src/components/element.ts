@@ -1,5 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import { unrefValue } from '@rasenjs/core'
+import { toValue } from '@rasenjs/core'
 import type { StringHost } from '../types'
 import {
   stringifyAttr,
@@ -32,31 +32,31 @@ export const element = (props: {
     let html = `<${tag}`
 
     // id
-    const id = unrefValue(props.id)
+    const id = toValue(props.id)
     if (id) {
       html += stringifyAttr('id', id)
     }
 
     // className
-    const className = unrefValue(props.className)
+    const className = toValue(props.className)
     if (className) {
       html += stringifyAttr('class', className)
     }
 
     // style
-    const style = unrefValue(props.style)
+    const style = toValue(props.style)
     if (style && Object.keys(style).length > 0) {
       html += stringifyAttr('style', stringifyStyle(style))
     }
 
     // value (for input, textarea, select)
-    const value = unrefValue(props.value)
+    const value = toValue(props.value)
     if (value !== undefined) {
       html += stringifyAttr('value', String(value))
     }
 
     // attrs (other attributes)
-    const attrs = unrefValue(props.attrs)
+    const attrs = toValue(props.attrs)
     if (attrs) {
       for (const [key, val] of Object.entries(attrs)) {
         // 跳过无效的属性名（数字开头或纯数字）
@@ -72,7 +72,7 @@ export const element = (props: {
       if (key.startsWith('on')) continue // 跳过事件处理器（SSR不需要）
       if (val === undefined || val === null) continue
       
-      const attrValue = unrefValue(val as PropValue<unknown>)
+      const attrValue = toValue(val as PropValue<unknown>)
       if (attrValue !== undefined && attrValue !== null) {
         // 只处理基本类型（string, number, boolean）
         if (typeof attrValue === 'string' || typeof attrValue === 'number' || typeof attrValue === 'boolean') {
@@ -94,7 +94,7 @@ export const element = (props: {
     if (children !== undefined) {
       if (typeof children === 'string' || (typeof children === 'object' && 'value' in (children as any))) {
         // String content (or ref to string)
-        html += escapeHtml(String(unrefValue(children as PropValue<string>)))
+        html += escapeHtml(String(toValue(children as PropValue<string>)))
       } else if (Array.isArray(children) && children.length > 0) {
         // Array of children - 创建子宿主收集子元素内容
         const childHost: StringHost = {

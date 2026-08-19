@@ -1,5 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import { getReactiveRuntime, unrefValue } from '@rasenjs/core'
+import { getReactiveRuntime, toValue } from '@rasenjs/core'
 
 interface GPUAdapter {
   requestDevice: () => Promise<unknown>
@@ -148,8 +148,8 @@ export function canvas<Ctx>(props: {
     const canvasEl = document.createElement('canvas')
 
     // 设置尺寸（逻辑像素）
-    const width = unrefValue(props.width)
-    const height = unrefValue(props.height)
+    const width = toValue(props.width)
+    const height = toValue(props.height)
 
     // 获取 DPR
     const dpr =
@@ -175,12 +175,12 @@ export function canvas<Ctx>(props: {
 
     // 设置样式
     if (props.className) {
-      const className = unrefValue(props.className)
+      const className = toValue(props.className)
       if (className) canvasEl.className = className
     }
 
     if (props.style) {
-      const style = unrefValue(props.style)
+      const style = toValue(props.style)
       if (style) {
         Object.entries(style).forEach(([key, value]) => {
           canvasEl.style.setProperty(key, String(value))
@@ -228,7 +228,7 @@ export function canvas<Ctx>(props: {
     // visible area grows with the window instead of stretching.
     const runtime = getReactiveRuntime()
     const stopSizeWatch = runtime.watch(
-      () => [unrefValue(props.width), unrefValue(props.height), dpr] as const,
+      () => [toValue(props.width), toValue(props.height), dpr] as const,
       ([w, h]) => {
         canvasEl.width = w * dpr
         canvasEl.height = h * dpr

@@ -46,6 +46,9 @@ export function initMockReactiveRuntime(): void {
       }
       return ref as T
     },
+    setValue: <T>(ref: { value: T }, value: T): void => {
+      ref.value = value
+    },
     watch: (_source: () => unknown, callback: () => void) => {
       // 简单实现：立即执行一次 callback
       callback()

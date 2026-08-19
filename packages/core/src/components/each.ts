@@ -1,6 +1,6 @@
- import { getReactiveRuntime } from '../reactive'
+ import { getReactiveRuntime, toValue } from '../reactive'
 import { com } from '../com'
-import { type Mountable, type Ref } from '../types'
+import { type Mountable, type Ref, type PropValue } from '../types'
 
 /**
  * each 组件 - 对象列表渲染
@@ -77,10 +77,6 @@ export function each<T extends object, Host = unknown>(
   const isProps = (v: unknown): v is EachProps<T, Host> =>
     v !== null && typeof v === 'object' && 'of' in v && 'children' in v
 
-  // 判断是否为 Ref（有 value 属性）
-  const isRef = (v: unknown): v is Ref<T[]> =>
-    v !== null && typeof v === 'object' && 'value' in v
-
   let items: T[] | Ref<T[]> | (() => T[])
   let renderFn: (item: T, index: number) => Mountable<Host>
 
@@ -93,12 +89,8 @@ export function each<T extends object, Host = unknown>(
   }
 
   return eachImpl({
-    items:
-      typeof items === 'function'
-        ? items
-        : isRef(items)
-          ? () => items.value
-          : () => items, // 普通数组
+    // toValue 统一处理 getter / Ref / 普通数组
+    items: () => toValue(items),
     render: renderFn
   })
 }
@@ -360,8 +352,8 @@ export function repeat<T, Host = unknown>(
 ): Mountable<Host> {
   return repeatImpl({
     items: () => {
-      const value =
-        typeof itemsOrCount === 'function' ? itemsOrCount() : itemsOrCount.value
+      // toValue 统一处理 getter / Ref / 普通值
+      const value = toValue(itemsOrCount as PropValue<T[] | number>)
 
       if (typeof value === 'number') {
         // 数量模式：生成索引数组

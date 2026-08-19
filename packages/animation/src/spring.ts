@@ -1,4 +1,4 @@
-import { ref, type Ref } from '@rasenjs/core'
+import { ref, unref, setValue, type Ref } from '@rasenjs/core'
 import type { SpringRef, SpringOptions } from './types'
 
 const DEFAULT_STIFFNESS = 100
@@ -20,20 +20,20 @@ function createSpringRef(initial: number, options?: SpringOptions): SpringRef {
   let resolve: (() => void) | null = null
 
   const tick = () => {
-    const displacement = valueRef.value - target
+    const displacement = unref(valueRef) - target
     const springForce = -stiffness * displacement
     const dampingForce = -damping * velocity
     const acceleration = (springForce + dampingForce) / mass
     
     velocity += acceleration * 0.016
-    valueRef.value = valueRef.value + velocity * 0.016
+    setValue(valueRef, unref(valueRef) + velocity * 0.016)
     
     const settled = 
       Math.abs(velocity) < SETTLE_THRESHOLD && 
       Math.abs(displacement) < SETTLE_THRESHOLD
     
     if (settled) {
-      valueRef.value = target
+      setValue(valueRef, target)
       velocity = 0
       isAnimating = false
       isSettled = true
@@ -75,7 +75,7 @@ function createSpringRef(initial: number, options?: SpringOptions): SpringRef {
 
   const set = (value: number) => {
     stop()
-    valueRef.value = value
+    setValue(valueRef, value)
     velocity = 0
     target = value
     isSettled = true
@@ -83,14 +83,14 @@ function createSpringRef(initial: number, options?: SpringOptions): SpringRef {
 
   const setWithVelocity = (value: number, v: number) => {
     stop()
-    valueRef.value = value
+    setValue(valueRef, value)
     velocity = v
     target = value
     isSettled = Math.abs(v) < SETTLE_THRESHOLD
   }
 
   return {
-    get value() { return valueRef.value },
+    get value() { return unref(valueRef) },
     get velocity() { return velocity },
     get isAnimating() { return isAnimating },
     get isSettled() { return isSettled },

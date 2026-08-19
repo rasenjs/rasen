@@ -156,9 +156,11 @@ export function createMockReactiveRuntime(): ReactiveRuntime {
       value && typeof value === 'object' && 'value' in value
         ? (value as { value: T }).value
         : (value as T),
+    setValue: <T>(ref: { value: T }, value: T): void => {
+      ref.value = value
+    },
     isRef: (value: unknown): boolean =>
-      !!(value && typeof value === 'object' && 'value' in value),
-    isReactive: () => false
+      !!(value && typeof value === 'object' && 'value' in value)
   }
 }
 
