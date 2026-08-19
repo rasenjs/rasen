@@ -16,6 +16,10 @@ export { wedge } from './2d/wedge'
 export { polygon } from './2d/polygon'
 export { arrow } from './2d/arrow'
 export { group } from './2d/group'
+export { each } from './each'
+
+// 3D Components
+export * from './3d'
 
 export type { ElementProps } from './element'
 export type { RectProps } from './2d/rect'

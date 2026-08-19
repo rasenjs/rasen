@@ -125,39 +125,114 @@ export class ShaderProgram {
 }
 
 /**
- * Unified 2D/3D vertex shader
- * Uses vec3 positions and mat4x4 transforms
- * 2D mode: z=0, orthographic projection
- * 3D mode: z varies, perspective projection
+ * Unified vertex shader
+ *
+ * `a_position` arrives in WORLD space: the batch renderer pre-transforms each
+ * item's local vertices by its model matrix on the CPU (that is what enables
+ * one VBO / one draw call for many items). The shader then applies the camera
+ * view + projection: gl_Position = proj * view * worldPos.
+ *
+ * 2D scenes use the identity view + orthographic projection; 3D scenes use a
+ * camera's lookAt view + perspective projection. Same pipeline either way.
  */
 export const DEFAULT_VERTEX_SHADER = `
 attribute vec3 a_position;
 attribute vec4 a_color;
+attribute vec2 a_texCoord;
+attribute vec3 a_normal;
 
-uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
 
 varying vec4 v_color;
+varying vec2 v_texCoord;
+varying vec3 v_normal;
+varying vec3 v_worldPos;
 
 void main() {
-  vec4 worldPos = u_model * vec4(a_position, 1.0);
-  vec4 viewPos = u_view * worldPos;
+  vec4 viewPos = u_view * vec4(a_position, 1.0);
   gl_Position = u_projection * viewPos;
   v_color = a_color;
+  v_texCoord = a_texCoord;
+  v_normal = a_normal;
+  // a_position is in WORLD space (batch pre-transforms on CPU)
+  v_worldPos = a_position;
 }
 `
 
 /**
- * Default fragment shader
+ * Default fragment shader (supports optional texture sampling + per-pixel
+ * directional lighting from world-space normals + shadow mapping).
  */
 export const DEFAULT_FRAGMENT_SHADER = `
 precision mediump float;
 
 varying vec4 v_color;
+varying vec2 v_texCoord;
+varying vec3 v_normal;
+varying vec3 v_worldPos;
+
+uniform sampler2D u_texture;
+uniform bool u_useTexture;
+uniform bool u_useLighting;
+uniform vec3 u_lightDir;
+uniform vec3 u_ambient;
+
+uniform sampler2D u_shadowMap;
+uniform mat4 u_shadowMatrix;
+uniform bool u_useShadow;
+uniform bool u_skipTonemap;
 
 void main() {
-  gl_FragColor = v_color;
+  vec4 base = u_useTexture ? texture2D(u_texture, v_texCoord) : vec4(1.0, 1.0, 1.0, 1.0);
+  vec3 color = base.rgb * v_color.rgb;
+  float alpha = base.a * v_color.a;
+
+  if (u_useLighting) {
+    vec3 n = normalize(v_normal);
+    vec3 l = normalize(u_lightDir);
+    float diff = max(dot(n, l), 0.0);
+    // Sun slightly stronger than ambient so lit faces stay vivid but not
+    // oversaturated. Values can exceed 1.0 (HDR) → ACES tonemap below.
+    color *= u_ambient + 0.8 * diff;
+  }
+
+  if (u_useShadow) {
+    vec4 sp = u_shadowMatrix * vec4(v_worldPos, 1.0);
+    vec3 ndc = sp.xyz / sp.w;
+    vec3 uvz = ndc * 0.5 + 0.5;
+    if (uvz.x >= 0.0 && uvz.x <= 1.0 && uvz.y >= 0.0 && uvz.y <= 1.0 && uvz.z <= 1.0) {
+      float cur = uvz.z;
+      // Small bias — the ortho depth range is ~200 world units, so a bias of
+      // 0.001 in [0,1] depth = ~0.2 units (enough for acne, not hiding shadows).
+      float bias = 0.001;
+      // PCF 5x5 soft shadows (Godot uses PCF shadow filtering by default).
+      // Wider tap spacing for softer, less "mosaic" edges.
+      float shadow = 0.0;
+      float texel = 5.0 / 2048.0;
+      for (int y = -2; y <= 2; y++) {
+        for (int x = -2; x <= 2; x++) {
+          float sd = texture2D(u_shadowMap, uvz.xy + vec2(float(x), float(y)) * texel).r;
+          shadow += (sd < cur - bias) ? 0.0 : 1.0;
+        }
+      }
+      shadow /= 25.0;
+      // Lighter shadow (matches Godot shadow_opacity 0.75 → ~0.72 kept lit).
+      color *= 0.72 + 0.28 * shadow;
+    }
+  }
+
+  // Godot tonemap_mode = 2 (ACES). Applied to HDR-ish values (up to ~1.4) it
+  // keeps colours saturated and soft — unlike applying it to pure LDR (grey).
+  // Skybox skips tonemapping so the panorama keeps its original vivid colours.
+  // Slight gamma lift after ACES to match the original's bright ground.
+  if (!u_skipTonemap) {
+    color = clamp(color, 0.0, 1.0);
+    color = (color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14);
+    color = pow(color, vec3(1.0 / 1.15));
+  }
+
+  gl_FragColor = vec4(color, alpha);
 }
 `
 

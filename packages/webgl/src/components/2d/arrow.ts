@@ -3,12 +3,12 @@
  */
 
 import type { SyncComponent } from '@rasenjs/core'
-import type { MaybeRef, CommonDrawProps, TransformProps, Bounds } from '../../types'
+import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
 import { element } from '../element'
 
-export interface ArrowProps extends CommonDrawProps, TransformProps {
+export interface ArrowProps extends CommonDrawProps, Transform2DProps {
   x1: MaybeRef<number>
   y1: MaybeRef<number>
   x2: MaybeRef<number>

@@ -160,3 +160,73 @@ export function createOrthoMatrix(
     -1, 1, 1
   ]
 }
+
+// Texture cache keyed by (gl context → source image). A WebGLTexture belongs
+// to exactly one context, so the cache must be scoped per context — otherwise
+// a page reload (new context) reusing a cached texture fails to bind.
+const textureCache = new WeakMap<
+  WebGLRenderingContext | WebGL2RenderingContext,
+  Map<TexImageSource, Map<string, WebGLTexture>>
+>()
+
+/**
+ * Texture sampling options (overrides the pixelated sprite defaults).
+ */
+export interface TextureOptions {
+  /** Wrap mode for S (U) axis. Defaults to CLAMP_TO_EDGE. */
+  wrapS?: number
+  /** Wrap mode for T (V) axis. Defaults to CLAMP_TO_EDGE. */
+  wrapT?: number
+  /** Minification filter. Defaults to NEAREST. */
+  minFilter?: number
+  /** Magnification filter. Defaults to NEAREST. */
+  magFilter?: number
+}
+
+/**
+ * Upload a TexImageSource (HTMLImageElement / HTMLCanvasElement / …) as a
+ * WebGLTexture (cached per gl context, pixelated filtering for crisp sprite
+ * look, clamp-to-edge wrapping).
+ *
+ * Pass options for a smooth/repeat texture (e.g. skybox panoramas should use
+ * LINEAR filtering + REPEAT wrapping so the equirectangular seam is seamless).
+ */
+export function createTexture(
+  gl: WebGLRenderingContext | WebGL2RenderingContext,
+  source: TexImageSource,
+  options?: TextureOptions
+): WebGLTexture {
+  let perContext = textureCache.get(gl)
+  if (!perContext) {
+    perContext = new Map()
+    textureCache.set(gl, perContext)
+  }
+  // Cache key = source (by reference) + sampling options, so a source can be
+  // sampled differently (sprite vs skybox) without collisions.
+  const optionKey = options
+    ? `${options.wrapS ?? 'c'}|${options.wrapT ?? 'c'}|${options.minFilter ?? 'n'}|${options.magFilter ?? 'n'}`
+    : 'default'
+  let byOptions = perContext.get(source)
+  if (!byOptions) {
+    byOptions = new Map<string, WebGLTexture>()
+    perContext.set(source, byOptions)
+  }
+  const cached = byOptions.get(optionKey)
+  if (cached) return cached
+
+  const texture = gl.createTexture()
+  if (!texture) throw new Error('Failed to create WebGL texture')
+
+  gl.bindTexture(gl.TEXTURE_2D, texture)
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, options?.wrapS ?? gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, options?.wrapT ?? gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, options?.minFilter ?? gl.NEAREST)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, options?.magFilter ?? gl.NEAREST)
+  gl.bindTexture(gl.TEXTURE_2D, null)
+
+  byOptions.set(optionKey, texture)
+  return texture
+}
+

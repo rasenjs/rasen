@@ -144,9 +144,6 @@ export const group = com(
       // Exit group context
       exitGroupContext(gl)
       
-      // Mark as dirty to trigger initial render
-      renderContext.markDirty()
-      
       runtime.watch(
         () => [
           x.value,

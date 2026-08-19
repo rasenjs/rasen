@@ -4,12 +4,12 @@
  */
 
 import type { SyncComponent } from '@rasenjs/core'
-import type { MaybeRef, CommonDrawProps, TransformProps, Bounds, Point } from '../../types'
+import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds, Point } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
 import { element } from '../element'
 
-export interface PolygonProps extends CommonDrawProps, TransformProps {
+export interface PolygonProps extends CommonDrawProps, Transform2DProps {
   points?: MaybeRef<Point[]>
   x?: MaybeRef<number>
   y?: MaybeRef<number>
@@ -147,11 +147,8 @@ export const polygon: SyncComponent<
       if (!visible || opacity <= 0) return
 
       const rotation = unref(props.rotation) ?? 0
-      const rotationX = unref(props.rotationX) ?? 0
-      const rotationY = unref(props.rotationY) ?? 0
       const scaleX = unref(props.scaleX) ?? 1
       const scaleY = unref(props.scaleY) ?? 1
-      const scaleZ = unref(props.scaleZ) ?? 1
 
       const renderContext = getRenderContext(gl)
 
@@ -200,12 +197,12 @@ export const polygon: SyncComponent<
             tx: transform.tx + rotatedX * transform.scaleX,
             ty: transform.ty + rotatedY * transform.scaleY,
             tz: transform.tz + z * transform.scaleZ,
-            rotationX: transform.rotationX + rotationX,
-            rotationY: transform.rotationY + rotationY,
+            rotationX: transform.rotationX,
+            rotationY: transform.rotationY,
             rotationZ: transform.rotationZ + rotation,
             scaleX: transform.scaleX * scaleX,
             scaleY: transform.scaleY * scaleY,
-            scaleZ: transform.scaleZ * scaleZ
+            scaleZ: transform.scaleZ
           }
           
           renderContext.addShape(
@@ -232,11 +229,8 @@ export const polygon: SyncComponent<
       unref(props.visible),
       unref(props.opacity),
       unref(props.rotation),
-      unref(props.rotationX),
-      unref(props.rotationY),
       unref(props.scaleX),
-      unref(props.scaleY),
-      unref(props.scaleZ)
+      unref(props.scaleY)
     ]
   })
 }

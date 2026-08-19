@@ -15,8 +15,12 @@ import {
 import type { Bounds } from '../types'
 
 export interface ElementProps {
-  /** Calculate component bounds */
-  getBounds: () => Bounds
+  /**
+   * Calculate component bounds.
+   * Return `null` for 3D components (depth/camera dependent) — the
+   * RenderContext falls back to full redraws for them.
+   */
+  getBounds: () => Bounds | null
   /** Draw function */
   draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => void
   /** Collect reactive dependencies */
@@ -54,14 +58,12 @@ export const element = com(
       // Initialize bounds
       currentBounds = getBounds()
       
-      // Register component
+      // Register component — register() itself marks the screen dirty, so a
+      // newly mounted component becomes visible without extra bookkeeping.
       const componentId = renderContext.register({
         bounds: () => currentBounds,
         draw: drawFn
       })
-      
-      // Mark initial dirty region
-      renderContext.markDirty(currentBounds)
       
       // Watch for reactive changes - optimize: only update when deps actually change
       const runtime = getReactiveRuntime()
@@ -116,8 +118,7 @@ export const element = com(
             renderContext.markDirty(newBounds || currentBounds || undefined)
             currentBounds = newBounds
           }
-        },
-        { deep: true }
+        }
       )
       
       // Cleanup

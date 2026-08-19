@@ -42,7 +42,7 @@ describe('@rasenjs/webgl utils', () => {
     })
 
     it('should default to white for unsupported format', () => {
-      const color = parseColor('rgb(255, 0, 0)')
+      const color = parseColor('not-a-color')
       expect(color).toEqual({ r: 1, g: 1, b: 1, a: 1 })
     })
 

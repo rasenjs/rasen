@@ -54,7 +54,10 @@ export interface CommonDrawProps {
 }
 
 /**
- * Transform properties (2D/3D unified)
+ * Transform properties (3D — full model transform).
+ *
+ * 3D shapes (box, mesh, billboard, …) expose these; 2D shapes use the smaller
+ * `Transform2DProps` subset instead, keeping their API free of 3D concerns.
  */
 export interface TransformProps {
   z?: number | Ref<number> | ReadonlyRef<number>
@@ -62,7 +65,26 @@ export interface TransformProps {
   rotationX?: number | Ref<number> | ReadonlyRef<number>
   rotationY?: number | Ref<number> | ReadonlyRef<number>
   rotationZ?: number | Ref<number> | ReadonlyRef<number>
+  scale?: number | Ref<number> | ReadonlyRef<number>
   scaleX?: number | Ref<number> | ReadonlyRef<number>
   scaleY?: number | Ref<number> | ReadonlyRef<number>
   scaleZ?: number | Ref<number> | ReadonlyRef<number>
+}
+
+/**
+ * Transform properties for 2D shapes — a deliberate subset of the 3D
+ * transform (2D is just 3D with z = 0 and no X/Y rotation).
+ *
+ * - `rotation` is around the Z axis
+ * - `scaleX` / `scaleY` are per-axis scale factors
+ * - `z` is an optional depth offset for layering / 2.5D scenes
+ *
+ * Internally 2D shapes build the same 3D model transform as 3D shapes, so
+ * they share the unified pipeline — but their public API stays 2D.
+ */
+export interface Transform2DProps {
+  rotation?: number | Ref<number> | ReadonlyRef<number>
+  scaleX?: number | Ref<number> | ReadonlyRef<number>
+  scaleY?: number | Ref<number> | ReadonlyRef<number>
+  z?: number | Ref<number> | ReadonlyRef<number>
 }

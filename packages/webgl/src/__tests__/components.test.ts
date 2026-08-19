@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest'
 describe('@rasenjs/webgl components', () => {
   describe('rect', () => {
     it('should export rect component', async () => {
-      const { rect } = await import('../components/rect')
+      const { rect } = await import('../components/2d/rect')
       expect(rect).toBeDefined()
       expect(typeof rect).toBe('function')
     })
@@ -14,7 +14,7 @@ describe('@rasenjs/webgl components', () => {
 
   describe('circle', () => {
     it('should export circle component', async () => {
-      const { circle } = await import('../components/circle')
+      const { circle } = await import('../components/2d/circle')
       expect(circle).toBeDefined()
       expect(typeof circle).toBe('function')
     })
@@ -22,7 +22,7 @@ describe('@rasenjs/webgl components', () => {
 
   describe('line', () => {
     it('should export line component', async () => {
-      const { line } = await import('../components/line')
+      const { line } = await import('../components/2d/line')
       expect(line).toBeDefined()
       expect(typeof line).toBe('function')
     })
@@ -30,7 +30,7 @@ describe('@rasenjs/webgl components', () => {
 
   describe('ellipse', () => {
     it('should export ellipse component', async () => {
-      const { ellipse } = await import('../components/ellipse')
+      const { ellipse } = await import('../components/2d/ellipse')
       expect(ellipse).toBeDefined()
       expect(typeof ellipse).toBe('function')
     })
@@ -38,7 +38,7 @@ describe('@rasenjs/webgl components', () => {
 
   describe('arc', () => {
     it('should export arc component', async () => {
-      const { arc } = await import('../components/arc')
+      const { arc } = await import('../components/2d/arc')
       expect(arc).toBeDefined()
       expect(typeof arc).toBe('function')
     })
@@ -46,7 +46,7 @@ describe('@rasenjs/webgl components', () => {
 
   describe('ring', () => {
     it('should export ring component', async () => {
-      const { ring } = await import('../components/ring')
+      const { ring } = await import('../components/2d/ring')
       expect(ring).toBeDefined()
       expect(typeof ring).toBe('function')
     })
@@ -54,7 +54,7 @@ describe('@rasenjs/webgl components', () => {
 
   describe('star', () => {
     it('should export star component', async () => {
-      const { star } = await import('../components/star')
+      const { star } = await import('../components/2d/star')
       expect(star).toBeDefined()
       expect(typeof star).toBe('function')
     })
@@ -62,7 +62,7 @@ describe('@rasenjs/webgl components', () => {
 
   describe('wedge', () => {
     it('should export wedge component', async () => {
-      const { wedge } = await import('../components/wedge')
+      const { wedge } = await import('../components/2d/wedge')
       expect(wedge).toBeDefined()
       expect(typeof wedge).toBe('function')
     })
@@ -70,7 +70,7 @@ describe('@rasenjs/webgl components', () => {
 
   describe('polygon', () => {
     it('should export polygon component', async () => {
-      const { polygon } = await import('../components/polygon')
+      const { polygon } = await import('../components/2d/polygon')
       expect(polygon).toBeDefined()
       expect(typeof polygon).toBe('function')
     })
@@ -78,7 +78,7 @@ describe('@rasenjs/webgl components', () => {
 
   describe('arrow', () => {
     it('should export arrow component', async () => {
-      const { arrow } = await import('../components/arrow')
+      const { arrow } = await import('../components/2d/arrow')
       expect(arrow).toBeDefined()
       expect(typeof arrow).toBe('function')
     })
