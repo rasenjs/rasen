@@ -1,8 +1,9 @@
 // Auto-generated from Kenney Starter-Kit-Racing scenes/main.tscn (GridMap data).
 // Decoded with the Godot 4.6 GridMap cell format (IndexKey + Cell) and placed
 // with the scene's GridMap transform (scale 0.75, cell_size 9.99, centered).
-// rotY is the Rasen rotationY (Godot yaw negated to match Rasen's rotateY
-// convention where +90° maps +Z→-X).
+// rotY is the Rasen rotationY. Godot's _ortho_bases row0 = (cos,0,-sin) gives
+// GodotYaw = atan2(-xz, xx); Rasen's rotateY is opposite-handed, so
+// Rasen rotationY = atan2(xz, xx) = -GodotYaw.
 export interface LevelPiece {
   name: string
   x: number
@@ -27,7 +28,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -18.7312,
     "y": -0.125,
     "z": 11.2387,
-    "rotY": 1.5708,
+    "rotY": -1.5708,
     "scale": 0.75
   },
   {
@@ -35,7 +36,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -18.7312,
     "y": -0.125,
     "z": 18.7313,
-    "rotY": -1.5708,
+    "rotY": 1.5708,
     "scale": 0.75
   },
   {
@@ -43,7 +44,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 11.2387,
     "y": -0.125,
     "z": -3.7462,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -51,7 +52,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 11.2387,
     "y": -0.125,
     "z": 3.7462,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -59,7 +60,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 11.2387,
     "y": -0.125,
     "z": 11.2387,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -75,7 +76,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 11.2387,
     "y": -0.125,
     "z": 26.2237,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -91,7 +92,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -3.7462,
     "y": -0.125,
     "z": 26.2237,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -99,7 +100,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -11.2387,
     "y": -0.125,
     "z": 26.2237,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -107,7 +108,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -18.7312,
     "y": -0.125,
     "z": 26.2237,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -115,7 +116,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -26.2238,
     "y": -0.125,
     "z": -11.2387,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -131,7 +132,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -26.2238,
     "y": -0.125,
     "z": -26.2238,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -139,7 +140,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -26.2238,
     "y": -0.125,
     "z": -18.7312,
-    "rotY": -1.5708,
+    "rotY": 1.5708,
     "scale": 0.75
   },
   {
@@ -147,7 +148,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -18.7312,
     "y": -0.125,
     "z": -26.2238,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -155,7 +156,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -11.2387,
     "y": -0.125,
     "z": -26.2238,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -163,55 +164,55 @@ export const trackPieces: LevelPiece[] = [
     "x": -3.7462,
     "y": -0.125,
     "z": -26.2238,
+    "rotY": -1.5708,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 3.7462,
+    "y": -0.125,
+    "z": -26.2238,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 11.2387,
+    "y": -0.125,
+    "z": -26.2238,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 11.2387,
+    "y": -0.125,
+    "z": -18.7312,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 11.2387,
+    "y": -0.125,
+    "z": -11.2387,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -26.2238,
+    "y": -0.125,
+    "z": 3.7462,
     "rotY": 1.5708,
     "scale": 0.75
   },
   {
     "name": "decoration-forest",
-    "x": 3.7462,
-    "y": -0.125,
-    "z": -26.2238,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 11.2387,
-    "y": -0.125,
-    "z": -26.2238,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 11.2387,
-    "y": -0.125,
-    "z": -18.7312,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 11.2387,
-    "y": -0.125,
-    "z": -11.2387,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -26.2238,
-    "y": -0.125,
-    "z": 3.7462,
-    "rotY": -1.5708,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
     "x": -26.2238,
     "y": -0.125,
     "z": 11.2387,
-    "rotY": -1.5708,
+    "rotY": 1.5708,
     "scale": 0.75
   },
   {
@@ -219,7 +220,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -26.2238,
     "y": -0.125,
     "z": 18.7313,
-    "rotY": -1.5708,
+    "rotY": 1.5708,
     "scale": 0.75
   },
   {
@@ -235,7 +236,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -26.2238,
     "y": -0.125,
     "z": 33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -251,7 +252,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -11.2387,
     "y": -0.125,
     "z": 33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -259,7 +260,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -3.7462,
     "y": -0.125,
     "z": 33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -267,7 +268,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 3.7462,
     "y": -0.125,
     "z": 33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -275,7 +276,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 11.2387,
     "y": -0.125,
     "z": 33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -283,7 +284,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": 33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -291,7 +292,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": 26.2237,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -299,7 +300,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": 18.7313,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -307,7 +308,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": 11.2387,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -315,7 +316,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": 3.7462,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -323,7 +324,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": -3.7462,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -339,7 +340,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": -18.7312,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -347,7 +348,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": -26.2238,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -355,7 +356,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": -33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -363,7 +364,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 11.2387,
     "y": -0.125,
     "z": -33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -371,7 +372,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 3.7462,
     "y": -0.125,
     "z": -33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -387,7 +388,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -3.7462,
     "y": -0.125,
     "z": -41.2088,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -395,7 +396,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -3.7462,
     "y": -0.125,
     "z": -33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -403,7 +404,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -11.2387,
     "y": -0.125,
     "z": -33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -419,7 +420,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -26.2238,
     "y": -0.125,
     "z": -33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -451,7 +452,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 11.2387,
     "y": -0.125,
     "z": -41.2088,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -459,7 +460,7 @@ export const trackPieces: LevelPiece[] = [
     "x": 18.7313,
     "y": -0.125,
     "z": -41.2088,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -467,7 +468,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -33.7163,
     "y": -0.125,
     "z": 33.7163,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -483,7 +484,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -33.7163,
     "y": -0.125,
     "z": 18.7313,
-    "rotY": -1.5708,
+    "rotY": 1.5708,
     "scale": 0.75
   },
   {
@@ -491,7 +492,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -33.7163,
     "y": -0.125,
     "z": 11.2387,
-    "rotY": -1.5708,
+    "rotY": 1.5708,
     "scale": 0.75
   },
   {
@@ -499,588 +500,12 @@ export const trackPieces: LevelPiece[] = [
     "x": -33.7163,
     "y": -0.125,
     "z": 3.7462,
-    "rotY": -1.5708,
+    "rotY": 1.5708,
     "scale": 0.75
   },
   {
     "name": "decoration-empty",
     "x": -33.7163,
-    "y": -0.125,
-    "z": -3.7462,
-    "rotY": -1.5708,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -33.7163,
-    "y": -0.125,
-    "z": -11.2387,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-empty",
-    "x": -33.7163,
-    "y": -0.125,
-    "z": -18.7312,
-    "rotY": -1.5708,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-empty",
-    "x": -33.7163,
-    "y": -0.125,
-    "z": -26.2238,
-    "rotY": 0,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -33.7163,
-    "y": -0.125,
-    "z": -33.7163,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -33.7163,
-    "y": -0.125,
-    "z": -41.2088,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-empty",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": -41.2088,
-    "rotY": 0,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": -33.7163,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-empty",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": -26.2238,
-    "rotY": 0,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-empty",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": -18.7312,
-    "rotY": -1.5708,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-empty",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": -11.2387,
-    "rotY": -1.5708,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-empty",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": -3.7462,
-    "rotY": -1.5708,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": 3.7462,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": 11.2387,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": 18.7313,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": 26.2237,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": 33.7163,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -33.7163,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-empty",
-    "x": -26.2238,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": 0,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-empty",
-    "x": -18.7312,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": 0,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -11.2387,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -3.7462,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 3.7462,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 11.2387,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 18.7313,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 18.7313,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 11.2387,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 3.7462,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -3.7462,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -11.2387,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -18.7312,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -26.2238,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -33.7163,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": -41.2088,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": -33.7163,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": -26.2238,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": -18.7312,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": -11.2387,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": -3.7462,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": 3.7462,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": 11.2387,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": 18.7313,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": 26.2237,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": 33.7163,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": 33.7163,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": 26.2237,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": 18.7313,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": 11.2387,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": 3.7462,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": -3.7462,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": -11.2387,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": -18.7312,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": -26.2238,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": -33.7163,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": -41.2088,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": -48.7013,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": -56.1937,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -56.1937,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -48.7013,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -41.2088,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -33.7163,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -26.2238,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -18.7312,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -11.2387,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -3.7462,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 3.7462,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 11.2387,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": 18.7313,
-    "y": -0.125,
-    "z": -63.6862,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "decoration-forest",
-    "x": -3.7462,
     "y": -0.125,
     "z": -3.7462,
     "rotY": 1.5708,
@@ -1088,10 +513,586 @@ export const trackPieces: LevelPiece[] = [
   },
   {
     "name": "decoration-forest",
-    "x": -3.7462,
+    "x": -33.7163,
+    "y": -0.125,
+    "z": -11.2387,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-empty",
+    "x": -33.7163,
+    "y": -0.125,
+    "z": -18.7312,
+    "rotY": 1.5708,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-empty",
+    "x": -33.7163,
+    "y": -0.125,
+    "z": -26.2238,
+    "rotY": 0,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -33.7163,
+    "y": -0.125,
+    "z": -33.7163,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -33.7163,
+    "y": -0.125,
+    "z": -41.2088,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-empty",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": -41.2088,
+    "rotY": 0,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": -33.7163,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-empty",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": -26.2238,
+    "rotY": 0,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-empty",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": -18.7312,
+    "rotY": 1.5708,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-empty",
+    "x": -41.2088,
     "y": -0.125,
     "z": -11.2387,
     "rotY": 1.5708,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-empty",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": -3.7462,
+    "rotY": 1.5708,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": 3.7462,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": 11.2387,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": 18.7313,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": 26.2237,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": 33.7163,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -33.7163,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-empty",
+    "x": -26.2238,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 0,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-empty",
+    "x": -18.7312,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 0,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -11.2387,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -3.7462,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 3.7462,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 11.2387,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 18.7313,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 18.7313,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 11.2387,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 3.7462,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -3.7462,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -11.2387,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -18.7312,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -26.2238,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -33.7163,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": -41.2088,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": -33.7163,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": -26.2238,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": -18.7312,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": -11.2387,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": -3.7462,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": 3.7462,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": 11.2387,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": 18.7313,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": 26.2237,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": 33.7163,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": 33.7163,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": 26.2237,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": 18.7313,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": 11.2387,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": 3.7462,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": -3.7462,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": -11.2387,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": -18.7312,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": -26.2238,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": -33.7163,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": -41.2088,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": -48.7013,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": -56.1937,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -56.1937,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -48.7013,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -41.2088,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -33.7163,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -26.2238,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -18.7312,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -11.2387,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -3.7462,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 3.7462,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 11.2387,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": 18.7313,
+    "y": -0.125,
+    "z": -63.6862,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -3.7462,
+    "y": -0.125,
+    "z": -3.7462,
+    "rotY": -1.5708,
+    "scale": 0.75
+  },
+  {
+    "name": "decoration-forest",
+    "x": -3.7462,
+    "y": -0.125,
+    "z": -11.2387,
+    "rotY": -1.5708,
     "scale": 0.75
   },
   {
@@ -1099,7 +1100,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -11.2387,
     "y": -0.125,
     "z": -11.2387,
-    "rotY": 1.5708,
+    "rotY": -1.5708,
     "scale": 0.75
   },
   {
@@ -1107,7 +1108,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -3.7462,
     "y": -0.125,
     "z": 11.2387,
-    "rotY": 1.5708,
+    "rotY": -1.5708,
     "scale": 0.75
   },
   {
@@ -1115,7 +1116,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -3.7462,
     "y": -0.125,
     "z": 3.7462,
-    "rotY": 1.5708,
+    "rotY": -1.5708,
     "scale": 0.75
   },
   {
@@ -1139,7 +1140,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -11.2387,
     "y": -0.125,
     "z": 3.7462,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -1147,7 +1148,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -11.2387,
     "y": -0.125,
     "z": 11.2387,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -1163,7 +1164,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -11.2387,
     "y": -0.125,
     "z": -18.7312,
-    "rotY": 1.5708,
+    "rotY": -1.5708,
     "scale": 0.75
   },
   {
@@ -1171,7 +1172,7 @@ export const trackPieces: LevelPiece[] = [
     "x": -3.7462,
     "y": -0.125,
     "z": -18.7312,
-    "rotY": 1.5708,
+    "rotY": -1.5708,
     "scale": 0.75
   },
   {
@@ -1187,55 +1188,55 @@ export const trackPieces: LevelPiece[] = [
     "x": -3.7462,
     "y": -0.125,
     "z": 18.7313,
-    "rotY": -1.5708,
-    "scale": 0.75
-  },
-  {
-    "name": "track-corner",
-    "x": -18.7312,
-    "y": -0.125,
-    "z": -18.7312,
-    "rotY": -1.5708,
-    "scale": 0.75
-  },
-  {
-    "name": "track-corner",
-    "x": -18.7312,
-    "y": -0.125,
-    "z": -3.7462,
-    "rotY": -3.1416,
-    "scale": 0.75
-  },
-  {
-    "name": "track-corner",
-    "x": -11.2387,
-    "y": -0.125,
-    "z": -3.7462,
-    "rotY": 0,
-    "scale": 0.75
-  },
-  {
-    "name": "track-corner",
-    "x": 3.7462,
-    "y": -0.125,
-    "z": -18.7312,
-    "rotY": 0,
-    "scale": 0.75
-  },
-  {
-    "name": "track-corner",
-    "x": 3.7462,
-    "y": -0.125,
-    "z": 18.7313,
     "rotY": 1.5708,
     "scale": 0.75
   },
   {
     "name": "track-corner",
+    "x": -18.7312,
+    "y": -0.125,
+    "z": -18.7312,
+    "rotY": 1.5708,
+    "scale": 0.75
+  },
+  {
+    "name": "track-corner",
+    "x": -18.7312,
+    "y": -0.125,
+    "z": -3.7462,
+    "rotY": 3.1416,
+    "scale": 0.75
+  },
+  {
+    "name": "track-corner",
+    "x": -11.2387,
+    "y": -0.125,
+    "z": -3.7462,
+    "rotY": 0,
+    "scale": 0.75
+  },
+  {
+    "name": "track-corner",
+    "x": 3.7462,
+    "y": -0.125,
+    "z": -18.7312,
+    "rotY": 0,
+    "scale": 0.75
+  },
+  {
+    "name": "track-corner",
+    "x": 3.7462,
+    "y": -0.125,
+    "z": 18.7313,
+    "rotY": -1.5708,
+    "scale": 0.75
+  },
+  {
+    "name": "track-corner",
     "x": -11.2387,
     "y": -0.125,
     "z": 18.7313,
-    "rotY": -3.1416,
+    "rotY": 3.1416,
     "scale": 0.75
   },
   {
@@ -1254,7 +1255,7 @@ export const aiTrucks: LevelPiece[] = [
     "x": -3.51261,
     "y": -0.00957274,
     "z": 12.7003,
-    "rotY": -1.7112,
+    "rotY": 1.7112,
     "scale": 1
   },
   {
@@ -1270,7 +1271,7 @@ export const aiTrucks: LevelPiece[] = [
     "x": -1.36138,
     "y": -0.148564,
     "z": -23.8,
-    "rotY": -2.7215,
+    "rotY": 2.7215,
     "scale": 1
   }
 ]

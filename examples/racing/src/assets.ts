@@ -13,9 +13,19 @@ import { Mat4x4f } from '@rasenjs/math'
 export interface RacingAssets {
   models: Map<string, LoadedGLTF>
   /** Player truck split into named parts (body, wheels, underside). */
-  truckParts: Map<string, LoadedGLTF>
+  truckParts: Map<string, TruckPart>
   textures: Map<string, HTMLImageElement>
   sounds: Map<string, HTMLAudioElement>
+}
+
+/**
+ * A single truck part: geometry centered on its own bounding-box center
+ * (so it can spin/steer around its own origin) plus the world offset of that
+ * center (so the renderer can place it back in the truck's local space).
+ */
+export interface TruckPart {
+  geo: LoadedGLTF
+  center: { x: number; y: number; z: number }
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -34,16 +44,16 @@ function loadSound(url: string): HTMLAudioElement {
 }
 
 /**
- * Load a GLB and return each node-with-mesh as a separate part. The node's
- * world transform (relative to the model root) is baked into the geometry, so
- * each part is centered in its own local space — e.g. a wheel part is centered
- * on its hub and can be spun with rotationX.
+ * Load a GLB and return each node-with-mesh as a separate part. Each part's
+ * geometry is centered on its own bounding-box center (so a wheel can spin
+ * around its hub), and the world offset of that center is returned separately
+ * so the renderer can place the part back in the truck's local space.
  */
 export async function loadGLBParts(
   url: string,
   _textureUrl?: string,
   sharedTexture?: HTMLImageElement | HTMLCanvasElement,
-): Promise<Map<string, LoadedGLTF>> {
+): Promise<Map<string, TruckPart>> {
   const resp = await fetch(url)
   const buf = await resp.arrayBuffer()
   const view = new DataView(buf)
@@ -92,11 +102,12 @@ export async function loadGLBParts(
       case 5126: return new Float32Array(binView.buffer, tightStart, Math.min(byteLength / 4, accessor.count * components))
       case 5123: return new Uint16Array(binView.buffer, tightStart, Math.min(byteLength / 2, accessor.count * components))
       case 5125: return new Uint32Array(binView.buffer, tightStart, Math.min(byteLength / 4, accessor.count * components))
+      case 5121: return new Uint8Array(binView.buffer, tightStart, Math.min(byteLength, accessor.count * components))
       default: return new Float32Array(binView.buffer, tightStart, Math.min(byteLength / 4, accessor.count * components))
     }
   }
 
-  const parts = new Map<string, LoadedGLTF>()
+  const parts = new Map<string, TruckPart>()
   const rootNodes = json.scenes?.[0]?.nodes ?? []
 
   const visit = (nodeIdx: number, parent: Mat4x4f) => {
@@ -149,12 +160,26 @@ export async function loadGLBParts(
           for (let i = 0; i < posData.length / 3; i++) emit(i)
         }
       }
+      // Center the geometry on its own bounding-box center so the part can
+      // spin/steer around its own origin (e.g. a wheel around its hub).
+      const cx = (minX + maxX) / 2
+      const cy = (minY + maxY) / 2
+      const cz = (minZ + maxZ) / 2
+      const centered = new Float32Array(allPos.length)
+      for (let i = 0; i < allPos.length; i += 3) {
+        centered[i] = allPos[i] - cx
+        centered[i + 1] = allPos[i + 1] - cy
+        centered[i + 2] = allPos[i + 2] - cz
+      }
       parts.set(node.name ?? `part-${nodeIdx}`, {
-        vertices: new Float32Array(allPos),
-        uv: allUV.length ? new Float32Array(allUV) : undefined,
-        normals: allNorm.length ? new Float32Array(allNorm) : undefined,
-        texture: sharedTexture,
-        bounds: { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] },
+        geo: {
+          vertices: centered,
+          uv: allUV.length ? new Float32Array(allUV) : undefined,
+          normals: allNorm.length ? new Float32Array(allNorm) : undefined,
+          texture: sharedTexture,
+          bounds: { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] },
+        },
+        center: { x: cx, y: cy, z: cz },
       })
     }
     for (const c of node.children ?? []) visit(c, world)

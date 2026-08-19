@@ -85,11 +85,12 @@ export class Vehicle {
     const inputX = (keys.right ? 1 : 0) - (keys.left ? 1 : 0)
     const inputZ = (keys.forward ? 1 : 0) - (keys.back ? 1 : 0)
 
-    // Steering (vehicle.gd)
+    // Steering (vehicle.gd). Godot's rotate_y is opposite-handed to Rasen's
+    // rotateY, so the sign of the target angular speed is flipped.
     let direction = Math.sign(this.linearSpeed)
     if (direction === 0) direction = Math.abs(inputZ) > 0.1 ? Math.sign(inputZ) : 1
     const grip = clamp(Math.abs(this.linearSpeed), 0.2, 1)
-    const targetAngular = -inputX * grip * 4 * direction
+    const targetAngular = inputX * grip * 4 * direction
     this.angularSpeed = lerp(this.angularSpeed, targetAngular, dt * 4)
     this.yaw += this.angularSpeed * dt
 
@@ -103,10 +104,12 @@ export class Vehicle {
     }
     this.acceleration = lerp(this.acceleration, this.linearSpeed, dt * 1)
 
-    // Move along forward axis. The truck's cab faces -Z in model space, so
-    // world forward = rotateY(yaw) * (0,0,-1) = (sin(yaw), 0, -cos(yaw)).
+    // Move along the forward axis. The truck's cab faces +Z in model space
+    // (front wheels at +Z), and the original drives along its local X axis
+    // (rolling the sphere), which resolves to +Z at yaw=0. So world forward =
+    // (sin(yaw), 0, cos(yaw)).
     const fwdX = Math.sin(this.yaw)
-    const fwdZ = -Math.cos(this.yaw)
+    const fwdZ = Math.cos(this.yaw)
     this.x += fwdX * this.linearSpeed * MOVE_SPEED * dt
     this.z += fwdZ * this.linearSpeed * MOVE_SPEED * dt
 
@@ -115,10 +118,11 @@ export class Vehicle {
     this.prevX = this.x
     this.prevZ = this.z
 
-    // Effects (vehicle.gd effect_body / effect_wheels)
-    this.lean = lerpAngle(this.lean, (-inputX / 5) * this.linearSpeed, dt * 5)
+    // Effects (vehicle.gd effect_body / effect_wheels). Signs flipped to match
+    // Rasen's opposite-handed rotations.
+    this.lean = lerpAngle(this.lean, (inputX / 5) * this.linearSpeed, dt * 5)
     this.wheelSpin += this.acceleration * WHEEL_SPIN * dt
-    this.frontSteer = lerp(this.frontSteer, -inputX / 1.5, dt * 10)
+    this.frontSteer = lerp(this.frontSteer, inputX / 1.5, dt * 10)
 
     // Lap progress along the track centerline
     this.updateProgress(centerline)

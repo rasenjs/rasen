@@ -7,7 +7,7 @@
  */
 import { configureTags, com, type Mountable } from '@rasenjs/core'
 import { mount, when } from '@rasenjs/dom'
-import { ref } from '@rasenjs/reactive-signals'
+import { ref, computed } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { PerspectiveCamera, group, mesh, billboard, each, getRenderContext } from '@rasenjs/webgl'
 import { Mat4x4f, vec3f } from '@rasenjs/math'
@@ -33,7 +33,6 @@ const vyaw = ref(0)
 const bodyPitch = ref(0)
 const bodyLean = ref(0)
 const wheelSpin = ref(0)
-const rearYaw = ref(0)
 const frontYaw = ref(0)
 
 // Chase camera
@@ -83,20 +82,78 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
     }
   }
 
-  // Player truck — separate parts so wheels spin/steer and the body leans.
+  // Player truck — rendered WITHOUT group nesting because the WebGL group's
+  // pushTransform only rotates child translations by the parent's rotationZ
+  // (not rotationY), so wheels wouldn't follow the body's yaw. Instead each
+  // part's absolute world transform is computed from the vehicle yaw via
+  // computed() refs, and every mesh gets its texture (fixes the all-white
+  // body/wheels).
   const parts = assets.truckParts
-  const bodyGeo = parts.get('body')
-  const undersideGeo = parts.get('underside')
-  const wheelBackLeft = parts.get('wheel-back-left')
-  const wheelBackRight = parts.get('wheel-back-right')
-  const wheelFrontLeft = parts.get('wheel-front-left')
-  const wheelFrontRight = parts.get('wheel-front-right')
+  const body = parts.get('body')
+  const under = parts.get('underside')
+  const bl = parts.get('wheel-back-left')
+  const br = parts.get('wheel-back-right')
+  const fl = parts.get('wheel-front-left')
+  const fr = parts.get('wheel-front-right')
 
-  const partMesh = (geo: typeof bodyGeo, ry: typeof rearYaw, rx?: typeof wheelSpin) =>
-    geo ? (
-      <mesh geometry={{ vertices: geo.vertices, uv: geo.uv, normals: geo.normals }} texture={geo.texture}
-        x={vx} y={VEHICLE_Y} z={vz} rotationX={rx ?? 0} rotationY={ry} />
-    ) : null
+  // Rotate a truck-local offset (part.center) by the vehicle yaw and add the
+  // vehicle position → the part's world position. Rasen rotateY maps
+  // (x,z) → (c*x - s*z, s*x + c*z).
+  const worldPos = (part: { center: { x: number; y: number; z: number } }) => ({
+    x: computed(() => {
+      const c = Math.cos(vyaw.value), s = Math.sin(vyaw.value)
+      return vx.value + c * part.center.x - s * part.center.z
+    }),
+    y: computed(() => VEHICLE_Y + part.center.y),
+    z: computed(() => {
+      const c = Math.cos(vyaw.value), s = Math.sin(vyaw.value)
+      return vz.value + s * part.center.x + c * part.center.z
+    }),
+  })
+
+  const bodyPos = worldPos(body ?? { center: { x: 0, y: 0, z: 0 } })
+  const underPos = worldPos(under ?? { center: { x: 0, y: 0, z: 0 } })
+  const blPos = worldPos(bl ?? { center: { x: 0, y: 0, z: 0 } })
+  const brPos = worldPos(br ?? { center: { x: 0, y: 0, z: 0 } })
+  const flPos = worldPos(fl ?? { center: { x: 0, y: 0, z: 0 } })
+  const frPos = worldPos(fr ?? { center: { x: 0, y: 0, z: 0 } })
+
+  // Front wheels steer around their own Y axis: yaw + frontSteer.
+  const frontRotY = computed(() => vyaw.value + frontYaw.value)
+
+  const bodyMesh = body ? (
+    <mesh geometry={body.geo} texture={body.geo.texture}
+      x={bodyPos.x} y={bodyPos.y} z={bodyPos.z}
+      rotationX={bodyPitch} rotationY={vyaw} rotationZ={bodyLean} />
+  ) : null
+  const underMesh = under ? (
+    <mesh geometry={under.geo} texture={under.geo.texture}
+      x={underPos.x} y={underPos.y} z={underPos.z} rotationY={vyaw} />
+  ) : null
+
+  // A wheel: positioned at its hub, spins around its own X axis (rolling),
+  // and follows the body's yaw.
+  const wheelMesh = (part: typeof bl, pos: ReturnType<typeof worldPos>) => part ? (
+    <mesh geometry={part.geo} texture={part.geo.texture}
+      x={pos.x} y={pos.y} z={pos.z} rotationX={wheelSpin} rotationY={vyaw} />
+  ) : null
+
+  // A front wheel: additionally steers around its own Y axis.
+  const steerWheelMesh = (part: typeof fl, pos: ReturnType<typeof worldPos>) => part ? (
+    <mesh geometry={part.geo} texture={part.geo.texture}
+      x={pos.x} y={pos.y} z={pos.z} rotationX={wheelSpin} rotationY={frontRotY} />
+  ) : null
+
+  const vehicleChildren: Mountable<any>[] = [
+    bodyMesh, underMesh,
+    wheelMesh(bl, blPos), wheelMesh(br, brPos),
+    steerWheelMesh(fl, flPos), steerWheelMesh(fr, frPos),
+  ].filter((c): c is Mountable<any> => c != null)
+
+  // Debug: expose wheel world positions to verify they follow the body yaw.
+  ;(window as unknown as { __wheels?: { bl: typeof blPos; br: typeof brPos; fl: typeof flPos; fr: typeof frPos; body: typeof bodyPos } }).__wheels = {
+    bl: blPos, br: brPos, fl: flPos, fr: frPos, body: bodyPos,
+  }
 
   // Collect all WebGL scene children into one array. The DOM canvas children
   // type is `Mountable<HTMLElement>`; WebGL components are `Mountable<WebGL…>`,
@@ -106,16 +163,7 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
       fov={(40 * Math.PI) / 180} near={0.1} far={200} />,
     <group children={trackMeshes as Mountable[]} />,
     <group children={truckMeshes as Mountable[]} />,
-    // Player truck
-    bodyGeo ? (
-      <mesh geometry={{ vertices: bodyGeo.vertices, uv: bodyGeo.uv, normals: bodyGeo.normals }} texture={bodyGeo.texture}
-        x={vx} y={VEHICLE_Y} z={vz} rotationX={bodyPitch} rotationY={vyaw} rotationZ={bodyLean} />
-    ) : null,
-    partMesh(undersideGeo, vyaw),
-    partMesh(wheelBackLeft, rearYaw, wheelSpin),
-    partMesh(wheelBackRight, rearYaw, wheelSpin),
-    partMesh(wheelFrontLeft, frontYaw, wheelSpin),
-    partMesh(wheelFrontRight, frontYaw, wheelSpin),
+    ...vehicleChildren,
     // Skid smoke trails
     each(() => trails.value, (p) => (
       <billboard x={p.x} y={p.y} z={p.z} width={p.size} height={p.size} opacity={p.opacity} texture={assets.textures.get('smoke')!} mode="full" />
@@ -208,6 +256,10 @@ async function start() {
   // Debug hooks
   ;(window as unknown as { __racing?: { vehicle: Vehicle; assets: RacingAssets } }).__racing = { vehicle, assets }
   ;(window as unknown as { __trail?: { puffs: () => SmokePuff[] } }).__trail = { puffs: () => trail.puffs }
+  ;(window as unknown as { __cam?: { pos: typeof camPos; target: typeof camTarget } }).__cam = { pos: camPos, target: camTarget }
+  ;(window as unknown as { __dbg?: { started: typeof started; keys: typeof keys; loopCount: () => number } }).__dbg = {
+    started, keys, loopCount: () => loopCount,
+  }
   ;(window as unknown as { __rc?: typeof renderContext }).__rc = renderContext
 
   // Reset on R
@@ -220,9 +272,11 @@ async function start() {
   })
 
   let last = performance.now()
+  let loopCount = 0
   const loop = (now: number) => {
     const dt = Math.min((now - last) / 1000, 1 / 30)
     last = now
+    loopCount++
 
     if (started.value) {
       vehicle.update(dt, keys, trackCenterline)
@@ -238,11 +292,10 @@ async function start() {
       vx.value = vehicle.x
       vz.value = vehicle.z
       vyaw.value = vehicle.yaw
-      bodyPitch.value = -(vehicle.linearSpeed - vehicle.acceleration) / 6
+      bodyPitch.value = (vehicle.linearSpeed - vehicle.acceleration) / 6
       bodyLean.value = vehicle.lean
       wheelSpin.value = vehicle.wheelSpin
-      rearYaw.value = vehicle.yaw
-      frontYaw.value = vehicle.yaw + vehicle.frontSteer
+      frontYaw.value = vehicle.frontSteer
       speed.value = vehicle.speedFactor
       lap.value = vehicle.lap
 
