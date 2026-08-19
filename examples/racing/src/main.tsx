@@ -50,6 +50,25 @@ const trails = ref<SmokePuff[]>([])
 // Vehicle sits on the road surface (track cells are at y ≈ -0.125).
 const VEHICLE_Y = -0.125
 
+/**
+ * Decompose Ry(A)·Rx(B) into mesh-compatible Rx(X)·Ry(Y)·Rz(Z) Euler angles.
+ *
+ * The WebGL mesh builds its transform as T·Rx·Ry·Rz·S, so `rotationX` always
+ * rotates around the WORLD X axis. But a wheel must roll around the BODY's
+ * local X axis (which follows the vehicle yaw). That rotation is Ry(yaw)·Rx(spin);
+ * this function re-expresses it as Rx·Ry·Rz so the mesh renders it correctly.
+ * Verified: Rx(X)·Ry(Y)·Rz(Z) ≡ Ry(A)·Rx(B) for all tested A/B.
+ */
+function decomposeYawRoll(A: number, B: number): { X: number; Y: number; Z: number } {
+  const sinA = Math.sin(A), cosA = Math.cos(A)
+  const sinB = Math.sin(B), cosB = Math.cos(B)
+  return {
+    X: Math.atan2(sinB, cosA * cosB),
+    Y: Math.asin(sinA * cosB),
+    Z: Math.atan2(-sinA * sinB, cosA),
+  }
+}
+
 // === App ===
 interface AppProps {
   assets: RacingAssets
@@ -121,6 +140,14 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
   // Front wheels steer around their own Y axis: yaw + frontSteer.
   const frontRotY = computed(() => vyaw.value + frontYaw.value)
 
+  // A wheel's rotation = Ry(yaw)·Rx(spin) — roll around the body's local X
+  // axis. Decompose into mesh-compatible Rx·Ry·Rz Euler angles.
+  const wheelRot = (yawRef: typeof vyaw) => ({
+    rotationX: computed(() => decomposeYawRoll(yawRef.value, wheelSpin.value).X),
+    rotationY: computed(() => decomposeYawRoll(yawRef.value, wheelSpin.value).Y),
+    rotationZ: computed(() => decomposeYawRoll(yawRef.value, wheelSpin.value).Z),
+  })
+
   const bodyMesh = body ? (
     <mesh geometry={body.geo} texture={body.geo.texture}
       x={bodyPos.x} y={bodyPos.y} z={bodyPos.z}
@@ -131,23 +158,25 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
       x={underPos.x} y={underPos.y} z={underPos.z} rotationY={vyaw} />
   ) : null
 
-  // A wheel: positioned at its hub, spins around its own X axis (rolling),
-  // and follows the body's yaw.
-  const wheelMesh = (part: typeof bl, pos: ReturnType<typeof worldPos>) => part ? (
+  // A wheel: positioned at its hub, rolls around the body's local X axis and
+  // follows the body's yaw.
+  const wheelMesh = (part: typeof bl, pos: ReturnType<typeof worldPos>, rot: ReturnType<typeof wheelRot>) => part ? (
     <mesh geometry={part.geo} texture={part.geo.texture}
-      x={pos.x} y={pos.y} z={pos.z} rotationX={wheelSpin} rotationY={vyaw} />
+      x={pos.x} y={pos.y} z={pos.z}
+      rotationX={rot.rotationX} rotationY={rot.rotationY} rotationZ={rot.rotationZ} />
   ) : null
 
-  // A front wheel: additionally steers around its own Y axis.
-  const steerWheelMesh = (part: typeof fl, pos: ReturnType<typeof worldPos>) => part ? (
+  // A front wheel: additionally steers around its own Y axis (yaw + steer).
+  const steerWheelMesh = (part: typeof fl, pos: ReturnType<typeof worldPos>, rot: ReturnType<typeof wheelRot>) => part ? (
     <mesh geometry={part.geo} texture={part.geo.texture}
-      x={pos.x} y={pos.y} z={pos.z} rotationX={wheelSpin} rotationY={frontRotY} />
+      x={pos.x} y={pos.y} z={pos.z}
+      rotationX={rot.rotationX} rotationY={rot.rotationY} rotationZ={rot.rotationZ} />
   ) : null
 
   const vehicleChildren: Mountable<any>[] = [
     bodyMesh, underMesh,
-    wheelMesh(bl, blPos), wheelMesh(br, brPos),
-    steerWheelMesh(fl, flPos), steerWheelMesh(fr, frPos),
+    wheelMesh(bl, blPos, wheelRot(vyaw)), wheelMesh(br, brPos, wheelRot(vyaw)),
+    steerWheelMesh(fl, flPos, wheelRot(frontRotY)), steerWheelMesh(fr, frPos, wheelRot(frontRotY)),
   ].filter((c): c is Mountable<any> => c != null)
 
   // Debug: expose wheel world positions to verify they follow the body yaw.
