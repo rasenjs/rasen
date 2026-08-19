@@ -1,0 +1,25 @@
+{
+  "name": "@rasenjs/examples-craft",
+  "version": "0.1.0",
+  "description": "Craft — a Minecraft-like voxel world built with Rasen (reactive webgl + dom). Inspired by the classic open-source fogleman/Craft.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/dom": "workspace:*",
+    "@rasenjs/math": "workspace:*",
+    "@rasenjs/reactive-signals": "workspace:*",
+    "@rasenjs/vite-plugin-rasen": "workspace:*",
+    "@rasenjs/webgl": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.7"
+  }
+}
