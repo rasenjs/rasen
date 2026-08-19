@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Rasen RN DevTools</title>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #14171c; color: #e6e6e6; font-size: 13px;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    background: #1b1f24; border-bottom: 1px solid #2a2f36;
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+  .dot.on { background: #16c79a; }
+  .dot.off { background: #e74c3c; }
+  button {
+    background: #2a2f36; color: #e6e6e6; border: 1px solid #3a4149;
+    border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+  }
+  button:hover { background: #343b44; }
+  .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  section { padding: 12px 16px; min-height: 60vh; }
+  section + section { border-left: 1px solid #2a2f36; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+       color: #8a9199; margin: 0 0 10px; }
+  .tree-node { margin-left: 14px; padding: 2px 0; }
+  .tree-node .tag { color: #16c79a; font-weight: 600; }
+  .tree-node .testid { color: #f0db4f; margin-left: 6px; }
+  .tree-node .props { color: #8a9199; margin-left: 6px; font-size: 12px; }
+  .tree-root { margin-left: 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: right; padding: 4px 8px; border-bottom: 1px solid #23282e; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: #8a9199; font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  .empty { color: #8a9199; padding: 20px; text-align: center; }
+  .bar { display: inline-block; height: 10px; border-radius: 2px;
+         background: #16c79a; vertical-align: middle; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Rasen RN DevTools</h1>
+  <span class="status"><span class="dot" id="dot"></span><span id="status">connecting…</span></span>
+  <div class="spacer"></div>
+  <button id="refresh">Refresh</button>
+  <button id="resetPerf">Reset perf</button>
+</header>
+<main>
+  <section>
+    <h2>Node Tree</h2>
+    <div id="tree"><div class="empty">No app connected.</div></div>
+  </section>
+  <section>
+    <h2>Render Performance</h2>
+    <div id="perf"><div class="empty">No data yet.</div></div>
+  </section>
+</main>
+<script>
+(function () {
+  var socket = io({ transports: ['websocket'] })
+  var dot = document.getElementById('dot')
+  var statusEl = document.getElementById('status')
+
+  socket.on('connect', function () {
+    dot.className = 'dot on'
+    statusEl.textContent = 'connected'
+    refresh()
+  })
+  socket.on('disconnect', function () {
+    dot.className = 'dot off'
+    statusEl.textContent = 'disconnected'
+  })
+
+  function refresh() {
+    socket.emit('rasen:getTree', function (tree) { renderTree(tree) })
+    socket.emit('rasen:getPerf', function (perf) { renderPerf(perf) })
+  }
+
+  function renderTree(tree) {
+    var el = document.getElementById('tree')
+    if (!tree || !tree.length) {
+      el.innerHTML = '<div class="empty">Empty tree.</div>'
+      return
+    }
+    el.innerHTML = ''
+    tree.forEach(function (node) { el.appendChild(buildNode(node, true)) })
+  }
+
+  function buildNode(node, isRoot) {
+    var div = document.createElement('div')
+    div.className = 'tree-node' + (isRoot ? ' tree-root' : '')
+
+    var tag = document.createElement('span')
+    tag.className = 'tag'
+    tag.textContent = node.tag
+    div.appendChild(tag)
+
+    if (node.testID) {
+      var tid = document.createElement('span')
+      tid.className = 'testid'
+      tid.textContent = '#' + node.testID
+      div.appendChild(tid)
+    }
+
+    var props = node.props || {}
+    var summary = []
+    if (props.style && props.style.length) summary.push('style:[' + props.style.join(',') + ']')
+    if (props.text != null) summary.push('text:"' + props.text + '"')
+    if (summary.length) {
+      var p = document.createElement('span')
+      p.className = 'props'
+      p.textContent = summary.join(' ')
+      div.appendChild(p)
+    }
+
+    node.children.forEach(function (child) { div.appendChild(buildNode(child, false)) })
+    return div
+  }
+
+  function renderPerf(perf) {
+    var el = document.getElementById('perf')
+    if (!perf || !perf.length) {
+      el.innerHTML = '<div class="empty">No data yet.</div>'
+      return
+    }
+    var max = perf[0] ? perf[0].totalMs : 1
+    var html = '<table><thead><tr><th>Tag</th><th>Count</th><th>Total</th><th>Max</th><th></th></tr></thead><tbody>'
+    perf.forEach(function (s) {
+      var width = Math.max(2, Math.round((s.totalMs / max) * 100))
+      html += '<tr><td>' + s.tagName + '</td><td>' + s.count + '</td><td>' +
+        s.totalMs.toFixed(2) + 'ms</td><td>' + s.maxMs.toFixed(2) + 'ms</td>' +
+        '<td><span class="bar" style="width:' + width + 'px"></span></td></tr>'
+    })
+    html += '</tbody></table>'
+    el.innerHTML = html
+  }
+
+  document.getElementById('refresh').addEventListener('click', refresh)
+  document.getElementById('resetPerf').addEventListener('click', function () {
+    socket.emit('rasen:resetPerf', function () { refresh() })
+  })
+})()
+</script>
+</body>
+</html>

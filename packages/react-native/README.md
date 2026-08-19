@@ -214,6 +214,227 @@ image({
 })
 ```
 
+### Pressable
+
+Pressable with `pressed` state, function styles, and Android ripple support.
+
+```typescript
+import { pressable, text } from '@rasenjs/react-native'
+
+pressable({
+  style: ({ pressed }) => ({
+    backgroundColor: pressed ? '#007AFF' : '#ccc',
+    opacity: pressed ? 0.8 : 1
+  }),
+  onPress: () => console.log('Pressed!'),
+  android_ripple: { color: '#ffffff' },
+  children: [
+    text({ children: 'Press Me' })
+  ]
+})
+```
+
+### Button
+
+Native-style button (Android: filled background + uppercase title; iOS: tinted text).
+
+```typescript
+import { button } from '@rasenjs/react-native'
+
+button({
+  title: 'Submit',
+  color: '#007AFF',
+  onPress: () => console.log('Submitted!'),
+  disabled: false
+})
+```
+
+### TouchableHighlight / TouchableWithoutFeedback
+
+```typescript
+import { touchableHighlight, touchableWithoutFeedback, text } from '@rasenjs/react-native'
+
+touchableHighlight({
+  underlayColor: '#ddd',
+  activeOpacity: 0.85,
+  onPress: () => console.log('Highlighted!'),
+  children: [text({ children: 'Highlight' })]
+})
+
+touchableWithoutFeedback({
+  onPress: () => console.log('No feedback'),
+  children: [text({ children: 'Plain' })]
+})
+```
+
+### SafeAreaView
+
+Safe-area container (iOS notch/pill insets).
+
+```typescript
+import { safeAreaView, text } from '@rasenjs/react-native'
+
+safeAreaView({
+  style: { flex: 1 },
+  children: [text({ children: 'Safe content' })]
+})
+```
+
+### ImageBackground
+
+View with an absolute-fill background image and layered children.
+
+```typescript
+import { imageBackground, text } from '@rasenjs/react-native'
+
+imageBackground({
+  source: { uri: 'https://example.com/bg.png' },
+  style: { flex: 1 },
+  imageStyle: { opacity: 0.5 },
+  children: [text({ children: 'Overlay' })]
+})
+```
+
+### KeyboardAvoidingView
+
+Container that avoids the on-screen keyboard (padding behavior).
+
+```typescript
+import { keyboardAvoidingView, textInput } from '@rasenjs/react-native'
+
+keyboardAvoidingView({
+  behavior: 'padding',
+  keyboardVerticalOffset: 60,
+  children: [textInput({ placeholder: 'Type here' })]
+})
+```
+
+### StatusBar
+
+Configurator component (pushes an entry on mount, pops on unmount).
+
+```typescript
+import { statusBar } from '@rasenjs/react-native'
+
+statusBar({
+  barStyle: 'light-content',
+  backgroundColor: '#000000'
+})
+```
+
+### FlatList
+
+Reactive scrollable list.
+
+```typescript
+import { flatList, text } from '@rasenjs/react-native'
+import { ref } from '@vue/reactivity'
+
+const todos = ref([
+  { id: 1, title: 'Learn Rasen' },
+  { id: 2, title: 'Build an app' }
+])
+
+flatList({
+  data: todos,
+  keyExtractor: (item) => String(item.id),
+  renderItem: ({ item }) => text({ children: item.title }),
+  ListHeaderComponent: () => text({ children: 'TODO' }),
+  ItemSeparatorComponent: () => text({ children: '\n' }),
+  onEndReached: () => console.log('Reached the end!')
+})
+```
+
+## Testing
+
+The package ships a Vitest-based test infrastructure (mirroring `rn-dom` and
+`vue-rn`):
+
+```bash
+yarn workspace @rasenjs/react-native test
+```
+
+- `vitest.config.ts` — aliases `@rasenjs/rn-dom` to its source
+- `src/__tests__/setup.ts` — mocks `react-native`, `ReactNativePrivateInterface`,
+  `@rasenjs/rn-dom/elements`, and the Fabric UIManager; installs the Vue
+  reactive runtime
+- `src/__tests__/render-helper.ts` — `mountComponent()` + press-event helpers
+  (`firePress`, `firePressIn`, `firePressOut`) for asserting on the Fabric
+  node tree
+
+```typescript
+import { mountComponent, nodeProps, firePress } from '../__tests__/render-helper'
+
+const { root } = mountComponent((p) => Pressable({ onPress, ...p }))
+firePress(root)
+expect(onPress).toHaveBeenCalledTimes(1)
+```
+
+## Metro Plugin
+
+`@rasenjs/react-native/metro` wraps all the Metro config a Rasen RN app needs
+(JSX runtime redirection + single-instance resolution) into one line:
+
+```js
+// metro.config.js
+const { getDefaultConfig } = require('@react-native/metro-config')
+const { withRasenRN } = require('@rasenjs/react-native/metro')
+
+module.exports = withRasenRN(getDefaultConfig(__dirname))
+```
+
+What it does:
+- Redirects `react/jsx-runtime` / `react/jsx-dev-runtime` to
+  `@rasenjs/react-native/jsx-runtime` (Rasen renders without React)
+- Forces a single module instance for `@rasenjs/*` packages (avoids the
+  `import`/`require` split that would duplicate module-level state)
+- Adds the rasen package roots to `watchFolders` and `mjs` to `sourceExts`
+
+## Babel Plugin (Metro HMR)
+
+`@rasenjs/react-native/babel` injects rasen's HMR runtime calls into component
+files for Metro (which uses `module.hot.accept()`, unlike Vite):
+
+```js
+// babel.config.js
+module.exports = {
+  presets: ['module:@react-native/babel-preset'],
+  plugins: [
+    ['@rasenjs/react-native/babel', { hmr: true }],
+  ],
+}
+```
+
+Only files that call `com()` (rasen's component wrapper) are injected, so
+plain utility modules are untouched.
+
+## DevTools
+
+A lightweight remote debugger for Rasen RN apps (node tree + render
+performance), served over socket.io.
+
+```bash
+# 1. Start the devtools server (default port 8099)
+npx rasen-devtools
+# PORT=9000 npx rasen-devtools
+
+# 2. In the app (__DEV__ only), before registerApp():
+if (__DEV__) {
+  const { connectRasenDevTools } = require('@rasenjs/react-native/devtools')
+  connectRasenDevTools() // host: http://localhost (iOS sim) / 10.0.2.2 (Android emu)
+}
+
+# 3. Open http://localhost:8099/ in a browser
+```
+
+Features:
+- **Node Tree** — the live rn-dom node tree (tag, testID, style keys)
+- **Render Performance** — per-tag render count / total / max time
+
+The instrumentation hook is installed by `connectRasenDevTools()`; `element()`
+calls it around each mount with zero overhead when the devtools aren't
+connected.
+
 ## Reactive Props
 
 All props support reactive values:

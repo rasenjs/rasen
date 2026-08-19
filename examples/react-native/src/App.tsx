@@ -5,7 +5,7 @@
  * which Metro resolves to `@rasenjs/react-native/jsx-runtime` via extraNodeModules.
  */
 
-import { View, Text, TouchableOpacity, each, when } from '@rasenjs/react-native'
+import { View, Text, TouchableOpacity, Pressable, Button, FlatList, each, when } from '@rasenjs/react-native'
 import { ref, computed } from '@vue/reactivity'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
@@ -18,6 +18,13 @@ const todos = ref([
   { id: 1, text: 'Learn Rasen', done: true },
   { id: 2, text: 'Build an app', done: false },
   { id: 3, text: 'Ship to production', done: false },
+])
+
+const feed = ref([
+  { id: 1, title: 'Pressable with pressed state', body: 'Style as a function of { pressed }' },
+  { id: 2, title: 'Button component', body: 'Native-style button with title' },
+  { id: 3, title: 'FlatList', body: 'Reactive scrollable list' },
+  { id: 4, title: 'KeyboardAvoidingView', body: 'Avoids the on-screen keyboard' },
 ])
 
 const theme = computed(() => ({
@@ -122,14 +129,50 @@ const ConditionalSection = () => (
 )
 
 const ThemeToggle = () => (
-  <TouchableOpacity
-    style={() => ({ backgroundColor: theme.value.accent, paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginBottom: 16 })}
-    onTouchEnd={() => { isDark.value = !isDark.value }}
-  >
-    <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
-      {() => isDark.value ? '\u2600\uFE0F Light Mode' : '\uD83C\uDF19 Dark Mode'}
-    </Text>
-  </TouchableOpacity>
+  <Button
+    title={isDark.value ? '\u2600\uFE0F Light Mode' : '\uD83C\uDF19 Dark Mode'}
+    color={theme.value.accent}
+    onPress={() => { isDark.value = !isDark.value }}
+    style={{ marginBottom: 16 }}
+  />
+)
+
+const PressableSection = () => (
+  <View style={{ marginBottom: 16 }}>
+    <Text style={{ fontSize: 14, color: '#888', marginBottom: 4 }}>PRESSABLE</Text>
+    <Pressable
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? theme.value.accent : theme.value.surface,
+        paddingVertical: 14,
+        borderRadius: 8,
+        alignItems: 'center',
+        opacity: pressed ? 0.85 : 1,
+      })}
+      onPress={() => { counter.value += 10 }}
+    >
+      <Text style={() => ({ color: theme.value.text, fontSize: 16, fontWeight: 'bold' })}>
+        {() => `Pressable (+10) — counter: ${counter.value}`}
+      </Text>
+    </Pressable>
+  </View>
+)
+
+const FeedSection = () => (
+  <View style={{ marginBottom: 16 }}>
+    <Text style={{ fontSize: 14, color: '#888', marginBottom: 4 }}>FLATLIST</Text>
+    <FlatList
+      data={feed}
+      keyExtractor={(item) => String(item.id)}
+      renderItem={({ item }) => (
+        <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.value.text }}>{item.title}</Text>
+          <Text style={{ fontSize: 13, color: '#888' }}>{item.body}</Text>
+        </View>
+      )}
+      ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#eee' }} />}
+      ListEmptyComponent={() => <Text style={{ color: '#888' }}>No items</Text>}
+    />
+  </View>
 )
 
 export const App = () => (
@@ -140,6 +183,8 @@ export const App = () => (
     <CounterSection />
     <TodoSection />
     <ConditionalSection />
+    <PressableSection />
+    <FeedSection />
     <ThemeToggle />
   </View>
 )

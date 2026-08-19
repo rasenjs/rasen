@@ -21,15 +21,39 @@
       "types": "./dist/jsx-runtime.d.ts",
       "import": "./dist/jsx-runtime.js",
       "require": "./dist/jsx-runtime.cjs"
-    }
+    },
+    "./metro": {
+      "types": "./dist/metro/index.d.ts",
+      "import": "./dist/metro/index.js",
+      "require": "./dist/metro/index.cjs"
+    },
+    "./babel": {
+      "types": "./dist/babel/index.d.ts",
+      "import": "./dist/babel/index.js",
+      "require": "./dist/babel/index.cjs"
+    },
+    "./devtools": {
+      "types": "./dist/devtools/index.d.ts",
+      "import": "./dist/devtools/index.js",
+      "require": "./dist/devtools/index.cjs"
+    },
+    "./devtools/server": {
+      "require": "./dist/devtools/server.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "rasen-devtools": "./bin/rasen-devtools.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "dev": "../../node_modules/.bin/tsup --watch",
     "build": "yarn clean && ../../node_modules/.bin/tsup",
-    "test": "echo 'No tests configured'",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -60,9 +84,24 @@
   "peerDependenciesMeta": {
     "react-native": {
       "optional": false
+    },
+    "socket.io": {
+      "optional": true
+    },
+    "socket.io-client": {
+      "optional": true
     }
   },
+  "optionalDependencies": {
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
   "devDependencies": {
-    "@types/react-native": "^0.72.0"
+    "@babel/core": "^7.28.5",
+    "@babel/types": "^7.28.5",
+    "@rasenjs/reactive-vue": "workspace:^",
+    "@types/babel__core": "^7.20.5",
+    "@types/react-native": "^0.72.0",
+    "vitest": "^1.6.1"
   }
 }

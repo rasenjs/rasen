@@ -1,15 +1,17 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const { withRasenRN } = require('@rasenjs/react-native/metro');
 const path = require('path');
 
 // Get the monorepo root
 const monorepoRoot = path.resolve(__dirname, '../..');
 
-// Redirect react/jsx-runtime to @rasenjs/react-native's jsx-runtime
-const JSX_RUNTIME_PATH = path.join(monorepoRoot, 'packages/react-native', 'dist', 'jsx-runtime.js');
-
 /**
  * Metro configuration for Yarn Workspaces monorepo
  * https://reactnative.dev/docs/metro
+ *
+ * `withRasenRN` handles the JSX runtime redirection (react/jsx-runtime →
+ * @rasenjs/react-native/jsx-runtime) and single-instance resolution for the
+ * rasen packages. The rest is monorepo-specific wiring.
  *
  * @type {import('metro-config').MetroConfig}
  */
@@ -22,16 +24,6 @@ const config = {
     nodeModulesPaths: [
       path.resolve(monorepoRoot, 'node_modules'),
     ],
-    resolveRequest: (context, moduleName, platform) => {
-      if (moduleName === 'react/jsx-runtime' || moduleName === 'react/jsx-dev-runtime') {
-        return {
-          filePath: JSX_RUNTIME_PATH,
-          type: 'sourceFile',
-        }
-      }
-      // Let Metro handle everything else
-      return context.resolveRequest(context, moduleName, platform)
-    },
     extraNodeModules: {
       '@rasenjs/core': path.resolve(monorepoRoot, 'packages/core'),
       '@rasenjs/core/utils': path.resolve(monorepoRoot, 'packages/core/dist/utils.js'),
@@ -53,4 +45,4 @@ const config = {
   },
 };
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+module.exports = withRasenRN(mergeConfig(getDefaultConfig(__dirname), config));

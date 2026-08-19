@@ -29,11 +29,15 @@ import type { Mountable, Ref } from '@rasenjs/core'
 import { getReactiveRuntime } from '@rasenjs/core'
 import type { RNNode } from '@rasenjs/rn-dom'
 import type { RNElementPropMap } from '@rasenjs/rn-dom/elements'
+import { getDevtoolsHook } from './devtools/instrument'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
 export interface ElementProps {
-  style?: Record<string, unknown> | (() => Record<string, unknown>)
+  style?:
+    | Record<string, unknown>
+    | Array<Record<string, unknown>>
+    | (() => Record<string, unknown>)
   class?: string
   children?: Child | Child[]
   [key: string]: unknown
@@ -53,8 +57,10 @@ export type Child =
 /**
  * Render children into a parent RNNode.
  * Returns an array of cleanup functions to be called on unmount.
+ *
+ * @internal Shared by `element()` and the higher-level components.
  */
-function renderChildren(
+export function renderChildren(
   parent: RNNode,
   children: Child | Child[],
 ): (() => void)[] {
@@ -114,6 +120,11 @@ export function element(
   props: ElementProps = {},
 ): Mountable<RNNode> {
   return (host: RNNode) => {
+    // Devtools hook (optional — no-op when the devtools aren't connected).
+    const hook = getDevtoolsHook()
+    const start = hook?.renderStart ? performance.now() : 0
+    hook?.renderStart?.(tagName)
+
     const el = host.ownerDocument.createElement(tagName)
     host.appendChild(el)
 
@@ -123,7 +134,7 @@ export function element(
     // ── Style ────────────────────────────────────────────────────
     if (styleProp !== undefined) {
       if (typeof styleProp === 'function') {
-        // Apply initial style immediately, then watch for changes
+        // Apply initial style immediately, then watch for changes.
         const runtime = getReactiveRuntime()
         const stop = runtime.watch(
           styleProp as () => Record<string, unknown>,
@@ -137,9 +148,15 @@ export function element(
           { immediate: true },
         )
         cleanups.push(stop)
-      } else if (typeof styleProp === 'object' && styleProp !== null) {
-        for (const [k, v] of Object.entries(styleProp)) {
-          el.style.setProperty(k, v)
+      } else {
+        // Plain object or array of objects (RN style arrays).
+        const styleValue = Array.isArray(styleProp)
+          ? Object.assign({}, ...styleProp.filter(Boolean))
+          : styleProp
+        if (styleValue && typeof styleValue === 'object') {
+          for (const [k, v] of Object.entries(styleValue)) {
+            el.style.setProperty(k, v)
+          }
         }
       }
     }
@@ -182,6 +199,10 @@ export function element(
 
     // Attach node reference for eachImpl position tracking
     ;(unmount as { node?: RNNode }).node = el
+
+    if (hook?.renderEnd) {
+      hook.renderEnd(tagName, performance.now() - start)
+    }
 
     return unmount
   }

@@ -21,7 +21,6 @@ export { jsx, jsxs, jsx as jsxDEV, Fragment }
 interface RNComponentNameMap {
   view: 'View'
   text: 'Text'
-  safeAreaView: 'SafeAreaView'
   image: 'Image'
   textInput: 'TextInput'
   scrollView: 'ScrollView'
@@ -29,9 +28,22 @@ interface RNComponentNameMap {
   switch: 'Switch'
   modal: 'Modal'
   refreshControl: 'RefreshControl'
-  statusBar: 'StatusBar'
   drawerLayoutAndroid: 'DrawerLayoutAndroid'
   progressBarAndroid: 'ProgressBarAndroid'
+}
+
+// Composite JS components (typed via their own prop interfaces).
+interface RNComponentProps {
+  pressable: import('./components/Pressable').PressableProps
+  button: import('./components/Button').ButtonProps
+  touchableOpacity: import('./components/TouchableOpacity').TouchableOpacityProps
+  touchableHighlight: import('./components/TouchableHighlight').TouchableHighlightProps
+  touchableWithoutFeedback: import('./components/TouchableWithoutFeedback').TouchableWithoutFeedbackProps
+  safeAreaView: import('./components/SafeAreaView').SafeAreaViewProps
+  imageBackground: import('./components/ImageBackground').ImageBackgroundProps
+  keyboardAvoidingView: import('./components/KeyboardAvoidingView').KeyboardAvoidingViewProps
+  statusBar: import('./components/StatusBar').StatusBarProps
+  flatList: import('./components/FlatList').FlatListProps<object>
 }
 
 export namespace JSX {
@@ -40,6 +52,8 @@ export namespace JSX {
 
   export type IntrinsicElements = {
     [K in keyof RNComponentNameMap]: IntrinsicElementProps<K>
+  } & {
+    [K in keyof RNComponentProps]: RNComponentProps[K]
   } & {
     [tag: string]: Record<string, unknown>
   }
