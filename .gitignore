@@ -71,6 +71,10 @@ examples/*/android/local.properties
 examples/*/android/.cxx/
 examples/*/node_modules/
 
+# Kenney starter-kit reference projects (Godot originals — assets live in the
+# Rasen ports under examples/*/public)
+examples/kenney-*/
+
 # Package build outputs
 packages/*/dist/
 

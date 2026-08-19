@@ -1,0 +1,25 @@
+{
+  "name": "@rasenjs/examples-racing",
+  "version": "0.1.0",
+  "description": "Racing arena — Kenney Starter Kit Racing recreated with Rasen. MIT code + CC0 assets.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/dom": "workspace:*",
+    "@rasenjs/math": "workspace:*",
+    "@rasenjs/reactive-signals": "workspace:*",
+    "@rasenjs/vite-plugin-rasen": "workspace:*",
+    "@rasenjs/webgl": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.7"
+  }
+}
