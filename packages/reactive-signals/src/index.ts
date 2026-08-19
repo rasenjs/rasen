@@ -29,47 +29,46 @@ export function createReactiveRuntime(): ReactiveRuntime {
       let isFirstRun = true
       let stopped = false
 
-      // Create a Computed as effect
-      const effect = new Signal.Computed(() => {
+      // The Computed ONLY computes the value — it must NOT run the callback.
+      // If the callback ran inside the computed's getter, any signal it reads
+      // would be tracked as a dependency of this watch, creating hidden
+      // dependency edges (and potential infinite loops) for callbacks that
+      // read/write signals (e.g. `each`'s updateList re-reading config.items).
+      // The callback runs OUTSIDE the tracking scope in the watcher microtask.
+      const effect = new Signal.Computed<T | undefined>(() => {
+        if (stopped) return undefined
+        return typeof source === 'function' ? source() : (source as Ref<T>).value
+      })
+
+      const run = () => {
         if (stopped) return
-        
-        const newValue = typeof source === 'function' ? source() : (source as Ref<T>).value
-        
+        const newValue = effect.get() as T
         if (!isFirstRun && oldValue !== undefined) {
           callback(newValue, oldValue)
         } else if (options?.immediate) {
-          // For immediate option, first oldValue is also the current value
           callback(newValue, newValue)
         }
-        
-        if (isFirstRun) {
-          isFirstRun = false
-        }
-        
+        isFirstRun = false
         oldValue = newValue
-        return newValue
-      })
+      }
 
       // Create Watcher to listen to effect
       const watcher = new Signal.subtle.Watcher(() => {
         // Delay execution to avoid reading signal during notification phase
         queueMicrotask(() => {
+          if (stopped) return
+          run()
           if (!stopped) {
-            // Execute effect first
-            effect.get()
-            // If not stopped, continue watching
-            if (!stopped) {
-              watcher.watch(effect)
-            }
+            watcher.watch(effect)
           }
         })
       })
 
       // Watch effect itself
       watcher.watch(effect)
-      
+
       // Initial execution to establish dependencies and trigger immediate callback
-      effect.get()
+      run()
       // Need to re-watch after initial execution
       watcher.watch(effect)
 
@@ -78,12 +77,12 @@ export function createReactiveRuntime(): ReactiveRuntime {
         stopped = true
         watcher.unwatch(effect)
       }
-      
+
       // If within a scope, register cleanup function
       if (currentScope) {
         currentScope.addCleanup(stopFn)
       }
-      
+
       return stopFn
     },
 
