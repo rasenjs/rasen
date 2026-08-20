@@ -7,16 +7,52 @@
 
 import { getReactiveRuntime } from './reactive'
 import { hmrState, getRegistryEntry, setRegistryEntry } from './hmr'
+import type { HostContext } from './host-context'
 
 export type MountFn = (host: unknown) => (() => void) | undefined
 export type Scope = { run: <T>(fn: () => T) => T | undefined; stop: () => void }
 
 declare const __DEV__: boolean | undefined
 
+// ── HostContext 作用域栈 ────────────────────────────────────────────────
+// 由 com 内部托管：挂载时压栈（继承或覆盖），mount 执行后弹出。
+// 子组件在父 mount 的同步递归中挂载，自动读到栈顶 = 父上下文。
+// 不暴露给用户——结构性组件（each/when）通过 useHostContext() 获取，
+// 桥接组件（canvas）通过 provideHostContext() 覆盖子树上下文。
+const ctxStack: Array<HostContext | undefined> = []
+
+/**
+ * 获取当前生效的宿主上下文（挂载期间调用）
+ * 供结构性组件（each/when/match）内部使用，用户无需感知。
+ */
+export function getHostContext(): HostContext | undefined {
+  return ctxStack.length ? ctxStack[ctxStack.length - 1] : undefined
+}
+
+/**
+ * 在指定上下文中执行 fn（压栈/还原）
+ * 供桥接组件（如 canvas 切换宿主能力）覆盖子树上下文。
+ */
+export function provideHostContext<T, H = unknown, N = unknown>(
+  ctx: HostContext<H, N> | undefined,
+  fn: () => T
+): T {
+  ctxStack.push(ctx as HostContext | undefined)
+  try {
+    return fn()
+  } finally {
+    ctxStack.pop()
+  }
+}
+
 export function wrapMount(mount: MountFn, scope: Scope) {
   return (host: unknown) => {
+    // 生效上下文 = 继承栈顶（挂载时同步捕获）
+    const effective = getHostContext()
     let unmount: (() => void) | undefined
-    scope.run(() => { unmount = mount(host) })
+    provideHostContext(effective, () => {
+      scope.run(() => { unmount = mount(host) })
+    })
     const wrappedUnmount = () => { unmount?.(); scope.stop() }
     if (unmount && 'node' in unmount) {
       ;(wrappedUnmount as unknown as { node: unknown }).node = (
@@ -90,14 +126,14 @@ export function com(component: (...args: any[]) => any): typeof component {
   }
 
   const impl = component
-  const instances = new Map<symbol, { host: unknown; args: unknown[]; unmount: (() => void) | null }>()
+  const instances = new Map<symbol, { host: unknown; ctx?: HostContext; args: unknown[]; unmount: (() => void) | null }>()
 
   const wrapper = function (this: unknown, ...args: any[]) {
     const entry = getRegistryEntry(key)
     if (entry?._consumed) return () => {}
 
     const uid = Symbol(key)
-    const inst: { host: unknown; args: unknown[]; unmount: (() => void) | null } = { host: null, args, unmount: null }
+    const inst: { host: unknown; ctx?: HostContext; args: unknown[]; unmount: (() => void) | null } = { host: null, args, unmount: null }
     instances.set(uid, inst)
 
     const result = impl(...inst.args)
@@ -106,7 +142,9 @@ export function com(component: (...args: any[]) => any): typeof component {
       return result.then((mountFn) => {
         const scope = getReactiveRuntime().effectScope()
         let mUnmount: (() => void) | undefined
-        scope.run(() => { mUnmount = (mountFn as MountFn)(inst.host) })
+        provideHostContext(getHostContext(), () => {
+          scope.run(() => { mUnmount = (mountFn as MountFn)(inst.host) })
+        })
         inst.unmount = () => { mUnmount?.(); scope.stop() }
         return () => { inst.unmount?.(); instances.delete(uid) }
       })
@@ -129,6 +167,8 @@ export function com(component: (...args: any[]) => any): typeof component {
 function doMount(inst: { host: unknown; unmount: (() => void) | null }, mountFn: MountFn): (() => void) | null {
   const scope = getReactiveRuntime().effectScope()
   let mountUnmount: (() => void) | undefined
-  scope.run(() => { mountUnmount = mountFn(inst.host) })
+  provideHostContext(getHostContext(), () => {
+    scope.run(() => { mountUnmount = mountFn(inst.host) })
+  })
   return () => { mountUnmount?.(); scope.stop() }
 }

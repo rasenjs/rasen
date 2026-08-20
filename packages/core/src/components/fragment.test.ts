@@ -258,7 +258,7 @@ describe('fragment', () => {
     it('应该能处理文本节点', () => {
       const textNodes: Array<{ type: string; text: string }> = []
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (text: string) => {
+      hooks.createTextNode = (_host: unknown, text: string) => {
         const node = { type: 'text', text }
         textNodes.push(node)
         return node as any
@@ -281,7 +281,7 @@ describe('fragment', () => {
       const textNodes: string[] = []
       
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (text: string) => {
+      hooks.createTextNode = (_host: unknown, text: string) => {
         textNodes.push(text)
         return { type: 'text', text } as any
       }
@@ -379,7 +379,7 @@ describe('fragment', () => {
       
       const updates: string[] = []
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (text: string) => ({ text })
+      hooks.createTextNode = (_host: unknown, text: string) => ({ text })
       hooks.updateTextNode = (node: any, text: string) => {
         node.text = text
         updates.push(text)
@@ -437,7 +437,7 @@ describe('fragment', () => {
       const calls: string[] = []
       
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (text: string) => {
+      hooks.createTextNode = (_host: unknown, text: string) => {
         calls.push(`createTextNode:${text}`)
         return { text }
       }
@@ -486,7 +486,7 @@ describe('fragment', () => {
     it('应该处理数字类型的子元素', () => {
       const textNodes: string[] = []
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (text: string) => {
+      hooks.createTextNode = (_host: unknown, text: string) => {
         textNodes.push(text)
         return { text }
       }

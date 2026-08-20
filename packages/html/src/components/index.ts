@@ -10,7 +10,7 @@ export type { TextProps } from './text'
 export { fragment, f } from './fragment'
 export { when } from './when'
 export { each, repeat } from './each'
-export { match, switchCase } from './match'
+export { match } from './match'
 export { transition, fade, slide, scale } from './transition'
 export type { TransitionConfig } from './transition'
 export {

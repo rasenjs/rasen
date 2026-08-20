@@ -12,6 +12,7 @@ import type { Ref, ReadonlyRef } from './reactive'
 
 // Re-export for convenience
 export type { Ref, ReadonlyRef }
+export type { HostContext, HostHooks } from './host-context'
 
 /**
  * Unmount 函数类型
@@ -24,6 +25,9 @@ export type Unmount<Node = unknown> = (() => void) & { node?: Node }
  *
  * 接收 parent（宿主），执行挂载逻辑，返回 unmount 函数
  * 组件、each、when、show 等返回的都是 Mountable
+ *
+ * 宿主上下文（HostContext）不暴露为参数——由 com 内部托管，
+ * 结构性组件（each/when）通过 useHostContext() 获取，用户零感知。
  *
  * @example
  * ```typescript

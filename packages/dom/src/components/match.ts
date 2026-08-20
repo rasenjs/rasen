@@ -1,61 +1,9 @@
-import {
-  match as coreMatch,
-  type Mountable,
-  type PropValue
-} from '@rasenjs/core'
-import { hostHooks } from '../host-hooks'
+import { match as coreMatch } from '@rasenjs/core'
 
 /**
- * match component - multi-branch conditional rendering (DOM optimized)
- *
- * Provides DOM-specific optimizations on top of core match:
- * - Uses Comment nodes as markers
- * - Precise control over insertion points
- *
- * @example
- * // Basic usage
- * match({
- *   value: () => currentTab,
- *   cases: {
- *     home: () => HomeView(),
- *     profile: () => ProfileView(),
- *     settings: () => SettingsView(),
- *   },
- *   default: () => NotFoundView()
- * })
- *
- * // Routing scenario
- * match({
- *   value: () => router.current?.key,
- *   cases: {
- *     home: () => HomePage(),
- *     user: (key) => UserPage({ key }),
- *   },
- *   default: () => NotFound()
- * })
+ * @deprecated 从 @rasenjs/core 直接导入 `match`（宿主上下文由 mount 自动提供）
  */
-export function match<K extends string = string>(config: {
-  /** Reactive value used for matching cases */
-  value: PropValue<K | null | undefined>
-
-  /** Branch mapping: key -> component factory */
-  cases: Partial<Record<K, (key: K) => Mountable<HTMLElement>>>
-
-  /** Default branch (when no match) */
-  default?: () => Mountable<HTMLElement>
-
-  /**
-   * Whether to cache created branches
-   * - false (default): destroy old branch on switch
-   * - true: keep created branches, only hide/show on switch (platform support required)
-   */
-  cache?: boolean
-}): Mountable<HTMLElement> {
-  return coreMatch<HTMLElement, K, Node>({
-    ...config,
-    ...hostHooks
-  })
-}
+export const match = coreMatch
 
 /**
  * @deprecated Use `match` instead. Will be removed in future versions.

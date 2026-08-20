@@ -1,6 +1,6 @@
  import { getReactiveRuntime, toValue } from '../reactive'
-import { com } from '../com'
-import { type Mountable, type Ref, type PropValue } from '../types'
+import { com, getHostContext } from '../com'
+import { type Mountable, type Ref, type PropValue, type HostContext } from '../types'
 
 /**
  * each 组件 - 对象列表渲染
@@ -125,15 +125,19 @@ const eachImpl = com(
     return (host: Host) => {
       const runtime = getReactiveRuntime()
 
+      // 宿主上下文：com 挂载时已压栈。优先用 ctx.hooks，config 平铺的 hooks 作为显式 fallback。
+      const ctx = getHostContext() as HostContext<Host, N> | undefined
+      const hooks = ctx?.hooks ?? config
+
       // 用 WeakMap 追踪对象引用 -> 实例
       const instanceMap = new WeakMap<T, Instance<N>>()
       // 当前对象列表（保持引用以便清理）
       let currentItems: T[] = []
 
       // 末尾标记
-      const endMarker = config.createMarker?.(host, 'e')
-      if (endMarker && config.appendMarker) {
-        config.appendMarker(host, endMarker)
+      const endMarker = hooks.createMarker?.(host, 'e')
+      if (endMarker && hooks.appendMarker) {
+        hooks.appendMarker(host, endMarker)
       }
 
       // 移除实例
@@ -141,8 +145,8 @@ const eachImpl = com(
         const instance = instanceMap.get(item)
         if (instance) {
           instance.unmount?.()
-          if (config.removeNode && instance.node != null) {
-            config.removeNode(instance.node)
+          if (hooks.removeNode && instance.node != null) {
+            hooks.removeNode(instance.node)
           }
           instanceMap.delete(item)
         }
@@ -157,6 +161,7 @@ const eachImpl = com(
         const instance: Instance<N> = {}
 
         const mountResult = config.render(item, index)
+        // 子组件通过 com 的上下文栈自动继承当前宿主上下文（无需显式传参）
         const unmount = mountResult(targetHost)
         instance.unmount = unmount
         // 从 unmount 函数上获取节点引用
@@ -188,8 +193,8 @@ const eachImpl = com(
         const hasExisting = currentItems.some((item) => newItemSet.has(item))
 
         if (currentItems.length === 0 || !hasExisting) {
-          if (config.createFragment) {
-            const { host: fragmentHost, flush } = config.createFragment(host)
+          if (hooks.createFragment) {
+            const { host: fragmentHost, flush } = hooks.createFragment(host)
 
             for (let i = 0; i < newItems.length; i++) {
               const item = newItems[i]
@@ -231,7 +236,7 @@ const eachImpl = com(
         }
 
         // 计算 LIS
-        const lis = config.insertBefore
+        const lis = hooks.insertBefore
           ? longestIncreasingSubsequence(sources.filter((s) => s !== -1))
           : []
         const lisIndices = new Set<number>()
@@ -258,17 +263,17 @@ const eachImpl = com(
             const instance = createInstance(item, i, host)
             instanceMap.set(item, instance)
             // 如果有 insertBefore，需要插入到正确位置
-            if (config.insertBefore && instance.node != null) {
-              config.insertBefore(host, instance.node, nextNode)
+            if (hooks.insertBefore && instance.node != null) {
+              hooks.insertBefore(host, instance.node, nextNode)
             }
             if (instance.node != null) {
               nextNode = instance.node
             }
-          } else if (config.insertBefore && !lisIndices.has(i)) {
+          } else if (hooks.insertBefore && !lisIndices.has(i)) {
             // 需要移动
             const instance = instanceMap.get(item)!
             if (instance.node != null) {
-              config.insertBefore(host, instance.node, nextNode)
+              hooks.insertBefore(host, instance.node, nextNode)
               nextNode = instance.node
             }
           } else {
@@ -312,8 +317,8 @@ const eachImpl = com(
           removeInstance(item)
         }
         currentItems = []
-        if (endMarker && config.removeMarker) {
-          config.removeMarker(endMarker)
+        if (endMarker && hooks.removeMarker) {
+          hooks.removeMarker(endMarker)
         }
       }
     }

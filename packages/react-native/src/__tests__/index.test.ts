@@ -13,11 +13,9 @@ import {
   tag,
   view,
   text,
-  each,
-  when,
-  match,
   registerApp,
 } from '../index'
+import { each, when, match } from '@rasenjs/core'
 import { ref } from '@vue/reactivity'
 import {
   mountComponent,
@@ -101,7 +99,7 @@ describe('control flow', () => {
     const items = ref([{ id: 1, name: 'a' }, { id: 2, name: 'b' }])
     const { root } = mountComponent(() =>
       view({
-        children: each(items, (item) =>
+        children: each(items as never, (item: { id: number; name: string }) =>
           text({ children: item.name }),
         ),
       }),

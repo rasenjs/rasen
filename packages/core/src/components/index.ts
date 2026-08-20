@@ -15,6 +15,7 @@ export { when, type WhenConfig, type WhenHostHooks } from './when'
 export { match, switchCase, type MatchConfig, type MatchHostHooks } from './match'
 export { 
   fragment,
+  f,
   type FragmentConfig,
   type FragmentChild,
   type FragmentHostHooks

@@ -1,5 +1,5 @@
-import type { PropValue, Mountable } from '@rasenjs/core'
-import { getReactiveRuntime, toValue } from '@rasenjs/core'
+import type { PropValue, Mountable, HostContext } from '@rasenjs/core'
+import { getReactiveRuntime, toValue, provideHostContext } from '@rasenjs/core'
 
 interface GPUAdapter {
   requestDevice: () => Promise<unknown>
@@ -248,7 +248,12 @@ export function canvas<Ctx>(props: {
     )
 
     // 挂载子组件到渲染上下文
-    const childUnmounts = props.children.map((child) => child(ctx))
+    // 用 provideHostContext 包裹：结构性组件（each/when）在 canvas 内
+    // 继承 canvas 的宿主上下文（canvas-2d/webgl 无需 marker 节点操作）。
+    const childCtx: HostContext<Ctx> = { hooks: {} }
+    const childUnmounts = props.children.map((child) =>
+      provideHostContext(childCtx, () => child(ctx))
+    )
 
     // 返回 unmount 函数
     return () => {

@@ -18,6 +18,31 @@ import { isMarkerMatch } from './marker-constants'
  * 支持 SSR hydration：在水合模式下会 claim 已有节点而不是创建新节点
  */
 export const hostHooks = {
+  /** 创建文本节点（host 用于获取 ownerDocument，支持 iframe） */
+  createTextNode: (host: HTMLElement, text: string) => {
+    const ctx = getHydrationContext()
+    if (ctx?.isHydrating) {
+      const claimed = ctx.claim()
+      if (claimed?.nodeType === Node.TEXT_NODE) {
+        return claimed as Text
+      }
+      return (host.ownerDocument || document).createTextNode(text)
+    }
+    return (host.ownerDocument || document).createTextNode(text)
+  },
+
+  /** 追加节点到宿主 */
+  appendNode: (host: HTMLElement, node: Node) => {
+    if (!node.parentNode) {
+      host.appendChild(node)
+    }
+  },
+
+  /** 更新文本节点内容 */
+  updateTextNode: (node: Node, text: string) => {
+    node.textContent = text
+  },
+
   /** 创建标记节点（注释节点）from host's ownerDocument to support iframe */
   createMarker: (host: HTMLElement, content: string) => {
     const hydrationContext = getHydrationContext()

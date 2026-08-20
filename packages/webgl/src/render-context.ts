@@ -618,6 +618,18 @@ export class RenderContext {
     return this.viewMatrix
   }
 
+  /**
+   * The overlay (weapon) camera's view matrix — the matrix the overlay pass
+   * actually renders layer-2 items with. Components drawn in the overlay pass
+   * (e.g. a first-person weapon) should position themselves with THIS matrix's
+   * inverse, not the main view's: the main view is updated asynchronously
+   * (reactive watch → microtask) and can lag one frame behind the overlay view
+   * during mouse look, which makes overlay items jitter.
+   */
+  getOverlayViewMatrix(): Mat4x4f {
+    return this.overlayView
+  }
+
   setViewMatrix(matrix: Mat4x4f) {
     this.viewMatrix = matrix
     if (this.batchRenderer) {

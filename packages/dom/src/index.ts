@@ -7,8 +7,9 @@ export { watchProp } from './utils'
 export { hostHooks, type HostHooks } from './host-hooks'
 export { MARKERS, isMarkerMatch, MARKER_DEBUG_MAP } from './marker-constants'
 
-import type { Mountable } from '@rasenjs/core'
-import { mount as coreMount } from '@rasenjs/core'
+import type { Mountable, HostHooks } from '@rasenjs/core'
+import { mount as coreMount, provideHostContext } from '@rasenjs/core'
+import { hostHooks } from './host-hooks'
 import {
   createHydrationContext,
   setHydrationContext,
@@ -69,6 +70,9 @@ export {
 /**
  * 挂载组件到 DOM 元素
  *
+ * 内部自动提供 DOM 宿主上下文（hostHooks），用户无需传 ctx。
+ * 结构性组件（each/when/match）通过 com 托管的上下文自动获得 DOM 操作能力。
+ *
  * @param mountable - Mountable 函数
  * @param container - 目标容器元素
  * @returns unmount 函数
@@ -77,7 +81,11 @@ export function mount<T extends Element>(
   mountable: Mountable<T>,
   container: T
 ): (() => void) | undefined {
-  return coreMount(mountable, container)
+  // 内部提供 DOM 宿主上下文，用户无感
+  return provideHostContext(
+    { hooks: hostHooks as unknown as HostHooks<T, unknown> },
+    () => coreMount(mountable, container)
+  )
 }
 
 /**

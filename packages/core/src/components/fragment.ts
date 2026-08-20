@@ -1,37 +1,13 @@
-import { type Mountable } from '../types'
+import { type Mountable, type HostContext, type HostHooks } from '../types'
 import { getReactiveRuntime } from '../reactive'
+import { getHostContext } from '../com'
 
 /**
- * Fragment host hooks for text node creation and updates
- * 
- * Required hooks:
- * - createTextNode: Create text nodes for string/number children
- * - appendNode: Append nodes to host
- * - updateTextNode: Update text content (for reactive refs)
- * - removeNode: Remove nodes on unmount
- * 
- * Optional hooks (for SSR/hydration boundary markers):
- * - createMarker: Create boundary markers (unified with when/each/switch)
- * - appendMarker: Append markers to host
- * - removeMarker: Remove markers on unmount
+ * Fragment host hooks — alias of HostHooks (unified interface).
+ * Required hooks for fragment: createTextNode, appendNode, updateTextNode, removeNode.
+ * Optional: createMarker, appendMarker, removeMarker (SSR/hydration boundaries).
  */
-export interface FragmentHostHooks<Host = unknown, N = unknown> {
-  /** Create a text node with the given content */
-  createTextNode: (text: string) => N
-  /** Append a node to the host */
-  appendNode: (host: Host, node: N) => void
-  /** Update a text node's content */
-  updateTextNode: (node: N, text: string) => void
-  /** Remove a text node */
-  removeNode: (node: N) => void
-  
-  /** Create a marker node with specific content (e.g., 'f', '/f', 'w', '/w') */
-  createMarker?: (host: Host, content: string) => N
-  /** Append a marker to the host (unified with when/each/switch) */
-  appendMarker?: (host: Host, marker: N) => void
-  /** Remove a marker node (unified with when/each/switch) */
-  removeMarker?: (marker: N) => void
-}
+export type FragmentHostHooks<Host = unknown, N = unknown> = HostHooks<Host, N>
 
 /**
  * 子元素类型
@@ -67,9 +43,9 @@ function processChild<Host, N>(
     }
     const text = String(child)
     return (host: Host) => {
-      const textNode = hooks.createTextNode(text)
-      hooks.appendNode(host, textNode)
-      return () => hooks.removeNode(textNode)
+      const textNode = hooks.createTextNode!(host, text)
+      hooks.appendNode!(host, textNode)
+      return () => hooks.removeNode?.(textNode)
     }
   }
   
@@ -81,19 +57,19 @@ function processChild<Host, N>(
     }
     const refChild = child as { value: unknown }
     return (host: Host) => {
-      const textNode = hooks.createTextNode(String(refChild.value))
-      hooks.appendNode(host, textNode)
+      const textNode = hooks.createTextNode!(host, String(refChild.value))
+      hooks.appendNode!(host, textNode)
       
       const stop = runtime.watch(
         () => refChild.value,
         (newVal) => {
-          hooks.updateTextNode(textNode, String(newVal))
+          hooks.updateTextNode?.(textNode, String(newVal))
         }
       )
       
       return () => {
         stop()
-        hooks.removeNode(textNode)
+        hooks.removeNode?.(textNode)
       }
     }
   }
@@ -117,10 +93,13 @@ function processChild<Host, N>(
 export function fragment<Host = unknown, N = unknown>(
   config: FragmentConfig<Host, N>
 ): Mountable<Host> {
-  const { children, hooks } = config
-  const mounts = children.map(child => processChild(child, hooks))
-  
+  const { children } = config
   return (host: Host) => {
+    // 宿主上下文：com 挂载时已压栈。优先用 ctx.hooks，config.hooks 作为显式 fallback。
+    const ctx = getHostContext() as HostContext<Host, N> | undefined
+    const hooks = ctx?.hooks ?? config.hooks
+    const mounts = children.map(child => processChild(child, hooks))
+
     const markers: N[] = []
     
     // Add start marker if available
@@ -150,3 +129,6 @@ export function fragment<Host = unknown, N = unknown>(
     }
   }
 }
+
+/** @deprecated Use `fragment` instead */
+export const f = fragment

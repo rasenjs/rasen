@@ -19,10 +19,9 @@
  *    reuse `each` for these cases too).
  */
 
-import { getReactiveRuntime, toValue, type Mountable, type Ref } from '@rasenjs/core'
+import { getReactiveRuntime, toValue, type Mountable, type Ref, each } from '@rasenjs/core'
 import type { RNNode } from '@rasenjs/rn-dom'
 import { element, renderChildren, type Child } from '../element'
-import { each } from '../control-flow'
 
 export interface ListRenderItemInfo<T> {
   item: T

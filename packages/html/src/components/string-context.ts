@@ -2,8 +2,10 @@
  * htmlContext 组件 - 提供 HTML 渲染上下文
  */
 import type { Mountable } from '@rasenjs/core'
+import { provideHostContext } from '@rasenjs/core'
 import type { StringHost } from '../types'
 import { createStringHost } from '../types'
+import { htmlHostHooks } from '../host-hooks'
 
 /**
  * 创建字符串渲染上下文
@@ -31,7 +33,7 @@ export function stringContext(props: {
  */
 export function renderToString(component: Mountable<StringHost>): string {
   const host = createStringHost()
-  component(host)
+  provideHostContext({ hooks: htmlHostHooks }, () => component(host))
   return host.toString()
 }
 
@@ -40,8 +42,10 @@ export function renderToString(component: Mountable<StringHost>): string {
  */
 export function renderToStringMultiple(components: Mountable<StringHost>[]): string {
   const host = createStringHost()
-  for (const component of components) {
-    component(host)
-  }
+  provideHostContext({ hooks: htmlHostHooks }, () => {
+    for (const component of components) {
+      component(host)
+    }
+  })
   return host.toString()
 }

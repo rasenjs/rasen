@@ -1,18 +1,5 @@
 /**
- * HTML when component for SSR
+ * @deprecated 从 @rasenjs/core 直接导入 `when`（宿主上下文由 renderToString 自动提供）
  */
-import { when as coreWhen, type WhenConfig, type Mountable } from '@rasenjs/core'
-import { whenHostHooks } from '../host-hooks'
-import type { StringHost } from '../types'
-
-/**
- * when - conditional rendering for SSR
- */
-export function when<Host extends StringHost = StringHost>(
-  config: Omit<WhenConfig<Host>, keyof typeof whenHostHooks>
-): Mountable<Host> {
-  return coreWhen({
-    ...config,
-    ...whenHostHooks
-  } as any)
-}
+import { when } from '@rasenjs/core'
+export { when }

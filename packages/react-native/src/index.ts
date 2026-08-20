@@ -3,12 +3,11 @@
  *
  * Thin binding layer over @rasenjs/rn-dom that provides:
  * - Unified `component()` factory for creating any RN native element
- * - Control-flow components (`each`, `when`, `match`) with RN host hooks
  * - Convenience `registerApp()` for app bootstrap
  *
  * @example
  * ```ts
- * import { component, registerApp, each, when } from '@rasenjs/react-native'
+ * import { component, registerApp } from '@rasenjs/react-native'
  * import { ref, computed } from '@vue/reactivity'
  *
  * const todos = ref([{ id: 1, text: 'Hello' }])
@@ -16,9 +15,7 @@
  * registerApp('MyApp', () =>
  *   component('View', { style: { flex: 1 },
  *     children: [
- *       each(todos, (todo) =>
- *         component('Text', { children: todo.text })
- *       )
+ *       component('Text', { children: 'Hello' })
  *     ]
  *   })
  * )
@@ -40,6 +37,7 @@ import type {
   RNEvent,
 } from '@rasenjs/rn-dom'
 import type { Mountable } from '@rasenjs/core'
+import { provideHostContext } from '@rasenjs/core'
 
 import { element, tag } from './element'
 import type { ElementProps, Child } from './element'
@@ -61,10 +59,24 @@ export { dispatchCommand, sendAccessibilityEvent, findNodeHandle }
 // Tag alias components
 export * from './components'
 
-// ── Host Hooks + Control Flow ───────────────────────────────────────────
+// ── Host Hooks (internal, for registerApp) ────────────────────────────
 
-export { hostHooks, each, when, match } from './control-flow'
-export type { HostHooks } from './control-flow'
+export const hostHooks = {
+  createMarker: (host: RNNode, content: string): RNCommentNode =>
+    host.ownerDocument.createComment(content),
+  appendMarker: (_host: RNNode, _marker: RNCommentNode): void => {},
+  insertBefore: (host: RNNode, node: RNNode | RNTextNode | RNCommentNode, before: RNCommentNode | null): void => {
+    if (before) host.insertBefore(node, before)
+    else host.appendChild(node)
+  },
+  removeNode: (node: RNNode | RNTextNode | RNCommentNode): void => {
+    node.parentNode?.removeChild(node)
+  },
+  removeMarker: (marker: RNCommentNode): void => {
+    marker.parentNode?.removeChild(marker)
+  },
+}
+export type HostHooks = typeof hostHooks
 
 // ── App Bootstrap ───────────────────────────────────────────────────────
 
@@ -97,7 +109,10 @@ export function registerApp(
 
   AppRegistry.registerRunnable(appName, ({ rootTag }: { rootTag: number }) => {
     const doc = RNDocument.getOrCreate(rootTag)
-    rerender = () => { App()(doc.body) }
+    rerender = () => {
+      // 内部提供 RN 宿主上下文，用户无感
+      provideHostContext({ hooks: hostHooks }, () => App()(doc.body))
+    }
     rerender()
   })
 
