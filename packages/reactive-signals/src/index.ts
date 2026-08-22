@@ -17,8 +17,29 @@ let currentScope: { addCleanup: (cleanup: () => void) => void } | null = null
 
 /**
  * Creates Signals reactive runtime
+ *
+ * Performance-critical: the js-framework-benchmark "select row" case creates
+ * ~1000 watchers on a single `selected` signal. Naively each watcher enqueues
+ * its own queueMicrotask — 1000 microtasks, 1000 re-watches, layout thrashing.
+ * We batch them: all dirty watchers are collected in a Set and flushed together
+ * in a single microtask, coalescing the DOM writes into one frame.
  */
 export function createReactiveRuntime(): ReactiveRuntime {
+  // Global batched flush — internal, no developer API change.
+  // 1000 `selected` watchers share one microtask and de-duplicated re-watch.
+  const pending = new Set<() => void>()
+  let flushScheduled = false
+  const scheduleFlush = () => {
+    if (flushScheduled) return
+    flushScheduled = true
+    queueMicrotask(() => {
+      flushScheduled = false
+      const jobs = Array.from(pending)
+      pending.clear()
+      for (const job of jobs) job()
+    })
+  }
+
   return {
     watch<T>(
       source: (() => T) | Ref<T> | ReadonlyRef<T>,
@@ -30,11 +51,6 @@ export function createReactiveRuntime(): ReactiveRuntime {
       let stopped = false
 
       // The Computed ONLY computes the value — it must NOT run the callback.
-      // If the callback ran inside the computed's getter, any signal it reads
-      // would be tracked as a dependency of this watch, creating hidden
-      // dependency edges (and potential infinite loops) for callbacks that
-      // read/write signals (e.g. `each`'s updateList re-reading config.items).
-      // The callback runs OUTSIDE the tracking scope in the watcher microtask.
       const effect = new Signal.Computed<T | undefined>(() => {
         if (stopped) return undefined
         return typeof source === 'function' ? source() : (source as Ref<T>).value
@@ -52,33 +68,32 @@ export function createReactiveRuntime(): ReactiveRuntime {
         oldValue = newValue
       }
 
-      // Create Watcher to listen to effect
+      // Each watcher contributes its `run` to the shared batched queue.
+      const batchedRun = () => {
+        if (stopped) return
+        run()
+        if (!stopped) watcher.watch(effect)
+      }
+
       const watcher = new Signal.subtle.Watcher(() => {
-        // Delay execution to avoid reading signal during notification phase
-        queueMicrotask(() => {
-          if (stopped) return
-          run()
-          if (!stopped) {
-            watcher.watch(effect)
-          }
-        })
+        if (stopped) return
+        pending.add(batchedRun)
+        scheduleFlush()
       })
 
-      // Watch effect itself
       watcher.watch(effect)
 
-      // Initial execution to establish dependencies and trigger immediate callback
+      // Initial execution to establish dependencies and trigger immediate callback.
+      // Must also ensure effect is watched after get() re-validates it.
       run()
-      // Need to re-watch after initial execution
       watcher.watch(effect)
 
-      // Return stop function
       const stopFn = () => {
         stopped = true
+        pending.delete(batchedRun)
         watcher.unwatch(effect)
       }
 
-      // If within a scope, register cleanup function
       if (currentScope) {
         currentScope.addCleanup(stopFn)
       }
