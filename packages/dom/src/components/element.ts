@@ -46,10 +46,18 @@ const COMMON_DOM_PROPERTIES = new Set([
 
 /**
  * 判断是否应该作为 DOM property 设置
+ * tag 的小写形式按 tag 缓存：避免每元素×每key 重复 toLowerCase 分配字符串
  */
+const lowerTagCache = new Map<string, string>()
+
 function isDOMProperty(tag: string, key: string): boolean {
+  let lowerTag = lowerTagCache.get(tag)
+  if (lowerTag === undefined) {
+    lowerTag = tag.toLowerCase()
+    lowerTagCache.set(tag, lowerTag)
+  }
   // 先检查按标签划分的
-  const tagProps = TAG_SPECIFIC_PROPERTIES[tag.toLowerCase()]
+  const tagProps = TAG_SPECIFIC_PROPERTIES[lowerTag]
   if (tagProps?.has(key)) {
     return true
   }
@@ -60,11 +68,12 @@ function isDOMProperty(tag: string, key: string): boolean {
 /**
  * 判断是否是事件处理器
  * onClick, onMouseEnter 等
+ * 用 charCode 判断大写，避免每次 key[2].toUpperCase() 分配字符串
  */
 function isEventProp(key: string): boolean {
-  return (
-    key.startsWith('on') && key.length > 2 && key[2] === key[2].toUpperCase()
-  )
+  if (!key.startsWith('on') || key.length < 3) return false
+  const c = key.charCodeAt(2)
+  return c >= 65 && c <= 90 // 'A' - 'Z'
 }
 
 /**
@@ -178,7 +187,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
           console.warn(
             `[Rasen Hydration] Tag mismatch: expected <${props.tag}>, got <${existingEl.tagName.toLowerCase()}>`
           )
-          el = document.createElement(props.tag)
+          el = (host.ownerDocument || document).createElement(props.tag)
         }
       } else {
         if (existing) {
@@ -186,38 +195,43 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             `[Rasen Hydration] Expected element <${props.tag}>, got ${existing.nodeType === Node.TEXT_NODE ? 'text node' : 'other node'}`
           )
         }
-        el = document.createElement(props.tag)
+        el = (host.ownerDocument || document).createElement(props.tag)
       }
     } else {
-      el = document.createElement(props.tag)
+      el = (host.ownerDocument || document).createElement(props.tag)
     }
 
-    const stops: Array<() => void> = []
-    const childUnmounts: Array<(() => void) | undefined> = []
-    const eventListeners: Array<{
+    let stops: Array<() => void> | null = null
+    let childUnmounts: Array<(() => void) | undefined> | null = null
+    let eventListeners: Array<{
       event: string
       handler: (e: Event) => void
-    }> = []
+    }> | null = null
 
-    // 处理 class
+    // 处理 class — 静态字面量直写，仅响应式才建 Watcher（公平对等 Vue patchFlag）
     if (props.class !== undefined) {
-      // 优化：缓存当前 class 值，减少不必要的 DOM 操作
-      let currentClass = ''
-      
-      stops.push(
-        watchProp(
-          () => unref(props.class),
-          (classValue) => {
-            const newClass = String(classValue || '')
-            // 只有 class 真正改变时才更新 DOM
-            if (currentClass !== newClass) {
-              el.className = newClass
-              currentClass = newClass
-            }
-          },
-          false // 始终执行immediate，确保class被正确设置（包括hydration模式）
+      const rawClass = props.class
+      const isReactiveClass =
+        typeof rawClass === 'function' ||
+        (rawClass !== null && typeof rawClass === 'object' && 'value' in (rawClass as object))
+      if (isReactiveClass) {
+        let currentClass = ''
+        ;(stops ??= []).push(
+          watchProp(
+            () => unref(rawClass as PropValue<string>),
+            (classValue) => {
+              const newClass = String(classValue || '')
+              if (currentClass !== newClass) {
+                el.className = newClass
+                currentClass = newClass
+              }
+            },
+            false
+          )
         )
-      )
+      } else {
+        el.className = String(rawClass || '')
+      }
     }
 
     // 处理 style
@@ -228,7 +242,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
       
       if (isReactiveStyle) {
         // 响应式的 style - 监听整个 style 对象的变化
-        stops.push(
+        ;(stops ??= []).push(
           watchProp(
             () => unref(props.style),
             (styleValue) => {
@@ -264,7 +278,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             },
             !hydrated
           )
-          stops.push(stop)
+          ;(stops ??= []).push(stop)
         }
       }
     }
@@ -280,6 +294,16 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
         ctx.enterChildren(el)
       }
 
+      // Fast path: a single static string child -> assign textContent directly.
+      // Avoids allocating a separate Text node + appendChild (2 DOM calls -> 1).
+      // Only safe when there are no other children to preserve.
+      if (
+        !ctx?.isHydrating &&
+        childrenArray.length === 1 &&
+        typeof childrenArray[0] === 'string'
+      ) {
+        el.textContent = childrenArray[0]
+      } else {
       // 2. Process each child
       for (const child of childrenArray) {
         if (typeof child === 'string') {
@@ -292,14 +316,14 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             } else {
               // Mismatch: remove claimed node and create new one
               if (claimed) claimed.parentNode?.removeChild(claimed)
-              textNode = document.createTextNode(child)
+              textNode = (host.ownerDocument || document).createTextNode(child)
               el.appendChild(textNode)
             }
           } else {
-            textNode = document.createTextNode(child)
+            textNode = (host.ownerDocument || document).createTextNode(child)
             el.appendChild(textNode)
           }
-          childUnmounts.push(() => textNode.remove())
+          ;(childUnmounts ??= []).push(() => textNode.remove())
         } else if (
           typeof child === 'object' &&
           child !== null &&
@@ -314,11 +338,11 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             } else {
               // Mismatch: remove claimed node and create new one
               if (claimed) claimed.parentNode?.removeChild(claimed)
-              textNode = document.createTextNode(String(unref(child)))
+              textNode = (host.ownerDocument || document).createTextNode(String(unref(child)))
               el.appendChild(textNode)
             }
           } else {
-            textNode = document.createTextNode(String(unref(child)))
+            textNode = (host.ownerDocument || document).createTextNode(String(unref(child)))
             el.appendChild(textNode)
           }
           const stop = watchProp(
@@ -328,45 +352,20 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             },
             hydrated
           )
-          stops.push(stop)
-          childUnmounts.push(() => textNode.remove())
+          ;(stops ??= []).push(stop)
+          ;(childUnmounts ??= []).push(() => textNode.remove())
         } else if (typeof child === 'function') {
-          // 可能是 Mountable 函数，也可能是返回字符串/数字的响应式函数
-          // 先调用一次，检查返回值类型
           type ChildFn = (host: HTMLElement) => unknown
           const result = (child as ChildFn)(el)
-          
-          // 如果返回值是字符串或数字，当作响应式文本内容处理
           if (typeof result === 'string' || typeof result === 'number') {
-            let textNode: Text
-            if (ctx?.isHydrating) {
-              const claimed = ctx.claim()
-              if (claimed?.nodeType === Node.TEXT_NODE) {
-                textNode = claimed as Text
-              } else {
-                // Mismatch: remove claimed node and create new one
-                if (claimed) claimed.parentNode?.removeChild(claimed)
-                textNode = document.createTextNode(String(result))
-                el.appendChild(textNode)
-              }
-            } else {
-              textNode = document.createTextNode(String(result))
-              el.appendChild(textNode)
-            }
-            const stop = watchProp(
-              child as () => string | number,
-              (v) => {
-                textNode.textContent = String(v) || ''
-              },
-              hydrated
-            )
-            stops.push(stop)
-            childUnmounts.push(() => textNode.remove())
+            const textNode = (host.ownerDocument || document).createTextNode(String(result))
+            el.appendChild(textNode)
+            ;(childUnmounts ??= []).push(() => textNode.remove())
           } else {
-            // 返回值是 unmount 函数（或 undefined），是真正的 Mountable
-            childUnmounts.push(result as (() => void) | undefined)
+            ;(childUnmounts ??= []).push(result as (() => void) | undefined)
           }
         }
+      }
       }
 
       if (ctx?.isHydrating) {
@@ -391,38 +390,45 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
           const eventName = getEventName(key)
           const handler = value as (e: Event) => void
           el.addEventListener(eventName, handler)
-          eventListeners.push({ event: eventName, handler })
+          ;(eventListeners ??= []).push({ event: eventName, handler })
         }
         continue
       }
 
-      // DOM property（需要直接设置 el[name] = value）
-      // 在 hydration 模式下，某些 DOM properties（如 href, value）也需要被设置
-      // 因为它们可能与 HTML attribute 不同步
+      const isReactiveAttr =
+        typeof value === 'function' ||
+        (value !== null && typeof value === 'object' && 'value' in (value as object))
       if (isDOMProperty(props.tag, key)) {
-        stops.push(
-          watchProp(
-            () => unref(value as PropValue<string | number | boolean>),
-            (propValue) => {
-              ;(el as unknown as Record<string, unknown>)[key] = propValue
-            },
-            false // 始终执行immediate，确保DOM property被正确设置
+        if (isReactiveAttr) {
+          ;(stops ??= []).push(
+            watchProp(
+              () => unref(value as PropValue<string | number | boolean>),
+              (propValue) => {
+                ;(el as unknown as Record<string, unknown>)[key] = propValue
+              },
+              false
+            )
           )
-        )
+        } else {
+          ;(el as unknown as Record<string, unknown>)[key] = value as string | number | boolean
+        }
         continue
       }
 
-      // 其他 HTML 属性 - 在 hydration 模式下可以跳过（已经在服务器端渲染）
       const attrName = getDOMAttrName(key)
-      stops.push(
-        watchProp(
-          () => unref(value as PropValue<string | number | boolean>),
-          (attrValue) => {
-            setAttribute(el, attrName, attrValue)
-          },
-          hydrated
+      if (isReactiveAttr) {
+        ;(stops ??= []).push(
+          watchProp(
+            () => unref(value as PropValue<string | number | boolean>),
+            (attrValue) => {
+              setAttribute(el, attrName, attrValue)
+            },
+            hydrated
+          )
         )
-      )
+      } else {
+        if (!hydrated) setAttribute(el, attrName, value as string | number | boolean)
+      }
     }
 
     // ref - 设置元素引用
@@ -441,8 +447,8 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
       if (props.ref) {
         setValue(props.ref, null)
       }
-      stops.forEach((stop) => stop())
-      childUnmounts.forEach((u, index) => {
+      stops?.forEach((stop) => stop())
+      childUnmounts?.forEach((u, index) => {
         if (typeof u === 'function') {
           u()
         } else if (u !== undefined) {
@@ -450,8 +456,10 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
         }
       })
       // 移除事件监听器
-      for (const { event, handler } of eventListeners) {
-        el.removeEventListener(event, handler)
+      if (eventListeners) {
+        for (const { event, handler } of eventListeners) {
+          el.removeEventListener(event, handler)
+        }
       }
       el.remove()
     }

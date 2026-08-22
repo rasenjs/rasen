@@ -100,15 +100,14 @@ const warnedKeys = new Set<string>()
 export function warnInvalidEventCase(key: string, value: unknown): void {
   if (!isDev) return
 
+  // 先做最便宜的检查：非 on* 的 key 直接返回（大多数 props 走这条路径）
+  if (!key.startsWith('on') || key.length < 3) return
+
   // 避免重复警告
   if (warnedKeys.has(key)) return
 
   // 检查是否以 on 开头但第三个字符是小写（错误写法）
-  if (
-    key.startsWith('on') &&
-    key.length > 2 &&
-    key[2] === key[2].toLowerCase()
-  ) {
+  if (key[2] === key[2].toLowerCase()) {
     const eventName = key.slice(2).toLowerCase()
 
     // 检查是否是常见的事件名称，且值是函数
