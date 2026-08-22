@@ -172,45 +172,56 @@ const eachImpl = com(
         return instance
       }
 
-      // 更新列表
+      // 更新列表 — hot path:首创 1000 行占 Create 1k 全耗时
       const updateList = () => {
         const newItems = config.items()
+        const newLen = newItems.length
 
-        // 构建新项集合
-        const newItemSet = new WeakSet<T>()
-        for (const item of newItems) {
-          newItemSet.add(item)
-        }
-
-        // 1. 移除不再存在的项
-        for (const item of currentItems) {
-          if (!newItemSet.has(item)) {
-            removeInstance(item)
-          }
-        }
-
-        // 2. 快速路径：完全新建
-        const hasExisting = currentItems.some((item) => newItemSet.has(item))
-
-        if (currentItems.length === 0 || !hasExisting) {
+        // 首创/全量新建：O(n) 快速路径，跳过 WeakSet/Map/LIS 全量分配
+        if (currentItems.length === 0) {
           if (hooks.createFragment) {
             const { host: fragmentHost, flush } = hooks.createFragment(host)
-
-            for (let i = 0; i < newItems.length; i++) {
+            for (let i = 0; i < newLen; i++) {
               const item = newItems[i]
-              const instance = createInstance(item, i, fragmentHost)
-              instanceMap.set(item, instance)
+              instanceMap.set(item, createInstance(item, i, fragmentHost))
             }
-
             flush(host, endMarker ?? null)
           } else {
-            for (let i = 0; i < newItems.length; i++) {
+            for (let i = 0; i < newLen; i++) {
               const item = newItems[i]
-              const instance = createInstance(item, i, host)
-              instanceMap.set(item, instance)
+              instanceMap.set(item, createInstance(item, i, host))
             }
           }
+          currentItems = newItems.slice()
+          return
+        }
 
+        // 增量路径：构建集合、清理、判全新建
+        const newItemSet = new WeakSet<T>()
+        for (let i = 0; i < newLen; i++) newItemSet.add(newItems[i])
+
+        // 1. 移除不再存在的项
+        for (let i = 0; i < currentItems.length; i++) {
+          const item = currentItems[i]
+          if (!newItemSet.has(item)) removeInstance(item)
+        }
+
+        // 2. 若无任何复用，亦可走 Fragment 批量新建（swap/remove 后可能命中）
+        const hasExisting = currentItems.some((item) => newItemSet.has(item))
+        if (!hasExisting) {
+          if (hooks.createFragment) {
+            const { host: fragmentHost, flush } = hooks.createFragment(host)
+            for (let i = 0; i < newLen; i++) {
+              const item = newItems[i]
+              instanceMap.set(item, createInstance(item, i, fragmentHost))
+            }
+            flush(host, endMarker ?? null)
+          } else {
+            for (let i = 0; i < newLen; i++) {
+              const item = newItems[i]
+              instanceMap.set(item, createInstance(item, i, host))
+            }
+          }
           currentItems = newItems.slice()
           return
         }
@@ -291,23 +302,14 @@ const eachImpl = com(
       // 初始渲染
       updateList()
 
-      // 监听变化（由 com 自动清理）
-      // 使用嵌套 watch：
-      // 外层 watch 监听数组引用变化（整体替换）
-      // 内层 watch 监听数组内部变化（push/pop/splice/替换 item）
+      // Single subscription: config.items() already reads the signal (Ref.value / getter).
+      // Whether the producer does `data.value = [...d]` or mutating methods, the
+      // ref's identity is replaced or the getter re-evaluates, so one watch is enough.
+      // The old nested watch leaked a new watcher per update (created after microtask,
+      // outside the captured scope) and `deep:false` is ignored by signals adapter.
       const scope = runtime.effectScope()
       scope.run(() => {
-        runtime.watch(
-          config.items,
-          (newItems) => {
-            updateList()
-            // 每次数组变化时，重新 watch 新数组的内部变化
-            if (Array.isArray(newItems)) {
-              runtime.watch(newItems as any, updateList, { deep: false })
-            }
-          },
-          { deep: false, immediate: true }
-        )
+        runtime.watch(config.items, updateList, { deep: false })
       })
 
       // unmount
@@ -471,23 +473,9 @@ const repeatImpl = com(
       // 初始渲染
       updateList()
 
-      // 监听变化（由 com 自动清理）
-      // 使用嵌套 watch：
-      // 外层 watch 监听数组引用变化（整体替换）
-      // 内层 watch 监听数组内部变化（push/pop/splice/替换 item）
       const scope = runtime.effectScope()
       scope.run(() => {
-        runtime.watch(
-          config.items,
-          (newItems) => {
-            updateList()
-            // 每次数组变化时，重新 watch 新数组的内部变化
-            if (Array.isArray(newItems)) {
-              runtime.watch(newItems as any, updateList, { deep: false })
-            }
-          },
-          { deep: false, immediate: true }
-        )
+        runtime.watch(config.items, updateList, { deep: false })
       })
 
       // unmount
