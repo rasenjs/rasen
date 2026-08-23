@@ -21,7 +21,7 @@
  *    server-rendered markup is the source of truth for the first frame.
  */
 
-import { getReactiveRuntime, type PropValue } from '@rasenjs/core'
+import { getReactiveRuntime, isRef, type PropValue } from '@rasenjs/core'
 
 // Re-exported for the compiler's single import source
 // ('@rasenjs/dom/template' → bindings): generated SSR code references these.
@@ -99,14 +99,14 @@ export function getEventName(key: string): string {
 // Value-kind dispatch (static vs reactive)
 // ---------------------------------------------------------------------------
 
-/** A prop value is reactive when it is a getter function or a ref-like
- *  object carrying a `value` slot. Single source of truth for both entry
- *  points (element factory passes raw props; compiled code passes getters). */
+/** A prop value is reactive when it is a getter function or when the active
+ *  reactive runtime brands it as a ref. Detection goes through the runtime's
+ *  authoritative `isRef` — never structural duck-typing — so every adapter's
+ *  ref flavor works and plain objects stay static. Single source of truth
+ *  for both entry points (element factory passes raw props; compiled code
+ *  passes getters). */
 function isReactiveValue(v: unknown): boolean {
-  return (
-    typeof v === 'function' ||
-    (v !== null && typeof v === 'object' && 'value' in (v as object))
-  )
+  return typeof v === 'function' || isRef(v)
 }
 
 const noop = () => {}

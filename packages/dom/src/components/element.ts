@@ -1,4 +1,4 @@
-import { setValue, type PropValue, type Ref, type Mountable } from '@rasenjs/core'
+import { setValue, isRef, type PropValue, type Ref, type Mountable } from '@rasenjs/core'
 import { unref } from '../utils'
 import { warnInvalidEventCase } from '../utils/dev-warnings'
 import { getHydrationContext, claimElement } from '../hydration-context'
@@ -153,11 +153,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             el.appendChild(textNode)
           }
           ;(childUnmounts ??= []).push(() => textNode.remove())
-        } else if (
-          typeof child === 'object' &&
-          child !== null &&
-          'value' in child
-        ) {
+        } else if (isRef(child)) {
           // Ref 对象 - 创建或复用响应式文本节点；写入语义统一走共享绑定层
           // 的 bindText（ref → 响应式监听；水合时跳过首帧写入）
           let textNode: Text
@@ -168,14 +164,18 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             } else {
               // Mismatch: remove claimed node and create new one
               if (claimed) claimed.parentNode?.removeChild(claimed)
-              textNode = (host.ownerDocument || document).createTextNode(String(unref(child)))
+              textNode = (host.ownerDocument || document).createTextNode(
+                String(unref(child as PropValue<string>))
+              )
               el.appendChild(textNode)
             }
           } else {
             textNode = (host.ownerDocument || document).createTextNode('')
             el.appendChild(textNode)
           }
-          ;(stops ??= []).push(bindText(textNode, () => child))
+          ;(stops ??= []).push(
+            bindText(textNode, () => child as PropValue<unknown>)
+          )
           ;(childUnmounts ??= []).push(() => textNode.remove())
         } else if (typeof child === 'function') {
           type ChildFn = (host: HTMLElement) => unknown
