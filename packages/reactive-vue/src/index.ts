@@ -17,7 +17,7 @@ import {
   type Ref as VueRef,
   type ComputedRef
 } from '@vue/reactivity'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
+import { setReactiveRuntime, getReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
 
 /**
  * Creates Vue reactive runtime
@@ -79,4 +79,12 @@ export function createReactiveRuntime(): ReactiveRuntime {
  */
 export function useReactiveRuntime(): void {
   setReactiveRuntime(createReactiveRuntime())
+}
+
+/**
+ * Convenient ref function — mirrors @rasenjs/reactive-signals' standalone `ref`.
+ * Creates a Vue ref via the active runtime.
+ */
+export function ref<T>(value: T): Ref<T> {
+  return getReactiveRuntime().ref(value)
 }

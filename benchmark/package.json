@@ -1,0 +1,13 @@
+{
+  "name": "benchmark-harness",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Benchmark harness (Puppeteer driver) for the Rasen js-framework-benchmark comparisons",
+  "scripts": {
+    "benchmark": "node bench.js",
+    "benchmark:headless": "node bench.js --no-headless"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.32.0"
+  }
+}
