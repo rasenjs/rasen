@@ -8,7 +8,7 @@
  * 使用 core 的 match 组件实现 RouterView
  */
 
-import { match, getReactiveRuntime, unref, setValue, type MatchHostHooks, type Mountable } from '@rasenjs/core'
+import { match, getReactiveRuntime, unref, setValue, type Mountable } from '@rasenjs/core'
 import type { 
   Router, 
   Route, 
@@ -360,14 +360,13 @@ export type ViewsConfig<TRoutes, Host> = {
  * div({}, RouterView())
  * ```
  */
-export function createRouterView<TRoutes extends Record<string, unknown>, Host = unknown, N = unknown>(
+export function createRouterView<TRoutes extends Record<string, unknown>, Host = unknown>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   router: Router<TRoutes>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   views: ViewsConfig<TRoutes, Host> & Record<string, any>,
   options?: {
     default?: () => Mountable<Host>
-    hostHooks?: MatchHostHooks<Host, N>
   }
 ): () => Mountable<Host> {
   // 从 router 获取 routes 配置
@@ -482,8 +481,7 @@ export function createRouterView<TRoutes extends Record<string, unknown>, Host =
         return pathToKey.get(currentRoute.fullPath)
       },
       cases,
-      default: options?.default,
-      ...options?.hostHooks
+      default: options?.default
     })
   }
 }

@@ -1168,7 +1168,7 @@ export interface RNCommentNode {
 // then flushed atomically into a real parent node. Unlike RNCommentNode,
 // children ARE registered in the instance map so event dispatch works.
 //
-// Used by eachImpl's fast path via host-hooks createFragment.
+// Used by eachImpl's fast path via host-hooks batch.
 // ============================================================================
 
 export class RNDocumentFragment {

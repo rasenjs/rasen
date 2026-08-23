@@ -48,9 +48,6 @@ import type { StringHost } from '@rasenjs/html'
 // Import HTML elements
 import { a } from '@rasenjs/html'
 
-// Import match host hooks for SSR
-import { matchHostHooks } from '@rasenjs/html'
-
 // Import router component factories and types
 import {
   createRouterView as createRouterViewFactory,
@@ -79,9 +76,8 @@ export function createRouterView<TRoutes extends Record<string, unknown>>(
     default?: () => Mountable<StringHost>
   } = {}
 ): () => Mountable<StringHost> {
-  return createRouterViewFactory<TRoutes, StringHost, string>(router, views, {
-    ...options,
-    hostHooks: matchHostHooks
+  return createRouterViewFactory<TRoutes, StringHost>(router, views, {
+    ...options
   })
 }
 

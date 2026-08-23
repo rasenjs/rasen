@@ -11,24 +11,24 @@ import { MARKERS, createMarker } from '../marker-constants'
  * Following the same pattern as text nodes: <!-- f --> and <!-- /f -->
  */
 const hostHooks = {
-  createTextNode: (text: string) => {
+  createMarker: (_host: StringHost, kind: string): string => {
+    return createMarker(kind)
+  },
+  insert: (host: StringHost, node: string, _ref: string | null): void => {
+    host.append(node)
+  },
+  detach: (): void => {},
+  nextSibling: (): string | null => null,
+  createText: (_host: StringHost, content: string) => {
     // Wrap each text piece with comment markers for hydration matching
-    return `${createMarker(MARKERS.TEXT_START)}${escapeHtml(text)}${createMarker(MARKERS.TEXT_END)}`
+    const node = `${createMarker(MARKERS.TEXT_START)}${escapeHtml(content)}${createMarker(MARKERS.TEXT_END)}`
+    return {
+      node,
+      update: () => {
+        // SSR 中不需要更新文本节点
+      },
+    }
   },
-  appendNode: (host: StringHost, node: string) => host.append(node),
-  updateTextNode: () => {
-    // SSR 中不需要更新文本节点
-  },
-  removeNode: () => {
-    // SSR 中不需要移除节点
-  },
-  createMarker: (_host: StringHost, content: string) => {
-    return createMarker(content)
-  },
-  appendMarker: (host: StringHost, marker: string) => host.append(marker),
-  removeMarker: () => {
-    // SSR 中不需要移除标记
-  }
 }
 
 /**

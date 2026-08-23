@@ -51,7 +51,6 @@ import {
 
 // Import DOM-specific things
 import { a } from '@rasenjs/dom'
-import { hostHooks } from '@rasenjs/dom'
 import type { Mountable } from '@rasenjs/core'
 import type { Router } from '@rasenjs/router'
 import type { ElementProps } from '@rasenjs/dom'
@@ -75,9 +74,8 @@ export function createRouterView<TRoutes extends Record<string, unknown>>(
     default?: () => Mountable<HTMLElement>
   } = {}
 ) {
-  return createRouterViewFactory<TRoutes, HTMLElement, Node>(router, views, {
-    ...options,
-    hostHooks
+  return createRouterViewFactory<TRoutes, HTMLElement>(router, views, {
+    ...options
   })
 }
 

@@ -61,19 +61,77 @@ export * from './components'
 
 // ── Host Hooks (internal, for registerApp) ────────────────────────────
 
+type RNAnyNode = RNNode | RNTextNode | RNCommentNode
+
+function guardedInsertBefore(
+  host: RNNode,
+  node: RNAnyNode,
+  ref: RNAnyNode | null
+): void {
+  if (ref) host.insertBefore(node, ref)
+  else host.appendChild(node)
+}
+
 export const hostHooks = {
-  createMarker: (host: RNNode, content: string): RNCommentNode =>
-    host.ownerDocument.createComment(content),
-  appendMarker: (_host: RNNode, _marker: RNCommentNode): void => {},
-  insertBefore: (host: RNNode, node: RNNode | RNTextNode | RNCommentNode, before: RNCommentNode | null): void => {
-    if (before) host.insertBefore(node, before)
-    else host.appendChild(node)
+  /** Create a detached marker comment; position decided by insert */
+  createMarker: (host: RNNode, kind: string): RNCommentNode =>
+    host.ownerDocument.createComment(kind),
+  /** Insert node before ref (null = append); also used for moves */
+  insert: (host: RNNode, node: RNAnyNode, ref: RNAnyNode | null): void => {
+    guardedInsertBefore(host, node, ref)
   },
-  removeNode: (node: RNNode | RNTextNode | RNCommentNode): void => {
+  /** Detach node from the tree */
+  detach: (node: RNAnyNode): void => {
     node.parentNode?.removeChild(node)
   },
-  removeMarker: (marker: RNCommentNode): void => {
-    marker.parentNode?.removeChild(marker)
+  /** Next sibling (marker region walks) */
+  nextSibling: (node: RNAnyNode): RNAnyNode | null => node.nextSibling,
+  /** Create a detached text node handle */
+  createText: (host: RNNode, content: string) => {
+    const textNode = host.ownerDocument.createTextNode(content)
+    return {
+      node: textNode,
+      update: (v: string) => {
+        textNode.textContent = v
+      },
+    }
+  },
+  /**
+   * Bounded host view: transparently forwards all properties, intercepts
+   * appendChild/insertBefore to redirect appends before the marker.
+   */
+  boundedHost: (host: RNNode, marker: RNAnyNode): RNNode =>
+    new Proxy(host, {
+      get(target, prop, receiver) {
+        if (prop === 'appendChild') {
+          return (node: RNAnyNode) => {
+            guardedInsertBefore(target, node, marker)
+            return node
+          }
+        }
+        if (prop === 'insertBefore') {
+          return (node: RNAnyNode, ref: RNAnyNode | null) => {
+            guardedInsertBefore(target, node, ref || marker)
+            return node
+          }
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    }) as RNNode,
+  /** DocumentFragment batch insertion */
+  batch: (
+    host: RNNode
+  ): {
+    host: RNNode
+    flush: (host: RNNode, ref: RNAnyNode | null) => void
+  } => {
+    const fragment = host.ownerDocument.createDocumentFragment()
+    return {
+      host: fragment as unknown as RNNode,
+      flush: (targetHost: RNNode, ref: RNAnyNode | null) => {
+        fragment.flush(targetHost, ref)
+      },
+    }
   },
 }
 export type HostHooks = typeof hostHooks

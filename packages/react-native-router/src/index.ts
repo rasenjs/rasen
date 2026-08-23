@@ -53,7 +53,6 @@ import {
 } from '@rasenjs/router/components'
 
 import { touchableOpacity } from '@rasenjs/react-native'
-import { hostHooks } from '@rasenjs/react-native'
 import type { Mountable } from '@rasenjs/core'
 import type { Router } from '@rasenjs/router'
 import type { Host } from '@rasenjs/react-native'
@@ -68,9 +67,8 @@ export function createRouterView<TRoutes extends Record<string, unknown>>(
     default?: () => Mountable<Host>
   } = {}
 ) {
-  return createRouterViewFactory<TRoutes, Host, unknown>(router, views, {
-    ...options,
-    hostHooks
+  return createRouterViewFactory<TRoutes, Host>(router, views, {
+    ...options
   })
 }
 
