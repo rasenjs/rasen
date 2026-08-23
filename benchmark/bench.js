@@ -968,8 +968,9 @@ function buildMultiplierRows(allResults, official) {
   // instead of indexing the full BENCHMARKS list.
   const rows = rasen.results.map((r, i) => {
     const vResult = vanilla.results[i];
+    if (!r.stats || !vResult || !vResult.stats) return null; // failed run
     const rMean = r.stats.mean;
-    const vMean = vResult ? vResult.stats.mean : null;
+    const vMean = vResult.stats.mean;
     const row = { id: r.id, label: r.label, native: 1.0, rasen: (rMean && vMean) ? rMean / vMean : null };
     const officialId = BENCHMARK_OFFICIAL_ID[r.id];
     OFFICIAL_COMPARISONS.forEach(comp => {
@@ -985,10 +986,11 @@ function buildMultiplierRows(allResults, official) {
     return row;
   });
 
+  const validRows = rows.filter(Boolean);
   const summary = { id: 'geo', label: 'Geometric mean', native: 1.0 };
-  summary.rasen = geoMean(rows.map(r => r.rasen));
+  summary.rasen = geoMean(validRows.map(r => r.rasen));
   OFFICIAL_COMPARISONS.forEach(comp => {
-    summary[comp.label] = geoMean(rows.map(r => r[comp.label]));
+    summary[comp.label] = geoMean(validRows.map(r => r[comp.label]));
   });
   rows.push(summary);
   return rows;

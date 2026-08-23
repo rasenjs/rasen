@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
+import { rasenCompile } from '@rasenjs/compiler'
 
 // Isolated benchmark preview for Rasen (render-function, built dist packages).
 // Each preview has its own package.json + vite config to avoid cross-pollution.
 export default defineConfig({
   base: './',
+  plugins: [rasenCompile.vite()],
   server: {
     port: 5174,
     strictPort: true

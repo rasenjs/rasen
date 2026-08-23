@@ -10,6 +10,7 @@
     "start": "node ../scripts/start-server.mjs"
   },
   "dependencies": {
+    "@rasenjs/compiler": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/reactive-signals": "workspace:*"

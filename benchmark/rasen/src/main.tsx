@@ -5,7 +5,7 @@
 
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime, ref } from '@rasenjs/reactive-vue'
-import { mount, tr, td, a, span, each } from '@rasenjs/dom'
+import { mount, each } from '@rasenjs/dom'
 
 // Initialize reactive runtime with Vue reactivity
 const runtime = createReactiveRuntime()
@@ -127,39 +127,29 @@ document.getElementById('clear')!.onclick = clear
 document.getElementById('swaprows')!.onclick = swapRows
 
 // ============================================================================
-// Row Component using @rasenjs/dom
+// Row Component — JSX + @rasen-compile (static hoisting via compiler)
+//
+// Idiomatic declarative JSX; the vite plugin compiles this element tree into
+// template-primitive calls (clone + baked navigation + exact-node wiring).
 // ============================================================================
 
+/** @rasen-compile */
 function Row(item: RowData) {
-  return tr(
-    {
-      class: () => selected.value === item.id ? 'danger' : '',
-    },
-    td({ class: 'col-md-1' }, String(item.id)),
-    td(
-      { class: 'col-md-4' },
-      a(
-        {
-          class: 'lbl',
-          onClick: () => select(item.id)
-        },
-        item.label
-      )
-    ),
-    td(
-      { class: 'col-md-1' },
-      a(
-        {
-          class: 'remove',
-          onClick: () => remove(item.id)
-        },
-        span({
-          class: 'remove glyphicon glyphicon-remove',
-          'aria-hidden': 'true'
-        })
-      )
-    ),
-    td({ class: 'col-md-6' })
+  return (
+    <tr class={selected.value === item.id ? 'danger' : ''}>
+      <td class="col-md-1">{String(item.id)}</td>
+      <td class="col-md-4">
+        <a class="lbl" onClick={() => select(item.id)}>
+          {item.label}
+        </a>
+      </td>
+      <td class="col-md-1">
+        <a class="remove" onClick={() => remove(item.id)}>
+          <span class="remove glyphicon glyphicon-remove" aria-hidden="true" />
+        </a>
+      </td>
+      <td class="col-md-6" />
+    </tr>
   )
 }
 

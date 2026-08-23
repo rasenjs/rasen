@@ -128,4 +128,45 @@ describe('@rasenjs/html', () => {
       expect(style).toBe('color: red')
     })
   })
+
+  // ── 编译组件 SSR 集成（P3：同一 IR 产出服务端 HTML）────────────────
+  // 编译器生成的 mountable 内置 StringHost 分支（duck-typing:
+  // host.append 存在且无 nodeType），html 渲染器零改动即可消费。
+  describe('compiled component (rasen-compile output)', () => {
+    // 模拟编译器产物形态：SSR 分支 + DOM 分支
+    function makeCompiledRow(item: { id: number; label: string }) {
+      return (host: any) => {
+        if (host.append !== undefined && host.nodeType === undefined) {
+          host.append(
+            `<tr class="${item.id === 1 ? 'danger' : ''}">` +
+              `<td class="col-md-1">${escapeHtml(String(item.id))}</td>` +
+              `<td class="col-md-4"><a class="lbl">${escapeHtml(item.label)}</a></td>` +
+              `</tr>`
+          )
+          return
+        }
+        // DOM path not exercised here
+        throw new Error('unexpected DOM host in SSR test')
+      }
+    }
+
+    it('should render a compiled component inside an html tree', () => {
+      const Row = makeCompiledRow({ id: 1, label: 'pretty <big> table' })
+      const html = renderToString(div({ class: 'table' }, Row as any))
+      expect(html).toContain('<div class="table">')
+      expect(html).toContain('<tr class="danger">')
+      expect(html).toContain('<td class="col-md-1">1</td>')
+      expect(html).toContain('pretty &lt;big&gt; table')
+      expect(html).toMatch(/<\/tr><\/div>$/)
+    })
+
+    it('should render compiled component with empty class when not selected', () => {
+      const Row = makeCompiledRow({ id: 2, label: 'plain' })
+      const html = renderToString(Row as any)
+      expect(html).toBe(
+        '<tr class=""><td class="col-md-1">2</td>' +
+          '<td class="col-md-4"><a class="lbl">plain</a></td></tr>'
+      )
+    })
+  })
 })
