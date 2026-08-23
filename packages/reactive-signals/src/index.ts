@@ -60,7 +60,15 @@ export function createReactiveRuntime(): ReactiveRuntime {
         if (stopped) return
         const newValue = effect.get() as T
         if (!isFirstRun && oldValue !== undefined) {
-          callback(newValue, oldValue)
+          // Fine-grained reactivity: only fire when the value actually
+          // changed. Without this, every dependent re-runs on any dirty
+          // notification even when its computed value is unchanged (e.g. 1000
+          // rows each watching a global `selected` signal all re-fire on a
+          // single selection change). Skipping unchanged values keeps updates
+          // O(changed) instead of O(subscribers), matching Vue/Solid.
+          if (!Object.is(newValue, oldValue)) {
+            callback(newValue, oldValue)
+          }
         } else if (options?.immediate) {
           callback(newValue, newValue)
         }
