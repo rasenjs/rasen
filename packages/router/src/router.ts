@@ -373,7 +373,7 @@ export function createRouter<TConfig extends RoutesConfig>(
    */
   function setIsNavigating(value: boolean) {
     if (isNavigatingRef) {
-      isNavigatingRef.value = value
+      setValue(isNavigatingRef, value)
     }
   }
 

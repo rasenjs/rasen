@@ -1,24 +1,34 @@
 /**
  * Rasen 内部响应式类型定义
  * 不直接依赖 Vue，而是定义通用的响应式接口
+ *
+ * Ref 是一个「不透明」的响应式引用类型：它不规定任何具体形状
+ * （Vue 的 ref 暴露 `.value`，TC39 Signal 暴露 `.get()`/`.set()`），
+ * 因此与具体响应式库完全解耦。访问一律走 unref / setValue / isRef
+ * （由运行时提供），或 core 的 toValue，禁止直接读 `.value`。
  */
+
+// 类型层品牌：仅用于在类型上把「响应式引用」和普通对象区分开，
+// 运行时并不依赖它（运行时判定走各适配器的 isRef）。
+declare const REF_BRAND: unique symbol
+declare const READONLY_REF_BRAND: unique symbol
 
 /**
  * 可读写的响应式引用接口（ref）
  *
- * 结构上暴露 `.value`（保证泛型推断与外部 ref 兼容），
- * 但框架的规范访问路径是 unref/setValue：
- * 适配器定义具体形状，core 内部通过 unref/setValue 访问，不直接依赖 `.value`。
+ * 不暴露任何结构属性——具体形状由适配器决定。
+ * 框架规范访问路径是 unref / setValue，禁止直接依赖 `.value`。
  */
 export interface Ref<T = unknown> {
-  value: T
+  readonly [REF_BRAND]: true
+  readonly __phantom?: T
 }
 
 /**
- * 只读的响应式引用接口（computed）
- */
+ * 只读的响应式引用接口（computed） */
 export interface ReadonlyRef<T = unknown> {
-  readonly value: T
+  readonly [READONLY_REF_BRAND]: true
+  readonly __phantom?: T
 }
 
 import type { PropValue } from './types'
@@ -161,22 +171,6 @@ export function setValue<T>(ref: Ref<T>, value: T): void {
  */
 export function isRef(value: unknown): boolean {
   return getReactiveRuntime().isRef(value)
-}
-
-/**
- * 为 `.value` 形状的适配器提供默认 unref/setValue 实现
- * Vue 原生 ref、Signals 包装 ref 等可直接展开使用
- */
-export function valueAccessors() {
-  return {
-    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>): T =>
-      value && typeof value === 'object' && 'value' in value
-        ? (value as { value: T }).value
-        : (value as T),
-    setValue: <T>(ref: Ref<T>, value: T): void => {
-      ;(ref as { value: T }).value = value
-    }
-  }
 }
 
 /**

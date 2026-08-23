@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, unref, setValue, type ReactiveRuntime, type Ref } from '../reactive'
+import { setReactiveRuntime, unref, setValue, type ReactiveRuntime, type Ref, type ReadonlyRef } from '../reactive'
 import { when } from './when'
 
 // ============================================
@@ -25,14 +25,14 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
     ref: <T>(value: T): Ref<T> => {
       const r = { value }
       refs.add(r)
-      return r
+      return r as unknown as Ref<T>
     },
 
     computed: <T>(getter: () => T) => ({
       get value() {
         return getter()
       }
-    }),
+    } as unknown as ReadonlyRef<T>),
 
     watch: <T>(
       source: () => T,
@@ -60,15 +60,15 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
       stop: () => {}
     }),
 
-    unref: <T>(value: T | Ref<T> | { readonly value: T }) => {
+    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
       if (value && typeof value === 'object' && 'value' in value) {
-        return (value as { value: T }).value
+        return (value as unknown as { value: T }).value
       }
       return value as T
     },
 
     setValue: <T>(ref: Ref<T>, value: T): void => {
-      ;(ref as { value: T }).value = value
+      ;(ref as unknown as { value: T }).value = value
     },
 
     isRef: (value: unknown): boolean => {

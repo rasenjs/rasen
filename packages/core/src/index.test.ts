@@ -7,13 +7,15 @@ import {
   setReactiveRuntime,
   getReactiveRuntime,
   toValue,
+  unref,
   fragment,
   each,
   repeat,
   when,
   type ReactiveRuntime,
   type MountFunction,
-  type Ref
+  type Ref,
+  type ReadonlyRef
 } from './index'
 
 // ============================================
@@ -37,7 +39,7 @@ function createMockReactiveRuntime(): ReactiveRuntime {
     ref: <T>(value: T): Ref<T> => {
       const r = { value }
       refs.add(r)
-      return r
+      return r as unknown as Ref<T>
     },
 
     computed: <T>(getter: () => T) => {
@@ -47,7 +49,7 @@ function createMockReactiveRuntime(): ReactiveRuntime {
         }
       }
       refs.add(c)
-      return c
+      return c as unknown as ReadonlyRef<T>
     },
 
     watch: <T>(
@@ -81,15 +83,15 @@ function createMockReactiveRuntime(): ReactiveRuntime {
       stop: () => {}
     }),
 
-    unref: <T>(value: T | Ref<T> | { readonly value: T }) => {
+    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
       if (value && typeof value === 'object' && 'value' in value) {
-        return (value as Ref<T>).value
+        return (value as unknown as { value: T }).value
       }
       return value as T
     },
 
     setValue: <T>(ref: Ref<T>, value: T): void => {
-      ;(ref as { value: T }).value = value
+      ;(ref as unknown as { value: T }).value = value
     },
 
     isRef: (value: unknown): boolean => {
@@ -154,7 +156,7 @@ describe('@rasenjs/core', () => {
 
     it('应该返回 computed 的值', () => {
       const ref = mockRuntime.ref(10)
-      const computed = mockRuntime.computed(() => ref.value * 2)
+      const computed = mockRuntime.computed(() => unref(ref) * 2)
       expect(toValue(computed)).toBe(20)
     })
   })
@@ -514,10 +516,10 @@ describe('@rasenjs/core', () => {
     it('应该导出核心类型', () => {
       // 通过 TypeScript 编译来验证类型导出
       const mountFn: MountFunction<HTMLElement> = () => () => {}
-      const ref: Ref<number> = { value: 1 }
+      const ref = mockRuntime.ref(1)
 
       expect(typeof mountFn).toBe('function')
-      expect(ref.value).toBe(1)
+      expect(unref(ref)).toBe(1)
     })
   })
 })

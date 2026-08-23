@@ -6,8 +6,10 @@
 import { Signal } from 'signal-polyfill'
 import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
 
-// Symbol for identifying Rasen refs
-const RASEN_REF_SYMBOL = Symbol('rasen.signals.ref')
+// The Signal itself IS the ref — a plain TC39 Signal.State / Signal.Computed
+// instance with no Rasen-specific wrapper. Values are read via `.get()` and
+// written via `.set()` (never `.value`), so the design does not depend on a
+// `.value` property. Detectable via `Signal.isState` / `Signal.isComputed`.
 
 // Create singleton runtime (lazily initialized)
 let runtime: ReactiveRuntime | undefined
@@ -53,7 +55,12 @@ export function createReactiveRuntime(): ReactiveRuntime {
       // The Computed ONLY computes the value — it must NOT run the callback.
       const effect = new Signal.Computed<T | undefined>(() => {
         if (stopped) return undefined
-        return typeof source === 'function' ? source() : (source as Ref<T>).value
+        if (typeof source === 'function') return source()
+        // The ref IS the Signal itself (Signal.State / Signal.Computed)
+        if (Signal.isState(source) || Signal.isComputed(source)) {
+          return (source as unknown as Signal.State<T> | Signal.Computed<T>).get()
+        }
+        return source as unknown as T
       })
 
       const run = () => {
@@ -145,47 +152,38 @@ export function createReactiveRuntime(): ReactiveRuntime {
     },
 
     ref: <T>(value: T): Ref<T> => {
-      const signal = new Signal.State(value)
-      const ref = {
-        get value() {
-          return signal.get()
-        },
-        set value(newValue: T) {
-          signal.set(newValue)
-        },
-        [RASEN_REF_SYMBOL]: true
-      }
-      return ref
+      // The Signal itself is the ref — a plain TC39 Signal.State instance.
+      return new Signal.State(value) as unknown as Ref<T>
     },
 
     computed: <T>(getter: () => T): ReadonlyRef<T> => {
-      const signal = new Signal.Computed(getter)
-      const computed = {
-        get value() {
-          return signal.get()
-        },
-        [RASEN_REF_SYMBOL]: true
-      }
-      return computed
+      // The Signal itself is the ref — a plain TC39 Signal.Computed instance.
+      return new Signal.Computed(getter) as unknown as ReadonlyRef<T>
     },
 
     unref: <T>(value: T | Ref<T> | ReadonlyRef<T>): T => {
-      // Vue 语义：只解包 ref，不调用 getter（getter 由 core 的 toValue 处理）
-      if (value && typeof value === 'object' && 'value' in value) {
-        return (value as Ref<T>).value
+      // The ref IS the Signal itself: read via Signal.get().
+      if (value && typeof value === 'object') {
+        if (Signal.isState(value) || Signal.isComputed(value)) {
+          return (value as unknown as Signal.State<T> | Signal.Computed<T>).get()
+        }
       }
       return value as T
     },
 
     setValue: <T>(ref: Ref<T>, value: T): void => {
-      ;(ref as { value: T }).value = value
+      // The ref IS the Signal itself: write via Signal.set().
+      if (Signal.isState(ref)) {
+        ;(ref as unknown as Signal.State<T>).set(value)
+      }
     },
 
     isRef: (value: unknown): boolean => {
+      // The ref IS the Signal itself — detect via TC39 Signal type guards.
       return (
         value !== null &&
         typeof value === 'object' &&
-        RASEN_REF_SYMBOL in value
+        (Signal.isState(value) || Signal.isComputed(value))
       )
     }
   }

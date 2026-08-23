@@ -11,7 +11,8 @@ import {
   setValue,
   ref,
   type ReactiveRuntime,
-  type Ref
+  type Ref,
+  type ReadonlyRef
 } from './reactive'
 
 describe('reactive', () => {
@@ -23,7 +24,7 @@ describe('reactive', () => {
       ref: <T>(value: T): Ref<T> => {
         const r = { value }
         refs.add(r)
-        return r
+        return r as unknown as Ref<T>
       },
 
       computed: <T>(getter: () => T) => {
@@ -33,7 +34,7 @@ describe('reactive', () => {
           }
         }
         refs.add(c)
-        return c
+        return c as unknown as ReadonlyRef<T>
       },
 
       watch: <T>(
@@ -52,7 +53,7 @@ describe('reactive', () => {
         stop: () => {}
       }),
 
-      unref: <T>(value: T | Ref<T> | { readonly value: T }) => {
+      unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
         if (value && typeof value === 'object' && 'value' in value) {
           return (value as { value: T }).value
         }
@@ -60,7 +61,7 @@ describe('reactive', () => {
       },
 
       setValue: <T>(ref: Ref<T>, value: T): void => {
-        ;(ref as { value: T }).value = value
+        ;(ref as unknown as { value: T }).value = value
       },
 
       isRef: (value: unknown): boolean => {
