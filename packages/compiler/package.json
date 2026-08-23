@@ -1,7 +1,7 @@
 {
-  "name": "@rasenjs/vite-plugin-rasen",
+  "name": "@rasenjs/compiler",
   "version": "0.1.0",
-  "description": "Vite plugin for Rasen HMR and development mode",
+  "description": "Rasen JSX static-hoisting compiler — bundler-agnostic (vite/webpack/rspack/esbuild via unplugin, Metro/RN via babel)",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -11,6 +11,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./babel": {
+      "types": "./dist/babel.d.ts",
+      "import": "./dist/babel.js",
+      "require": "./dist/babel.cjs"
     }
   },
   "files": [
@@ -20,26 +25,14 @@
     "dev": "../../node_modules/.bin/tsup --watch",
     "build": "yarn clean && ../../node_modules/.bin/tsup",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
+    "test": "../../node_modules/.bin/vitest --run",
     "clean": "rm -rf dist"
   },
-  "keywords": [
-    "rasen",
-    "vite-plugin",
-    "hmr"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rasenjs/rasen.git",
-    "directory": "packages/vite-plugin-rasen"
-  },
-  "author": "Rasen Contributors",
-  "license": "MIT",
   "dependencies": {
+    "@babel/generator": "^7.29.0",
     "@babel/parser": "^7.29.0",
     "@babel/traverse": "^7.29.0",
-    "@rasenjs/compiler": "workspace:*"
-  },
-  "peerDependencies": {
-    "vite": "^5.0.0 || ^6.0.0"
+    "@babel/types": "^7.29.0",
+    "unplugin": "^3.3.0"
   }
 }

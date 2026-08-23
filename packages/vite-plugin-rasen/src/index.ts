@@ -11,12 +11,19 @@
 import type { Plugin, ResolvedConfig } from 'vite'
 import { relative } from 'path'
 import { transformJsxExpressions } from './jsx-transform'
+import { compileFile } from './compile'
+
+export { compileFile }
+
 
 export interface RasenHMRPluginOptions {
   enabled?: boolean
   exclude?: string[]
   /** Disable the JSX attribute expression transform (default: enabled). */
   jsxTransform?: boolean
+  /** Enable static-hoisting compilation for files marked `@rasen-compile`
+   *  (default: enabled). */
+  compile?: boolean
 }
 
 const IMPORT_LINE_RE = /^import\s+/m
@@ -30,6 +37,7 @@ export function rasenHMR(options: RasenHMRPluginOptions = {}): Plugin {
 
   return {
     name: 'rasen:hmr',
+    enforce: 'pre',
 
     configResolved(resolvedConfig) {
       config = resolvedConfig
@@ -41,13 +49,21 @@ export function rasenHMR(options: RasenHMRPluginOptions = {}): Plugin {
       if (!/\.(tsx?|jsx?)$/.test(id)) return
       if (id.includes('node_modules')) return
 
-      // 1. JSX attribute expression transform (default-on)
+      // 1. Static-hoisting compilation for @rasen-compile files
       let out = code
+      if (options.compile !== false) {
+        const result = compileFile(out)
+        if (result) {
+          out = result.code
+        }
+      }
+
+      // 2. JSX attribute expression transform (default-on)
       if (jsxTransform) {
         out = transformJsxExpressions(out)
       }
 
-      // 2. HMR injection (dev only, files using com())
+      // 3. HMR injection (dev only, files using com())
       if (config.command !== 'build' && COM_CALL_RE.test(out) && !out.includes('enterHmrModule(')) {
         out = injectHmr(out, id, config.root)
       }
