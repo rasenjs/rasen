@@ -53,13 +53,7 @@ export function wrapMount(mount: MountFn, scope: Scope) {
     provideHostContext(effective, () => {
       scope.run(() => { unmount = mount(host) })
     })
-    const wrappedUnmount = () => { unmount?.(); scope.stop() }
-    if (unmount && 'node' in unmount) {
-      ;(wrappedUnmount as unknown as { node: unknown }).node = (
-        unmount as unknown as { node: unknown }
-      ).node
-    }
-    return wrappedUnmount
+    return () => { unmount?.(); scope.stop() }
   }
 }
 

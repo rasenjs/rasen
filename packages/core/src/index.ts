@@ -10,3 +10,10 @@ export { jsx, jsxs, jsxDEV, Fragment } from './jsx-runtime'
 export { registerTag, configureTags, clearTags, getRegisteredTags } from './jsx-runtime/tag-config'
 export type { TagConfig, TagComponent } from './jsx-runtime/tag-config'
 
+export {
+  escapeHtml,
+  escapeAttr,
+  renderText,
+  stringifyStyleInline,
+} from './html-escape'
+export { collectHtml } from './collect-html'
