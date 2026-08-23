@@ -31,6 +31,9 @@ export const MARKERS = {
   EACH_START: 'e',
   EACH_END: '/e',
 
+  /** Per-item anchor inside an each list (placed before each item's nodes) */
+  EACH_ITEM: 'i',
+
   MATCH_START: 'm',
   MATCH_END: '/m',
 } as const
@@ -52,6 +55,7 @@ export const MARKER_DEBUG_MAP: Record<string, string> = {
   [MARKERS.WHEN_END]: 'When End',
   [MARKERS.EACH_START]: 'Each Start',
   [MARKERS.EACH_END]: 'Each End',
+  [MARKERS.EACH_ITEM]: 'Each Item',
   [MARKERS.MATCH_START]: 'Match Start',
   [MARKERS.MATCH_END]: 'Match End',
 }

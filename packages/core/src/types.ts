@@ -12,7 +12,7 @@ import type { Ref, ReadonlyRef } from './reactive'
 
 // Re-export for convenience
 export type { Ref, ReadonlyRef }
-export type { HostContext, HostHooks } from './host-context'
+export type { HostContext, HostHooks, TextHandle } from './host-context'
 
 /**
  * Unmount 函数类型

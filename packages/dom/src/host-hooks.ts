@@ -1,111 +1,145 @@
 /**
- * DOM 宿主钩子
+ * DOM 宿主钩子（统一造型）
  *
- * 为 core 的 when、each、match 等组件提供 DOM 操作能力
- * 这些操作是平台相关的，每个渲染目标需要自己实现
+ * 为 core 的 when、each、match、fragment 提供节点操作能力。
+ * 水合逻辑完全封装在实现内部：createMarker / createText 在水合模式下 claim 并校验
+ * 已有节点，core 不感知水合的存在。
  *
- * 统一的 DOM 操作集合，包含所有组件可能需要的操作
- * 各组件按需使用其中的部分
+ * 造型说明：
+ *  - createMarker：创建标记（Comment），只创建不挂载，位置由 insert 决定
+ *  - createText：创建游离文本节点，返回句柄（node + update）
+ *  - insert / detach / nextSibling：定位与区间遍历原语
+ *  - boundedHost：有界宿主视图，子树追加全部落在标记之前
+ *  - batch：DocumentFragment 批量插入
  */
 
+import type { TextHandle } from '@rasenjs/core'
 import { getHydrationContext } from './hydration-context'
 import { isMarkerMatch } from './marker-constants'
 
 /**
+ * 受保护的插入：水合模式下跳过已被 claim 的节点（它们已在正确位置）。
+ */
+function guardedInsertBefore(
+  host: HTMLElement,
+  node: Node,
+  ref: Node | null
+): void {
+  const ctx = getHydrationContext()
+  if (ctx?.isHydrating && node.parentNode) return
+  host.insertBefore(node, ref)
+}
+
+/**
  * DOM 宿主钩子
  *
- * 包含 when、each、repeat、match 等组件需要的所有 DOM 操作
- * 支持 SSR hydration：在水合模式下会 claim 已有节点而不是创建新节点
+ * 支持 SSR hydration：在水合模式下 createMarker/createText 会 claim 已有节点而不是创建新节点。
  */
 export const hostHooks = {
-  /** 创建文本节点（host 用于获取 ownerDocument，支持 iframe） */
-  createTextNode: (host: HTMLElement, text: string) => {
-    const ctx = getHydrationContext()
-    if (ctx?.isHydrating) {
-      const claimed = ctx.claim()
-      if (claimed?.nodeType === Node.TEXT_NODE) {
-        return claimed as Text
-      }
-      return (host.ownerDocument || document).createTextNode(text)
-    }
-    return (host.ownerDocument || document).createTextNode(text)
-  },
-
-  /** 追加节点到宿主 */
-  appendNode: (host: HTMLElement, node: Node) => {
-    if (!node.parentNode) {
-      host.appendChild(node)
-    }
-  },
-
-  /** 更新文本节点内容 */
-  updateTextNode: (node: Node, text: string) => {
-    node.textContent = text
-  },
-
-  /** 创建标记节点（注释节点）from host's ownerDocument to support iframe */
-  createMarker: (host: HTMLElement, content: string) => {
+  /** 创建定位标记（Comment）。水合模式下 claim 并校验已有标记，不重复挂载。 */
+  createMarker: (host: HTMLElement, kind: string): Node => {
     const hydrationContext = getHydrationContext()
-    
+
     if (hydrationContext) {
       // Hydration mode: claim existing marker
       const node = hydrationContext.claim()
       if (node && node.nodeType === Node.COMMENT_NODE) {
         const comment = node as Comment
-        
+
         // Verify marker content matches expected content
-        if (!isMarkerMatch(comment, content)) {
+        if (!isMarkerMatch(comment, kind)) {
           throw new Error(
-            `[Rasen Hydration] Marker mismatch: expected "${content}", got "${comment.textContent?.trim()}"`
+            `[Rasen Hydration] Marker mismatch: expected "${kind}", got "${comment.textContent?.trim()}"`
           )
         }
-        
+
         return comment
       }
       throw new Error('[Rasen Hydration] Expected marker comment but got: ' + node?.nodeName)
     }
-    
-    // Client mode: create new marker with specified content
-    return (host.ownerDocument || document).createComment(content) as Node
+
+    // Client mode: create detached marker; position decided by insert()
+    return (host.ownerDocument || document).createComment(kind)
   },
 
-  /** 将标记添加到宿主 */
-  appendMarker: (host: HTMLElement, marker: Node) => {
-    const hydrationContext = getHydrationContext()
-    
-    // In hydration mode, marker is already in DOM, skip append
-    if (hydrationContext) {
-      return
-    }
-    
-    host.appendChild(marker)
+  /** 在 ref 之前插入节点（null = 追加到末尾）；也用于移动已有节点 */
+  insert: (host: HTMLElement, node: Node, ref: Node | null): void => {
+    guardedInsertBefore(host, node, ref)
   },
 
-  /** 在指定位置之前插入节点 */
-  insertBefore: (host: HTMLElement, node: Node, before: Node | null) => {
-    host.insertBefore(node, before)
-  },
-
-  /** 移除节点（用于移除列表项等） */
-  removeNode: (node: Node) => {
+  /** 将节点从树上摘除 */
+  detach: (node: Node): void => {
     node.parentNode?.removeChild(node)
   },
 
-  /** 移除标记节点（与 removeNode 相同，语义不同） */
-  get removeMarker() {
-    return this.removeNode
+  /** 下一个兄弟节点（区间遍历用） */
+  nextSibling: (node: Node): Node | null => {
+    return node.nextSibling
   },
 
-  /** 创建 DocumentFragment 用于批量插入 */
-  createFragment: () => {
-    const fragment = document.createDocumentFragment()
+  /** 创建游离文本节点，返回句柄。水合模式下 claim 已有文本节点（已在 DOM 中，insert 时自动跳过）。 */
+  createText: (host: HTMLElement, content: string): TextHandle<Node> => {
+    const hydrationContext = getHydrationContext()
+    let textNode: Text
+
+    if (hydrationContext) {
+      const claimed = hydrationContext.claim()
+      if (claimed?.nodeType === Node.TEXT_NODE) {
+        textNode = claimed as Text
+      } else {
+        textNode = (host.ownerDocument || document).createTextNode(content)
+      }
+    } else {
+      textNode = (host.ownerDocument || document).createTextNode(content)
+    }
+
+    return {
+      node: textNode,
+      update: (v: string) => {
+        textNode.textContent = v
+      },
+    }
+  },
+
+  /**
+   * 有界宿主：透传所有宿主属性（ownerDocument 等），
+   * 只拦截 appendChild / insertBefore 重定向到标记之前。
+   */
+  boundedHost: (host: HTMLElement, marker: Node): HTMLElement => {
+    return new Proxy(host, {
+      get(target, prop, receiver) {
+        if (prop === 'appendChild') {
+          return (node: Node) => {
+            guardedInsertBefore(target, node, marker)
+            return node
+          }
+        }
+        if (prop === 'insertBefore') {
+          return (node: Node, ref: Node | null) => {
+            guardedInsertBefore(target, node, ref || marker)
+            return node
+          }
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    }) as HTMLElement
+  },
+
+  /** DocumentFragment 批量插入：在暂存宿主上挂载，flush 时一次性落位 */
+  batch: (
+    host: HTMLElement
+  ): {
+    host: HTMLElement
+    flush: (host: HTMLElement, ref: Node | null) => void
+  } => {
+    const fragment = (host.ownerDocument || document).createDocumentFragment()
     return {
       host: fragment as unknown as HTMLElement,
-      flush: (host: HTMLElement, before: Node | null) => {
-        host.insertBefore(fragment, before)
-      }
+      flush: (targetHost: HTMLElement, ref: Node | null) => {
+        guardedInsertBefore(targetHost, fragment, ref)
+      },
     }
-  }
+  },
 }
 
 /**

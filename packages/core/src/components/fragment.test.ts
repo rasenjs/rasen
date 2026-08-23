@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, getReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
+import { setReactiveRuntime, getReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '../reactive'
 import { fragment, type FragmentHostHooks } from './fragment'
 
 // ============================================
@@ -17,14 +17,14 @@ function createMockReactiveRuntime(): ReactiveRuntime {
     ref: <T>(value: T): Ref<T> => {
       const r = { value }
       refs.add(r)
-      return r
+      return r as unknown as Ref<T>
     },
 
     computed: <T>(getter: () => T) => ({
       get value() {
         return getter()
       }
-    }),
+    } as unknown as ReadonlyRef<T>),
 
     watch: <T>(
       source: () => T,
@@ -42,15 +42,15 @@ function createMockReactiveRuntime(): ReactiveRuntime {
       stop: () => {}
     }),
 
-    unref: <T>(value: T | Ref<T> | { readonly value: T }) => {
+    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
       if (value && typeof value === 'object' && 'value' in value) {
-        return (value as Ref<T>).value
+        return (value as unknown as { value: T }).value
       }
       return value as T
     },
 
     setValue: <T>(ref: Ref<T>, value: T): void => {
-      ;(ref as { value: T }).value = value
+      ;(ref as unknown as { value: T }).value = value
     },
 
     isRef: (value: unknown): boolean => {
@@ -66,13 +66,20 @@ function createMockReactiveRuntime(): ReactiveRuntime {
 // Mock host hooks for testing
 function createMockHostHooks<Host = unknown, N = unknown>(): FragmentHostHooks<Host, N> {
   return {
-    createTextNode: (text: string) => ({ type: 'text', text } as N),
-    appendNode: () => {},
-    updateTextNode: () => {},
-    removeNode: () => {},
-    createMarker: (_host: Host, content: string) => ({ type: 'marker', content } as N),
-    appendMarker: () => {},
-    removeMarker: () => {}
+    createMarker: (_host: Host, kind: string) => ({ type: 'marker', content: kind } as N),
+    insert: () => {},
+    detach: () => {},
+    nextSibling: () => null,
+    createText: (_host: Host, content: string) => {
+      const node = { type: 'text', text: content }
+      return {
+        node: node as N,
+        update: (v: string) => {
+          node.text = v
+        },
+      }
+    },
+    boundedHost: (host: Host) => host
   }
 }
 
@@ -258,10 +265,13 @@ describe('fragment', () => {
     it('应该能处理文本节点', () => {
       const textNodes: Array<{ type: string; text: string }> = []
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (_host: unknown, text: string) => {
-        const node = { type: 'text', text }
+      hooks.createText = (_host: unknown, content: string) => {
+        const node = { type: 'text', text: content }
         textNodes.push(node)
-        return node as any
+        return {
+          node: node as any,
+          update: () => {}
+        }
       }
 
       const frag = fragment({ 
@@ -281,9 +291,9 @@ describe('fragment', () => {
       const textNodes: string[] = []
       
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (_host: unknown, text: string) => {
-        textNodes.push(text)
-        return { type: 'text', text } as any
+      hooks.createText = (_host: unknown, content: string) => {
+        textNodes.push(content)
+        return { node: { text: content } as any, update: () => {} }
       }
 
       const component = (() => {
@@ -304,8 +314,8 @@ describe('fragment', () => {
     it('应该添加边界标记（如果提供）', () => {
       const markers: Array<{ type: string; content: string }> = []
       const hooks = createMockHostHooks()
-      hooks.createMarker = (_host: any, content: string) => {
-        const marker = { type: 'marker', content }
+      hooks.createMarker = (_host: any, kind: string) => {
+        const marker = { type: 'marker', content: kind }
         markers.push(marker)
         return marker as any
       }
@@ -323,8 +333,8 @@ describe('fragment', () => {
     it('应该在没有标记钩子时正常工作', () => {
       const hooks = createMockHostHooks()
       delete hooks.createMarker
-      delete hooks.appendMarker
-      delete hooks.removeMarker
+      delete hooks.insert
+      delete hooks.detach
 
       const child = (() => () => {})
 
@@ -339,13 +349,13 @@ describe('fragment', () => {
       const removedMarkers: any[] = []
       
       const hooks = createMockHostHooks()
-      hooks.createMarker = (_host: any, content: string) => {
-        const marker = { type: 'marker', content }
+      hooks.createMarker = (_host: any, kind: string) => {
+        const marker = { type: 'marker', content: kind }
         markers.push(marker)
         return marker
       }
-      hooks.removeMarker = (marker: any) => {
-        removedMarkers.push(marker)
+      hooks.detach = (node: any) => {
+        removedMarkers.push(node)
       }
 
       const child = (() => () => {})
@@ -379,10 +389,15 @@ describe('fragment', () => {
       
       const updates: string[] = []
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (_host: unknown, text: string) => ({ text })
-      hooks.updateTextNode = (node: any, text: string) => {
-        node.text = text
-        updates.push(text)
+      hooks.createText = (_host: unknown, content: string) => {
+        const node = { text: content }
+        return {
+          node: node as any,
+          update: (v: string) => {
+            node.text = v
+            updates.push(v)
+          }
+        }
       }
 
       const frag = fragment({ 
@@ -437,25 +452,22 @@ describe('fragment', () => {
       const calls: string[] = []
       
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (_host: unknown, text: string) => {
-        calls.push(`createTextNode:${text}`)
-        return { text }
+      hooks.createMarker = (_host: any, kind: string) => {
+        calls.push(`createMarker:${kind}`)
+        return { kind }
       }
-      hooks.appendNode = () => {
-        calls.push('appendNode')
+      hooks.insert = () => {
+        calls.push('insert')
       }
-      hooks.createMarker = (_host: any, content: string) => {
-        calls.push(`createMarker:${content}`)
-        return { content }
+      hooks.createText = (_host: unknown, content: string) => {
+        calls.push(`createText:${content}`)
+        return {
+          node: { text: content },
+          update: () => {}
+        }
       }
-      hooks.appendMarker = () => {
-        calls.push('appendMarker')
-      }
-      hooks.removeNode = () => {
-        calls.push('removeNode')
-      }
-      hooks.removeMarker = () => {
-        calls.push('removeMarker')
+      hooks.detach = () => {
+        calls.push('detach')
       }
 
       const frag = fragment({ 
@@ -466,29 +478,29 @@ describe('fragment', () => {
 
       expect(calls).toEqual([
         'createMarker:f',
-        'appendMarker',
-        'createTextNode:Hello',
-        'appendNode',
+        'insert',
+        'createText:Hello',
+        'insert',
         'createMarker:/f',
-        'appendMarker'
+        'insert'
       ])
 
       calls.length = 0
       cleanup?.()
 
       expect(calls).toEqual([
-        'removeNode',
-        'removeMarker',
-        'removeMarker'
+        'detach',
+        'detach',
+        'detach'
       ])
     })
 
     it('应该处理数字类型的子元素', () => {
       const textNodes: string[] = []
       const hooks = createMockHostHooks()
-      hooks.createTextNode = (_host: unknown, text: string) => {
-        textNodes.push(text)
-        return { text }
+      hooks.createText = (_host: unknown, content: string) => {
+        textNodes.push(content)
+        return { node: { text: content } as any, update: () => {} }
       }
 
       const frag = fragment({ 

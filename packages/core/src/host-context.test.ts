@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref } from './reactive'
+import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from './reactive'
 import { com, getHostContext, provideHostContext } from './com'
 import { mount } from './mount'
 import { each } from './components/each'
@@ -21,15 +21,19 @@ type MockHost = { nodes: string[] }
 // 模拟 hooks：把节点"插入"到 host.nodes
 function createMockHooks(tag: string): HostHooks<MockHost, unknown> {
   return {
-    createMarker: (_host, content) => `[${tag}:${content}]`,
-    appendMarker: (host, marker) => { host.nodes.push(marker as string) },
-    insertBefore: (host, node, before) => {
-      const idx = before ? host.nodes.indexOf(before as string) : host.nodes.length
+    createMarker: (_host, kind) => `[${tag}:${kind}]`,
+    insert: (host, node, ref) => {
+      const idx = ref ? host.nodes.indexOf(ref as string) : host.nodes.length
       if (idx === -1) host.nodes.push(node as string)
       else host.nodes.splice(idx, 0, node as string)
     },
-    removeNode: () => { /* no-op for test */ },
-    removeMarker: () => { /* no-op */ },
+    detach: () => { /* no-op for test */ },
+    nextSibling: () => null,
+    createText: (_host, content) => ({
+      node: content,
+      update: () => {},
+    }),
+    boundedHost: (host) => host,
   }
 }
 
@@ -39,12 +43,12 @@ function createMockRuntime(): ReactiveRuntime {
     ref: <T>(value: T): Ref<T> => {
       const r = { value }
       refs.add(r)
-      return r
+      return r as unknown as Ref<T>
     },
     computed: <T>(getter: () => T) => {
       const c = { get value() { return getter() } }
       refs.add(c)
-      return c
+      return c as unknown as ReadonlyRef<T>
     },
     watch: <T>(source: () => T, callback: (v: T, o: T) => void, options?: { immediate?: boolean }) => {
       if (options?.immediate) callback(source(), undefined as T)
@@ -54,12 +58,12 @@ function createMockRuntime(): ReactiveRuntime {
       run: <T>(fn: () => T) => fn(),
       stop: () => {},
     }),
-    unref: <T>(value: T | Ref<T> | { readonly value: T }) =>
+    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) =>
       value && typeof value === 'object' && 'value' in value
-        ? (value as { value: T }).value
+        ? (value as unknown as { value: T }).value
         : (value as T),
     setValue: <T>(ref: Ref<T>, value: T): void => {
-      ;(ref as { value: T }).value = value
+      ;(ref as unknown as { value: T }).value = value
     },
     isRef: (value: unknown): boolean =>
       value !== null && typeof value === 'object' && refs.has(value as { value: unknown }),

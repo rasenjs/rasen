@@ -1,30 +1,7 @@
 import { getReactiveRuntime, toValue } from '../reactive'
-import { com } from '../com'
-import { type Mountable, type PropValue } from '../types'
-
-/**
- * 宿主操作钩子 - 全部可选，与 each 保持一致
- * 不提供时 when 仍能正确工作，只是没有位置精确控制
- */
-export interface WhenHostHooks<Host = unknown, N = unknown> {
-  /** 创建标记节点，用于定位插入位置 (receives host to ensure correct document context) */
-  createMarker?: (host: Host, content: string) => N
-  /** 将标记节点添加到宿主 */
-  appendMarker?: (host: Host, marker: N) => void
-  /** 在指定位置之前插入节点 */
-  insertBefore?: (host: Host, node: N, before: N | null) => void
-  /** 移除节点 */
-  removeNode?: (node: N) => void
-  /** 从 mount 结果中捕获节点 */
-  captureNode?: (callback: (node: N) => void) => Host
-  /** 创建批量插入的 fragment */
-  createFragment?: () => {
-    host: Host
-    flush: (host: Host, before: N | null) => void
-  }
-  /** 清理标记节点 */
-  removeMarker?: (marker: N) => void
-}
+import { com, getHostContext } from '../com'
+import { MARKERS } from '../marker-constants'
+import { type Mountable, type PropValue, type HostContext, type HostHooks } from '../types'
 
 /**
  * when 组件配置
@@ -34,17 +11,8 @@ export interface WhenConfig<Host, N = unknown> {
   then: () => Mountable<Host>
   else?: () => Mountable<Host>
 
-  // 可选的宿主操作钩子
-  createMarker?: (host: Host, content: string) => N
-  appendMarker?: (host: Host, marker: N) => void
-  insertBefore?: (host: Host, node: N, before: N | null) => void
-  removeNode?: (node: N) => void
-  captureNode?: (callback: (node: N) => void) => Host
-  createFragment?: () => {
-    host: Host
-    flush: (host: Host, before: N | null) => void
-  }
-  removeMarker?: (marker: N) => void
+  /** 显式宿主钩子（缺省时从 HostContext 继承） */
+  hooks?: HostHooks<Host, N>
 }
 
 /**
@@ -74,10 +42,16 @@ export const when = com(
     return (host: Host) => {
       const runtime = getReactiveRuntime()
 
-      // 创建标记（可选）
-      const marker = config.createMarker?.(host, 'w')
-      if (marker && config.appendMarker) {
-        config.appendMarker(host, marker)
+      // 宿主上下文：com 挂载时已压栈。优先用 ctx.hooks，config.hooks 作为显式 fallback。
+      const ctx = getHostContext() as HostContext<Host, N> | undefined
+      const hooks = ctx?.hooks ?? config.hooks
+
+      // 定位标记：分支内容始终插在标记之前（有界宿主保证）。
+      // 无标记能力时退化为直接追加到宿主末尾。
+      let marker: N | undefined
+      if (hooks?.createMarker && hooks.insert) {
+        marker = hooks.createMarker(host, MARKERS.WHEN_START)
+        hooks.insert(host, marker, null)
       }
 
       let currentUnmount: (() => void) | undefined
@@ -97,30 +71,10 @@ export const when = com(
         const factory = branch === 'then' ? config.then : config.else
         if (!factory) return
 
-        let targetHost = host
-
-        // 如果有 marker 和 insertBefore，创建代理 host
-        // 使用真正的 Proxy 透传所有宿主属性（ownerDocument 等），
-        // 只拦截 appendChild / insertBefore 重定向到 insertBefore(node, marker)。
-        if (marker && config.insertBefore) {
-          targetHost = new Proxy(host as object, {
-            get(target, prop, receiver) {
-              if (prop === 'appendChild') {
-                return (node: N) => {
-                  config.insertBefore!(host, node, marker)
-                  return node
-                }
-              }
-              if (prop === 'insertBefore') {
-                return (node: N, ref: N | null) => {
-                  config.insertBefore!(host, node, ref || marker)
-                  return node
-                }
-              }
-              return Reflect.get(target, prop, receiver)
-            },
-          }) as Host
-        }
+        // 有界宿主：子树的所有追加都落在标记之前。
+        // 无 boundedHost 能力时直接使用宿主（位置不精确但功能正确）。
+        const targetHost =
+          marker && hooks?.boundedHost ? hooks.boundedHost(host, marker) : host
 
         const mountableChild = factory()
         if (!mountableChild) return
@@ -156,8 +110,8 @@ export const when = com(
 
       return () => {
         cleanup()
-        if (marker && config.removeMarker) {
-          config.removeMarker(marker)
+        if (marker && hooks?.detach) {
+          hooks.detach(marker)
         }
       }
     }

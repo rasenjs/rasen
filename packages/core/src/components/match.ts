@@ -1,20 +1,7 @@
-import { getReactiveRuntime } from '../reactive'
-import { com } from '../com'
-import { type Mountable, type PropValue } from '../types'
-
-/**
- * Host operation hooks - consistent with when/each
- */
-export interface MatchHostHooks<Host = unknown, N = unknown> {
-  /** Create a marker node for positioning (receives host to ensure correct document context) */
-  createMarker?: (host: Host, content: string) => N
-  /** Append marker node to host */
-  appendMarker?: (host: Host, marker: N) => void
-  /** Insert node before specified position */
-  insertBefore?: (host: Host, node: N, before: N | null) => void
-  /** Remove marker node */
-  removeMarker?: (marker: N) => void
-}
+import { getReactiveRuntime, toValue } from '../reactive'
+import { com, getHostContext } from '../com'
+import { MARKERS } from '../marker-constants'
+import { type Mountable, type PropValue, type HostContext, type HostHooks } from '../types'
 
 /**
  * match component configuration
@@ -23,7 +10,7 @@ export interface MatchConfig<
   Host,
   K extends string = string,
   N = unknown
-> extends MatchHostHooks<Host, N> {
+> {
   /** Reactive value for matching cases */
   value: PropValue<K | null | undefined>
 
@@ -41,6 +28,9 @@ export interface MatchConfig<
    * - true: keep created branches, only hide/show on switch (requires platform support)
    */
   cache?: boolean
+
+  /** 显式宿主钩子（缺省时从 HostContext 继承） */
+  hooks?: HostHooks<Host, N>
 }
 
 /**
@@ -89,10 +79,15 @@ export const match = com(
     return (host: Host) => {
       const runtime = getReactiveRuntime()
 
-      // Create marker (optional)
-      const marker = config.createMarker?.(host, 'm')
-      if (marker && config.appendMarker) {
-        config.appendMarker(host, marker)
+      // 宿主上下文：com 挂载时已压栈。优先用 ctx.hooks，config.hooks 作为显式 fallback。
+      const ctx = getHostContext() as HostContext<Host, N> | undefined
+      const hooks = ctx?.hooks ?? config.hooks
+
+      // 定位标记：分支内容始终插在标记之前（有界宿主保证）。
+      let marker: N | undefined
+      if (hooks?.createMarker && hooks.insert) {
+        marker = hooks.createMarker(host, MARKERS.MATCH_START)
+        hooks.insert(host, marker, null)
       }
 
       // Use Symbol to mark "uninitialized" state
@@ -134,27 +129,9 @@ export const match = com(
 
         if (!factory) return
 
-        let targetHost = host
-
-        if (marker && config.insertBefore) {
-          targetHost = new Proxy(host as object, {
-            get(target, prop, receiver) {
-              if (prop === 'appendChild') {
-                return (node: N) => {
-                  config.insertBefore!(host, node, marker)
-                  return node
-                }
-              }
-              if (prop === 'insertBefore') {
-                return (node: N, ref: N | null) => {
-                  config.insertBefore!(host, node, ref || marker)
-                  return node
-                }
-              }
-              return Reflect.get(target, prop, receiver)
-            },
-          }) as Host
-        }
+        // 有界宿主：子树的所有追加都落在标记之前。
+        const targetHost =
+          marker && hooks?.boundedHost ? hooks.boundedHost(host, marker) : host
 
         const mountable =
           key != null && factory !== config.default && !Array.isArray(config.cases)
@@ -164,20 +141,12 @@ export const match = com(
         currentUnmount = mountable(targetHost)
       }
 
-      // Unwrap PropValue
-      const unref = <T>(value: PropValue<T>): T => {
-        if (typeof value === 'function') {
-          return (value as () => T)()
-        }
-        if (value && typeof value === 'object' && 'value' in value) {
-          return (value as { value: T }).value
-        }
-        return value as T
-      }
+      // Unwrap PropValue (function / ref / plain) via the active runtime.
+      const unwrap = <T>(value: PropValue<T>): T => toValue(value)
 
       // Watch value changes (automatically cleaned by com)
       runtime.watch(
-        () => unref(config.value),
+        () => unwrap(config.value),
         (newKey) => {
           // If key hasn't changed, no need to do anything (key performance optimization)
           if (currentKey === newKey) return
@@ -196,8 +165,8 @@ export const match = com(
 
       return () => {
         cleanup()
-        if (marker && config.removeMarker) {
-          config.removeMarker(marker)
+        if (marker && hooks?.detach) {
+          hooks.detach(marker)
         }
       }
     }

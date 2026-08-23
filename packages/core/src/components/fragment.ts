@@ -1,11 +1,12 @@
 import { type Mountable, type HostContext, type HostHooks } from '../types'
-import { getReactiveRuntime } from '../reactive'
+import { getReactiveRuntime, unref, type Ref } from '../reactive'
 import { getHostContext } from '../com'
+import { MARKERS } from '../marker-constants'
 
 /**
  * Fragment host hooks — alias of HostHooks (unified interface).
- * Required hooks for fragment: createTextNode, appendNode, updateTextNode, removeNode.
- * Optional: createMarker, appendMarker, removeMarker (SSR/hydration boundaries).
+ * Required hooks for fragment: text.
+ * Optional: createMarker/insert/detach (SSR/hydration boundaries).
  */
 export type FragmentHostHooks<Host = unknown, N = unknown> = HostHooks<Host, N>
 
@@ -16,7 +17,7 @@ export type FragmentChild<Host> =
   | string 
   | number 
   | Mountable<Host>
-  | { value: unknown }  // Ref
+  | Ref<unknown>
 
 /**
  * Fragment config
@@ -37,39 +38,39 @@ function processChild<Host, N>(
   
   if (typeof child === 'string' || typeof child === 'number') {
     // Static text - requires hooks
-    if (!hooks) {
+    if (!hooks?.createText) {
       console.warn('[Rasen] Text children require hooks to be provided')
       return () => undefined
     }
     const text = String(child)
     return (host: Host) => {
-      const textNode = hooks.createTextNode!(host, text)
-      hooks.appendNode!(host, textNode)
-      return () => hooks.removeNode?.(textNode)
+      const handle = hooks.createText!(host, text)
+      hooks.insert!(host, handle.node, null)
+      return () => hooks.detach!(handle.node)
     }
   }
   
   if (runtime.isRef(child)) {
-    // Reactive ref - requires hooks
-    if (!hooks) {
+    // Reactive ref child - requires hooks
+    if (!hooks?.createText) {
       console.warn('[Rasen] Reactive ref children require hooks to be provided')
       return () => undefined
     }
-    const refChild = child as { value: unknown }
+    const refChild = child as Ref<unknown>
     return (host: Host) => {
-      const textNode = hooks.createTextNode!(host, String(refChild.value))
-      hooks.appendNode!(host, textNode)
-      
+      const handle = hooks.createText!(host, String(unref(refChild)))
+      hooks.insert!(host, handle.node, null)
+
       const stop = runtime.watch(
-        () => refChild.value,
+        () => unref(refChild),
         (newVal) => {
-          hooks.updateTextNode?.(textNode, String(newVal))
+          handle.update(String(newVal))
         }
       )
       
       return () => {
         stop()
-        hooks.removeNode?.(textNode)
+        hooks.detach!(handle.node)
       }
     }
   }
@@ -101,30 +102,30 @@ export function fragment<Host = unknown, N = unknown>(
     const mounts = children.map(child => processChild(child, hooks))
 
     const markers: N[] = []
-    
+
     // Add start marker if available
-    if (hooks?.createMarker && hooks.appendMarker) {
-      const startMarker = hooks.createMarker(host, 'f')
-      hooks.appendMarker(host, startMarker)
-      markers.push(startMarker)
+    if (hooks?.createMarker && hooks.insert) {
+      const startAnchor = hooks.createMarker(host, MARKERS.FRAGMENT_START)
+      hooks.insert(host, startAnchor, null)
+      markers.push(startAnchor)
     }
-    
+
     // Mount all children
     const unmounts = mounts.map(m => m(host))
-    
+
     // Add end marker if available
-    if (hooks?.createMarker && hooks.appendMarker) {
-      const endMarker = hooks.createMarker(host, '/f')
-      hooks.appendMarker(host, endMarker)
-      markers.push(endMarker)
+    if (hooks?.createMarker && hooks.insert) {
+      const endAnchor = hooks.createMarker(host, MARKERS.FRAGMENT_END)
+      hooks.insert(host, endAnchor, null)
+      markers.push(endAnchor)
     }
-    
+
     return () => {
       // Unmount children first
       unmounts.forEach(unmount => unmount?.())
       // Remove markers
-      if (hooks?.removeMarker) {
-        markers.forEach(marker => hooks.removeMarker?.(marker))
+      if (hooks?.detach) {
+        markers.forEach(marker => hooks.detach!(marker))
       }
     }
   }

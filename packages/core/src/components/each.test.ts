@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
+import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '../reactive'
 import { each, repeat } from './each'
 import { when } from './when'
 
@@ -28,14 +28,14 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
     ref: <T>(value: T): Ref<T> => {
       const r = { value }
       refs.add(r)
-      return r
+      return r as unknown as Ref<T>
     },
 
     computed: <T>(getter: () => T) => ({
       get value() {
         return getter()
       }
-    }),
+    } as unknown as ReadonlyRef<T>),
 
     watch: <T>(
       source: () => T,
@@ -64,15 +64,15 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
       stop: () => {}
     }),
 
-    unref: <T>(value: T | Ref<T> | { readonly value: T }) => {
+    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
       if (value && typeof value === 'object' && 'value' in value) {
-        return (value as Ref<T>).value
+        return (value as unknown as { value: T }).value
       }
       return value as T
     },
 
     setValue: <T>(ref: Ref<T>, value: T): void => {
-      ;(ref as { value: T }).value = value
+      ;(ref as unknown as { value: T }).value = value
     },
 
     isRef: (value: unknown): boolean => {
@@ -252,6 +252,39 @@ describe('each', () => {
 
       expect(unmounted).toEqual([1])
       expect(mounted).toEqual([1, 2])
+    })
+
+    it('纯尾部追加多项时应该保持顺序（快速路径）', () => {
+      const a = { id: 1 }
+      const b = { id: 2 }
+      const items = runtime.ref([a, b])
+      const mounted: number[] = []
+
+      const eachMountable = each(items, (item) =>
+        (() => {
+          mounted.push(item.id)
+          return () => {}
+        })
+      )
+
+      eachMountable({})
+      expect(mounted).toEqual([1, 2])
+
+      // 尾部一次追加多项（含中间项被移除的场景也走相同路径）
+      const c = { id: 3 }
+      const d = { id: 4 }
+      const e = { id: 5 }
+      items.value = [a, b, c, d, e]
+      runtime.triggerWatchers()
+
+      expect(mounted).toEqual([1, 2, 3, 4, 5])
+
+      // 中间移除 + 尾部追加混合
+      const f = { id: 6 }
+      items.value = [a, c, e, f]
+      runtime.triggerWatchers()
+
+      expect(mounted).toEqual([1, 2, 3, 4, 5, 6])
     })
   })
 

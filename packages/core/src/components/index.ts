@@ -11,8 +11,8 @@ export {
   type EachImplConfig,
   type RepeatImplConfig
 } from './each'
-export { when, type WhenConfig, type WhenHostHooks } from './when'
-export { match, switchCase, type MatchConfig, type MatchHostHooks } from './match'
+export { when, type WhenConfig } from './when'
+export { match, switchCase, type MatchConfig } from './match'
 export { 
   fragment,
   f,
