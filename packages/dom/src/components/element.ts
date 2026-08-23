@@ -1,107 +1,27 @@
 import { setValue, type PropValue, type Ref, type Mountable } from '@rasenjs/core'
-import { unref, setAttribute, setStyle, watchProp, watchObjectProps } from '../utils'
+import { unref } from '../utils'
 import { warnInvalidEventCase } from '../utils/dev-warnings'
-import { getHydrationContext } from '../hydration-context'
+import { getHydrationContext, claimElement } from '../hydration-context'
+import {
+  bindClass,
+  bindStyle,
+  bindText,
+  bindKey,
+  on,
+  isEventProp,
+  getEventName,
+} from '../bindings'
+
+/**
+ * 特殊 props 列表（框架层面处理）
+ */
+const SPECIAL_PROPS = new Set(['ref', 'children', 'tag', 'class', 'style'])
 import type {
   HTMLTagName,
   HTMLTagAttributes,
   ClassAttributes
 } from '../types/dom'
 
-/**
- * 将 camelCase 转换为 kebab-case
- * dataUserId -> data-user-id
- * ariaLabel -> aria-label
- */
-function camelToKebab(str: string): string {
-  return str.replace(/([A-Z])/g, '-$1').toLowerCase()
-}
-
-/**
- * 特殊 props 列表（框架层面处理）
- */
-const SPECIAL_PROPS = new Set(['ref', 'children', 'tag', 'class', 'style'])
-
-/**
- * 按标签划分的 DOM property（必须作为 property 设置，否则响应式更新无效）
- * 这些属性的 attribute 和 property 行为不同
- */
-const TAG_SPECIFIC_PROPERTIES: Record<string, Set<string>> = {
-  input: new Set(['value', 'checked', 'indeterminate']),
-  textarea: new Set(['value']),
-  select: new Set(['value', 'selectedIndex']),
-  option: new Set(['selected'])
-}
-
-/**
- * 通用 DOM property（所有元素都可以用 property 设置）
- * 这些属性用 property 或 attribute 效果一致，但 property 更直接
- */
-const COMMON_DOM_PROPERTIES = new Set([
-  'disabled', // 禁用状态
-  'readOnly', // 只读状态
-  'multiple', // select 多选
-  'hidden' // 隐藏
-])
-
-/**
- * 判断是否应该作为 DOM property 设置
- * tag 的小写形式按 tag 缓存：避免每元素×每key 重复 toLowerCase 分配字符串
- */
-const lowerTagCache = new Map<string, string>()
-
-function isDOMProperty(tag: string, key: string): boolean {
-  let lowerTag = lowerTagCache.get(tag)
-  if (lowerTag === undefined) {
-    lowerTag = tag.toLowerCase()
-    lowerTagCache.set(tag, lowerTag)
-  }
-  // 先检查按标签划分的
-  const tagProps = TAG_SPECIFIC_PROPERTIES[lowerTag]
-  if (tagProps?.has(key)) {
-    return true
-  }
-  // 再检查通用的
-  return COMMON_DOM_PROPERTIES.has(key)
-}
-
-/**
- * 判断是否是事件处理器
- * onClick, onMouseEnter 等
- * 用 charCode 判断大写，避免每次 key[2].toUpperCase() 分配字符串
- */
-function isEventProp(key: string): boolean {
-  if (!key.startsWith('on') || key.length < 3) return false
-  const c = key.charCodeAt(2)
-  return c >= 65 && c <= 90 // 'A' - 'Z'
-}
-
-/**
- * 获取事件名称
- * onClick -> click
- * onMouseEnter -> mouseenter
- */
-function getEventName(key: string): string {
-  return key.slice(2).toLowerCase()
-}
-
-/**
- * 判断是否需要转换为 kebab-case 的属性
- * data*, aria* 开头的属性需要转换
- */
-function needsKebabConversion(key: string): boolean {
-  return key.startsWith('data') || key.startsWith('aria')
-}
-
-/**
- * 获取 DOM 属性名
- */
-function getDOMAttrName(key: string): string {
-  if (needsKebabConversion(key)) {
-    return camelToKebab(key)
-  }
-  return key
-}
 
 // ============================================================================
 // 类型定义 - 使用 Preact-style DOM 类型
@@ -171,116 +91,25 @@ export function element(props: AnyElementProps): Mountable<HTMLElement>
 export function element(props: AnyElementProps): Mountable<HTMLElement> {
   return (host: HTMLElement) => {
     const ctx = getHydrationContext()
-    let el: HTMLElement
-    let hydrated = false
 
-    if (ctx?.isHydrating) {
-      // === Hydration 模式：复用已有 DOM ===
-      const existing = ctx.claim()
-
-      if (existing && existing.nodeType === Node.ELEMENT_NODE) {
-        const existingEl = existing as HTMLElement
-        if (existingEl.tagName.toLowerCase() === props.tag.toLowerCase()) {
-          el = existingEl
-          hydrated = true
-        } else {
-          console.warn(
-            `[Rasen Hydration] Tag mismatch: expected <${props.tag}>, got <${existingEl.tagName.toLowerCase()}>`
-          )
-          el = (host.ownerDocument || document).createElement(props.tag)
-        }
-      } else {
-        if (existing) {
-          console.warn(
-            `[Rasen Hydration] Expected element <${props.tag}>, got ${existing.nodeType === Node.TEXT_NODE ? 'text node' : 'other node'}`
-          )
-        }
-        el = (host.ownerDocument || document).createElement(props.tag)
-      }
-    } else {
-      el = (host.ownerDocument || document).createElement(props.tag)
-    }
+    // 节点获取：水合时认领服务端元素（共享逻辑见 hydration-context），
+    // 否则新建。认领失败（标签/类型不匹配）时残留节点已被移除并回退新建。
+    const claimed = claimElement(props.tag)
+    const hydrated = claimed !== null
+    const el = claimed ?? (host.ownerDocument || document).createElement(props.tag)
 
     let stops: Array<() => void> | null = null
     let childUnmounts: Array<(() => void) | undefined> | null = null
-    let eventListeners: Array<{
-      event: string
-      handler: (e: Event) => void
-    }> | null = null
 
-    // 处理 class — 静态字面量直写，仅响应式才建 Watcher（公平对等 Vue patchFlag）
+    // class / style — 写入语义（静态一次性 / 响应式监听 / 水合跳过首帧）
+    // 全部在共享绑定层内部分派，工厂只负责传入原始值
     if (props.class !== undefined) {
-      const rawClass = props.class
-      const isReactiveClass =
-        typeof rawClass === 'function' ||
-        (rawClass !== null && typeof rawClass === 'object' && 'value' in (rawClass as object))
-      if (isReactiveClass) {
-        let currentClass = ''
-        ;(stops ??= []).push(
-          watchProp(
-            () => unref(rawClass as PropValue<string>),
-            (classValue) => {
-              const newClass = String(classValue || '')
-              if (currentClass !== newClass) {
-                el.className = newClass
-                currentClass = newClass
-              }
-            },
-            false
-          )
-        )
-      } else {
-        el.className = String(rawClass || '')
-      }
+      ;(stops ??= []).push(bindClass(el, props.class as PropValue<string>))
     }
-
-    // 处理 style
     if (props.style !== undefined) {
-      // 检查 props.style 本身是否是响应式的
-      const isReactiveStyle = typeof props.style === 'function' || 
-                               (props.style && typeof props.style === 'object' && 'value' in props.style)
-      
-      if (isReactiveStyle) {
-        // 响应式的 style - 监听整个 style 对象的变化
-        ;(stops ??= []).push(
-          watchProp(
-            () => unref(props.style),
-            (styleValue) => {
-              if (typeof styleValue === 'string') {
-                el.style.cssText = styleValue
-              } else if (styleValue && typeof styleValue === 'object') {
-                // 清空现有样式
-                el.style.cssText = ''
-                // 设置新样式
-                setStyle(el, styleValue as Record<string, string | number>)
-              }
-            },
-            hydrated
-          )
-        )
-      } else {
-        // 普通对象 style - 支持内部属性的响应式
-        const styleValue = props.style
-        
-        if (typeof styleValue === 'string') {
-          el.style.cssText = styleValue
-        } else if (styleValue && typeof styleValue === 'object') {
-          const stop = watchObjectProps(
-            styleValue as Record<string, unknown>,
-            (key, value) => {
-              // setProperty only accepts kebab-case; convert camelCase keys
-              const cssKey = key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
-              if (value === null || value === undefined) {
-                el.style.removeProperty(cssKey)
-              } else {
-                el.style.setProperty(cssKey, String(value))
-              }
-            },
-            !hydrated
-          )
-          ;(stops ??= []).push(stop)
-        }
-      }
+      ;(stops ??= []).push(
+        bindStyle(el, props.style as PropValue<string | Record<string, string | number>>)
+      )
     }
 
     // 处理 children
@@ -329,7 +158,8 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
           child !== null &&
           'value' in child
         ) {
-          // Ref 对象 - 创建或复用响应式文本节点
+          // Ref 对象 - 创建或复用响应式文本节点；写入语义统一走共享绑定层
+          // 的 bindText（ref → 响应式监听；水合时跳过首帧写入）
           let textNode: Text
           if (ctx?.isHydrating) {
             const claimed = ctx.claim()
@@ -342,17 +172,10 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
               el.appendChild(textNode)
             }
           } else {
-            textNode = (host.ownerDocument || document).createTextNode(String(unref(child)))
+            textNode = (host.ownerDocument || document).createTextNode('')
             el.appendChild(textNode)
           }
-          const stop = watchProp(
-            () => String(unref(child)),
-            (v) => {
-              textNode.textContent = v || ''
-            },
-            hydrated
-          )
-          ;(stops ??= []).push(stop)
+          ;(stops ??= []).push(bindText(textNode, () => child))
           ;(childUnmounts ??= []).push(() => textNode.remove())
         } else if (typeof child === 'function') {
           type ChildFn = (host: HTMLElement) => unknown
@@ -387,48 +210,15 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
       // 事件处理器 - 在 hydration 模式下也要设置（服务器端不渲染事件）
       if (isEventProp(key)) {
         if (typeof value === 'function') {
-          const eventName = getEventName(key)
-          const handler = value as (e: Event) => void
-          el.addEventListener(eventName, handler)
-          ;(eventListeners ??= []).push({ event: eventName, handler })
-        }
-        continue
-      }
-
-      const isReactiveAttr =
-        typeof value === 'function' ||
-        (value !== null && typeof value === 'object' && 'value' in (value as object))
-      if (isDOMProperty(props.tag, key)) {
-        if (isReactiveAttr) {
           ;(stops ??= []).push(
-            watchProp(
-              () => unref(value as PropValue<string | number | boolean>),
-              (propValue) => {
-                ;(el as unknown as Record<string, unknown>)[key] = propValue
-              },
-              false
-            )
+            on(el, getEventName(key), value as (e: Event) => void)
           )
-        } else {
-          ;(el as unknown as Record<string, unknown>)[key] = value as string | number | boolean
         }
         continue
       }
 
-      const attrName = getDOMAttrName(key)
-      if (isReactiveAttr) {
-        ;(stops ??= []).push(
-          watchProp(
-            () => unref(value as PropValue<string | number | boolean>),
-            (attrValue) => {
-              setAttribute(el, attrName, attrValue)
-            },
-            hydrated
-          )
-        )
-      } else {
-        if (!hydrated) setAttribute(el, attrName, value as string | number | boolean)
-      }
+      // 属性 / attribute — 分类、静态/响应式分派、水合规则全部在绑定层内
+      ;(stops ??= []).push(bindKey(el, props.tag, key, value as PropValue<unknown>))
     }
 
     // ref - 设置元素引用
@@ -455,12 +245,6 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
           console.error(`[Rasen] Invalid unmount function at index ${index}:`, u, typeof u)
         }
       })
-      // 移除事件监听器
-      if (eventListeners) {
-        for (const { event, handler } of eventListeners) {
-          el.removeEventListener(event, handler)
-        }
-      }
       el.remove()
     }
 

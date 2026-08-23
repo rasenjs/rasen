@@ -1,5 +1,6 @@
 import { type Mountable, type PropValue, com } from '@rasenjs/core'
 import { unref, watchProp } from '../utils'
+import { parseFragment } from '../template'
 
 /**
  * html 组件 - 用于插入原始 HTML 内容
@@ -33,15 +34,6 @@ export const html = com(
       host.appendChild(anchor)
 
       /**
-       * 解析 HTML 字符串为 DOM 节点数组
-       */
-      const parseHTML = (htmlString: string): Node[] => {
-        const template = document.createElement('template')
-        template.innerHTML = htmlString
-        return Array.from(template.content.childNodes)
-      }
-
-      /**
        * 移除当前所有插入的节点
        */
       const removeCurrentNodes = () => {
@@ -67,7 +59,7 @@ export const html = com(
         (value) => {
           removeCurrentNodes()
           if (value) {
-            const nodes = parseHTML(value)
+            const nodes = Array.from(parseFragment(value).childNodes)
             insertNodes(nodes)
           }
         }

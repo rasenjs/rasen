@@ -20,6 +20,10 @@ import {
 // 导出 hydration 相关
 export { getHydrationContext, isHydrating }
 
+// 编译模板共享层（绑定 / 委托 / 槽位挂载）
+export { configureEventDelegation } from './bindings'
+export { mountSlot, collectHtml } from './template'
+
 // 事件修饰器
 export {
   // 底层函数
@@ -103,6 +107,13 @@ export function hydrate(
 ) {
   if (!container) {
     throw new Error('Container element is null')
+  }
+  if (isHydrating()) {
+    throw new Error(
+      '[Rasen Hydration] hydrate() called while already hydrating. ' +
+        'The hydration cursor is a module-level singleton; concurrent or ' +
+        'nested hydration is not supported.'
+    )
   }
 
   // 创建 hydration 上下文

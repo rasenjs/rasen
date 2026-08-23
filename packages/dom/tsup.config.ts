@@ -4,6 +4,8 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     'jsx-runtime': 'src/jsx-runtime.ts',
+    template: 'src/template.ts',
+    bindings: 'src/bindings.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,
