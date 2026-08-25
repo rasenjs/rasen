@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -8,7 +8,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 export interface ArcProps
   extends
@@ -30,11 +30,12 @@ export interface ArcProps
  * arc 组件 - 绘制圆弧段
  * 与 circle 不同，arc 只绘制圆弧部分，不会自动闭合路径
  */
-export const arc: SyncComponent<CanvasRenderingContext2D, [ArcProps]> = (
+export const arc: Component2D<ArcProps> = (
   props: ArcProps
 ) => {
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const radius = unref(props.radius) as number
@@ -48,7 +49,7 @@ export const arc: SyncComponent<CanvasRenderingContext2D, [ArcProps]> = (
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       withDrawProps(
         ctx,
         props,
@@ -106,5 +107,7 @@ export const arc: SyncComponent<CanvasRenderingContext2D, [ArcProps]> = (
       props.lineWidth ? unref(props.lineWidth) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

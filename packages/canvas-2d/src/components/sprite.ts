@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -7,7 +7,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 export interface SpriteProps extends CommonDrawProps, TransformProps {
   image: CanvasImageSource | Ref<CanvasImageSource> | ReadonlyRef<CanvasImageSource>
@@ -21,11 +21,12 @@ export interface SpriteProps extends CommonDrawProps, TransformProps {
   height?: number | Ref<number> | ReadonlyRef<number>
 }
 
-export const sprite: SyncComponent<CanvasRenderingContext2D, [SpriteProps]> = (
+export const sprite: Component2D<SpriteProps> = (
   props: SpriteProps
 ) => {
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const width = props.width ? (unref(props.width) as number) : props.frameWidth
@@ -33,7 +34,7 @@ export const sprite: SyncComponent<CanvasRenderingContext2D, [SpriteProps]> = (
       return { x, y, width, height }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       const img = unref(props.image) as CanvasImageSource
       const x = unref(props.x) as number
       const y = unref(props.y) as number
@@ -83,5 +84,7 @@ export const sprite: SyncComponent<CanvasRenderingContext2D, [SpriteProps]> = (
       props.height ? unref(props.height) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

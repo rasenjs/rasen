@@ -95,9 +95,13 @@ export function svgPathToPoints(data: string): {
         if (points.length > 0) {
           const prevSeg = points[points.length - 1]
           const px =
-            typeof prevSeg.x === 'number' ? prevSeg.x : unref(prevSeg.x)
+            typeof prevSeg.x === 'number'
+              ? prevSeg.x
+              : (unref(prevSeg.x) as unknown as number)
           const py =
-            typeof prevSeg.y === 'number' ? prevSeg.y : unref(prevSeg.y)
+            typeof prevSeg.y === 'number'
+              ? prevSeg.y
+              : (unref(prevSeg.y) as unknown as number)
           prevSeg.handleOut = { x: cp1x - px, y: cp1y - py }
         }
 
@@ -124,9 +128,13 @@ export function svgPathToPoints(data: string): {
         if (points.length > 0) {
           const prevSeg = points[points.length - 1]
           const px =
-            typeof prevSeg.x === 'number' ? prevSeg.x : unref(prevSeg.x)
+            typeof prevSeg.x === 'number'
+              ? prevSeg.x
+              : (unref(prevSeg.x) as unknown as number)
           const py =
-            typeof prevSeg.y === 'number' ? prevSeg.y : unref(prevSeg.y)
+            typeof prevSeg.y === 'number'
+              ? prevSeg.y
+              : (unref(prevSeg.y) as unknown as number)
           prevSeg.handleOut = {
             x: cpx - px,
             y: cpy - py
@@ -157,7 +165,7 @@ export function svgPathToPoints(data: string): {
           if (prevSeg.handleOut) {
             const prevHandleOut = typeof prevSeg.handleOut === 'object' && 'x' in prevSeg.handleOut
               ? prevSeg.handleOut
-              : unref(prevSeg.handleOut)
+              : (unref(prevSeg.handleOut) as unknown as { x: number; y: number })
             // 镜像：cp1 = current - (handleOut)
             cp1x = currentX - prevHandleOut.x
             cp1y = currentY - prevHandleOut.y
@@ -172,8 +180,8 @@ export function svgPathToPoints(data: string): {
         // 设置前一个点的出手柄
         if (points.length > 0) {
           const prevSeg = points[points.length - 1]
-          const px = typeof prevSeg.x === 'number' ? prevSeg.x : unref(prevSeg.x)
-          const py = typeof prevSeg.y === 'number' ? prevSeg.y : unref(prevSeg.y)
+          const px = typeof prevSeg.x === 'number' ? prevSeg.x : (unref(prevSeg.x) as unknown as number)
+          const py = typeof prevSeg.y === 'number' ? prevSeg.y : (unref(prevSeg.y) as unknown as number)
           prevSeg.handleOut = { x: cp1x - px, y: cp1y - py }
         }
 

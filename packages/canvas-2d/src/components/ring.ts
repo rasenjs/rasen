@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -8,7 +8,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 export interface RingProps
   extends
@@ -28,11 +28,12 @@ export interface RingProps
  * ring 组件 - 绘制圆环
  * 使用内外两个圆形成空心圆环
  */
-export const ring: SyncComponent<CanvasRenderingContext2D, [RingProps]> = (
+export const ring: Component2D<RingProps> = (
   props: RingProps
 ) => {
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const outerRadius = unref(props.outerRadius) as number
@@ -46,7 +47,7 @@ export const ring: SyncComponent<CanvasRenderingContext2D, [RingProps]> = (
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       withDrawProps(
         ctx,
         props,
@@ -98,5 +99,7 @@ export const ring: SyncComponent<CanvasRenderingContext2D, [RingProps]> = (
       props.lineWidth ? unref(props.lineWidth) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

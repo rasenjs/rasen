@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -8,7 +8,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 /**
  * polygon 组件属性
@@ -79,12 +79,10 @@ function calculatePoints(props: PolygonProps): {
  * polygon 组件 - 绘制多边形
  * 支持自定义多边形（通过points）和正多边形（通过sides和radius）
  */
-export const polygon: SyncComponent<
-  CanvasRenderingContext2D,
-  [PolygonProps]
-> = (props: PolygonProps) => {
-  return element({
-    getBounds: () => {
+export const polygon: Component2D<PolygonProps> = (props: PolygonProps) => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const { points } = calculatePoints(props)
       const lineWidth = props.lineWidth ? (unref(props.lineWidth) as number) : 1
       const halfLine = lineWidth / 2
@@ -112,7 +110,7 @@ export const polygon: SyncComponent<
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       const fill = props.fill ? (unref(props.fill) as string) : undefined
       const stroke = props.stroke ? (unref(props.stroke) as string) : undefined
       const lineWidth = props.lineWidth ? (unref(props.lineWidth) as number) : 1
@@ -214,5 +212,7 @@ export const polygon: SyncComponent<
       props.cornerRadius ? unref(props.cornerRadius) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

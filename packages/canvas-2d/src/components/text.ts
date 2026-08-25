@@ -1,7 +1,7 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { ReadonlyRef, Ref } from '@rasenjs/core'
 import { unref } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 /**
  * text 组件属性
@@ -27,11 +27,12 @@ export interface TextProps {
 /**
  * text 组件 - 绘制文本
  */
-export const text: SyncComponent<CanvasRenderingContext2D, [TextProps]> = (
+export const text: Component2D<TextProps> = (
   props
 ) => {
-  return element({
-    getBounds: (ctx) => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: (ctx: Context2D) => {
       const textContent = unref(props.text)
       const x = unref(props.x)
       const y = unref(props.y)
@@ -90,7 +91,7 @@ export const text: SyncComponent<CanvasRenderingContext2D, [TextProps]> = (
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       const textContent = unref(props.text)
       const x = unref(props.x)
       const y = unref(props.y)
@@ -210,5 +211,7 @@ export const text: SyncComponent<CanvasRenderingContext2D, [TextProps]> = (
       props.letterSpacing ? unref(props.letterSpacing) : undefined,
       props.textDecoration ? unref(props.textDecoration) : undefined
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

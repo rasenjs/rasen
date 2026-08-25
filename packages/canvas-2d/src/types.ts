@@ -7,14 +7,10 @@
  * - PixiJS: 样式转换
  */
 
-// 响应式引用类型定义（与 @rasenjs/core 保持一致）
-export interface Ref<T = unknown> {
-  value: T
-}
+import type { Ref, ReadonlyRef } from '@rasenjs/core'
 
-export interface ReadonlyRef<T = unknown> {
-  readonly value: T
-}
+// Ref/ReadonlyRef 统一使用 core 的品牌化定义（消除双类型系统）
+export type { Ref, ReadonlyRef } from '@rasenjs/core'
 
 // ============================================================================
 // 基础类型

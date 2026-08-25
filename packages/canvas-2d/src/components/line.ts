@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -7,7 +7,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 export interface LineProps
   extends Partial<CommonDrawProps>, Partial<LineStyleProps> {
@@ -25,11 +25,12 @@ export interface LineProps
 /**
  * line 组件 - 绘制线条
  */
-export const line: SyncComponent<CanvasRenderingContext2D, [LineProps]> = (
+export const line: Component2D<LineProps> = (
   props: LineProps
 ) => {
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const lineWidth = props.lineWidth ? (unref(props.lineWidth) as number) : 1
       const halfLine = lineWidth / 2
       const points = props.points
@@ -67,7 +68,7 @@ export const line: SyncComponent<CanvasRenderingContext2D, [LineProps]> = (
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       withDrawProps(ctx, props, () => {
         const stroke = props.stroke
           ? (unref(props.stroke) as string)
@@ -141,5 +142,7 @@ export const line: SyncComponent<CanvasRenderingContext2D, [LineProps]> = (
       props.lineWidth ? unref(props.lineWidth) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

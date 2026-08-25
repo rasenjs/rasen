@@ -1,4 +1,5 @@
 import type { Ref, ReadonlyRef } from '../types'
+import type { Context2D } from '../node'
 import { unref } from './ref'
 
 /**
@@ -48,7 +49,7 @@ export type GradientOptions = LinearGradientOptions | RadialGradientOptions
  * @returns CanvasGradient 对象
  */
 export function createLinearGradient(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   options: LinearGradientOptions
 ): CanvasGradient {
   const x0 = unref(options.x0) as number
@@ -74,7 +75,7 @@ export function createLinearGradient(
  * @returns CanvasGradient 对象
  */
 export function createRadialGradient(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   options: RadialGradientOptions
 ): CanvasGradient {
   const x0 = unref(options.x0) as number
@@ -102,7 +103,7 @@ export function createRadialGradient(
  * @returns CanvasGradient 对象
  */
 export function createGradient(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   options: GradientOptions
 ): CanvasGradient {
   if (options.type === 'linear') {
@@ -136,7 +137,7 @@ export interface PatternOptions {
  * @returns CanvasPattern 对象或 null
  */
 export function createPattern(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   options: PatternOptions
 ): CanvasPattern | null {
   const image = unref(options.image) as CanvasImageSource

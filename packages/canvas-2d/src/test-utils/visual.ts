@@ -53,6 +53,11 @@ export function initMockReactiveRuntime(): void {
       // 简单实现：立即执行一次 callback
       callback()
       return () => {}
+    },
+    subscribe: (_source: () => unknown, callback: () => void) => {
+      // 简单实现：立即执行一次 callback
+      callback()
+      return () => {}
     }
   })
 }
@@ -290,6 +295,9 @@ export async function runVisualTest(
   snapshotsDir: string
 ): Promise<VisualTestResult> {
   const ctx = canvas.getContext('2d')!
+
+  // 边界包装：ctx 自引用为宿主节点（CanvasNode），场景内 mountable(ctx) 直传
+  ;(ctx as unknown as { ctx: unknown }).ctx = ctx
 
   // 清空画布
   ctx.clearRect(0, 0, canvas.width, canvas.height)

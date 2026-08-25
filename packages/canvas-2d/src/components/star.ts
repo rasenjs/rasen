@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -8,7 +8,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 export interface StarProps
   extends
@@ -29,11 +29,12 @@ export interface StarProps
  * star 组件 - 绘制星形
  * 根据角数、内外半径生成星形路径
  */
-export const star: SyncComponent<CanvasRenderingContext2D, [StarProps]> = (
+export const star: Component2D<StarProps> = (
   props: StarProps
 ) => {
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const outerRadius = unref(props.outerRadius) as number
@@ -47,7 +48,7 @@ export const star: SyncComponent<CanvasRenderingContext2D, [StarProps]> = (
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       withDrawProps(
         ctx,
         props,
@@ -117,5 +118,7 @@ export const star: SyncComponent<CanvasRenderingContext2D, [StarProps]> = (
       props.lineWidth ? unref(props.lineWidth) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

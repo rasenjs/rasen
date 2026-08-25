@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import { createNode, type Component2D, type CanvasNode, type Context2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -7,7 +7,6 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
 
 /**
  * 图片裁剪区域
@@ -37,11 +36,12 @@ export interface ImageProps extends CommonDrawProps, TransformProps {
 /**
  * image 组件 - 绘制图片
  */
-export const image: SyncComponent<CanvasRenderingContext2D, [ImageProps]> = (
+export const image: Component2D<ImageProps> = (
   props: ImageProps
 ) => {
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const img = unref(props.image) as CanvasImageSource
       const x = unref(props.x) as number
       const y = unref(props.y) as number
@@ -68,7 +68,7 @@ export const image: SyncComponent<CanvasRenderingContext2D, [ImageProps]> = (
       return { x, y, width, height }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       const img = unref(props.image) as CanvasImageSource
       const x = unref(props.x) as number
       const y = unref(props.y) as number
@@ -130,5 +130,7 @@ export const image: SyncComponent<CanvasRenderingContext2D, [ImageProps]> = (
       props.crop ? unref(props.crop) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

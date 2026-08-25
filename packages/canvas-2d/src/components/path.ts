@@ -8,7 +8,7 @@ import {
   collectDrawPropsDependencies,
   svgPathToPoints
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 /**
  * 路径点 - 类似设计工具(Figma/Sketch)的路径点
@@ -39,7 +39,7 @@ export interface PathProps
   // 方式2: 使用SVG路径数据(会被转换成points)
   data?: string | Ref<string> | ReadonlyRef<string>
   // 方式3: 使用子组件(point组件,会收集成points数组)
-  children?: Array<Mountable<CanvasRenderingContext2D>>
+  children?: Array<Mountable<CanvasNode>>
   stroke?: string | Ref<string> | ReadonlyRef<string>
   fill?: string | Ref<string> | ReadonlyRef<string>
   lineWidth?: number | Ref<number> | ReadonlyRef<number>
@@ -60,7 +60,7 @@ let currentPathContext: PathContext | null = null
  */
 export const point = (
   props: PathPoint
-): Mountable<CanvasRenderingContext2D> => {
+): Mountable<CanvasNode> => {
   return () => {
     // 将point添加到当前path上下文
     if (currentPathContext) {
@@ -70,19 +70,32 @@ export const point = (
   }
 }
 
+const resolveNum = (v: number | Ref<number> | ReadonlyRef<number>): number =>
+  typeof v === 'number' ? v : (unref(v as Ref<number>) as unknown as number)
+
+type Handle = { x: number; y: number }
+const resolveHandle = (
+  v: Handle | Ref<Handle> | ReadonlyRef<Handle>
+): Handle => {
+  const h = unref(v as Ref<Handle>) as unknown as Handle
+  return h
+}
+
 /**
  * 渲染points到canvas
  */
 function renderPoints(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   points: PathPoint[],
   closed: boolean
 ) {
   if (points.length === 0) return
 
   const firstSeg = points[0]
-  const firstX = typeof firstSeg.x === 'number' ? firstSeg.x : unref(firstSeg.x)
-  const firstY = typeof firstSeg.y === 'number' ? firstSeg.y : unref(firstSeg.y)
+  const resolveNum = (v: number | Ref<number> | ReadonlyRef<number>): number =>
+    typeof v === 'number' ? v : (unref(v as Ref<number>) as unknown as number)
+  const firstX = resolveNum(firstSeg.x)
+  const firstY = resolveNum(firstSeg.y)
 
   ctx.moveTo(firstX, firstY)
 
@@ -91,13 +104,13 @@ function renderPoints(
     const prev = points[i - 1]
     const curr = points[i] as PathPoint & { curveType?: 'quadratic' }
 
-    const prevX = typeof prev.x === 'number' ? prev.x : unref(prev.x)
-    const prevY = typeof prev.y === 'number' ? prev.y : unref(prev.y)
-    const currX = typeof curr.x === 'number' ? curr.x : unref(curr.x)
-    const currY = typeof curr.y === 'number' ? curr.y : unref(curr.y)
+    const prevX = resolveNum(prev.x)
+    const prevY = resolveNum(prev.y)
+    const currX = resolveNum(curr.x)
+    const currY = resolveNum(curr.y)
 
-    const prevHandleOut = prev.handleOut ? unref(prev.handleOut) : null
-    const currHandleIn = curr.handleIn ? unref(curr.handleIn) : null
+    const prevHandleOut = (prev.handleOut ? unref(prev.handleOut as { x: number; y: number }) : null) as { x: number; y: number } | null
+    const currHandleIn = (curr.handleIn ? unref(curr.handleIn as { x: number; y: number }) : null) as { x: number; y: number } | null
 
     // 检查是否为二次贝塞尔曲线(从SVG Q命令转换来的)
     if (curr.curveType === 'quadratic' && prevHandleOut) {
@@ -125,11 +138,11 @@ function renderPoints(
     const last = points[points.length - 1]
     const first = points[0]
 
-    const lastX = typeof last.x === 'number' ? last.x : unref(last.x)
-    const lastY = typeof last.y === 'number' ? last.y : unref(last.y)
+    const lastX = resolveNum(last.x)
+    const lastY = resolveNum(last.y)
 
-    const lastHandleOut = last.handleOut ? unref(last.handleOut) : null
-    const firstHandleIn = first.handleIn ? unref(first.handleIn) : null
+    const lastHandleOut = (last.handleOut ? unref(last.handleOut as { x: number; y: number }) : null) as { x: number; y: number } | null
+    const firstHandleIn = (first.handleIn ? unref(first.handleIn as { x: number; y: number }) : null) as { x: number; y: number } | null
 
     if (lastHandleOut || firstHandleIn) {
       const cp1x = lastX + (lastHandleOut?.x || 0)
@@ -157,10 +170,8 @@ function calculatePathBounds(points: PathPoint[]): {
     return { x: 0, y: 0, width: 0, height: 0 }
   }
 
-  const firstX =
-    typeof points[0].x === 'number' ? points[0].x : unref(points[0].x)
-  const firstY =
-    typeof points[0].y === 'number' ? points[0].y : unref(points[0].y)
+  const firstX = resolveNum(points[0].x)
+  const firstY = resolveNum(points[0].y)
 
   let minX = firstX,
     maxX = firstX
@@ -169,19 +180,19 @@ function calculatePathBounds(points: PathPoint[]): {
 
   for (let i = 0; i < points.length; i++) {
     const point = points[i]
-    const px = typeof point.x === 'number' ? point.x : unref(point.x)
-    const py = typeof point.y === 'number' ? point.y : unref(point.y)
+    const px = resolveNum(point.x)
+    const py = resolveNum(point.y)
     
-    minX = Math.min(minX, px as number)
-    maxX = Math.max(maxX, px as number)
-    minY = Math.min(minY, py as number)
-    maxY = Math.max(maxY, py as number)
+    minX = Math.min(minX, px)
+    maxX = Math.max(maxX, px)
+    minY = Math.min(minY, py)
+    maxY = Math.max(maxY, py)
 
     // 包含控制点（handleOut 和 handleIn）
     if (point.handleOut) {
-      const handleOut = unref(point.handleOut)
-      const cpx = (px as number) + handleOut.x
-      const cpy = (py as number) + handleOut.y
+      const handleOut = resolveHandle(point.handleOut)
+      const cpx = px + handleOut.x
+      const cpy = py + handleOut.y
       minX = Math.min(minX, cpx)
       maxX = Math.max(maxX, cpx)
       minY = Math.min(minY, cpy)
@@ -189,9 +200,9 @@ function calculatePathBounds(points: PathPoint[]): {
     }
 
     if (point.handleIn) {
-      const handleIn = unref(point.handleIn)
-      const cpx = (px as number) + handleIn.x
-      const cpy = (py as number) + handleIn.y
+      const handleIn = resolveHandle(point.handleIn)
+      const cpx = px + handleIn.x
+      const cpy = py + handleIn.y
       minX = Math.min(minX, cpx)
       maxX = Math.max(maxX, cpx)
       minY = Math.min(minY, cpy)
@@ -216,7 +227,7 @@ function calculatePathBounds(points: PathPoint[]): {
  */
 export const path = (
   props: PathProps
-): Mountable<CanvasRenderingContext2D> => {
+): Mountable<CanvasNode> => {
   // 在 setup 阶段预先收集 children 的数据
   let collectedChildPoints: PathPoint[] | null = null
   if (props.children) {
@@ -226,14 +237,15 @@ export const path = (
     // 注意：这里需要一个临时的 ctx，但 point 组件只是收集数据，不需要真正的 ctx
     for (const child of props.children) {
       // point 组件的 setup 返回 mount，mount 执行时收集点
-      child(null as unknown as CanvasRenderingContext2D)
+      child(null as unknown as CanvasNode, undefined)
     }
     collectedChildPoints = pathContext.points
     currentPathContext = null
   }
 
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const lineWidth = props.lineWidth ? (unref(props.lineWidth) as number) : 1
       const halfLine = lineWidth / 2
 
@@ -257,7 +269,7 @@ export const path = (
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       withDrawProps(ctx, props, () => {
         const stroke = props.stroke
           ? (unref(props.stroke) as string)
@@ -271,7 +283,7 @@ export const path = (
         ctx.beginPath()
 
         let points: PathPoint[] = []
-        let shouldClose = closed
+        let shouldClose = unref(closed) as boolean
 
         if (props.points) {
           points = unref(props.points) as PathPoint[]
@@ -281,7 +293,7 @@ export const path = (
           const data = unref(props.data) as string
           const result = svgPathToPoints(data)
           points = result.points as PathPoint[]
-          shouldClose = result.closed
+          shouldClose = Boolean(result.closed)
         }
 
         renderPoints(ctx, points, shouldClose)
@@ -308,5 +320,7 @@ export const path = (
       props.closed ? unref(props.closed) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -8,7 +8,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 /**
  * wedge 组件属性
@@ -29,11 +29,12 @@ export interface WedgeProps
  * wedge 组件 - 绘制楔形（扇形）
  * 类似于 arc，但从中心点开始绘制完整的扇形
  */
-export const wedge: SyncComponent<CanvasRenderingContext2D, [WedgeProps]> = (
+export const wedge: Component2D<WedgeProps> = (
   props: WedgeProps
 ) => {
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const radius = unref(props.radius) as number
@@ -47,7 +48,7 @@ export const wedge: SyncComponent<CanvasRenderingContext2D, [WedgeProps]> = (
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const radius = unref(props.radius) as number
@@ -95,5 +96,7 @@ export const wedge: SyncComponent<CanvasRenderingContext2D, [WedgeProps]> = (
       props.lineWidth ? unref(props.lineWidth) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -8,7 +8,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 export interface CircleProps
   extends
@@ -29,12 +29,13 @@ export interface CircleProps
 /**
  * circle 组件 - 绘制圆形
  */
-export const circle: SyncComponent<CanvasRenderingContext2D, [CircleProps]> = (
+export const circle: Component2D<CircleProps> = (
   props: CircleProps
 ) => {
   // setup 周期：基于 element 组件构建
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const radius = unref(props.radius) as number
@@ -48,7 +49,7 @@ export const circle: SyncComponent<CanvasRenderingContext2D, [CircleProps]> = (
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       withDrawProps(
         ctx,
         props,
@@ -108,5 +109,7 @@ export const circle: SyncComponent<CanvasRenderingContext2D, [CircleProps]> = (
       props.anticlockwise ? unref(props.anticlockwise) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

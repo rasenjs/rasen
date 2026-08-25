@@ -1,4 +1,5 @@
 import type { Ref, ReadonlyRef } from './types'
+import type { Context2D } from './node'
 import { unref } from './utils'
 
 /**
@@ -52,7 +53,7 @@ export interface TransformProps {
  * @returns 是否应用了任何属性（需要 save/restore）
  */
 export function applyCommonDrawProps(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   props: CommonDrawProps
 ): boolean {
   let applied = false
@@ -94,7 +95,7 @@ export function applyCommonDrawProps(
  * @returns 是否应用了任何属性（需要 save/restore）
  */
 export function applyLineStyleProps(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   props: LineStyleProps
 ): boolean {
   let applied = false
@@ -140,7 +141,7 @@ export function applyLineStyleProps(
  * @returns 是否应用了任何变换（需要 save/restore）
  */
 export function applyTransformProps(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   props: TransformProps,
   centerX = 0,
   centerY = 0
@@ -198,7 +199,7 @@ export function applyTransformProps(
 export function withDrawProps<
   T extends CommonDrawProps & LineStyleProps & TransformProps
 >(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   props: T,
   drawFn: () => void,
   options?: {

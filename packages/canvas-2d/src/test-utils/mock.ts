@@ -6,16 +6,20 @@
 
 import { vi } from 'vitest'
 import type { ReactiveRuntime } from '@rasenjs/core'
+import type { CanvasNode, Context2D } from '../node'
 
 /**
- * 创建模拟的 CanvasRenderingContext2D
+ * 创建模拟的 domlike 2D 绘制上下文
+ *
+ * 返回对象同时满足 Context2D 与 CanvasNode（ctx 字段自引用），
+ * 因此测试里 mountable(ctx) 可直接以 ctx 作为宿主节点传入——
+ * 等价于真实场景的 mountable({ ctx })。
  */
-export function createMockContext(): CanvasRenderingContext2D {
+export function createMockContext(): Context2D & CanvasNode {
   const canvas = {
     width: 800,
-    height: 600,
-    getContext: vi.fn()
-  } as unknown as HTMLCanvasElement
+    height: 600
+  }
 
   const ctx = {
     canvas,
@@ -23,12 +27,12 @@ export function createMockContext(): CanvasRenderingContext2D {
     fillStyle: '#000000',
     strokeStyle: '#000000',
     lineWidth: 1,
-    lineCap: 'butt' as CanvasLineCap,
-    lineJoin: 'miter' as CanvasLineJoin,
+    lineCap: 'butt',
+    lineJoin: 'miter',
     miterLimit: 10,
     lineDashOffset: 0,
     globalAlpha: 1,
-    globalCompositeOperation: 'source-over' as GlobalCompositeOperation,
+    globalCompositeOperation: 'source-over',
 
     // 阴影
     shadowBlur: 0,
@@ -38,9 +42,9 @@ export function createMockContext(): CanvasRenderingContext2D {
 
     // 文本
     font: '10px sans-serif',
-    textAlign: 'start' as CanvasTextAlign,
-    textBaseline: 'alphabetic' as CanvasTextBaseline,
-    direction: 'ltr' as CanvasDirection,
+    textAlign: 'start',
+    textBaseline: 'alphabetic',
+    direction: 'ltr',
 
     // 变换矩阵
     _transform: [1, 0, 0, 1, 0, 0] as number[],
@@ -81,7 +85,7 @@ export function createMockContext(): CanvasRenderingContext2D {
       alphabeticBaseline: 0,
       hangingBaseline: 8,
       ideographicBaseline: -2
-    })) as unknown as CanvasRenderingContext2D['measureText'],
+    })),
 
     // 变换
     scale: vi.fn(),
@@ -126,7 +130,10 @@ export function createMockContext(): CanvasRenderingContext2D {
     getContextAttributes: vi.fn(() => ({})),
     drawFocusIfNeeded: vi.fn(),
     roundRect: vi.fn()
-  } as unknown as CanvasRenderingContext2D
+  } as unknown as Context2D & CanvasNode
+
+  // 自引用为宿主节点：ctx 即 CanvasNode（mountable(ctx) 直传）
+  ;(ctx as unknown as { ctx: unknown }).ctx = ctx
 
   return ctx
 }
@@ -166,7 +173,7 @@ export function callCount(fn: ReturnType<typeof vi.fn>): number {
 /**
  * 清除所有模拟函数的调用记录
  */
-export function clearMockCalls(ctx: CanvasRenderingContext2D): void {
+export function clearMockCalls(ctx: Context2D): void {
   const mockFunctions = [
     'beginPath',
     'closePath',
@@ -225,6 +232,12 @@ export function createMockReactiveRuntime(): ReactiveRuntime {
         callback(value, value)
       }
       // 返回停止函数
+      return () => {}
+    },
+    subscribe: (source: any, callback: any) => {
+      // 渲染层订阅原语：与 watch 一致的桩实现
+      const value = source()
+      void value
       return () => {}
     },
     effectScope: () => ({

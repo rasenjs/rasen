@@ -3,6 +3,9 @@
  */
 
 import { SyncComponent } from '@rasenjs/core'
+import type { CanvasNode } from './node'
+
+export type { CanvasNode, Context2D, CanvasSurface } from './node'
 
 export {
   rect,
@@ -91,18 +94,15 @@ export type {
   GroupConfig
 } from './types'
 
-type Canvas2DAppComponent = SyncComponent<
-  CanvasRenderingContext2D,
-  [props: object]
->
+type Canvas2DAppComponent = SyncComponent<[props: object]>
 
 export function render(
   component: Canvas2DAppComponent,
   props: object,
-  ctx: CanvasRenderingContext2D
+  node: CanvasNode
 ): () => void {
   const mountable = component(props)
-  const cleanup = mountable(ctx)
+  const cleanup = mountable(node, {})
   return () => {
     cleanup?.()
   }

@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -9,7 +9,7 @@ import {
   collectDrawPropsDependencies,
   calculateFullBounds
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 /**
  * rect 组件属性
@@ -36,7 +36,7 @@ export interface RectProps
  * 绘制圆角矩形路径
  */
 function drawRoundedRect(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   x: number,
   y: number,
   width: number,
@@ -92,11 +92,12 @@ function drawRoundedRect(
 /**
  * rect 组件 - 绘制矩形
  */
-export const rect: SyncComponent<CanvasRenderingContext2D, [RectProps]> = (
+export const rect: Component2D<RectProps> = (
   props: RectProps
 ) => {
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const width = unref(props.width) as number
@@ -122,7 +123,7 @@ export const rect: SyncComponent<CanvasRenderingContext2D, [RectProps]> = (
       )
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const width = unref(props.width) as number
@@ -184,5 +185,7 @@ export const rect: SyncComponent<CanvasRenderingContext2D, [RectProps]> = (
       props.cornerRadius ? unref(props.cornerRadius) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

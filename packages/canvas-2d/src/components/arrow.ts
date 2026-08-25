@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -8,7 +8,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 /**
  * arrow 组件属性
@@ -28,11 +28,12 @@ export interface ArrowProps
 /**
  * arrow 组件 - 绘制带箭头的线条
  */
-export const arrow: SyncComponent<CanvasRenderingContext2D, [ArrowProps]> = (
+export const arrow: Component2D<ArrowProps> = (
   props: ArrowProps
 ) => {
-  return element({
-    getBounds: () => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const points = unref(props.points) as number[]
       const lineWidth = props.lineWidth ? (unref(props.lineWidth) as number) : 1
       const pointerLength = props.pointerLength
@@ -66,7 +67,7 @@ export const arrow: SyncComponent<CanvasRenderingContext2D, [ArrowProps]> = (
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       const points = unref(props.points) as number[]
       const pointerLength = props.pointerLength
         ? (unref(props.pointerLength) as number)
@@ -179,5 +180,7 @@ export const arrow: SyncComponent<CanvasRenderingContext2D, [ArrowProps]> = (
       props.lineWidth ? unref(props.lineWidth) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

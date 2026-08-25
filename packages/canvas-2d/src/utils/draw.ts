@@ -1,4 +1,5 @@
 import type { Ref, ReadonlyRef } from '../types'
+import type { Context2D } from '../node'
 import { unref } from './ref'
 
 /**
@@ -58,26 +59,30 @@ export interface TransformProps {
  * @returns 是否应用了任何属性（需要 save/restore）
  */
 export function applyCommonDrawProps(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   props: CommonDrawProps
 ): boolean {
   let applied = false
 
   // 应用阴影
   if (props.shadowColor !== undefined) {
-    ctx.shadowColor = unref(props.shadowColor)
+    ctx.shadowColor = unref(props.shadowColor) as string
     ctx.shadowBlur =
-      props.shadowBlur !== undefined ? unref(props.shadowBlur) : 0
+      props.shadowBlur !== undefined ? (unref(props.shadowBlur) as number) : 0
     ctx.shadowOffsetX =
-      props.shadowOffsetX !== undefined ? unref(props.shadowOffsetX) : 0
+      props.shadowOffsetX !== undefined
+        ? (unref(props.shadowOffsetX) as number)
+        : 0
     ctx.shadowOffsetY =
-      props.shadowOffsetY !== undefined ? unref(props.shadowOffsetY) : 0
+      props.shadowOffsetY !== undefined
+        ? (unref(props.shadowOffsetY) as number)
+        : 0
     applied = true
   }
 
   // 应用透明度
   if (props.opacity !== undefined) {
-    ctx.globalAlpha = unref(props.opacity)
+    ctx.globalAlpha = unref(props.opacity) as number
     applied = true
   }
 
@@ -100,36 +105,36 @@ export function applyCommonDrawProps(
  * @returns 是否应用了任何属性（需要 save/restore）
  */
 export function applyLineStyleProps(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   props: LineStyleProps
 ): boolean {
   let applied = false
 
   // 应用虚线
   if (props.lineDash !== undefined) {
-    ctx.setLineDash(unref(props.lineDash))
+    ctx.setLineDash(unref(props.lineDash) as number[])
     applied = true
   }
 
   if (props.lineDashOffset !== undefined) {
-    ctx.lineDashOffset = unref(props.lineDashOffset)
+    ctx.lineDashOffset = unref(props.lineDashOffset) as number
     applied = true
   }
 
   // 应用线帽样式
   if (props.lineCap !== undefined) {
-    ctx.lineCap = unref(props.lineCap)
+    ctx.lineCap = unref(props.lineCap) as CanvasLineCap
     applied = true
   }
 
   // 应用线连接样式
   if (props.lineJoin !== undefined) {
-    ctx.lineJoin = unref(props.lineJoin)
+    ctx.lineJoin = unref(props.lineJoin) as CanvasLineJoin
     applied = true
   }
 
   if (props.miterLimit !== undefined) {
-    ctx.miterLimit = unref(props.miterLimit)
+    ctx.miterLimit = unref(props.miterLimit) as number
     applied = true
   }
 
@@ -146,7 +151,7 @@ export function applyLineStyleProps(
  * @returns 是否应用了任何变换（需要 save/restore）
  */
 export function applyTransformProps(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   props: TransformProps,
   centerX = 0,
   centerY = 0
@@ -222,7 +227,7 @@ export function applyTransformProps(
 export function withDrawProps<
   T extends CommonDrawProps & LineStyleProps & TransformProps
 >(
-  ctx: CanvasRenderingContext2D,
+  ctx: Context2D,
   props: T,
   drawFn: () => void,
   options?: {

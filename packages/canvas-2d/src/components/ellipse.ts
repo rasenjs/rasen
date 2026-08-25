@@ -1,4 +1,4 @@
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component2D } from '../node'
 import type { Ref, ReadonlyRef } from '../types'
 import {
   unref,
@@ -8,7 +8,7 @@ import {
   withDrawProps,
   collectDrawPropsDependencies
 } from '../utils'
-import { element } from './element'
+import { createNode, type CanvasNode, type Context2D } from '../node'
 
 export interface EllipseProps
   extends
@@ -30,12 +30,10 @@ export interface EllipseProps
 /**
  * ellipse 组件 - 绘制椭圆
  */
-export const ellipse: SyncComponent<
-  CanvasRenderingContext2D,
-  [EllipseProps]
-> = (props: EllipseProps) => {
-  return element({
-    getBounds: () => {
+export const ellipse: Component2D<EllipseProps> = (props: EllipseProps) => {
+  return (node: CanvasNode) => {
+    const n = createNode(node, {
+    bounds: () => {
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const radiusX = unref(props.radiusX) as number
@@ -50,7 +48,7 @@ export const ellipse: SyncComponent<
       }
     },
 
-    draw: (ctx) => {
+    draw: (ctx: Context2D) => {
       withDrawProps(
         ctx,
         props,
@@ -121,5 +119,7 @@ export const ellipse: SyncComponent<
       props.anticlockwise ? unref(props.anticlockwise) : undefined,
       ...collectDrawPropsDependencies(props)
     ]
-  })
+    })
+    return () => n.remove()
+  }
 }

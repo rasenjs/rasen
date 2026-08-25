@@ -35,6 +35,8 @@ describe('动画和脏区域检测', () => {
   beforeEach(() => {
     canvas = createCanvas(400, 300)
     ctx = canvas.getContext('2d')
+    // 边界包装：ctx 自引用为宿主节点（CanvasNode）
+    ;(ctx as unknown as { ctx: unknown }).ctx = ctx
     // 创建 RenderContext 并关联到 ctx
     renderContext = new RenderContext(ctx)
   })
