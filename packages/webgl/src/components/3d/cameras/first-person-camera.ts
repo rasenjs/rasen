@@ -23,6 +23,7 @@
  */
 
 import { com, getReactiveRuntime, type Mountable } from '@rasenjs/core'
+import type { GlNode } from '../../../node'
 import { Mat4x4f, Vec3f, vec3f } from '@rasenjs/math'
 import type { MaybeRef } from '../../../types'
 import { unref } from '../../../utils'
@@ -74,9 +75,10 @@ function toVec3(v: { x: number; y: number; z: number } | Vec3f): Vec3f {
  * FirstPersonCamera — reactive yaw/pitch first-person view.
  */
 export const FirstPersonCamera = com(
-  (props: FirstPersonCameraProps): Mountable<WebGLRenderingContext | WebGL2RenderingContext> => {
-    return (gl) => {
-      const rc = ensureRenderContext(gl)
+  (props: FirstPersonCameraProps): Mountable<GlNode> => {
+    return (node) => {
+      const gl = node.ctx
+      const rc = ensureRenderContext(gl, node.rcOptions)
       rc.enableDepth()
 
       const apply = () => {
@@ -99,7 +101,7 @@ export const FirstPersonCamera = com(
       apply()
 
       const runtime = getReactiveRuntime()
-      const stopWatch = runtime.watch(
+      const stopWatch = runtime.subscribe(
         () => {
           const p = unref(props.position)
           const u = unref(props.up)

@@ -8,7 +8,7 @@ export { hostHooks, type HostHooks } from './host-hooks'
 export { MARKERS, isMarkerMatch, MARKER_DEBUG_MAP } from './marker-constants'
 
 import type { Mountable, HostHooks } from '@rasenjs/core'
-import { mount as coreMount, provideHostContext } from '@rasenjs/core'
+import { mount as coreMount } from '@rasenjs/core'
 import { hostHooks } from './host-hooks'
 import {
   createHydrationContext,
@@ -85,11 +85,8 @@ export function mount<T extends Element>(
   mountable: Mountable<T>,
   container: T
 ): (() => void) | undefined {
-  // 内部提供 DOM 宿主上下文，用户无感
-  return provideHostContext(
-    { hooks: hostHooks as unknown as HostHooks<T, unknown> },
-    () => coreMount(mountable, container)
-  )
+  // DOM hooks 显式传入——hooks 即上下文，无全局栈
+  return coreMount(mountable, container, hostHooks as unknown as HostHooks<T>)
 }
 
 /**

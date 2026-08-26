@@ -20,22 +20,19 @@ function createMockReactiveRuntime(): ReactiveRuntime {
       return r as unknown as Ref<T>
     },
 
-    computed: <T>(getter: () => T) => ({
-      get value() {
-        return getter()
-      }
-    } as unknown as ReadonlyRef<T>),
-
-    watch: <T>(
-      source: () => T,
-      callback: (value: T, oldValue: T) => void,
-      options?: { immediate?: boolean }
+    subscribe: <T>(
+      _source: () => T,
+      _callback: (value: T, oldValue: T) => void
     ) => {
-      if (options?.immediate) {
-        callback(source(), undefined as T)
-      }
       return () => {}
     },
+
+    computed: <T>(getter: () => T) =>
+      ({
+        get value() {
+          return getter()
+        }
+      } as unknown as ReadonlyRef<T>),
 
     effectScope: () => ({
       run: <T>(fn: () => T) => fn(),
@@ -64,16 +61,16 @@ function createMockReactiveRuntime(): ReactiveRuntime {
 }
 
 // Mock host hooks for testing
-function createMockHostHooks<Host = unknown, N = unknown>(): FragmentHostHooks<Host, N> {
+function createMockHostHooks<Host = unknown>(): FragmentHostHooks<Host> {
   return {
-    createMarker: (_host: Host, kind: string) => ({ type: 'marker', content: kind } as N),
+    createMarker: (_host: Host, kind: string) => ({ type: 'marker', content: kind } as Host),
     insert: () => {},
     detach: () => {},
     nextSibling: () => null,
     createText: (_host: Host, content: string) => {
       const node = { type: 'text', text: content }
       return {
-        node: node as N,
+        node: node as Host,
         update: (v: string) => {
           node.text = v
         },
@@ -112,7 +109,7 @@ describe('fragment', () => {
       })
 
       const frag = fragment({ children: [child1, child2] })
-      frag({})
+      frag({}, undefined)
 
       expect(mountCalls).toEqual(['child1', 'child2'])
     })
@@ -128,14 +125,14 @@ describe('fragment', () => {
       )
 
       const frag = fragment({ children })
-      frag({})
+      frag({}, undefined)
 
       expect(order).toEqual([1, 2, 3, 4, 5])
     })
 
     it('应该支持空子组件列表', () => {
       const frag = fragment({ children: [] })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
 
       expect(cleanup).toBeDefined()
       expect(() => cleanup?.()).not.toThrow()
@@ -147,13 +144,13 @@ describe('fragment', () => {
       const receivedHosts: unknown[] = []
       const testHost = { id: 'shared-host' }
 
-      const child = ((host: { id: string }) => {
+      const child = ((host: unknown) => {
         receivedHosts.push(host)
         return () => {}
       })
 
       const frag = fragment({ children: [child, child, child] })
-      frag(testHost)
+      frag(testHost, undefined)
 
       expect(receivedHosts).toEqual([testHost, testHost, testHost])
     })
@@ -170,13 +167,13 @@ describe('fragment', () => {
         context: new Map([['key', 'value']])
       }
 
-      const child = ((host: ComplexHost) => {
-        receivedHost.push(host)
+      const child = ((host: unknown) => {
+        receivedHost.push(host as ComplexHost)
         return () => {}
       })
 
       const frag = fragment({ children: [child] })
-      frag(testHost)
+      frag(testHost, undefined)
 
       expect(receivedHost[0]).toBe(testHost)
     })
@@ -195,7 +192,7 @@ describe('fragment', () => {
       })
 
       const frag = fragment({ children: [child1, child2] })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
 
       expect(unmountCalls).toEqual([])
 
@@ -213,7 +210,7 @@ describe('fragment', () => {
       )
 
       const frag = fragment({ children })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
 
       cleanup?.()
       expect(order).toEqual([1, 2, 3])
@@ -229,7 +226,7 @@ describe('fragment', () => {
       })
 
       const frag = fragment({ children: [child1, child2] })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
 
       expect(() => cleanup?.()).not.toThrow()
     })
@@ -255,7 +252,7 @@ describe('fragment', () => {
         children: [outerChild, innerFragment, outerChild]
       })
 
-      outerFragment({})
+      outerFragment({}, undefined)
 
       expect(mountOrder).toEqual(['outer', 'inner', 'inner', 'outer'])
     })
@@ -278,7 +275,7 @@ describe('fragment', () => {
         children: ['Hello', ' ', 'World'], 
         hooks 
       })
-      frag({})
+      frag({}, undefined)
 
       expect(textNodes).toHaveLength(3)
       expect(textNodes[0].text).toBe('Hello')
@@ -305,7 +302,7 @@ describe('fragment', () => {
         children: ['Text1', component, 'Text2'], 
         hooks 
       })
-      frag({})
+      frag({}, undefined)
 
       expect(textNodes).toEqual(['Text1', 'Text2'])
       expect(mountCalls).toEqual(['component'])
@@ -323,7 +320,7 @@ describe('fragment', () => {
       const child = (() => () => {})
 
       const frag = fragment({ children: [child], hooks })
-      frag({})
+      frag({}, undefined)
 
       expect(markers).toHaveLength(2)
       expect(markers[0].content).toBe('f')
@@ -339,7 +336,7 @@ describe('fragment', () => {
       const child = (() => () => {})
 
       const frag = fragment({ children: [child], hooks })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
 
       expect(() => cleanup?.()).not.toThrow()
     })
@@ -361,7 +358,7 @@ describe('fragment', () => {
       const child = (() => () => {})
       
       const frag = fragment({ children: [child], hooks })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
 
       expect(markers).toHaveLength(2)
       expect(removedMarkers).toHaveLength(0)
@@ -378,13 +375,10 @@ describe('fragment', () => {
       const count = runtime.ref(0)
       
       let watchCallback: ((val: number) => void) | null = null
-      const originalWatch = runtime.watch
-      runtime.watch = (source: any, callback: any, options?: any) => {
+      const originalSubscribe = runtime.subscribe
+      runtime.subscribe = (source: any, callback: any) => {
         watchCallback = callback
-        if (options?.immediate) {
-          callback(source())
-        }
-        return originalWatch(source, callback, options)
+        return originalSubscribe(source, callback)
       }
       
       const updates: string[] = []
@@ -404,7 +398,7 @@ describe('fragment', () => {
         children: [count], 
         hooks 
       })
-      frag({})
+      frag({}, undefined)
 
       expect(watchCallback).toBeTruthy()
       expect(updates).toHaveLength(0)
@@ -424,9 +418,9 @@ describe('fragment', () => {
       const count = runtime.ref(0)
       
       let stopCalled = false
-      const originalWatch = runtime.watch
-      runtime.watch = (source: any, callback: any, options?: any) => {
-        const stop = originalWatch(source, callback, options)
+      const originalSubscribe = runtime.subscribe
+      runtime.subscribe = (source: any, callback: any) => {
+        const stop = originalSubscribe(source, callback)
         return () => {
           stopCalled = true
           stop()
@@ -439,7 +433,7 @@ describe('fragment', () => {
         children: [count], 
         hooks 
       })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
 
       expect(stopCalled).toBe(false)
 
@@ -474,7 +468,7 @@ describe('fragment', () => {
         children: ['Hello'], 
         hooks 
       })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
 
       expect(calls).toEqual([
         'createMarker:f',
@@ -507,7 +501,7 @@ describe('fragment', () => {
         children: [0, 42, -1, 3.14], 
         hooks 
       })
-      frag({})
+      frag({}, undefined)
 
       expect(textNodes).toEqual(['0', '42', '-1', '3.14'])
     })
@@ -520,7 +514,7 @@ describe('fragment', () => {
       const frag = fragment({ 
         children: ['Hello'] 
       })
-      frag({})
+      frag({}, undefined)
 
       console.warn = originalWarn
 
@@ -539,7 +533,7 @@ describe('fragment', () => {
       const frag = fragment({ 
         children: [count] 
       })
-      frag({})
+      frag({}, undefined)
 
       console.warn = originalWarn
 

@@ -6,7 +6,8 @@ import {
   type LineStyleProps,
   type TransformProps,
   withDrawProps,
-  collectDrawPropsDependencies
+  collectDrawPropsDependencies,
+  pointerHandlersFrom,
 } from '../utils'
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
@@ -96,6 +97,17 @@ export const circle: Component2D<CircleProps> = (
         }
       )
     },
+
+    hit: (px: number, py: number) => {
+      const cx = unref(props.x) as number
+      const cy = unref(props.y) as number
+      const r = unref(props.radius) as number
+      const dx = px - cx
+      const dy = py - cy
+      return dx * dx + dy * dy <= r * r
+    },
+
+    on: pointerHandlersFrom(props),
 
     deps: () => [
       unref(props.x),

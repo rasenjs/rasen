@@ -53,13 +53,14 @@ export function text(props: TextProps): Mountable<HTMLElement> {
     // Handle content
     if (typeof content === 'function') {
       // Reactive content
-      const stop = runtime.watch(
-        content,
-        (newText) => {
-          textNode.textContent = String(newText)
-        },
-        { immediate: !ctx?.isHydrating } // Skip immediate in hydration mode
-      )
+      const stop = runtime.subscribe(content, (newText) => {
+        textNode.textContent = String(newText)
+      })
+
+      // 初始值由调用方写入（hydration 模式跳过，SSR 已产出）
+      if (!ctx?.isHydrating) {
+        textNode.textContent = String(content())
+      }
 
       return () => {
         stop()

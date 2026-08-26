@@ -7,6 +7,7 @@
  * scene's sun. Works on both WebGL1 (WEBGL_depth_texture ext) and WebGL2.
  */
 
+import type { GlContext } from '../node'
 import { ShaderProgram } from './shader'
 import { Mat4x4f } from '@rasenjs/math'
 
@@ -33,21 +34,22 @@ void main() {
 `
 
 export class ShadowRenderer {
-  private gl: WebGLRenderingContext | WebGL2RenderingContext
+  private gl: GlContext
   private shader: ShaderProgram
   private framebuffer: WebGLFramebuffer
   private depthTexture: WebGLTexture
   private size = 2048
   private isWebGL2: boolean
 
-  constructor(gl: WebGLRenderingContext | WebGL2RenderingContext) {
+  constructor(gl: GlContext) {
     this.gl = gl
-    this.isWebGL2 = gl instanceof WebGL2RenderingContext
+    // 能力探测：不依赖 DOM 全局 instanceof
+    this.isWebGL2 = 'drawBuffers' in gl
 
     // Depth texture
     this.depthTexture = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, this.depthTexture)
-    const internalFormat = this.isWebGL2 ? (gl as WebGL2RenderingContext).DEPTH_COMPONENT24 : gl.DEPTH_COMPONENT
+    const internalFormat = this.isWebGL2 && 'DEPTH_COMPONENT24' in gl ? gl.DEPTH_COMPONENT24 : gl.DEPTH_COMPONENT
     gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, this.size, this.size, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
@@ -59,10 +61,9 @@ export class ShadowRenderer {
     this.framebuffer = gl.createFramebuffer()!
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer)
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.depthTexture, 0)
-    if (this.isWebGL2) {
-      const gl2 = gl as WebGL2RenderingContext
-      gl2.drawBuffers([gl2.NONE])
-      gl2.readBuffer(gl2.NONE)
+    if ('drawBuffers' in gl) {
+      gl.drawBuffers([gl.NONE])
+      gl.readBuffer(gl.NONE)
     } else if (!gl.getExtension('WEBGL_depth_texture')) {
       throw new Error('WEBGL_depth_texture extension required for shadow maps')
     }

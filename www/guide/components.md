@@ -30,8 +30,8 @@ const Counter = com(() => {
   const runtime = getReactiveRuntime()
   const count = runtime.ref(0)
   
-  // Effects are automatically tracked and cleaned up
-  runtime.watch(
+  // Subscriptions are automatically tracked and cleaned up
+  runtime.subscribe(
     () => count.value,
     (value) => {
       // Update UI using reactive values

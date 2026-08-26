@@ -12,6 +12,7 @@ import {
   getRenderContext,
   hasRenderContext
 } from '../render-context'
+import type { GlNode } from '../node'
 import type { Bounds } from '../types'
 
 export interface ElementProps {
@@ -22,7 +23,7 @@ export interface ElementProps {
    */
   getBounds: () => Bounds | null
   /** Draw function */
-  draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => void
+  draw: (gl: GlNode['ctx']) => void
   /** Collect reactive dependencies */
   deps: () => unknown[]
 }
@@ -37,17 +38,14 @@ export interface ElementProps {
  * - Cleanup
  */
 export const element = com(
-  (props: ElementProps): Mountable<WebGLRenderingContext | WebGL2RenderingContext> => {
+  (props: ElementProps): Mountable<GlNode> => {
     const { getBounds, draw, deps } = props
 
-    return (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
-      // Auto-create RenderContext if not exists
+    return (node: GlNode) => {
+      const gl = node.ctx
+      // Auto-create RenderContext if not exists（配置经 node.rcOptions 注入）
       if (!hasRenderContext(gl)) {
-        // Read context options from canvas element
-        const canvas = gl.canvas as HTMLCanvasElement
-        const optionsStr = canvas.dataset.contextOptions
-        const options = optionsStr ? JSON.parse(optionsStr) : {}
-        new RenderContext(gl, options)
+        new RenderContext(gl, node.rcOptions)
       }
 
       const renderContext = getRenderContext(gl)
@@ -69,7 +67,7 @@ export const element = com(
       const runtime = getReactiveRuntime()
       let prevDeps: unknown[] = []
       
-      const stopWatch = runtime.watch(
+      const stopWatch = runtime.subscribe(
         deps,
         (newDeps) => {
           // Check if deps actually changed (avoid unnecessary getBounds calls)

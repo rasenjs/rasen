@@ -1,0 +1,175 @@
+/* Bootstrap-like styles for js-framework-benchmark */
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.42857143;
+  color: #333;
+  background-color: #fff;
+  padding: 0;
+  margin: 0;
+}
+
+.container {
+  padding-right: 15px;
+  padding-left: 15px;
+  margin-right: auto;
+  margin-left: auto;
+  max-width: 1170px;
+}
+
+.jumbotron {
+  padding: 30px 15px;
+  margin-bottom: 30px;
+  background-color: #e9ecef;
+  border-radius: 6px;
+}
+
+.jumbotron h1 {
+  margin: 0;
+  font-size: 42px;
+  font-weight: 400;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -15px;
+  margin-left: -15px;
+}
+
+.col-md-6 {
+  flex: 0 0 50%;
+  max-width: 50%;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+.col-sm-6 {
+  flex: 0 0 50%;
+  max-width: 50%;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+.smallpad {
+  padding: 2px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 6px 12px;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.42857143;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.btn-primary {
+  color: #fff;
+  background-color: #337ab7;
+  border-color: #2e6da4;
+}
+
+.btn-primary:hover {
+  background-color: #286090;
+  border-color: #204d74;
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+}
+
+.table {
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 20px;
+  border-collapse: collapse;
+}
+
+.table > tbody > tr > td {
+  padding: 8px;
+  line-height: 1.42857143;
+  vertical-align: middle;
+  border-top: 1px solid #ddd;
+}
+
+.table-hover > tbody > tr:hover {
+  background-color: #f5f5f5;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+  background-color: #f9f9f9;
+}
+
+.table > tbody > tr.danger {
+  background-color: #f2dede;
+}
+
+.table > tbody > tr.danger:hover {
+  background-color: #ebcccc;
+}
+
+.col-md-1 {
+  width: 8%;
+  text-align: right;
+}
+
+.col-md-4 {
+  width: 33%;
+}
+
+.col-md-6 {
+  width: 50%;
+}
+
+.lbl {
+  cursor: pointer;
+  color: #337ab7;
+  text-decoration: none;
+}
+
+.lbl:hover {
+  color: #23527c;
+  text-decoration: underline;
+}
+
+.remove {
+  cursor: pointer;
+}
+
+.glyphicon {
+  position: relative;
+  top: 1px;
+  display: inline-block;
+  font-family: 'Glyphicons Halflings';
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.glyphicon-remove:before {
+  content: '✖';
+  color: #000;
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+.preloadicon {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .col-sm-6 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}

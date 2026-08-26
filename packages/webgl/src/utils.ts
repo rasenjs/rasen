@@ -3,13 +3,14 @@
  */
 
 import type { Ref, ReadonlyRef, MaybeRef, Color } from './types'
+import type { GlContext } from './node'
 import { unref as coreUnref } from '@rasenjs/core'
 
 /**
  * Unwrap a potentially reactive value
  */
 export function unref<T>(value: MaybeRef<T>): T {
-  return coreUnref(value as T | Ref<T> | ReadonlyRef<T>)
+  return coreUnref(value as T | Ref<T> | ReadonlyRef<T>) as T
 }
 
 // Color cache for frequently used colors
@@ -164,7 +165,7 @@ export function createOrthoMatrix(
 // to exactly one context, so the cache must be scoped per context — otherwise
 // a page reload (new context) reusing a cached texture fails to bind.
 const textureCache = new WeakMap<
-  WebGLRenderingContext | WebGL2RenderingContext,
+  GlContext,
   Map<TexImageSource, Map<string, WebGLTexture>>
 >()
 
@@ -191,7 +192,7 @@ export interface TextureOptions {
  * LINEAR filtering + REPEAT wrapping so the equirectangular seam is seamless).
  */
 export function createTexture(
-  gl: WebGLRenderingContext | WebGL2RenderingContext,
+  gl: GlContext,
   source: TexImageSource,
   options?: TextureOptions
 ): WebGLTexture {

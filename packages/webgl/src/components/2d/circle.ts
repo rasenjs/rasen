@@ -2,11 +2,11 @@
  * Circle component (2D/3D unified)
  */
 
-import type { SyncComponent } from '@rasenjs/core'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
 import { element } from '../element'
+import type { Component3D, GlContext } from '../../node'
 
 /**
  * Generate circle vertices (triangle fan approximation)
@@ -55,10 +55,7 @@ export interface CircleProps extends CommonDrawProps, Transform2DProps {
 /**
  * Circle component
  */
-export const circle: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [CircleProps]
-> = (props: CircleProps) => {
+export const circle: Component3D<CircleProps> = (props: CircleProps) => {
   let cachedGeometry: Float32Array | null = null
   let cachedRadius: number | null = null
   let cachedSegments: number | null = null
@@ -96,7 +93,7 @@ export const circle: SyncComponent<
       return cachedBounds
     },
 
-    draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
+    draw: (gl: GlContext) => {
       const x = unref(props.x)
       const y = unref(props.y)
       const z = unref(props.z) ?? 0

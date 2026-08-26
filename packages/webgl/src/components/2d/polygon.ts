@@ -3,7 +3,7 @@
  * Supports both regular polygons (sides + radius) and custom polygons (points array)
  */
 
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component3D, GlContext } from '../../node'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds, Point } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
@@ -81,10 +81,7 @@ function calculatePoints(
   return { points: [], centerX: 0, centerY: 0 }
 }
 
-export const polygon: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [PolygonProps]
-> = (props: PolygonProps) => {
+export const polygon: Component3D<PolygonProps> = (props: PolygonProps) => {
   let cachedGeometry: Float32Array | null = null
   let cachedPoints: Array<{ x: number; y: number }> | null = null
   let cachedCenterX: number = 0
@@ -133,7 +130,7 @@ export const polygon: SyncComponent<
       }
     },
 
-    draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
+    draw: (gl: GlContext) => {
       const x = unref(props.x) ?? 0
       const y = unref(props.y) ?? 0
       const z = unref(props.z) ?? 0

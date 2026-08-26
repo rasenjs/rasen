@@ -2,11 +2,11 @@
  * Ellipse component (2D/3D unified)
  */
 
-import type { SyncComponent } from '@rasenjs/core'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
 import { element } from '../element'
+import type { Component3D, GlContext } from '../../node'
 
 export interface EllipseProps extends CommonDrawProps, Transform2DProps {
   x: MaybeRef<number>
@@ -57,10 +57,7 @@ function createEllipseGeometry(
 /**
  * Ellipse component
  */
-export const ellipse: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [EllipseProps]
-> = (props: EllipseProps) => {
+export const ellipse: Component3D<EllipseProps> = (props: EllipseProps) => {
   let cachedGeometry: Float32Array | null = null
   let cachedRadiusX: number | null = null
   let cachedRadiusY: number | null = null
@@ -101,7 +98,7 @@ export const ellipse: SyncComponent<
       return cachedBounds
     },
 
-    draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
+    draw: (gl: GlContext) => {
       const x = unref(props.x)
       const y = unref(props.y)
       const z = unref(props.z) ?? 0

@@ -1,13 +1,12 @@
-import { getReactiveRuntime, toValue } from '../reactive'
-import { com, getHostContext } from '../com'
+import { toValue, getReactiveRuntime } from '../reactive'
+import { com } from '../com'
 import { MARKERS } from '../marker-constants'
-import { type Mountable, type PropValue, type HostContext, type HostHooks } from '../types'
+import { type Mountable, type PropValue, type HostHooks } from '../types'
 
 /**
  * match component configuration
  */
 export interface MatchConfig<
-  Host,
   K extends string = string,
   N = unknown
 > {
@@ -17,10 +16,10 @@ export interface MatchConfig<
   /** Branch mapping - supports both object and array forms */
   /** Object form: value matching (key -> component) */
   /** Array form: condition matching [[condition, component], ...] */
-  cases: Partial<Record<K, (key: K) => Mountable<Host>>> | Array<[() => boolean, () => Mountable<Host>]>
+  cases: Partial<Record<K, (key: K) => Mountable<N>>> | Array<[() => boolean, () => Mountable<N>]>
 
   /** Default branch (when no match) */
-  default?: () => Mountable<Host>
+  default?: () => Mountable<N>
 
   /**
    * Whether to cache created branches
@@ -30,7 +29,7 @@ export interface MatchConfig<
   cache?: boolean
 
   /** 显式宿主钩子（缺省时从 HostContext 继承） */
-  hooks?: HostHooks<Host, N>
+  hooks?: HostHooks<N>
 }
 
 /**
@@ -73,21 +72,19 @@ export interface MatchConfig<
  * })
  */
 export const match = com(
-  <Host = unknown, K extends string = string, N = unknown>(
-    config: MatchConfig<Host, K, N>
-  ): Mountable<Host> => {
-    return (host: Host) => {
+  <K extends string = string, N = unknown>(
+    config: MatchConfig<K, N>
+  ): Mountable<N> => {
+    return (node: N, mountHooks?: HostHooks<N>) => {
+      const hooks = mountHooks ?? config.hooks
       const runtime = getReactiveRuntime()
 
-      // 宿主上下文：com 挂载时已压栈。优先用 ctx.hooks，config.hooks 作为显式 fallback。
-      const ctx = getHostContext() as HostContext<Host, N> | undefined
-      const hooks = ctx?.hooks ?? config.hooks
 
       // 定位标记：分支内容始终插在标记之前（有界宿主保证）。
       let marker: N | undefined
       if (hooks?.createMarker && hooks.insert) {
-        marker = hooks.createMarker(host, MARKERS.MATCH_START)
-        hooks.insert(host, marker, null)
+        marker = hooks.createMarker(node, MARKERS.MATCH_START)
+        hooks.insert(node, marker, null)
       }
 
       // Use Symbol to mark "uninitialized" state
@@ -110,8 +107,8 @@ export const match = com(
       // Mount branch
       const mountBranch = (key: K | null | undefined) => {
         let factory:
-          | ((key: K) => Mountable<Host>)
-          | (() => Mountable<Host>)
+          | ((key: K) => Mountable<N>)
+          | (() => Mountable<N>)
           | undefined
 
         if (Array.isArray(config.cases)) {
@@ -131,21 +128,21 @@ export const match = com(
 
         // 有界宿主：子树的所有追加都落在标记之前。
         const targetHost =
-          marker && hooks?.boundedHost ? hooks.boundedHost(host, marker) : host
+          marker && hooks?.boundedHost ? hooks.boundedHost(node, marker) : node
 
         const mountable =
           key != null && factory !== config.default && !Array.isArray(config.cases)
-            ? (factory as (key: K) => Mountable<Host>)(key)
-            : (factory as () => Mountable<Host>)()
+            ? (factory as (key: K) => Mountable<N>)(key)
+            : (factory as () => Mountable<N>)()
 
-        currentUnmount = mountable(targetHost)
+        currentUnmount = mountable(targetHost, hooks)
       }
 
       // Unwrap PropValue (function / ref / plain) via the active runtime.
       const unwrap = <T>(value: PropValue<T>): T => toValue(value)
 
-      // Watch value changes (automatically cleaned by com)
-      runtime.watch(
+      // Subscribe value changes (automatically cleaned by com)
+      runtime.subscribe(
         () => unwrap(config.value),
         (newKey) => {
           // If key hasn't changed, no need to do anything (key performance optimization)
@@ -159,9 +156,19 @@ export const match = com(
 
           // Mount new branch
           mountBranch(newKey)
-        },
-        { immediate: true }
+        }
       )
+
+      // immediate 语义：以当前值同步执行一次分支决策（与回调逻辑一致，
+      // currentKey 初始为 UNINITIALIZED，因此首次必然挂载）
+      {
+        const newKey = unwrap(config.value)
+        if ((currentKey as unknown) !== (newKey as unknown)) {
+          cleanup()
+          currentKey = newKey
+          mountBranch(newKey)
+        }
+      }
 
       return () => {
         cleanup()

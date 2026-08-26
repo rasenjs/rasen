@@ -71,7 +71,7 @@ export function KeyboardAvoidingView(props: KeyboardAvoidingViewProps): Mountabl
     }
     apply()
 
-    const stop = runtime.watch(() => runtime.unref(keyboardHeight), apply)
+    const stop = runtime.subscribe(() => runtime.unref(keyboardHeight), apply)
     cleanups.push(() => { stop(); styleCleanup?.() })
 
     // ── Keyboard listeners ─────────────────────────────────────────

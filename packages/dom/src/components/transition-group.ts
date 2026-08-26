@@ -1,4 +1,4 @@
-import { com, type Mountable, type PropValue } from '@rasenjs/core'
+import { com, type Mountable, type PropValue, type HostHooks } from '@rasenjs/core'
 import { watchProp, unref } from '../utils'
 
 export interface TransitionGroupConfig<T> {
@@ -27,13 +27,13 @@ interface SimpleRect {
 export const transitionGroup = com(<T extends object>(
   config: TransitionGroupConfig<T>
 ): Mountable<HTMLElement> => {
-  return (host: HTMLElement) => {
+  return (node: HTMLElement, hooks: HostHooks<HTMLElement> | undefined) => {
     const { items, children, name = 'v', tag = 'div' } = config
     const instances = new Map<unknown, ItemInstance>()
 
     const container = document.createElement(tag)
     container.style.position = 'relative'
-    host.appendChild(container)
+    node.appendChild(container)
 
     const endTransition = (element: HTMLElement, done: () => void) => {
       let finished = false
@@ -137,7 +137,7 @@ export const transitionGroup = com(<T extends object>(
           wrapper.style.display = 'contents'
           container.appendChild(wrapper)
           
-          const unmount = mountable(wrapper)
+          const unmount = mountable(wrapper, hooks)
           const el = wrapper.firstElementChild as HTMLElement || wrapper
           
           const instance: ItemInstance = { el, wrapper, unmount }

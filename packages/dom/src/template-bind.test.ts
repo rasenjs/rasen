@@ -10,6 +10,7 @@ import {
   template,
   child,
   bindClass,
+  bindClassToggle,
   bindText,
   bindStyle,
   bindProp,
@@ -19,6 +20,14 @@ import {
   configureEventDelegation,
 } from './template'
 import { createHydrationContext, setHydrationContext } from './hydration-context'
+
+/** Read the delegation handler bag off an element (symbol-keyed). */
+function handlerBag(el: Element): Record<string, unknown> | undefined {
+  const sym = Object.getOwnPropertySymbols(el).find(
+    (s) => s.description === 'rasen-events'
+  )
+  return sym ? (el as never as Record<symbol, Record<string, unknown>>)[sym] : undefined
+}
 
 let host: HTMLElement
 
@@ -77,6 +86,60 @@ describe('bindClass', () => {
     cls.value = 'b'
     await Promise.resolve()
     expect(el.className).toBe('a') // 已停止
+  })
+})
+
+describe('bindClassToggle', () => {
+  it('静态真值：一次性 toggle，不创建 watcher', () => {
+    const el = document.createElement('div')
+    const stop = bindClassToggle(el, true, 'on')
+
+    expect(el.classList.contains('on')).toBe(true)
+    expect(() => stop()).not.toThrow() // no-op
+  })
+
+  it('CSR：立即应用初始条件并响应翻转', async () => {
+    const sel = ref(false)
+    const el = document.createElement('div')
+    el.className = 'keep-me'
+    bindClassToggle(el, () => sel.value, 'danger')
+
+    expect(el.classList.contains('danger')).toBe(false)
+
+    sel.value = true
+    await Promise.resolve()
+    expect(el.classList.contains('danger')).toBe(true)
+    expect(el.className).toBe('keep-me danger') // 不破坏既有 class
+
+    sel.value = false
+    await Promise.resolve()
+    expect(el.classList.contains('danger')).toBe(false)
+  })
+
+  it('水合模式跳过首帧但保留后续更新', async () => {
+    setHydrationContext(createHydrationContext(host))
+    const sel = ref(true)
+    const el = document.createElement('div')
+    el.className = 'danger from-server'
+    // 服务端已渲染 danger；首帧不应移除它（即使条件为真，toggle(true) 也无害，
+    // 但水合契约要求完全跳过首帧写入）
+    bindClassToggle(el, () => sel.value, 'danger')
+    expect(el.className).toBe('danger from-server')
+
+    sel.value = false
+    await Promise.resolve()
+    expect(el.className).toBe('from-server')
+  })
+
+  it('返回的 stop 函数终止后续更新', async () => {
+    const sel = ref(false)
+    const el = document.createElement('div')
+    const stop = bindClassToggle(el, () => sel.value, 'x')
+
+    stop()
+    sel.value = true
+    await Promise.resolve()
+    expect(el.classList.contains('x')).toBe(false) // 已停止
   })
 })
 
@@ -265,7 +328,7 @@ describe('事件委托（P4 opt-in）', () => {
     const stop = on(btn, 'click', () => calls.push('hit'))
 
     // 未挂到 document 前直接 dispatch 不触发（监听器在 document 上）
-    expect(btn.getAttribute('data-rasen-eid')).not.toBeNull()
+    expect(handlerBag(btn)?.click).toBeDefined()
 
     // 通过冒泡触发（btn 在 host 内，host 在 document 中）
     btn.click()
@@ -304,7 +367,7 @@ describe('事件委托（P4 opt-in）', () => {
     const calls: number[] = []
     const stop = on(btn, 'click', () => calls.push(1))
 
-    expect(btn.getAttribute('data-rasen-eid')).toBeNull() // 无 eid 标记
+    expect(handlerBag(btn)?.click).toBeUndefined() // 无 handler bag
     btn.click()
     expect(calls).toEqual([1])
     stop()
@@ -318,7 +381,7 @@ describe('事件委托（P4 opt-in）', () => {
     const calls: number[] = []
     const stop = on(input, 'focus', () => calls.push(1))
 
-    expect(input.getAttribute('data-rasen-eid')).toBeNull() // 未打 eid
+    expect(handlerBag(input)?.focus).toBeUndefined() // 非委托类型不进 bag
     // focus 不冒泡，但直连监听器直接在元素上触发
     input.dispatchEvent(new FocusEvent('focus'))
     expect(calls).toEqual([1])

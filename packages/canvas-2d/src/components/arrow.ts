@@ -6,7 +6,8 @@ import {
   type LineStyleProps,
   type TransformProps,
   withDrawProps,
-  collectDrawPropsDependencies
+  collectDrawPropsDependencies,
+  pointerHandlersFrom,
 } from '../utils'
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
@@ -168,6 +169,8 @@ export const arrow: Component2D<ArrowProps> = (
         }
       )
     },
+
+    on: pointerHandlersFrom(props),
 
     deps: () => [
       unref(props.points),

@@ -5,7 +5,7 @@
  * so it always appears behind all other geometry.
  */
 
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component3D } from '../../../node'
 import type { MaybeRef, CommonDrawProps } from '../../../types'
 import { unref, createTexture } from '../../../utils'
 import { getRenderContext } from '../../../render-context'
@@ -13,7 +13,7 @@ import { element } from '../../element'
 
 export interface SkyboxProps extends CommonDrawProps {
   /** Panoramic sky texture (equirectangular). */
-  texture: MaybeRef<TexImageSource | HTMLImageElement | HTMLCanvasElement | undefined>
+  texture: MaybeRef<TexImageSource | undefined>
   /** Radius of the sky sphere. Default 500. */
   radius?: MaybeRef<number>
   /** Camera eye position — skybox renders centered on this point. */
@@ -91,10 +91,7 @@ function getSphereGeometry(radius: number) {
  * <skybox texture={skyTexture} radius={500} />
  * ```
  */
-export const skybox: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [SkyboxProps]
-> = (props: SkyboxProps) => {
+export const skybox: Component3D<SkyboxProps> = (props: SkyboxProps) => {
   return element({
     getBounds: () => null,
 

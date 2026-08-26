@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '../reactive'
+import { setReactiveRuntime, setValue, type ReactiveRuntime, type Ref, type ReadonlyRef } from '../reactive'
 import { each, repeat } from './each'
 import { when } from './when'
 
@@ -31,33 +31,28 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
       return r as unknown as Ref<T>
     },
 
-    computed: <T>(getter: () => T) => ({
-      get value() {
-        return getter()
-      }
-    } as unknown as ReadonlyRef<T>),
-
-    watch: <T>(
+    subscribe: <T>(
       source: () => T,
-      callback: (value: T, oldValue: T) => void,
-      options?: { immediate?: boolean }
+      callback: (value: T, oldValue: T) => void
     ) => {
-      const sourceFn = typeof source === 'function' ? source : () => source
       const watcher = {
-        source: sourceFn as () => unknown,
+        source: source as () => unknown,
         callback: callback as (value: unknown, oldValue: unknown) => void
       }
       watchers.push(watcher)
-
-      if (options?.immediate) {
-        callback(sourceFn(), undefined as T)
-      }
 
       return () => {
         const index = watchers.indexOf(watcher)
         if (index > -1) watchers.splice(index, 1)
       }
     },
+
+    computed: <T>(getter: () => T) =>
+      ({
+        get value() {
+          return getter()
+        }
+      } as unknown as ReadonlyRef<T>),
 
     effectScope: () => ({
       run: <T>(fn: () => T) => fn(),
@@ -120,7 +115,7 @@ describe('each', () => {
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
       expect(mounted).toEqual([1, 2, 3])
     })
 
@@ -135,7 +130,7 @@ describe('each', () => {
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
       expect(indices).toEqual([0, 1])
     })
 
@@ -150,7 +145,7 @@ describe('each', () => {
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
       expect(mounted).toEqual([])
     })
   })
@@ -167,7 +162,7 @@ describe('each', () => {
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
       expect(mounted).toEqual([1, 2])
     })
 
@@ -184,7 +179,7 @@ describe('each', () => {
           })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
       expect(mounted).toEqual([1])
     })
   })
@@ -202,7 +197,7 @@ describe('each', () => {
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
       expect(mounted).toEqual([1])
 
       items.push({ id: 2 })
@@ -222,7 +217,7 @@ describe('each', () => {
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
       expect(unmounted).toEqual([])
 
       items.splice(1, 1)
@@ -244,7 +239,7 @@ describe('each', () => {
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
       expect(mounted).toEqual([1])
 
       items[0] = { id: 2 }
@@ -267,21 +262,21 @@ describe('each', () => {
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
       expect(mounted).toEqual([1, 2])
 
       // 尾部一次追加多项（含中间项被移除的场景也走相同路径）
       const c = { id: 3 }
       const d = { id: 4 }
       const e = { id: 5 }
-      items.value = [a, b, c, d, e]
+      setValue(items, [a, b, c, d, e])
       runtime.triggerWatchers()
 
       expect(mounted).toEqual([1, 2, 3, 4, 5])
 
       // 中间移除 + 尾部追加混合
       const f = { id: 6 }
-      items.value = [a, c, e, f]
+      setValue(items, [a, c, e, f])
       runtime.triggerWatchers()
 
       expect(mounted).toEqual([1, 2, 3, 4, 5, 6])
@@ -299,7 +294,7 @@ describe('each', () => {
         })
       )
 
-      const cleanup = eachMountable({})
+      const cleanup = eachMountable({}, undefined)
       expect(unmounted).toEqual([])
 
       cleanup?.()
@@ -332,7 +327,7 @@ describe('each + when 嵌套', () => {
       })
     )
 
-    eachMountable({})
+    eachMountable({}, undefined)
     expect(unmounted).toEqual([])
 
     items[1].visible = false
@@ -354,7 +349,7 @@ describe('each + when 嵌套', () => {
       })
     )
 
-    const cleanup = eachMountable({})
+    const cleanup = eachMountable({}, undefined)
     expect(unmounted).toEqual([])
 
     cleanup?.()
@@ -380,7 +375,7 @@ describe('each + when 嵌套', () => {
     )
 
     const host = {}
-    eachMountable(host)
+    eachMountable(host, undefined)
 
     expect(detailMounted).toEqual([])
     expect(detailUnmounted).toEqual([])
@@ -410,7 +405,7 @@ describe('each + when 嵌套', () => {
       })
     )
 
-    eachMountable({})
+    eachMountable({}, undefined)
 
     items[0].showDetail = true
     runtime.triggerWatchers()
@@ -448,7 +443,7 @@ describe('each + when 嵌套', () => {
       })
     )
 
-    eachMountable({})
+    eachMountable({}, undefined)
 
     expect(mounted).toEqual([])
     expect(unmounted).toEqual([])
@@ -495,8 +490,8 @@ describe('each + when 嵌套', () => {
       })
 
       return (host: unknown) => {
-        const unmountA = whenA(host)
-        const unmountB = whenB(host)
+        const unmountA = whenA(host, undefined)
+        const unmountB = whenB(host, undefined)
         return () => {
           unmountA?.()
           unmountB?.()
@@ -504,7 +499,7 @@ describe('each + when 嵌套', () => {
       }
     })
 
-    eachMountable({})
+    eachMountable({}, undefined)
 
     expect(mountedA).toEqual([])
     expect(mountedB).toEqual([])
@@ -554,8 +549,8 @@ describe('each + when 嵌套', () => {
       })
 
       return (host: unknown) => {
-        const unmountA = whenA(host)
-        const unmountB = whenB(host)
+        const unmountA = whenA(host, undefined)
+        const unmountB = whenB(host, undefined)
         return () => {
           unmountA?.()
           unmountB?.()
@@ -563,7 +558,7 @@ describe('each + when 嵌套', () => {
       }
     })
 
-    eachMountable({})
+    eachMountable({}, undefined)
 
     items[0].showA = true
     items[1].showA = true
@@ -600,7 +595,7 @@ describe('repeat', () => {
         })
       )
 
-      repeatMountable({})
+      repeatMountable({}, undefined)
       expect(mounted).toEqual([0, 1, 2])
     })
 
@@ -616,7 +611,7 @@ describe('repeat', () => {
           })
       )
 
-      repeatMountable({})
+      repeatMountable({}, undefined)
       expect(mounted).toEqual([0, 1])
     })
 
@@ -631,7 +626,7 @@ describe('repeat', () => {
         })
       )
 
-      repeatMountable({})
+      repeatMountable({}, undefined)
       expect(mounted).toEqual([])
     })
   })
@@ -648,7 +643,7 @@ describe('repeat', () => {
         })
       )
 
-      repeatMountable({})
+      repeatMountable({}, undefined)
       expect(mounted).toEqual(['a', 'b', 'c'])
     })
 
@@ -665,7 +660,7 @@ describe('repeat', () => {
           })
       )
 
-      repeatMountable({})
+      repeatMountable({}, undefined)
       expect(mounted).toEqual(['x', 'y'])
     })
   })
@@ -681,7 +676,7 @@ describe('repeat', () => {
         })
       )
 
-      const cleanup = repeatMountable({})
+      const cleanup = repeatMountable({}, undefined)
       expect(unmounted).toEqual([])
 
       cleanup?.()

@@ -7,6 +7,8 @@
 
 import type { Context2D } from './node'
 import type { CanvasNode } from './node'
+import type { CanvasSurface } from './node'
+import type { CanvasEventHandlers } from './events'
 
 export interface Bounds {
   x: number
@@ -22,6 +24,13 @@ export interface RenderContextOptions {
    */
   schedule?: (cb: () => void) => unknown
   cancel?: (handle: unknown) => void
+  /**
+   * Device pixel ratio of the backing store (default 1). When >1, every
+   * frame starts from a scaled base transform so drawing code keeps using
+   * CSS pixel coordinates while rasterizing at device resolution. The HOST
+   * owns sizing the backing store: canvas.width = cssWidth * resolution.
+   */
+  resolution?: number
 }
 
 const contextMap = new WeakMap<Context2D, RenderContext>()
@@ -43,12 +52,22 @@ export class RenderContext {
   private roots: CanvasNode[] = []
   private rafId: number | null = null
   private options: RenderContextOptions
+  private readonly resolution: number
+  private eventListenersAttached = false
+
+  private static readonly EVENT_TYPES = [
+    'click',
+    'pointerdown',
+    'pointerup',
+    'pointermove'
+  ] as const
 
   constructor(
     private ctx: Context2D,
     options: RenderContextOptions = {}
   ) {
     this.options = options
+    this.resolution = options.resolution ?? 1
     contextMap.set(ctx, this)
   }
 
@@ -103,12 +122,124 @@ export class RenderContext {
   /** 清屏 + 前序遍历渲染根 */
   draw() {
     const canvas = this.ctx.canvas
-    this.ctx.clearRect(0, 0, canvas.width, canvas.height)
+    const res = this.resolution
+    // Base device-pixel transform; all drawing keeps CSS-pixel coordinates.
+    // Per-shape/group transforms compose relatively (save/translate/restore),
+    // so this base survives them.
+    if (res !== 1) {
+      this.ctx.setTransform(res, 0, 0, res, 0, 0)
+    }
+    this.ctx.clearRect(0, 0, canvas.width / res, canvas.height / res)
 
     for (const root of this.roots) {
       root.draw(this.ctx)
     }
 
+  }
+
+  /**
+   * Topmost node whose shape contains the point (canvas CSS coordinates),
+   * or null.
+   *
+   * Traversal is reverse draw order so the visually topmost shape wins.
+   * Nodes with an exact `hit` closure use it; everything else falls back to
+   * its bounds AABB. v1 contract: geometric tests assume untransformed
+   * scenes — group/per-shape transforms are not inverted (component bounds
+   * are already computed in world coordinates).
+   */
+  hitTest(x: number, y: number): CanvasNode | null {
+    for (let i = this.roots.length - 1; i >= 0; i--) {
+      const found = this.hitTestNode(this.roots[i], x, y)
+      if (found) return found
+    }
+    return null
+  }
+
+  private hitTestNode(node: CanvasNode, x: number, y: number): CanvasNode | null {
+    // Children paint after their parent → walk them topmost-first.
+    for (let i = node.children.length - 1; i >= 0; i--) {
+      const found = this.hitTestNode(node.children[i], x, y)
+      if (found) return found
+    }
+
+    // Exact test is authoritative AND cheapest when present — computing
+    // bounds first (full effect bounds incl. trig) would cost more than the
+    // arithmetic hit itself, so only fall back to the AABB when no hit
+    // closure exists.
+    if (node.hit) return node.hit(x, y) ? node : null
+
+    const bounds = node.bounds?.() ?? null
+    if (!bounds) return null
+    if (
+      x < bounds.x ||
+      x > bounds.x + bounds.width ||
+      y < bounds.y ||
+      y > bounds.y + bounds.height
+    ) {
+      return null
+    }
+    return node
+  }
+
+  /**
+   * Attach delegated listeners on the canvas surface. Called lazily by
+   * createNode when the first node registers pointer handlers; a no-op on
+   * hosts whose surface has no event support (tests, SSR).
+   */
+  ensureEventListeners(): void {
+    if (this.eventListenersAttached) return
+    const surface = this.ctx.canvas as CanvasSurface & {
+      addEventListener?: (type: string, h: (e: unknown) => void) => void
+    }
+    if (typeof surface.addEventListener !== 'function') return
+    for (const type of RenderContext.EVENT_TYPES) {
+      surface.addEventListener(type, (native) =>
+        this.dispatch(type, native)
+      )
+    }
+    this.eventListenersAttached = true
+  }
+
+  /**
+   * Hit-test the point and bubble the event from the target up the ancestor
+   * chain, firing the first handler found for this type.
+   */
+  private dispatch(type: keyof CanvasEventHandlers, native: unknown): void {
+    const pt = this.eventPoint(native)
+    if (!pt) return
+    const target = this.hitTest(pt.x, pt.y)
+    if (!target) return
+    let node: CanvasNode | null = target
+    while (node) {
+      const handler = node.on?.[type]
+      if (handler) {
+        handler({ x: pt.x, y: pt.y, node: target, nativeEvent: native })
+        return
+      }
+      node = node.parent
+    }
+  }
+
+  /** Canvas-local CSS coordinates from a host event. */
+  private eventPoint(native: unknown): { x: number; y: number } | null {
+    const e = native as { offsetX?: unknown; offsetY?: unknown }
+    if (typeof e.offsetX === 'number' && typeof e.offsetY === 'number') {
+      return { x: e.offsetX, y: e.offsetY }
+    }
+    // Fallback: clientX/Y minus the canvas rect (DOM hosts without offsetX).
+    const ce = native as { clientX?: unknown; clientY?: unknown }
+    const surface = this.ctx.canvas as CanvasSurface & {
+      getBoundingClientRect?: () => { left: number; top: number }
+    }
+    if (
+      typeof ce.clientX === 'number' &&
+      typeof ce.clientY === 'number' &&
+      typeof surface.getBoundingClientRect === 'function'
+    ) {
+      const r = surface.getBoundingClientRect()
+      return { x: ce.clientX - r.left, y: ce.clientY - r.top }
+    }
+    return null
   }
 
   /**

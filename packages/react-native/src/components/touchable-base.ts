@@ -81,7 +81,7 @@ export function createTouchable(
     apply()
 
     // Re-apply when pressed changes (function styles / feedback).
-    const stop = runtime.watch(
+    const stop = runtime.subscribe(
       () => {
         resolveStyle(props.style, { pressed: runtime.unref(pressed) })
         return runtime.unref(pressed)

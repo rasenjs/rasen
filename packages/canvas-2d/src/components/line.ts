@@ -5,7 +5,8 @@ import {
   type CommonDrawProps,
   type LineStyleProps,
   withDrawProps,
-  collectDrawPropsDependencies
+  collectDrawPropsDependencies,
+  pointerHandlersFrom,
 } from '../utils'
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
@@ -129,6 +130,8 @@ export const line: Component2D<LineProps> = (
         ctx.stroke()
       })
     },
+
+    on: pointerHandlersFrom(props),
 
     deps: () => [
       props.x1 !== undefined ? unref(props.x1) : undefined,

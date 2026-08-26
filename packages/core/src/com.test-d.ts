@@ -35,11 +35,13 @@ type Equal<X, Y> =
   const wrapped = com(NoArgsComponent)
 
   // 类型应该保持一致
-  type _Test1 = Expect<Equal<typeof wrapped, typeof NoArgsComponent>>
+  const _Test1: Expect<Equal<typeof wrapped, typeof NoArgsComponent>> = true
+  void _Test1
 
   // 调用方式应该一样
   const mountable = wrapped()
   const _unmount = mountable(document.body)
+  void _unmount
 }
 
 // 2. 单个 props 参数
@@ -52,10 +54,12 @@ type Equal<X, Y> =
 
   const wrapped = com(PropsComponent)
 
-  type _Test2 = Expect<Equal<typeof wrapped, typeof PropsComponent>>
+  const _Test2: Expect<Equal<typeof wrapped, typeof PropsComponent>> = true
+  void _Test2
 
   const mountable = wrapped({ count: 1, label: 'test' })
   const _unmount = mountable(document.body)
+  void _unmount
 }
 
 // 3. 多个参数
@@ -72,10 +76,13 @@ type Equal<X, Y> =
 
   const wrapped = com(MultiArgsComponent)
 
-  type _Test3 = Expect<Equal<typeof wrapped, typeof MultiArgsComponent>>
+  const _Test3: Expect<Equal<typeof wrapped, typeof MultiArgsComponent>> = true
+  void _Test3
 
   const _mountable = wrapped('test', 18)
   const _mountable2 = wrapped('test', 18, { debug: true })
+  void _mountable
+  void _mountable2
 }
 
 // 4. 异步组件
@@ -89,12 +96,14 @@ type Equal<X, Y> =
 
   const wrapped = com(AsyncComp)
 
-  type _Test4 = Expect<Equal<typeof wrapped, typeof AsyncComp>>
+  const _Test4: Expect<Equal<typeof wrapped, typeof AsyncComp>> = true
+  void _Test4
 
   const mountablePromise = wrapped({ url: 'test' })
   // mountablePromise 应该是 Promise
   mountablePromise.then((mountable) => {
     const _unmount = mountable(document.body)
+    void _unmount
   })
 }
 
@@ -113,9 +122,10 @@ type Equal<X, Y> =
 
   // 泛型应该保留
   const _mountable = wrapped([{ id: 1 }], (_item) => (_host) => () => {})
+  void _mountable
 }
 
-// 6. 不同 Host 类型
+// 6. 不同 N 类型
 {
   const CanvasComponent = (_props: { x: number }) => {
     return (_ctx: CanvasRenderingContext2D) => {
@@ -125,7 +135,8 @@ type Equal<X, Y> =
 
   const wrapped = com(CanvasComponent)
 
-  type _Test6 = Expect<Equal<typeof wrapped, typeof CanvasComponent>>
+  const _Test6: Expect<Equal<typeof wrapped, typeof CanvasComponent>> = true
+  void _Test6
 }
 
 // 7. 返回带 node 属性的 unmount
@@ -141,7 +152,8 @@ type Equal<X, Y> =
 
   const wrapped = com(WithNodeComponent)
 
-  type _Test7 = Expect<Equal<typeof wrapped, typeof WithNodeComponent>>
+  const _Test7: Expect<Equal<typeof wrapped, typeof WithNodeComponent>> = true
+  void _Test7
 }
 
 console.log('类型测试通过！')

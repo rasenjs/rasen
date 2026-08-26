@@ -4,6 +4,7 @@
  */
 
 import type { Color } from '../types'
+import type { Gl2Context } from '../node'
 import { ShaderProgram, INSTANCED_VERTEX_SHADER, INSTANCED_FRAGMENT_SHADER } from './shader'
 import { Mat4x4f, mat4x4f } from '@rasenjs/math'
 
@@ -35,7 +36,7 @@ export class InstancedRenderer {
   private colorLoc: number = -1
 
   constructor(
-    private gl: WebGL2RenderingContext,
+    private gl: Gl2Context,
     projectionMatrix: Mat4x4f | number[]
   ) {
     this.shader = new ShaderProgram(gl)
@@ -127,28 +128,28 @@ export class InstancedRenderer {
     gl.bufferData(gl.ARRAY_BUFFER, translations, gl.DYNAMIC_DRAW)
     gl.enableVertexAttribArray(this.translationLoc)
     gl.vertexAttribPointer(this.translationLoc, 3, gl.FLOAT, false, 0, 0)
-    gl.vertexAttribDivisor(this.translationLoc, 1)
+    gl.vertexAttribDivisor!(this.translationLoc, 1)
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.rotationBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, rotations, gl.DYNAMIC_DRAW)
     gl.enableVertexAttribArray(this.rotationLoc)
     gl.vertexAttribPointer(this.rotationLoc, 3, gl.FLOAT, false, 0, 0)
-    gl.vertexAttribDivisor(this.rotationLoc, 1)
+    gl.vertexAttribDivisor!(this.rotationLoc, 1)
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.scaleBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, scales, gl.DYNAMIC_DRAW)
     gl.enableVertexAttribArray(this.scaleLoc)
     gl.vertexAttribPointer(this.scaleLoc, 3, gl.FLOAT, false, 0, 0)
-    gl.vertexAttribDivisor(this.scaleLoc, 1)
+    gl.vertexAttribDivisor!(this.scaleLoc, 1)
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, colors, gl.DYNAMIC_DRAW)
     gl.enableVertexAttribArray(this.colorLoc)
     gl.vertexAttribPointer(this.colorLoc, 4, gl.FLOAT, false, 0, 0)
-    gl.vertexAttribDivisor(this.colorLoc, 1)
+    gl.vertexAttribDivisor!(this.colorLoc, 1)
 
-    const vertexCount = gl.getBufferParameter(gl.ARRAY_BUFFER, gl.BUFFER_SIZE) / 12
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, vertexCount, count)
+    const vertexCount = (gl.getBufferParameter(gl.ARRAY_BUFFER, gl.BUFFER_SIZE) as number) / 12
+    gl.drawArraysInstanced!(gl.TRIANGLES, 0, vertexCount, count)
 
     this.instances = []
   }

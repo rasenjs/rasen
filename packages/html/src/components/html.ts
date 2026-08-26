@@ -21,10 +21,10 @@ export const html = (props: {
   /** 原始 HTML 内容 */
   content: PropValue<string>
 }): Mountable<StringHost> => {
-  return (host: StringHost) => {
+  return (node: StringHost) => {
     const content = toValue(props.content) || ''
     // 直接输出 HTML 内容，不添加包裹元素
-    host.append(content)
+    node.append(content)
 
     // SSR 不需要 unmount
     return undefined

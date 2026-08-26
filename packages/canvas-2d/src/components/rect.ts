@@ -7,7 +7,8 @@ import {
   type TransformProps,
   withDrawProps,
   collectDrawPropsDependencies,
-  calculateFullBounds
+  calculateFullBounds,
+  pointerHandlersFrom,
 } from '../utils'
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
@@ -173,6 +174,16 @@ export const rect: Component2D<RectProps> = (
         }
       )
     },
+
+    hit: (px: number, py: number) => {
+      const x = unref(props.x) as number
+      const y = unref(props.y) as number
+      const width = unref(props.width) as number
+      const height = unref(props.height) as number
+      return px >= x && px <= x + width && py >= y && py <= y + height
+    },
+
+    on: pointerHandlersFrom(props),
 
     deps: () => [
       unref(props.x),

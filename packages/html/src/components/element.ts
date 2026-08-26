@@ -1,4 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
+import type { SSRNode } from '../host-hooks'
 import { toValue } from '@rasenjs/core'
 import type { StringHost } from '../types'
 import {
@@ -20,11 +21,11 @@ export const element = (props: {
   style?: PropValue<Record<string, string | number>>
   attrs?: PropValue<Record<string, string | number | boolean>>
   /** Text content or child mount functions (including reactive text functions) */
-  children?: PropValue<string> | Array<string | (() => string | number) | Mountable<StringHost>>
+  children?: PropValue<string> | Array<string | (() => string | number) | Mountable<SSRNode>>
   value?: PropValue<string | number>
   // SSR does not need events - removed for consistency
 }): Mountable<StringHost> => {
-  return (host: StringHost) => {
+  return (node: StringHost) => {
     const tag = props.tag
     const isVoid = isVoidElement(tag)
 
@@ -85,7 +86,7 @@ export const element = (props: {
 
     // 自闭合标签不需要内容和结束标签
     if (isVoid) {
-      host.append(html)
+      node.append(html)
       return undefined
     }
 
@@ -133,7 +134,7 @@ export const element = (props: {
     // 结束标签
     html += `</${tag}>`
 
-    host.append(html)
+    node.append(html)
 
     // SSR 不需要 unmount
     return undefined

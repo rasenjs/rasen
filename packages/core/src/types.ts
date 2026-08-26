@@ -9,10 +9,11 @@
  */
 
 import type { Ref, ReadonlyRef } from './reactive'
+import type { HostHooks } from './host-context'
 
 // Re-export for convenience
 export type { Ref, ReadonlyRef }
-export type { HostContext, HostHooks, TextHandle } from './host-context'
+export type { HostHooks, TextHandle } from './host-context'
 
 /**
  * Unmount 函数类型
@@ -20,14 +21,15 @@ export type { HostContext, HostHooks, TextHandle } from './host-context'
  */
 export type Unmount<Node = unknown> = (() => void) & { node?: Node }
 
+
 /**
  * Mountable - 可挂载函数
  *
  * 接收 parent（宿主），执行挂载逻辑，返回 unmount 函数
  * 组件、each、when、show 等返回的都是 Mountable
  *
- * 宿主上下文（HostContext）不暴露为参数——由 com 内部托管，
- * 结构性组件（each/when）通过 useHostContext() 获取，用户零感知。
+ * 宿主能力集（HostHooks）由父级显式传递给 mount 回调——hooks 就是上下文，
+ * 无全局栈、无隐式注入。
  *
  * @example
  * ```typescript
@@ -51,32 +53,35 @@ export type Unmount<Node = unknown> = (() => void) & { node?: Node }
  * const unmount = Counter({ initial: 0 })(document.body)
  * ```
  */
-export type Mountable<Host = unknown, Node = unknown> = (
-  host: Host
+export type Mountable<Node = unknown> = (
+  /** 插入目标：真实宿主，或父级提供的暂存区（batch fragment 等）。 */
+  node: Node,
+  /** 宿主能力集——就是上下文本身，显式传递，无全局栈。 */
+  hooks: HostHooks<Node> | undefined
 ) => Unmount<Node> | undefined
 
 /**
  * 组件函数（同步 setup）
  * 接收任意参数，返回 Mountable
  */
-export type SyncComponent<Host = unknown, Args extends unknown[] = []> = (
+export type SyncComponent<Args extends unknown[] = []> = (
   ...args: Args
-) => Mountable<Host>
+) => Mountable
 
 /**
  * 异步组件函数（异步 setup）
  * 接收任意参数，返回 Promise<Mountable>
  */
-export type AsyncComponent<Host = unknown, Args extends unknown[] = []> = (
+export type AsyncComponent<Args extends unknown[] = []> = (
   ...args: Args
-) => Promise<Mountable<Host>>
+) => Promise<Mountable>
 
 /**
  * 组件函数（支持同步或异步 setup）
  */
-export type Component<Host = unknown, Args extends unknown[] = []> =
-  | SyncComponent<Host, Args>
-  | AsyncComponent<Host, Args>
+export type Component<Args extends unknown[] = []> =
+  | SyncComponent<Args>
+  | AsyncComponent<Args>
 
 /**
  * Getter 函数类型

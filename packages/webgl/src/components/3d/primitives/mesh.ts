@@ -7,7 +7,7 @@
  * and an optional texture. Reactive like every other shape.
  */
 
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component3D } from '../../../node'
 import type { MaybeRef, CommonDrawProps, TransformProps } from '../../../types'
 import { unref, createTexture } from '../../../utils'
 import { getRenderContext } from '../../../render-context'
@@ -37,10 +37,7 @@ export interface MeshProps extends CommonDrawProps, TransformProps {
  * <mesh geometry={marioGeo} texture={colormap} x={0} y={0} z={0} scale={32} rotationY={Math.PI} />
  * ```
  */
-export const mesh: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [MeshProps]
-> = (props: MeshProps) => {
+export const mesh: Component3D<MeshProps> = (props: MeshProps) => {
   return element({
     getBounds: () => null, // 3D — full redraw
 

@@ -34,20 +34,15 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
       }
     } as unknown as ReadonlyRef<T>),
 
-    watch: <T>(
+    subscribe: <T>(
       source: () => T,
-      callback: (value: T, oldValue: T) => void,
-      options?: { immediate?: boolean }
+      callback: (value: T, oldValue: T) => void
     ) => {
       const watcher = {
         source: source as () => unknown,
         callback: callback as (value: unknown, oldValue: unknown) => void
       }
       watchers.push(watcher)
-
-      if (options?.immediate) {
-        callback(source(), undefined as T)
-      }
 
       return () => {
         const index = watchers.indexOf(watcher)
@@ -117,7 +112,7 @@ describe('when', () => {
         })
       })
 
-      result({})
+      result({}, undefined)
 
       expect(thenMounted).toHaveBeenCalled()
       expect(elseMounted).not.toHaveBeenCalled()
@@ -139,7 +134,7 @@ describe('when', () => {
         })
       })
 
-      result({})
+      result({}, undefined)
 
       expect(thenMounted).not.toHaveBeenCalled()
       expect(elseMounted).toHaveBeenCalled()
@@ -156,7 +151,7 @@ describe('when', () => {
         })
       })
 
-      result({})
+      result({}, undefined)
 
       expect(thenMounted).not.toHaveBeenCalled()
     })
@@ -175,7 +170,7 @@ describe('when', () => {
         })
       })
 
-      result({})
+      result({}, undefined)
 
       expect(thenMounted).toHaveBeenCalled()
     })
@@ -193,7 +188,7 @@ describe('when', () => {
         })
       })
 
-      result({})
+      result({}, undefined)
 
       expect(thenMounted).toHaveBeenCalled()
     })
@@ -215,7 +210,7 @@ describe('when', () => {
         })
       })
 
-      result({})
+      result({}, undefined)
 
       expect(thenMounted).not.toHaveBeenCalled()
       expect(elseMounted).toHaveBeenCalled()
@@ -245,7 +240,7 @@ describe('when', () => {
         })
       })
 
-      result({})
+      result({}, undefined)
 
       expect(thenMounted).toHaveBeenCalled()
 
@@ -273,7 +268,7 @@ describe('when', () => {
         })
       })
 
-      const unmount = result({})
+      const unmount = result({}, undefined)
       expect(childUnmounted).not.toHaveBeenCalled()
 
       unmount?.()
@@ -288,7 +283,7 @@ describe('when', () => {
         })
       })
 
-      const unmount = result({})
+      const unmount = result({}, undefined)
       expect(() => unmount?.()).not.toThrow()
     })
 
@@ -308,7 +303,7 @@ describe('when', () => {
         })
       })
 
-      result({})
+      result({}, undefined)
       expect(thenUnmounted).not.toHaveBeenCalled()
       expect(elseUnmounted).not.toHaveBeenCalled()
 
@@ -335,7 +330,7 @@ describe('when', () => {
         })
       })
 
-      result({})
+      result({}, undefined)
       expect(elseUnmounted).not.toHaveBeenCalled()
 
       setValue(condition, true)
@@ -359,7 +354,7 @@ describe('when', () => {
         })
       })
 
-      result(testHost)
+      result(testHost, undefined)
 
       // when 可能会创建代理 host，所以我们只检查是否收到了 host
       expect(receivedHost.length).toBe(1)

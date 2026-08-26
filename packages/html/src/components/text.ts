@@ -25,17 +25,17 @@ export interface TextProps {
  * text({ content: () => count.value })
  * ```
  */
-export function text(props: TextProps): Mountable<StringHost> {
+export function text(props: TextProps): Mountable<SSRNode> {
   const { content } = props
 
-  return (host: StringHost) => {
+  return (node: StringHost) => {
     // Resolve content
     const textContent = typeof content === 'function' 
       ? String(content())
       : String(content)
     
     // Append escaped text
-    host.append(escapeHtml(textContent))
+    node.append(escapeHtml(textContent))
     
     return undefined
   }

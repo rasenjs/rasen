@@ -1,0 +1,46 @@
+{
+  "name": "@rasenjs/reactive-alien-signals",
+  "version": "0.1.0-alpha",
+  "description": "alien-signals adapter for Rasen",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "../../node_modules/.bin/vitest run"
+  },
+  "keywords": [
+    "rasen",
+    "signals",
+    "reactive",
+    "adapter",
+    "alien-signals"
+  ],
+  "author": "Rasen Team",
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:^",
+    "alien-signals": "^3.2.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

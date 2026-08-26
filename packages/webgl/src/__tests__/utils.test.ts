@@ -1,7 +1,8 @@
 /**
  * Utils tests
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
+import { ref } from '@vue/reactivity'
 import { 
   parseColor, 
   createIdentityMatrix, 
@@ -11,8 +12,14 @@ import {
   createOrthoMatrix,
   unref
 } from '../utils'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
 describe('@rasenjs/webgl utils', () => {
+  // unref 依赖全局响应式运行时（isRef 判定），测试文件隔离后需自行安装
+  beforeAll(() => {
+    useReactiveRuntime()
+  })
+
   describe('unref', () => {
     it('should return plain value as-is', () => {
       expect(unref(42)).toBe(42)
@@ -21,8 +28,12 @@ describe('@rasenjs/webgl utils', () => {
     })
 
     it('should unwrap ref object', () => {
-      const ref = { value: 42 }
-      expect(unref(ref)).toBe(42)
+      const r = ref(42)
+      expect(unref(r)).toBe(42)
+    })
+
+    it('should return plain objects as-is (Vue unref semantics)', () => {
+      expect(unref({ value: 42 })).toEqual({ value: 42 })
     })
   })
 

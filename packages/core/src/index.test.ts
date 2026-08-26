@@ -13,7 +13,6 @@ import {
   repeat,
   when,
   type ReactiveRuntime,
-  type MountFunction,
   type Ref,
   type ReadonlyRef
 } from './index'
@@ -52,23 +51,15 @@ function createMockReactiveRuntime(): ReactiveRuntime {
       return c as unknown as ReadonlyRef<T>
     },
 
-    watch: <T>(
+    subscribe: <T>(
       source: () => T,
-      callback: (value: T, oldValue: T) => void,
-      options?: { immediate?: boolean; deep?: boolean }
+      callback: (value: T, oldValue: T) => void
     ) => {
       const watcher = {
         source: source as () => unknown,
-        callback: callback as (value: unknown, oldValue: unknown) => void,
-        options
+        callback: callback as (value: unknown, oldValue: unknown) => void
       }
       watchers.push(watcher)
-
-      // 初始调用
-      if (options?.immediate) {
-        const value = source()
-        callback(value, undefined as T)
-      }
 
       return () => {
         const index = watchers.indexOf(watcher)
@@ -181,7 +172,7 @@ describe('@rasenjs/core', () => {
       })
 
       const frag = fragment({ children: [child1, child2] })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
 
       expect(mountCalls).toEqual(['child1', 'child2'])
       expect(unmountCalls).toEqual([])
@@ -192,7 +183,7 @@ describe('@rasenjs/core', () => {
 
     it('应该支持空子组件列表', () => {
       const frag = fragment({ children: [] })
-      const cleanup = frag({})
+      const cleanup = frag({}, undefined)
       expect(cleanup).toBeDefined()
       cleanup?.()
     })
@@ -200,14 +191,14 @@ describe('@rasenjs/core', () => {
     it('应该传递正确的 host 给子组件', () => {
       const receivedHosts: unknown[] = []
 
-      const child = ((host: { id: string }) => {
+      const child = (host: unknown, _hooks?: unknown) => {
         receivedHosts.push(host)
         return () => {}
-      })
+      }
 
       const testHost = { id: 'test-host' }
       const frag = fragment({ children: [child, child] })
-      frag(testHost)
+      frag(testHost, undefined)
 
       expect(receivedHosts).toEqual([testHost, testHost])
     })
@@ -234,7 +225,7 @@ describe('@rasenjs/core', () => {
         })
       })
 
-      whenMountable({})
+      whenMountable({}, undefined)
 
       expect(thenMounted).toHaveBeenCalled()
       expect(elseMounted).not.toHaveBeenCalled()
@@ -256,7 +247,7 @@ describe('@rasenjs/core', () => {
         })
       })
 
-      whenMountable({})
+      whenMountable({}, undefined)
 
       expect(thenMounted).not.toHaveBeenCalled()
       expect(elseMounted).toHaveBeenCalled()
@@ -273,7 +264,7 @@ describe('@rasenjs/core', () => {
         })
       })
 
-      whenMountable({})
+      whenMountable({}, undefined)
 
       expect(thenMounted).not.toHaveBeenCalled()
     })
@@ -290,7 +281,7 @@ describe('@rasenjs/core', () => {
         })
       })
 
-      whenMountable({})
+      whenMountable({}, undefined)
 
       expect(thenMounted).toHaveBeenCalled()
     })
@@ -305,7 +296,7 @@ describe('@rasenjs/core', () => {
         })
       })
 
-      const unmount = whenMountable({})
+      const unmount = whenMountable({}, undefined)
       expect(childUnmounted).not.toHaveBeenCalled()
 
       unmount?.()
@@ -323,13 +314,13 @@ describe('@rasenjs/core', () => {
       const mountedItems: number[] = []
 
       const eachMountable = each(items, (item) =>
-        (() => {
+        ((_host: unknown, _hooks?: unknown) => {
           mountedItems.push(item.id)
           return () => {}
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
 
       expect(mountedItems).toEqual([1, 2, 3])
     })
@@ -339,13 +330,13 @@ describe('@rasenjs/core', () => {
       const mountedItems: number[] = []
 
       const eachMountable = each(items, (item) =>
-        (() => {
+        ((_host: unknown, _hooks?: unknown) => {
           mountedItems.push(item.id)
           return () => {}
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
 
       expect(mountedItems).toEqual([1, 2])
     })
@@ -363,7 +354,7 @@ describe('@rasenjs/core', () => {
           })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
 
       expect(mountedItems).toEqual([1, 2])
     })
@@ -379,7 +370,7 @@ describe('@rasenjs/core', () => {
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
 
       expect(receivedIndices).toEqual([0, 1, 2])
     })
@@ -394,7 +385,7 @@ describe('@rasenjs/core', () => {
         })
       )
 
-      const cleanup = eachMountable({})
+      const cleanup = eachMountable({}, undefined)
       expect(unmountedItems).toEqual([])
 
       cleanup?.()
@@ -406,13 +397,13 @@ describe('@rasenjs/core', () => {
       const mountedItems: number[] = []
 
       const eachMountable = each(items, (item) =>
-        (() => {
+        ((_host: unknown, _hooks?: unknown) => {
           mountedItems.push(item.id)
           return () => {}
         })
       )
 
-      eachMountable({})
+      eachMountable({}, undefined)
 
       expect(mountedItems).toEqual([])
     })
@@ -434,7 +425,7 @@ describe('@rasenjs/core', () => {
         })
       )
 
-      repeatMountable({})
+      repeatMountable({}, undefined)
 
       expect(mountedIndices).toEqual([0, 1, 2])
     })
@@ -450,7 +441,7 @@ describe('@rasenjs/core', () => {
         })
       )
 
-      repeatMountable({})
+      repeatMountable({}, undefined)
 
       expect(mountedItems).toEqual(['a', 'b', 'c'])
     })
@@ -467,7 +458,7 @@ describe('@rasenjs/core', () => {
           })
       )
 
-      repeatMountable({})
+      repeatMountable({}, undefined)
 
       expect(mountedIndices).toEqual([0, 1])
     })
@@ -485,7 +476,7 @@ describe('@rasenjs/core', () => {
           })
       )
 
-      repeatMountable({})
+      repeatMountable({}, undefined)
 
       expect(mountedItems).toEqual(['x', 'y'])
     })
@@ -500,7 +491,7 @@ describe('@rasenjs/core', () => {
         })
       )
 
-      const cleanup = repeatMountable({})
+      const cleanup = repeatMountable({}, undefined)
       expect(unmountedIndices).toEqual([])
 
       cleanup?.()
@@ -515,7 +506,7 @@ describe('@rasenjs/core', () => {
   describe('类型导出', () => {
     it('应该导出核心类型', () => {
       // 通过 TypeScript 编译来验证类型导出
-      const mountFn: MountFunction<HTMLElement> = () => () => {}
+      const mountFn: (host: HTMLElement) => () => void = () => () => {}
       const ref = mockRuntime.ref(1)
 
       expect(typeof mountFn).toBe('function')

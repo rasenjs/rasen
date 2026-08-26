@@ -46,7 +46,6 @@
  */
 
 import { claimElement, getHydrationContext, isHydrating } from './hydration-context'
-
 /** Parse an HTML string into a detached fragment. Shared core of every
  *  acquisition mode above; also consumed by the html component
  *  (components/html.ts). */
@@ -98,6 +97,7 @@ export function child(parent: ParentNode, index: number): ChildNode {
   return parent.childNodes[index]
 }
 
+
 /** Mark an existing DOM element as a template root (hydration mode).
  *  Internal: t0(host) adopts claimed roots; not part of the public API. */
 function adopt<N extends Element>(el: N): N {
@@ -147,6 +147,7 @@ export function mountSlot(
 // '@rasenjs/dom/template' (the compiler's default `templateSource`).
 export {
   bindClass,
+  bindClassToggle,
   bindStyle,
   bindText,
   bindProp,

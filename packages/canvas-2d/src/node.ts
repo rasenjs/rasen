@@ -14,6 +14,7 @@
 
 import { getReactiveRuntime } from '@rasenjs/core'
 import { RenderContext, hasRenderContext, type Bounds } from './render-context'
+import type { CanvasEventHandlers } from './events'
 
 /**
  * domlike 画布表面 —— 替代 HTMLCanvasElement 的最小造型
@@ -42,6 +43,12 @@ export interface CanvasNode {
   readonly parent: CanvasNode | null
   /** 子节点（按绘制顺序） */
   readonly children: CanvasNode[]
+  /** Optional bounds provider (world coordinates, untransformed scenes). */
+  bounds?: () => Bounds | null
+  /** Optional exact point-in-shape test; falls back to bounds containment. */
+  hit?: (x: number, y: number) => boolean
+  /** Pointer handlers dispatched when this node is the hit target. */
+  on?: CanvasEventHandlers
   /** 绘制：叶子只画自身；容器先应用自身状态再递归 children */
   draw(ctx: Context2D): void
   /** 从树上摘除并停止自身的响应式订阅 */
@@ -53,6 +60,16 @@ export interface CanvasNodeOptions {
   draw: (ctx: Context2D) => void
   /** 可选包围盒（预留：脏区优化）；可接收 ctx 用于 measureText 等 */
   bounds?: (ctx: Context2D) => Bounds | null
+  /**
+   * Optional exact point-in-shape test in canvas coordinates. When absent,
+   * hit testing falls back to bounds containment (AABB).
+   */
+  hit?: (x: number, y: number) => boolean
+  /**
+   * Pointer handlers dispatched when this node is the hit target. Presence
+   * lazily attaches the context's delegated DOM listeners.
+   */
+  on?: CanvasEventHandlers
   /** 可选响应式依赖：任一变化 → 标脏触发重绘 */
   deps?: () => unknown[]
 }
@@ -85,6 +102,10 @@ export function createNode(
     ctx,
     parent: attachedToTree ? treeNode : null,
     children,
+    // Adapt the ctx-taking provider to the public zero-arg shape.
+    bounds: opts.bounds ? () => opts.bounds!(ctx) : undefined,
+    hit: opts.hit ?? undefined,
+    on: opts.on ?? undefined,
     draw(ctx2: Context2D) {
       opts.draw(ctx2)
       for (const c of children) c.draw(ctx2)
@@ -99,6 +120,11 @@ export function createNode(
       }
       rc.markDirty()
     }
+  }
+
+  // Handlers on any node lazily attach the context's delegated listeners.
+  if (opts.on) {
+    rc.ensureEventListeners()
   }
 
   if (attachedToTree) {

@@ -2,10 +2,16 @@
  * Global event delegation subsystem (opt-in).
  *
  * When enabled via {@link configureEventDelegation}, `on()` (bindings.ts
- * facade) stops attaching per-element listeners and instead tags elements
- * with a data attribute + registers handlers in a shared table. One listener
- * per event type on the delegation root dispatches to the nearest registered
- * ancestor of `event.target` — O(N·listeners) becomes O(1) listeners.
+ * facade) stops attaching per-element listeners and instead stores the
+ * handler in a per-element bag under a symbol key. One listener per event
+ * type on the delegation root dispatches to the nearest registered ancestor
+ * of `event.target` — O(N·listeners) becomes O(1) listeners.
+ *
+ * Handlers live ON the element (same design as Svelte 5's `delegated()` /
+ * Solid's `$$click`): when a subtree is discarded, its handlers are collected
+ * by the GC together with the elements — no central registry to prune, no
+ * removeEventListener teardown for dead nodes. The per-element remover only
+ * detaches the handler while the element is still alive.
  *
  * Only known-bubbling event types delegate; anything else (focus/blur/
  * scroll/mouseenter…) silently never reaches a root listener, so those fall
@@ -15,34 +21,33 @@
 // ---------------------------------------------------------------------------
 // Event delegation (P4 opt-in)
 //
-// When enabled, on() stops attaching per-element listeners and instead tags
-// the element with a data attribute + registers the handler in a registry.
-// One listener per event type on the delegation root dispatches to the
-// nearest registered ancestor of event.target. Turns O(N·listeners) into
-// O(1) listeners + O(N) registry entries (e.g. 10k rows × 2 clicks → 1
-// listener).
+// When enabled, on() stops attaching per-element listeners and instead stores
+// the handler in a per-element bag under a symbol key. One listener per event
+// type on the delegation root dispatches to the nearest registered ancestor
+// of event.target. Turns O(N·listeners) into O(1) listeners + zero teardown
+// bookkeeping for discarded subtrees.
 // ---------------------------------------------------------------------------
 
-const DELEGATE_ATTR = 'data-rasen-eid'
+/** Per-element handler bag: element[EVENTS][type] -> handler. Symbol key so
+ *  it never collides with DOM attributes or framework expandos, and never
+ *  serializes into markup. */
+const EVENTS: unique symbol = Symbol('rasen-events')
 
-/** event type -> eid -> handler */
-const delegateRegistry = new Map<string, Map<number, EventListenerOrEventListenerObject>>()
-let delegateEid = 0
+type HandlerBag = Record<string, EventListenerOrEventListenerObject>
+
 let delegateRoot: Document | Element | null = null
 const attachedRootEvents = new Set<string>()
 
 function rootDispatch(event: Event): void {
-  const table = delegateRegistry.get(event.type)
-  if (!table) return
   let node = event.target as Element | null
   while (node && node.nodeType === 1) {
-    const eid = (node as HTMLElement).getAttribute?.(DELEGATE_ATTR)
-    if (eid !== null) {
-      const handler = table.get(Number(eid))
-      if (handler !== undefined) {
-        ;(handler as (e: Event) => void).call(node, event)
-        return
-      }
+    const bag = (node as unknown as Record<symbol, HandlerBag | undefined>)[
+      EVENTS
+    ]
+    const handler = bag?.[event.type]
+    if (handler !== undefined) {
+      ;(handler as (e: Event) => void).call(node, event)
+      return
     }
     node = node.parentElement
   }
@@ -54,12 +59,10 @@ function ensureRootListener(event: string): void {
   attachedRootEvents.add(event)
 }
 
-/** Enable/disable global event delegation for subsequently bound events.
- *  While disabled, on() attaches direct listeners as before; handlers
- *  already registered through delegation keep working until removed. */
 /** Delegation-aware attach used by the bindings `on()` facade:
- *  bubbling event types register in the shared table (no per-element
- *  listener); non-delegatable types attach directly. Returns its remover. */
+ *  bubbling event types store the handler on the element itself (no
+ *  per-element listener, no central registry); non-delegatable types attach
+ *  directly. Returns its remover. */
 export function attachEvent(
   el: Element,
   event: string,
@@ -70,21 +73,19 @@ export function attachEvent(
     return () => el.removeEventListener(event, handler)
   }
 
-  const existing = (el as HTMLElement).getAttribute?.(DELEGATE_ATTR)
-  let eid = existing !== null && existing !== undefined ? Number(existing) : NaN
-  if (!Number.isInteger(eid)) {
-    eid = ++delegateEid
-    ;(el as HTMLElement).setAttribute(DELEGATE_ATTR, String(eid))
+  const host = el as unknown as Record<symbol, HandlerBag | undefined>
+  let bag = host[EVENTS]
+  if (!bag) {
+    bag = host[EVENTS] = {}
   }
-  let table = delegateRegistry.get(event)
-  if (!table) {
-    table = new Map()
-    delegateRegistry.set(event, table)
-    ensureRootListener(event)
-  }
-  table.set(eid, handler)
+  bag[event] = handler
+  ensureRootListener(event)
+  // Detach only matters while the element is alive; discarded subtrees take
+  // their bags with them to the GC.
   return () => {
-    table!.delete(eid)
+    if (bag && bag[event] === handler) {
+      delete bag[event]
+    }
   }
 }
 
@@ -93,17 +94,15 @@ export function configureEventDelegation(enabled: boolean): void {
     delegateRoot = document
   }
   if (!enabled) {
-    // Detach root listeners and clear the registry: handlers registered
-    // while delegation was on lose their dispatch path with the root
-    // listener, so keeping their entries would only block re-attachment
-    // after a subsequent enable.
+    // Remove root listeners; dispatch paths disappear with them. Handler bags
+    // left on still-alive elements are inert (no dispatch path) and are
+    // reclaimed by the GC once those elements become unreachable.
     if (delegateRoot) {
       for (const evt of attachedRootEvents) {
         delegateRoot.removeEventListener(evt, rootDispatch)
       }
       attachedRootEvents.clear()
     }
-    delegateRegistry.clear()
     delegateRoot = null
   }
 }
@@ -138,4 +137,3 @@ const DELEGATABLE_EVENTS = new Set([
   'touchmove',
   'touchcancel',
 ])
-

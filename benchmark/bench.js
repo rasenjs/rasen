@@ -32,7 +32,8 @@ const vm = require('vm');
 const CONFIG = {
   serverUrl: 'http://localhost:5174',
   timeout: 60000,
-  defaultIterations: 3,
+  // Official default: NUM_ITERATIONS_FOR_BENCHMARK_CPU = 15
+  defaultIterations: 15,
   warmupIterations: 1
 };
 
@@ -40,12 +41,17 @@ const CONFIG = {
 // passing a dynamically allocated free port via the PORT env var and a ready
 // signal via BENCH_READY_SIGNAL. Each server is shut down after its package
 // is measured ("测完一个关一个"), so packages stay fully decoupled.
-// Only two local targets: Rasen + Native DOM (vanillajs, aligned with official
-// `vanillajs-keyed`). All other framework comparisons are fetched dynamically
-// from the official js-framework-benchmark `results.ts` at runtime.
+// Local targets: Rasen (reactive-vue), Native DOM (vanillajs, aligned with
+// official `vanillajs-keyed`) and Rasen backed by alien-signals. All other
+// framework comparisons are fetched dynamically from the official
+// js-framework-benchmark `results.ts` at runtime.
 const TARGETS = [
-  { name: 'Rasen', dir: 'rasen' },
-  { name: 'Native DOM (vanillajs)', dir: 'vanillajs' }
+  // Rasen variants stay fully separate: one measurement and one report column
+  // per reactive runtime, never merged into a single "Rasen" number.
+  { name: 'Rasen (reactive-vue)', dir: 'rasen' },
+  { name: 'Native DOM (vanillajs)', dir: 'vanillajs' },
+  { name: 'Rasen (alien-signals)', dir: 'rasen-alien' },
+  { name: 'Vue Vapor (local)', dir: 'vapor' }
 ];
 
 // Allocate a free TCP port the OS won't reuse immediately.
@@ -116,8 +122,11 @@ function stopServer(child, port) {
     const cleanup = () => {
       try { child.kill('SIGKILL'); } catch (e) { /* already gone */ }
       try {
-        // Fallback: free the port in case the child left orphans.
-        spawn('sh', ['-c', `lsof -ti tcp:${port} | xargs -r kill -9`], { stdio: 'ignore' });
+        // Fallback: free the port in case the child left orphans. Scope to
+        // LISTENERS only — a plain `lsof -ti tcp:PORT` also matches CLIENT
+        // connections with that remote port, i.e. this process's own pooled
+        // keep-alive socket, which would SIGKILL the harness itself.
+        spawn('sh', ['-c', `lsof -ti tcp:${port} -sTCP:LISTEN | xargs -r kill -9`], { stdio: 'ignore' });
       } catch (e) { /* ignore */ }
       resolve();
     };
@@ -128,261 +137,463 @@ function stopServer(child, port) {
   });
 }
 
-// 测试套件定义
+// ---------------------------------------------------------------------------
+// Benchmark suite — strict port of the OFFICIAL js-framework-benchmark
+// measurement methodology (webdriver-ts Puppeteer runner + timeline.ts).
+//
+// How the official harness measures:
+//   1. Fresh page per iteration, loaded with waitUntil: 'networkidle0'.
+//   2. benchmark.init() runs UNTRACED: builds the table and performs
+//      warmupCount warmup cycles (JIT warm-up; row ids keep incrementing
+//      across cycles — the run() assertions rely on that).
+//   3. CPU throttling via CDP emulation for the fast benchmarks
+//      (03/04/05/09 -> 4x, 06 -> 2x) so trace granularity stays meaningful.
+//   4. page.tracing.start(devtools.timeline categories), wait 50ms,
+//      forced GC via window.gc(), then benchmark.run(): exactly ONE real
+//      mouse click plus a DOM assertion.
+//   5. wait 100ms, stop tracing.
+//   6. Duration comes FROM THE TRACE: from the single click EventDispatch
+//      to the end of the first renderer Commit following the last relevant
+//      event (click/fireAnimationFrame/timerFire/layout/functionCall) on the
+//      same process — i.e. click-to-paint-commit including layout & paint.
+//      An unusually long (>16ms) rAF scheduling delay is corrected out.
+//   7. Default 15 iterations (04_select runs 15+10), statistics over ALL
+//      values — no trimming.// ---------------------------------------------------------------------------
+
+const TRACE_CATEGORIES = [
+  'disabled-by-default-v8.cpu_profiler',
+  'blink.user_timing',
+  'devtools.timeline',
+  'disabled-by-default-devtools.timeline'
+];
+
+const TRACES_DIR = path.join(__dirname, 'traces');
+
+const waitMs = (delay) => new Promise((res) => setTimeout(res, delay));
+
+async function forceGC(page) {
+  await page.evaluate("window.gc({type:'major',execution:'sync',flavor:'last-resort'})");
+}
+
+// --- Browser configuration, exact parity with the official runner ---
+// The official js-framework-benchmark drives REAL Google Chrome via
+// executablePath (webdriver-ts browserPath()), NOT Puppeteer's bundled
+// Chromium, and it never passes --disable-gpu (we previously forced software
+// rendering — an environment difference that inflates paint/commit times).
+function browserExecutablePath() {
+  switch (process.platform) {
+    case 'darwin': return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    case 'win32': return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+    default: return 'chrome'; // resolved via PATH on Linux (official behavior)
+  }
+}
+
+// Exact official chromeArgs (forkedBenchmarkRunnerPuppeteer.ts).
+const CHROME_ARGS = [
+  '--window-size=1280,800',
+  '--js-flags=--expose-gc',
+  '--no-default-browser-check',
+  '--disable-sync',
+  '--no-first-run',
+  '--ash-no-nudges',
+  '--disable-extensions',
+  '--disable-features=Translate,PrivacySandboxSettings4,IPH_SidePanelGenericMenuFeature'
+];
+
+async function launchBrowser(headless) {
+  const args = [...CHROME_ARGS];
+  // The official runner always launches with headless:false and expresses
+  // headless mode purely through the --headless=new CLI arg.
+  if (headless) args.push('--headless=new');
+  const options = {
+    headless: false,
+    dumpio: false,
+    defaultViewport: { width: 1280, height: 800 },
+    args
+  };
+  const chromePath = browserExecutablePath();
+  if (process.platform === 'linux' || fs.existsSync(chromePath)) {
+    options.executablePath = chromePath;
+  } else {
+    console.warn(`⚠️ 未找到系统 Chrome (${chromePath})，回退到内置 Chromium（与官方环境略有差异）`);
+  }
+  return puppeteer.launch(options);
+}
+
+// --- Check helpers (ported from webdriver-ts/src/puppeteerAccess.ts):
+// poll up to 10 times — fast (10ms) for the first 3 attempts, then 1s apart.
+async function checkElementExists(page, selector) {
+  for (let k = 0; k < 10; k++) {
+    const sel = await page.$(selector);
+    if (sel) {
+      await sel.dispose();
+      return;
+    }
+    await waitMs(k < 3 ? 10 : 1000);
+  }
+  throw `checkElementExists failed for ${selector}`;
+}
+
+async function checkElementNotExists(page, selector) {
+  for (let k = 0; k < 10; k++) {
+    const sel = await page.$(selector);
+    if (!sel) return;
+    if (sel.dispose) await sel.dispose();
+    await waitMs(k < 3 ? 10 : 1000);
+  }
+  throw `checkElementNotExists failed for ${selector}`;
+}
+
+async function clickElement(page, selector) {
+  const elem = await page.$(selector);
+  if (!elem) throw `clickElement failed. Element was not found: ${selector}`;
+  await elem.click();
+  await elem.dispose();
+}
+
+async function checkElementContainsText(page, selector, expectedText) {
+  let txt;
+  for (let k = 0; k < 10; k++) {
+    const elem = await page.$(selector);
+    if (elem) {
+      txt = await elem.evaluate((e) => e.innerText);
+      await elem.dispose();
+      if (typeof txt === 'string' && txt.includes(expectedText)) return;
+    }
+    await waitMs(k < 3 ? 10 : 1000);
+  }
+  throw `checkElementContainsText ${selector} failed. expected ${expectedText}, but was ${txt}`;
+}
+
+async function checkElementHasClass(page, selector, className) {
+  let clazzes;
+  for (let k = 0; k < 10; k++) {
+    const elem = await page.$(selector);
+    if (elem) {
+      clazzes = await elem.evaluate((e) => [...e.classList]);
+      await elem.dispose();
+      if (clazzes.includes(className)) return;
+    }
+    await waitMs(k < 3 ? 10 : 1000);
+  }
+  throw `checkElementHasClass ${selector} failed. expected ${className}, but was ${clazzes}`;
+}
+
+// --- Trace-based duration (strict port of timeline.ts computeResultsCPU):
+// duration = firstCommitAfterLastRelevantEvent.end - clickEvent.ts (ms).
+function extractRelevantEvents(entries, startLogicEventName) {
+  const filtered = [];
+  for (const e of entries) {
+    const type = e.args && e.args.data && e.args.data.type;
+    if (e.name === 'EventDispatch') {
+      if (type === startLogicEventName) {
+        filtered.push({ type: 'startLogicEvent', ts: +e.ts, dur: +e.dur, end: +e.ts + +e.dur, pid: e.pid });
+      }
+      if (type === 'click') {
+        filtered.push({ type: 'click', ts: +e.ts, dur: +e.dur, end: +e.ts + +e.dur, pid: e.pid });
+      } else if (type === 'mousedown') {
+        filtered.push({ type: 'mousedown', ts: +e.ts, dur: +e.dur, end: +e.ts + +e.dur, pid: e.pid });
+      } else if (type === 'pointerup') {
+        filtered.push({ type: 'pointerup', ts: +e.ts, dur: +e.dur, end: +e.ts + +e.dur, pid: e.pid });
+      }
+    } else if (e.name === 'Layout' && e.ph === 'X') {
+      filtered.push({ type: 'layout', ts: +e.ts, dur: +e.dur, end: +e.ts + +e.dur, pid: e.pid });
+    } else if (e.name === 'FunctionCall' && e.ph === 'X') {
+      filtered.push({ type: 'functioncall', ts: +e.ts, dur: +e.dur, end: +e.ts + +e.dur, pid: e.pid });
+    } else if (e.name === 'Commit' && e.ph === 'X') {
+      filtered.push({ type: 'commit', ts: +e.ts, dur: +e.dur, end: +e.ts + +e.dur, pid: e.pid });
+    } else if (e.name === 'Paint' && e.ph === 'X') {
+      filtered.push({ type: 'paint', ts: +e.ts, dur: +e.dur, end: +e.ts + +e.dur, pid: e.pid });
+    } else if (e.name === 'FireAnimationFrame' && e.ph === 'X') {
+      filtered.push({ type: 'fireAnimationFrame', ts: +e.ts, dur: +e.dur, end: +e.ts + +e.dur, pid: e.pid });
+    } else if (e.name === 'TimerFire' && e.ph === 'X') {
+      filtered.push({ type: 'timerFire', ts: +e.ts, dur: 0, end: +e.ts, pid: e.pid });
+    } else if (e.name === 'RequestAnimationFrame') {
+      filtered.push({ type: 'requestAnimationFrame', ts: +e.ts, dur: 0, end: +e.ts, pid: e.pid });
+    }
+  }
+  return filtered;
+}
+
+function computeResultsCPU(traceFile, startLogicEventName = 'click') {
+  const json = JSON.parse(fs.readFileSync(traceFile, { encoding: 'utf8' }));
+  const events = extractRelevantEvents(json.traceEvents || [], startLogicEventName)
+    .sort((a, b) => a.end - b.end);
+
+  const mousedowns = events.filter((e) => e.type === 'mousedown');
+  if (mousedowns.length > 1) throw 'at most one mousedown event is expected';
+
+  // Invariant: exactly ONE click dispatch inside the traced window.
+  const clicks = events.filter((e) => e.type === 'startLogicEvent');
+  if (clicks.length !== 1) throw 'exactly one click event is expected';
+  const click = clicks[0];
+
+  // Drop events from other processes (compositor/GPU), like the original.
+  const pid = click.pid;
+  const eventsDuringBenchmark = events.filter((e) => e.ts > click.end || e.type === 'click');
+  const mainThread = eventsDuringBenchmark.filter((e) => e.pid === pid);
+
+  const startFrom = mainThread.filter((e) =>
+    [startLogicEventName, 'fireAnimationFrame', 'timerFire', 'layout', 'functioncall'].includes(e.type)
+  );
+  const startFromEvent = startFrom[startFrom.length - 1];
+  if (!startFromEvent) throw 'unexpected situation. There must be some events, but there were none.';
+
+  const allCommitsAfterClick = mainThread.filter((e) => e.type === 'commit');
+  let commit = mainThread.find((e) => e.type === 'commit' && e.ts > startFromEvent.end);
+  if (!commit) {
+    if (allCommitsAfterClick.length === 0) throw 'No commit event found for ' + traceFile;
+    commit = allCommitsAfterClick[allCommitsAfterClick.length - 1];
+  }
+
+  let duration = (commit.end - clicks[0].ts) / 1000.0;
+
+  // Correct an unusually long delay between requestAnimationFrame and its
+  // firing (official raf_long_delay adjustment).
+  const layouts = mainThread.filter((e) => e.type === 'layout');
+  const rafsWithinClick = events.filter(
+    (e) => e.type === 'requestAnimationFrame' && e.ts >= click.ts && e.ts <= click.end
+  );
+  const fafs = events.filter(
+    (e) => e.type === 'fireAnimationFrame' && e.ts >= click.ts && e.ts < commit.ts
+  );
+  if (rafsWithinClick.length > 0 && fafs.length > 0) {
+    const waitDelay = (fafs[0].ts - click.end) / 1000.0;
+    if (rafsWithinClick.length === 1 && fafs.length === 1) {
+      if (waitDelay > 16) {
+        const ignored = layouts.some((e) => e.ts < fafs[0].ts);
+        if (!ignored) duration -= waitDelay - 16;
+      }
+    } else if (fafs.length === 1) {
+      throw 'Unexpected situation. One fire animation frame, but non consistent request animation frames';
+    }
+  }
+  return duration;
+}
+
+// --- Benchmark definitions (ports of webdriver-ts/src/benchmarksPuppeteer.ts).
+// Each entry: init(page) = untraced warmup/setup, run(page) = the single
+// TRACED interaction, throttle = CPU slowdown factor around the traced run.
 const BENCHMARKS = [
   {
     id: '01_run1k',
     label: 'Create 1,000 rows',
-    action: async (page) => {
-      const startTime = performance.now();
-      await page.click('#run');
-      // 等待表格渲染完成
-      await page.waitForFunction(
-        () => document.querySelectorAll('tbody tr').length >= 1000,
-        { timeout: 10000 }
-      );
-      return performance.now() - startTime;
+    async init(page) {
+      await checkElementExists(page, '#run');
+      for (let i = 0; i < 5; i++) {
+        await clickElement(page, '#run');
+        await checkElementContainsText(page, 'tbody>tr:nth-of-type(1)>td:nth-of-type(1)', (i * 1000 + 1).toFixed());
+        await clickElement(page, '#clear');
+        await checkElementNotExists(page, 'tbody>tr:nth-of-type(1000)>td:nth-of-type(1)');
+      }
+    },
+    async run(page) {
+      await clickElement(page, '#run');
+      await checkElementContainsText(page, 'tbody>tr:nth-of-type(1000)>td:nth-of-type(1)', ((5 + 1) * 1000).toFixed());
     }
   },
   {
     id: '02_runlots',
     label: 'Create 10,000 rows',
-    action: async (page) => {
-      const startTime = performance.now();
-      await page.click('#runlots');
-      await page.waitForFunction(
-        () => document.querySelectorAll('tbody tr').length >= 10000,
-        { timeout: 15000 }
-      );
-      return performance.now() - startTime;
+    async init(page) {
+      await checkElementExists(page, '#run');
+      for (let i = 0; i < 5; i++) {
+        await clickElement(page, '#run');
+        await checkElementContainsText(page, 'tbody>tr:nth-of-type(1)>td:nth-of-type(1)', (i * 1000 + 1).toFixed());
+        await clickElement(page, '#clear');
+        await checkElementNotExists(page, 'tbody>tr:nth-of-type(1000)>td:nth-of-type(1)');
+      }
+    },
+    async run(page) {
+      await clickElement(page, '#runlots');
+      await checkElementExists(page, 'tbody>tr:nth-of-type(10000)>td:nth-of-type(2)>a');
     }
   },
   {
     id: '03_update',
     label: 'Update every 10th row',
-    setup: async (page) => {
-      await page.click('#run');
-      await page.waitForFunction(
-        () => document.querySelectorAll('tbody tr').length >= 1000,
-        { timeout: 10000 }
-      );
+    throttle: 4,
+    async init(page) {
+      await checkElementExists(page, '#run');
+      await clickElement(page, '#run');
+      await checkElementExists(page, 'tbody>tr:nth-of-type(1000)>td:nth-of-type(1)');
+      for (let i = 0; i < 3; i++) {
+        await clickElement(page, '#update');
+        await checkElementContainsText(page, 'tbody>tr:nth-of-type(991)>td:nth-of-type(2)>a', ' !!!'.repeat(i + 1));
+      }
     },
-    action: async (page) => {
-      const startTime = performance.now();
-      await page.click('#update');
-      // Wait until the " !!!" suffix actually appears in the DOM instead of
-      // a fixed delay — makes the measurement reflect real render time.
-      await page.waitForFunction(
-        () => document.body.textContent.includes(' !!!'),
-        { timeout: 10000 }
-      );
-      return performance.now() - startTime;
+    async run(page) {
+      await clickElement(page, '#update');
+      await checkElementContainsText(page, 'tbody>tr:nth-of-type(991)>td:nth-of-type(2)>a', ' !!!'.repeat(3 + 1));
     }
   },
   {
     id: '04_select',
     label: 'Select row (highlight)',
-    setup: async (page) => {
-      await page.click('#run');
-      await page.waitForFunction(
-        () => document.querySelectorAll('tbody tr').length >= 1000,
-        { timeout: 10000 }
-      );
+    throttle: 4,
+    additionalRuns: 10,
+    async init(page) {
+      await checkElementExists(page, '#run');
+      await clickElement(page, '#run');
+      await checkElementContainsText(page, 'tbody>tr:nth-of-type(1000)>td:nth-of-type(1)', '1000');
+      await clickElement(page, 'tbody>tr:nth-of-type(5)>td:nth-of-type(2)>a');
+      await checkElementHasClass(page, 'tbody>tr:nth-of-type(5)', 'danger');
+      const dangers = await page.$$('tbody>tr.danger');
+      if (dangers.length !== 1) throw `checkCountForSelector tbody>tr.danger failed. expected 1, but ${dangers.length} were found`;
     },
-    action: async (page) => {
-      const startTime = performance.now();
-      await page.evaluate(() => {
-        const firstLink = document.querySelector('tbody tr a');
-        if (firstLink) firstLink.click();
-      });
-      // Wait until the selected row actually gets the `danger` class.
-      await page.waitForFunction(
-        () => document.querySelector('tbody tr.danger') !== null,
-        { timeout: 10000 }
-      );
-      return performance.now() - startTime;
+    async run(page) {
+      await clickElement(page, 'tbody>tr:nth-of-type(2)>td:nth-of-type(2)>a');
+      await checkElementHasClass(page, 'tbody>tr:nth-of-type(2)', 'danger');
     }
   },
   {
     id: '05_swap',
     label: 'Swap rows 1 and 998',
-    setup: async (page) => {
-      await page.click('#run');
-      await page.waitForFunction(
-        () => document.querySelectorAll('tbody tr').length >= 1000,
-        { timeout: 10000 }
-      );
+    throttle: 4,
+    async init(page) {
+      await checkElementExists(page, '#run');
+      await clickElement(page, '#run');
+      await checkElementExists(page, 'tbody>tr:nth-of-type(1000)>td:nth-of-type(1)');
+      for (let i = 0; i <= 5; i++) {
+        const text = i % 2 === 0 ? '2' : '999';
+        await clickElement(page, '#swaprows');
+        await checkElementContainsText(page, 'tbody>tr:nth-of-type(999)>td:nth-of-type(1)', text);
+      }
     },
-    action: async (page) => {
-      const startTime = performance.now();
-      // Capture the 2nd row's id cell before swapping (swapRows swaps
-      // index 1 and 998, so the first row is unchanged).
-      const before = await page
-        .$eval('tbody tr:nth-child(2) td:first-child', el => el.textContent)
-        .catch(() => null);
-      await page.click('#swaprows');
-      await page.waitForFunction(
-        (b) => {
-          const el = document.querySelector('tbody tr:nth-child(2) td:first-child');
-          return el !== null && el.textContent !== b;
-        },
-        { timeout: 10000 },
-        before
-      );
-      return performance.now() - startTime;
+    async run(page) {
+      await clickElement(page, '#swaprows');
+      // warmupCount (5) is odd -> after the run swap the parity flips.
+      await checkElementContainsText(page, 'tbody>tr:nth-of-type(999)>td:nth-of-type(1)', '2');
+      await checkElementContainsText(page, 'tbody>tr:nth-of-type(2)>td:nth-of-type(1)', '999');
     }
   },
   {
     id: '06_remove',
     label: 'Remove a row',
-    setup: async (page) => {
-      await page.click('#run');
-      await page.waitForFunction(
-        () => document.querySelectorAll('tbody tr').length >= 1000,
-        { timeout: 10000 }
-      );
+    throttle: 2,
+    async init(page) {
+      const rowsToSkip = 4;
+      const warmupCount = 5;
+      await checkElementExists(page, '#run');
+      await clickElement(page, '#run');
+      await checkElementExists(page, 'tbody>tr:nth-of-type(1000)>td:nth-of-type(1)');
+      for (let i = 0; i < warmupCount; i++) {
+        const rowToClick = warmupCount - i + rowsToSkip;
+        await checkElementContainsText(page, `tbody>tr:nth-of-type(${rowToClick})>td:nth-of-type(1)`, String(rowToClick));
+        await clickElement(page, `tbody>tr:nth-of-type(${rowToClick})>td:nth-of-type(3)>a>span:nth-of-type(1)`);
+        await checkElementContainsText(page, `tbody>tr:nth-of-type(${rowToClick})>td:nth-of-type(1)`, String(rowsToSkip + warmupCount + 1));
+      }
+      await checkElementContainsText(page, `tbody>tr:nth-of-type(${rowsToSkip + 1})>td:nth-of-type(1)`, String(rowsToSkip + warmupCount + 1));
+      await checkElementContainsText(page, `tbody>tr:nth-of-type(${rowsToSkip})>td:nth-of-type(1)`, String(rowsToSkip));
+      // Click on a row the second time
+      await checkElementContainsText(page, `tbody>tr:nth-of-type(${rowsToSkip + 2})>td:nth-of-type(1)`, String(rowsToSkip + warmupCount + 2));
+      await clickElement(page, `tbody>tr:nth-of-type(${rowsToSkip + 2})>td:nth-of-type(3)>a>span:nth-of-type(1)`);
+      await checkElementContainsText(page, `tbody>tr:nth-of-type(${rowsToSkip + 2})>td:nth-of-type(1)`, String(rowsToSkip + warmupCount + 3));
     },
-    action: async (page) => {
-      const startTime = performance.now();
-      const before = await page.$$eval('tbody tr', rows => rows.length);
-      await page.evaluate(() => {
-        const firstDeleteBtn = document.querySelector('tbody tr a.remove');
-        if (firstDeleteBtn) firstDeleteBtn.click();
-      });
-      // Wait until the row count actually drops.
-      await page.waitForFunction(
-        (n) => document.querySelectorAll('tbody tr').length < n,
-        { timeout: 10000 },
-        before
-      );
-      return performance.now() - startTime;
+    async run(page) {
+      await clickElement(page, 'tbody>tr:nth-of-type(4)>td:nth-of-type(3)>a>span:nth-of-type(1)');
+      await checkElementContainsText(page, 'tbody>tr:nth-of-type(4)>td:nth-of-type(1)', String(4 + 5 + 1));
     }
   },
   {
     id: '07_clear',
     label: 'Clear all rows',
-    action: async (page) => {
-      await page.click('#run');
-      await page.waitForFunction(
-        () => document.querySelectorAll('tbody tr').length >= 1000,
-        { timeout: 10000 }
-      );
-
-      const startTime = performance.now();
-      await page.click('#clear');
-      // Wait until all rows are actually removed.
-      await page.waitForFunction(
-        () => document.querySelectorAll('tbody tr').length === 0,
-        { timeout: 10000 }
-      );
-      return performance.now() - startTime;
+    throttle: 4,
+    async init(page) {
+      await checkElementExists(page, '#run');
+      for (let i = 0; i < 5; i++) {
+        await clickElement(page, '#run');
+        await checkElementContainsText(page, 'tbody>tr:nth-of-type(1)>td:nth-of-type(1)', (i * 1000 + 1).toFixed());
+        await clickElement(page, '#clear');
+        await checkElementNotExists(page, 'tbody>tr:nth-of-type(1000)>td:nth-of-type(1)');
+      }
+      await clickElement(page, '#run');
+      await checkElementContainsText(page, 'tbody>tr:nth-of-type(1)>td:nth-of-type(1)', (5 * 1000 + 1).toFixed());
+    },
+    async run(page) {
+      await clickElement(page, '#clear');
+      await checkElementNotExists(page, 'tbody>tr:nth-of-type(1000)>td:nth-of-type(1)');
     }
   }
 ];
 
 /**
- * 计算统计数据
+ * 计算统计数据（官方口径：全部样本参与统计，不裁剪）
  */
 function calculateStats(times) {
   if (times.length === 0) return null;
 
   const sorted = [...times].sort((a, b) => a - b);
-  
-  // 去掉最快和最慢的结果（冷启动和异常数据）
-  if (sorted.length > 2) {
-    sorted.shift();
-    sorted.pop();
-  }
 
   const min = sorted[0];
   const max = sorted[sorted.length - 1];
-  const mean = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+  const mean = times.reduce((a, b) => a + b, 0) / times.length;
   const median = sorted.length % 2 === 0
     ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
     : sorted[Math.floor(sorted.length / 2)];
 
-  const variance = sorted.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / sorted.length;
+  const variance = times.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / times.length;
   const stdDev = Math.sqrt(variance);
 
-  return { min, max, mean, median, stdDev, count: sorted.length, values: sorted };
+  return { min, max, mean, median, stdDev, count: times.length, values: times };
 }
 
 /**
- * 清空表格
- */
-async function clearTable(page) {
-  try {
-    await page.click('#clear');
-    await new Promise(r => setTimeout(r, 300));
-  } catch (e) {
-    // 忽略错误
-  }
-}
-
-/**
- * 运行单个基准测试
+ * 运行单个基准测试（官方方法论：trace 计时 + CPU 节流 + 强制 GC）
  */
 async function runBenchmark(browser, benchmark, iterations) {
-  console.log(`\n▶ ${benchmark.label} (${iterations}次迭代)`);
-  
-  const times = [];
-  
-  // 预热
-  if (iterations > 1) {
-    console.log('  预热...');
-    const page = await browser.newPage();
-    try {
-      page.setDefaultNavigationTimeout(CONFIG.timeout);
-      page.setDefaultTimeout(CONFIG.timeout);
-      await page.goto(CONFIG.serverUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await new Promise(r => setTimeout(r, 500));
-      if (benchmark.setup) {
-        await benchmark.setup(page);
-      }
-      await benchmark.action(page);
-      await clearTable(page);
-    } catch (e) {
-      console.log(`  预热失败: ${e.message}`);
-    } finally {
-      await page.close();
-    }
-  }
+  const throttleNote = benchmark.throttle ? `, CPU节流${benchmark.throttle}×` : '';
+  const totalRuns = iterations + (benchmark.additionalRuns || 0);
+  console.log(`\n▶ ${benchmark.label} (${totalRuns}次迭代${throttleNote}, 官方trace计时)`);
 
-  // 正式测试
-  for (let i = 0; i < iterations; i++) {
-    const page = await browser.newPage();
-    try {
-      // 设置超时
-      page.setDefaultNavigationTimeout(CONFIG.timeout);
-      page.setDefaultTimeout(CONFIG.timeout);
-      
-      // 导航到基准测试页面
-      console.log(`  迭代 ${i + 1}/${iterations}: 加载页面...`);
-      await page.goto(CONFIG.serverUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      
-      // 等待页面初始化
-      await new Promise(r => setTimeout(r, 500));
-      
-      // 执行 setup（如果有）
-      if (benchmark.setup) {
-        console.log(`  迭代 ${i + 1}/${iterations}: setup...`);
-        await benchmark.setup(page);
+  const times = [];
+
+  for (let i = 0; i < totalRuns; i++) {
+    let time = null;
+    // The official runner retries an iteration when the trace invariants
+    // fail ("exactly one click event is expected").
+    for (let attempt = 1; attempt <= 3 && time === null; attempt++) {
+      const page = await browser.newPage();
+      try {
+        page.setDefaultNavigationTimeout(CONFIG.timeout);
+        page.setDefaultTimeout(CONFIG.timeout);
+
+        await page.goto(CONFIG.serverUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+
+        // Untraced init: build the table + warmup cycles.
+        await benchmark.init(page);
+
+        const throttle = benchmark.throttle;
+        if (throttle) await page.emulateCPUThrottling(throttle);
+
+        if (!fs.existsSync(TRACES_DIR)) fs.mkdirSync(TRACES_DIR, { recursive: true });
+        const tracePath = path.join(TRACES_DIR, `${benchmark.id}_${Date.now()}_${i}.json`);
+
+        await page.tracing.start({ path: tracePath, screenshots: false, categories: TRACE_CATEGORIES });
+        await waitMs(50);
+        await forceGC(page);
+
+        await benchmark.run(page);
+
+        await waitMs(100);
+        await page.tracing.stop();
+        if (throttle) await page.emulateCPUThrottling(1);
+
+        time = computeResultsCPU(tracePath);
+      } catch (error) {
+        const msg = String((error && error.message) || error);
+        if (attempt < 3 && /click event|commit event|mousedown/.test(msg)) {
+          console.log(`  迭代 ${i + 1}/${totalRuns}: 重试 (${msg})`);
+        } else {
+          console.error(`  ✗ 迭代 ${i + 1}/${totalRuns} 失败: ${msg}`);
+        }
+      } finally {
+        await page.close();
       }
-      
-      // 执行基准测试
-      console.log(`  迭代 ${i + 1}/${iterations}: 运行...`);
-      const time = await benchmark.action(page);
+    }
+    if (time !== null) {
       times.push(time);
-      
-      // 清理
-      await clearTable(page);
-      
-      console.log(`    耗时: ${time.toFixed(2)}ms`);
-    } catch (error) {
-      console.error(`  ✗ 错误: ${error.message}`);
-      console.error(error.stack);
-    } finally {
-      await page.close();
+      console.log(`  迭代 ${i + 1}/${totalRuns}: 耗时 ${time.toFixed(2)}ms`);
     }
   }
 
@@ -700,15 +911,7 @@ async function main() {
     if (urlIdx !== -1) {
       // 自定义 URL 模式：用户自行启动服务器，使用单个浏览器
       console.log(`\n启动浏览器...`);
-      const browser = await puppeteer.launch({
-        headless: headless,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu'
-        ]
-      });
+      const browser = await launchBrowser(headless);
       console.log('✓ 浏览器已启动\n');
       try {
         const results = await runAllBenchmarks(browser, iterations, captureProfile, activeBenchmarks);
@@ -719,9 +922,29 @@ async function main() {
     } else {
       // 自管理服务器模式：逐个启动/关闭每个 target（测完一个关一个）
       // 每个 target 使用独立的浏览器实例，避免跨 target 的浏览器状态污染与崩溃
+      //
+      // 断点续跑：每个 target 测完立即写入 .partial-results.json。长时运行
+      // 可能被环境杀死（内存压力/终端回收），--resume 从缓存恢复已完成的
+      // target，只补测缺失的部分；全部完成后缓存文件自动删除。
       const signal = 'Benchmark Ready';
-      const allResults = [];
+      const partialPath = path.join(__dirname, '.partial-results.json');
+      let allResults = [];
+      if (args.includes('--resume') && fs.existsSync(partialPath)) {
+        try {
+          allResults = JSON.parse(fs.readFileSync(partialPath, 'utf8'));
+          console.log(`\n♻️ --resume: 恢复 ${allResults.length} 个已完成 target: ` +
+            allResults.map(r => r.target).join(', '));
+        } catch (e) {
+          console.warn(`⚠️ 缓存损坏，忽略: ${e.message}`);
+          allResults = [];
+        }
+      }
+      const doneNames = new Set(allResults.map(r => r.target));
       for (const target of TARGETS) {
+        if (doneNames.has(target.name)) {
+          console.log(`\n⏭️ [${target.name}] 已有缓存结果，跳过`);
+          continue;
+        }
         const port = await findFreePort();
         console.log(`\n🌐 [${target.name}] 分配空闲端口 ${port}，启动服务器...`);
         let server;
@@ -730,19 +953,12 @@ async function main() {
           server = await startServer(target.dir, port, signal);
           CONFIG.serverUrl = `http://localhost:${port}`;
           console.log(`📊 [${target.name}] 服务器就绪，开始基准测试 (count=${iterations})...`);
-          browser = await puppeteer.launch({
-            headless: headless,
-            args: [
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-gpu'
-            ]
-          });
+          browser = await launchBrowser(headless);
           const results = await runAllBenchmarks(
             browser, iterations, captureProfile && allResults.length === 0, activeBenchmarks
           );
           allResults.push({ target: target.name, results });
+          fs.writeFileSync(partialPath, JSON.stringify(allResults, null, 2));
         } finally {
           if (browser) await browser.close();
           await stopServer(server, port);
@@ -750,6 +966,7 @@ async function main() {
         }
       }
       await finalizeMultiplierReport(allResults);
+      try { fs.unlinkSync(partialPath); } catch (e) { /* not present */ }
     }
 
   } catch (error) {
@@ -959,8 +1176,12 @@ function fmtMult(v) {
 }
 
 function buildMultiplierRows(allResults, official) {
-  const rasen = allResults.find(t => t.target === 'Rasen');
+  // New caches store 'Rasen (reactive-vue)'; fall back to the legacy 'Rasen'
+  // name so older multiplier-*.json caches still regenerate correctly.
+  const rasen = allResults.find(t => t.target === 'Rasen (reactive-vue)')
+    || allResults.find(t => t.target === 'Rasen');
   const vanilla = allResults.find(t => t.target === 'Native DOM (vanillajs)');
+  const alien = allResults.find(t => t.target === 'Rasen (alien-signals)');
   if (!rasen || !vanilla) return null;
 
   // Iterate over the benchmarks that were ACTUALLY run (rasen.results), keyed
@@ -971,7 +1192,17 @@ function buildMultiplierRows(allResults, official) {
     if (!r.stats || !vResult || !vResult.stats) return null; // failed run
     const rMean = r.stats.mean;
     const vMean = vResult.stats.mean;
-    const row = { id: r.id, label: r.label, native: 1.0, rasen: (rMean && vMean) ? rMean / vMean : null };
+    const aResult = alien && alien.results[i];
+    const aMean = aResult && aResult.stats ? aResult.stats.mean : null;
+    const row = {
+      id: r.id,
+      label: r.label,
+      native: 1.0,
+      rasen: (rMean && vMean) ? rMean / vMean : null,
+      // Optional column: absent when the cached localRaw predates the
+      // rasen-alien target (older multiplier-*.json caches).
+      alien: (aMean && vMean) ? aMean / vMean : null
+    };
     const officialId = BENCHMARK_OFFICIAL_ID[r.id];
     OFFICIAL_COMPARISONS.forEach(comp => {
       let mult = null;
@@ -989,6 +1220,7 @@ function buildMultiplierRows(allResults, official) {
   const validRows = rows.filter(Boolean);
   const summary = { id: 'geo', label: 'Geometric mean', native: 1.0 };
   summary.rasen = geoMean(validRows.map(r => r.rasen));
+  summary.alien = geoMean(validRows.map(r => r.alien));
   OFFICIAL_COMPARISONS.forEach(comp => {
     summary[comp.label] = geoMean(validRows.map(r => r[comp.label]));
   });
@@ -998,11 +1230,17 @@ function buildMultiplierRows(allResults, official) {
 
 function generateMultiplierReport(rows, officialAvailable) {
   const timestamp = new Date().toISOString();
-  const columns = ['Rasen', ...OFFICIAL_COMPARISONS.map(c => c.label), 'Native'];
+  const columns = [
+    'Rasen (reactive-vue)',
+    'Rasen (alien-signals)',
+    ...OFFICIAL_COMPARISONS.map(c => c.label),
+    'Native'
+  ];
   const head = `<tr><th>Benchmark</th>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
-  const body = rows.map(row => {
+  const body = rows.filter(Boolean).map(row => {
     const cells = [
       fmtMult(row.rasen),
+      fmtMult(row.alien),
       ...OFFICIAL_COMPARISONS.map(c => fmtMult(row[c.label])),
       fmtMult(row.native)
     ].map(v => `<td>${v}</td>`).join('');
@@ -1010,8 +1248,8 @@ function generateMultiplierReport(rows, officialAvailable) {
     return `<tr${isSummary ? ' style="font-weight:700;border-top:2px solid #ddd;"' : ''}><td>${row.label}</td>${cells}</tr>`;
   }).join('');
   const note = officialAvailable
-    ? `官方对比数据动态拉取自 js-framework-benchmark（vanillajs-keyed 为基准 1.00×）。本地 Rasen 乘数 = 本地 Rasen 均值 / 本地 Native 均值；官方框架乘数 = 官方均值 / 官方 vanillajs 均值。`
-    : `⚠️ 官方数据拉取失败，仅显示本地 Rasen vs Native 乘数。`;
+    ? `官方对比数据动态拉取自 js-framework-benchmark（vanillajs-keyed 为基准 1.00×）。本地乘数（Rasen (reactive-vue) / Rasen (alien-signals)，两个变体独立计算）= 本地均值 / 本地 Native 均值；官方框架乘数 = 官方均值 / 官方 vanillajs 均值。`
+    : `⚠️ 官方数据拉取失败，仅显示本地 Rasen 变体 vs Native 乘数。`;
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1057,40 +1295,57 @@ async function finalizeMultiplierReport(allResults) {
 
   const rows = buildMultiplierRows(allResults, official);
   if (!rows) {
-    console.error('无法构建乘数报告：缺少 Rasen 或 Native DOM 结果。');
+    console.error('无法构建乘数报告：缺少 Rasen 变体或 Native DOM 结果。');
     return;
   }
 
   console.log(`\n\n${'═'.repeat(70)}`);
   console.log(`性能乘数报告（Native DOM = 1.00×）`);
   console.log(`${'═'.repeat(70)}\n`);
-  const header = ['Benchmark'.padEnd(26), 'Rasen'.padStart(8),
+  const header = ['Benchmark'.padEnd(26), 'Rasen(vue)'.padStart(10), 'Rasen(alien)'.padStart(12),
     ...OFFICIAL_COMPARISONS.map(c => c.label.padStart(14)), 'Native'.padStart(9)].join('  ');
   console.log(header);
   console.log('-'.repeat(70));
   rows.forEach(r => {
+    if (!r) return; // benchmark failed -> no stats
     const cells = [
-      fmtMult(r.rasen).padStart(8),
+      fmtMult(r.rasen).padStart(10),
+      fmtMult(r.alien).padStart(12),
       ...OFFICIAL_COMPARISONS.map(c => fmtMult(r[c.label]).padStart(14)),
       fmtMult(r.native).padStart(9)
     ].join('  ');
     console.log(`${r.label.padEnd(26)} ${cells}`);
   });
 
-  const htmlFile = path.join(__dirname, 'report.html');
-  fs.writeFileSync(htmlFile, generateMultiplierReport(rows, officialAvailable));
-  console.log(`\n✓ 乘数报告已保存到: ${htmlFile}`);
-
-  const jsonFile = path.join(__dirname, 'report.json');
-  fs.writeFileSync(jsonFile, JSON.stringify({
+  const reportPayload = JSON.stringify({
     generatedAt: new Date().toISOString(),
     baseline: 'Native DOM (vanillajs) = 1.00×',
     officialAvailable,
     officialVanillaName: official ? official.vanillaName : null,
     rows,
     localRaw: allResults
-  }, null, 2));
+  }, null, 2);
+
+  const htmlFile = path.join(__dirname, 'report.html');
+  fs.writeFileSync(htmlFile, generateMultiplierReport(rows, officialAvailable));
+  console.log(`\n✓ 乘数报告已保存到: ${htmlFile}`);
+
+  const jsonFile = path.join(__dirname, 'report.json');
+  fs.writeFileSync(jsonFile, reportPayload);
   console.log(`✓ JSON 数据已保存到: ${jsonFile}`);
+
+  // Archive timestamped copies under reports/: preserves every run's history
+  // and gives regenerate-report.js its multiplier-*.json cache source.
+  // Both files are gitignored via benchmark/.gitignore.
+  const reportDir = path.join(__dirname, 'reports');
+  if (!fs.existsSync(reportDir)) fs.mkdirSync(reportDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  fs.writeFileSync(
+    path.join(reportDir, `multiplier-${stamp}.html`),
+    generateMultiplierReport(rows, officialAvailable)
+  );
+  fs.writeFileSync(path.join(reportDir, `multiplier-${stamp}.json`), reportPayload);
+  console.log(`✓ 已归档到 reports/: multiplier-${stamp}.html / .json`);
 }
 
 module.exports = {

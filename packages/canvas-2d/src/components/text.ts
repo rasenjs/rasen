@@ -1,12 +1,12 @@
 import type { Component2D } from '../node'
 import type { ReadonlyRef, Ref } from '@rasenjs/core'
-import { unref } from '../utils'
+import { unref, pointerHandlersFrom, type CommonDrawProps } from '../utils'
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
 /**
  * text 组件属性
  */
-export interface TextProps {
+export interface TextProps extends Partial<CommonDrawProps> {
   text: string | Ref<string> | ReadonlyRef<string>
   x: number | Ref<number> | ReadonlyRef<number>
   y: number | Ref<number> | ReadonlyRef<number>
@@ -199,6 +199,8 @@ export const text: Component2D<TextProps> = (
         }
       }
     },
+
+    on: pointerHandlersFrom(props),
 
     deps: () => [
       unref(props.text),

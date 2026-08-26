@@ -6,7 +6,8 @@ import {
   type LineStyleProps,
   withDrawProps,
   collectDrawPropsDependencies,
-  svgPathToPoints
+  svgPathToPoints,
+  pointerHandlersFrom,
 } from '../utils'
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
@@ -310,6 +311,8 @@ export const path = (
         }
       })
     },
+
+    on: pointerHandlersFrom(props),
 
     deps: () => [
       props.points ? unref(props.points) : undefined,

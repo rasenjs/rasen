@@ -1,18 +1,16 @@
 /**
  * mount — renderer 无关的挂载入口
  *
- * 只是 mountable(host) 的类型安全调用。
- * effectScope 的生命周期由 com() 内部管理。
- * 宿主上下文由宿主入口（如 dom 的 mount）内部提供，用户无需感知。
+ * mountable(node, hooks) 的类型安全调用。hooks 缺省为 undefined
+ * （组件内部按能力降级）。effectScope 生命周期由 com() 内部管理。
  */
 
-import type { Mountable } from './types'
-import { provideHostContext, getHostContext } from './com'
+import type { Mountable, HostHooks } from './types'
 
-export function mount<T extends object>(
-  mountable: Mountable<T>,
-  host: T
+export function mount<Node extends object>(
+  mountable: Mountable<Node>,
+  node: Node,
+  hooks?: HostHooks<Node>
 ): (() => void) | undefined {
-  // 保持当前宿主上下文（继承栈顶），不改变
-  return provideHostContext(getHostContext(), () => mountable(host))
+  return mountable(node, hooks)
 }

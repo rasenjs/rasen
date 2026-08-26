@@ -1,6 +1,5 @@
-import { type Mountable, type HostContext, type HostHooks } from '../types'
+import { type Mountable, type HostHooks } from '../types'
 import { getReactiveRuntime, unref, type Ref } from '../reactive'
-import { getHostContext } from '../com'
 import { MARKERS } from '../marker-constants'
 
 /**
@@ -8,32 +7,32 @@ import { MARKERS } from '../marker-constants'
  * Required hooks for fragment: text.
  * Optional: createMarker/insert/detach (SSR/hydration boundaries).
  */
-export type FragmentHostHooks<Host = unknown, N = unknown> = HostHooks<Host, N>
+export type FragmentHostHooks<N = unknown> = HostHooks<N>
 
 /**
  * 子元素类型
  */
-export type FragmentChild<Host> = 
+export type FragmentChild<N = unknown> = 
   | string 
   | number 
-  | Mountable<Host>
+  | Mountable<N>
   | Ref<unknown>
 
 /**
  * Fragment config
  */
-export interface FragmentConfig<Host, N> {
-  children: Array<FragmentChild<Host>>
-  hooks?: FragmentHostHooks<Host, N>
+export interface FragmentConfig<N> {
+  children: Array<FragmentChild>
+  hooks?: FragmentHostHooks<N>
 }
 
 /**
  * Process a single child element
  */
-function processChild<Host, N>(
-  child: FragmentChild<Host>,
-  hooks?: FragmentHostHooks<Host, N>
-): Mountable<Host> {
+function processChild<N>(
+  child: FragmentChild,
+  hooks?: FragmentHostHooks<N>
+): Mountable<N> {
   const runtime = getReactiveRuntime()
   
   if (typeof child === 'string' || typeof child === 'number') {
@@ -43,7 +42,7 @@ function processChild<Host, N>(
       return () => undefined
     }
     const text = String(child)
-    return (host: Host) => {
+    return (host: N) => {
       const handle = hooks.createText!(host, text)
       hooks.insert!(host, handle.node, null)
       return () => hooks.detach!(handle.node)
@@ -57,11 +56,11 @@ function processChild<Host, N>(
       return () => undefined
     }
     const refChild = child as Ref<unknown>
-    return (host: Host) => {
+    return (host: N) => {
       const handle = hooks.createText!(host, String(unref(refChild)))
       hooks.insert!(host, handle.node, null)
 
-      const stop = runtime.watch(
+      const stop = runtime.subscribe(
         () => unref(refChild),
         (newVal) => {
           handle.update(String(newVal))
@@ -76,7 +75,7 @@ function processChild<Host, N>(
   }
   
   // Already a Mountable
-  return child as Mountable<Host>
+  return child as Mountable<N>
 }
 
 /**
@@ -91,32 +90,30 @@ function processChild<Host, N>(
  * Platform-specific implementations (DOM/HTML) should wrap this
  * and provide their own hooks.
  */
-export function fragment<Host = unknown, N = unknown>(
-  config: FragmentConfig<Host, N>
-): Mountable<Host> {
+export function fragment<N = unknown>(
+  config: FragmentConfig<N>
+): Mountable<N> {
   const { children } = config
-  return (host: Host) => {
-    // 宿主上下文：com 挂载时已压栈。优先用 ctx.hooks，config.hooks 作为显式 fallback。
-    const ctx = getHostContext() as HostContext<Host, N> | undefined
-    const hooks = ctx?.hooks ?? config.hooks
+  return (node: N, mountHooks?: HostHooks<N>) => {
+      const hooks = mountHooks ?? config.hooks
     const mounts = children.map(child => processChild(child, hooks))
 
     const markers: N[] = []
 
     // Add start marker if available
     if (hooks?.createMarker && hooks.insert) {
-      const startAnchor = hooks.createMarker(host, MARKERS.FRAGMENT_START)
-      hooks.insert(host, startAnchor, null)
+      const startAnchor = hooks.createMarker(node, MARKERS.FRAGMENT_START)
+      hooks.insert(node, startAnchor, null)
       markers.push(startAnchor)
     }
 
     // Mount all children
-    const unmounts = mounts.map(m => m(host))
+    const unmounts = mounts.map(m => m(node, hooks))
 
     // Add end marker if available
     if (hooks?.createMarker && hooks.insert) {
-      const endAnchor = hooks.createMarker(host, MARKERS.FRAGMENT_END)
-      hooks.insert(host, endAnchor, null)
+      const endAnchor = hooks.createMarker(node, MARKERS.FRAGMENT_END)
+      hooks.insert(node, endAnchor, null)
       markers.push(endAnchor)
     }
 

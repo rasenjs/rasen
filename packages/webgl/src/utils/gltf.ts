@@ -10,7 +10,7 @@ import type { MeshGeometry } from '../components/3d/primitives/mesh'
 import { Mat4x4f } from '@rasenjs/math'
 
 export interface LoadedGLTF extends MeshGeometry {
-  texture?: HTMLImageElement | HTMLCanvasElement
+  texture?: TexImageSource
   bounds: { min: [number, number, number]; max: [number, number, number] }
 }
 
@@ -90,7 +90,9 @@ function readAccessor(
   }
 }
 
-function loadImage(url: string): Promise<HTMLImageElement> {
+// TODO(domlike): new Image()/fetch 属浏览器运行时 API，待资产加载器
+// 注入设计落地后由此处移除（类型面已先行收敛到 TexImageSource）。
+function loadImage(url: string): Promise<TexImageSource> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -111,7 +113,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 export async function loadGLB(
   url: string,
   textureUrl?: string,
-  sharedTexture?: HTMLImageElement | HTMLCanvasElement,
+  sharedTexture?: TexImageSource,
 ): Promise<LoadedGLTF> {
   const resp = await fetch(url)
   const buf = await resp.arrayBuffer()
@@ -223,7 +225,7 @@ export async function loadGLB(
   const normals = allNorm.length ? new Float32Array(allNorm) : undefined
 
   // --- Texture ---
-  let texture: HTMLImageElement | HTMLCanvasElement | undefined
+  let texture: TexImageSource | undefined
   if (sharedTexture) {
     // Use the caller-provided shared texture (same Image object for all
     // models) so the batch renderer groups them into ONE draw call — this

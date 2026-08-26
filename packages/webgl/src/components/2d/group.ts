@@ -9,6 +9,7 @@ import {
   type Unmount
 } from '@rasenjs/core'
 import type { Ref, ReadonlyRef } from '../../types'
+import type { GlNode } from '../../node'
 import { unref } from '../../utils'
 import {
   getRenderContext,
@@ -34,7 +35,7 @@ export interface GroupProps {
   visible?: boolean | Ref<boolean> | ReadonlyRef<boolean>
   opacity?: number | Ref<number> | ReadonlyRef<number>
   
-  children: Array<Mountable<WebGLRenderingContext | WebGL2RenderingContext>>
+  children: Array<Mountable<GlNode>>
 }
 
 /**
@@ -68,13 +69,14 @@ export interface GroupProps {
  * ```
  */
 export const group = com(
-  (props: GroupProps): Mountable<WebGLRenderingContext | WebGL2RenderingContext> => {
-    return (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
+  (props: GroupProps): Mountable<GlNode> => {
+    return (node: GlNode) => {
+      const gl = node.ctx
       const runtime = getReactiveRuntime()
       
       // Auto-create RenderContext if not exists (for testing)
       if (!hasRenderContext(gl)) {
-        new RenderContext(gl)
+        new RenderContext(gl, node.rcOptions)
       }
       
       const renderContext = getRenderContext(gl)
@@ -84,18 +86,18 @@ export const group = com(
       let componentId: symbol | null = null
       let groupContext: GroupContext | null = null
       
-      const x: Ref<number> = runtime.isRef(props.x) ? props.x as Ref<number> : runtime.ref(unref(props.x) ?? 0)
-      const y: Ref<number> = runtime.isRef(props.y) ? props.y as Ref<number> : runtime.ref(unref(props.y) ?? 0)
-      const z: Ref<number> = runtime.isRef(props.z) ? props.z as Ref<number> : runtime.ref(unref(props.z) ?? 0)
-      const rotation: Ref<number> = runtime.isRef(props.rotation) ? props.rotation as Ref<number> : runtime.ref(unref(props.rotation) ?? 0)
-      const rotationX: Ref<number> = runtime.isRef(props.rotationX) ? props.rotationX as Ref<number> : runtime.ref(unref(props.rotationX) ?? 0)
-      const rotationY: Ref<number> = runtime.isRef(props.rotationY) ? props.rotationY as Ref<number> : runtime.ref(unref(props.rotationY) ?? 0)
-      const rotationZ: Ref<number> = runtime.isRef(props.rotationZ) ? props.rotationZ as Ref<number> : runtime.ref(unref(props.rotationZ) ?? unref(rotation))
-      const scaleX: Ref<number> = runtime.isRef(props.scaleX) ? props.scaleX as Ref<number> : runtime.ref(unref(props.scaleX) ?? 1)
-      const scaleY: Ref<number> = runtime.isRef(props.scaleY) ? props.scaleY as Ref<number> : runtime.ref(unref(props.scaleY) ?? 1)
-      const scaleZ: Ref<number> = runtime.isRef(props.scaleZ) ? props.scaleZ as Ref<number> : runtime.ref(unref(props.scaleZ) ?? 1)
-      const visible: Ref<boolean> = runtime.isRef(props.visible) ? props.visible as Ref<boolean> : runtime.ref(unref(props.visible) ?? true)
-      const opacity: Ref<number> = runtime.isRef(props.opacity) ? props.opacity as Ref<number> : runtime.ref(unref(props.opacity) ?? 1)
+      const x = runtime.isRef(props.x) ? (props.x as unknown as Ref<number>) : runtime.ref((unref(props.x) as number) ?? 0)
+      const y = runtime.isRef(props.y) ? (props.y as unknown as Ref<number>) : runtime.ref((unref(props.y) as number) ?? 0)
+      const z = runtime.isRef(props.z) ? (props.z as unknown as Ref<number>) : runtime.ref((unref(props.z) as number) ?? 0)
+      const rotation = runtime.isRef(props.rotation) ? (props.rotation as unknown as Ref<number>) : runtime.ref((unref(props.rotation) as number) ?? 0)
+      const rotationX = runtime.isRef(props.rotationX) ? (props.rotationX as unknown as Ref<number>) : runtime.ref((unref(props.rotationX) as number) ?? 0)
+      const rotationY = runtime.isRef(props.rotationY) ? (props.rotationY as unknown as Ref<number>) : runtime.ref((unref(props.rotationY) as number) ?? 0)
+      const rotationZ = runtime.isRef(props.rotationZ) ? (props.rotationZ as unknown as Ref<number>) : runtime.ref((unref(props.rotationZ) as number) ?? unref(rotation))
+      const scaleX = runtime.isRef(props.scaleX) ? (props.scaleX as unknown as Ref<number>) : runtime.ref((unref(props.scaleX) as number) ?? 1)
+      const scaleY = runtime.isRef(props.scaleY) ? (props.scaleY as unknown as Ref<number>) : runtime.ref((unref(props.scaleY) as number) ?? 1)
+      const scaleZ = runtime.isRef(props.scaleZ) ? (props.scaleZ as unknown as Ref<number>) : runtime.ref((unref(props.scaleZ) as number) ?? 1)
+      const visible = runtime.isRef(props.visible) ? (props.visible as unknown as Ref<boolean>) : runtime.ref((unref(props.visible) as boolean) ?? true)
+      const opacity = runtime.isRef(props.opacity) ? (props.opacity as unknown as Ref<number>) : runtime.ref((unref(props.opacity) as number) ?? 1)
       
       // Group's draw function - apply transform and draw children
       const drawGroup = () => {
@@ -137,14 +139,14 @@ export const group = com(
       
       // Mount all children (in group context)
       for (const child of props.children) {
-        const unmount = child(gl)
+        const unmount = child(node, undefined)
         childUnmounts.push(unmount)
       }
       
       // Exit group context
       exitGroupContext(gl)
       
-      runtime.watch(
+      runtime.subscribe(
         () => [
           unref(x),
           unref(y),
@@ -161,8 +163,7 @@ export const group = com(
         ],
         () => {
           renderContext.markDirty()
-        },
-        { immediate: false }
+        }
       )
       
       // Cleanup

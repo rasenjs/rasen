@@ -168,10 +168,10 @@ const Counter = (props) => {
   
   return (host: HTMLElement) => {
     return scope.run(() => {
-      // All watchers must be registered in this scope
-      runtime.watch(() => count.value, (val) => {
+      // All subscriptions must be registered in this scope
+      runtime.subscribe(() => count.value, (val) => {
         // Update rendering based on watched value
-      }, { immediate: true })
+      })
       
       return () => scope.stop()  // ← Must manually stop
     })

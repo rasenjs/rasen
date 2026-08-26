@@ -4,6 +4,7 @@
  */
 
 import type { Bounds } from './types'
+import type { Gl2Context, GlContext } from './node'
 import { boundsIntersect, mergeBounds } from '@rasenjs/core/utils'
 import { BatchRenderer } from './renderer/batch'
 import { InstancedRenderer } from './renderer/instanced'
@@ -62,6 +63,21 @@ export interface RenderContextOptions {
    * to false (event-driven redraws).
    */
   continuousRender?: boolean
+  /**
+   * 逻辑尺寸（CSS 像素）：投影矩阵的宽高来源。缺省退化为
+   * gl.canvas 的绘图缓冲尺寸。由桥接方（dom <canvas>）显式传入，
+   * 替代旧的 dataset 传递。
+   */
+  logicalWidth?: number
+  logicalHeight?: number
+  /**
+   * 尺寸变化事件源：桥接方传入画布元素（监听 'rasen:resize'）。
+   * 缺省时不监听（测试/离屏场景）。
+   */
+  resizeSource?: {
+    addEventListener(type: 'rasen:resize', cb: () => void): void
+    removeEventListener(type: 'rasen:resize', cb: () => void): void
+  }
 }
 
 /**
@@ -69,11 +85,19 @@ export interface RenderContextOptions {
  */
 export class RenderContext {
   private components = new Map<symbol, ComponentInstance>()
+  /** 场景树渲染根（顶层组件挂载时注册） */
+  private roots: import('./node').GlNode[] = []
   private dirtyRegions: Bounds[] = []
   private rafId: number | null = null
   private onCanvasResize: (() => void) | null = null
   private needsFullRedraw: boolean = true
-  private options: Required<RenderContextOptions>
+  private options: Omit<RenderContextOptions, 'dirtyTracking'> & {
+    batching: boolean
+    instancing: boolean
+    dirtyTracking: boolean
+    clearColor: string
+    continuousRender: boolean
+  }
   private batchRenderer: BatchRenderer | null = null
   private instancedRenderer: InstancedRenderer | null = null
   private projectionMatrix: Mat4x4f
@@ -110,7 +134,7 @@ export class RenderContext {
   }
 
   constructor(
-    private gl: WebGLRenderingContext | WebGL2RenderingContext,
+    private gl: GlContext,
     options: RenderContextOptions = {}
   ) {
     this.options = {
@@ -118,7 +142,10 @@ export class RenderContext {
       instancing: options.instancing ?? false,
       dirtyTracking: options.dirtyTracking ?? true,
       clearColor: options.clearColor ?? '#000000',
-      continuousRender: options.continuousRender ?? false
+      continuousRender: options.continuousRender ?? false,
+      logicalWidth: options.logicalWidth,
+      logicalHeight: options.logicalHeight,
+      resizeSource: options.resizeSource
     }
     
     this.setupWebGL()
@@ -137,26 +164,25 @@ export class RenderContext {
 
     // Repaint when the canvas' drawing buffer is resized (dispatched by the
     // canvas component) — even if the aspect ratio is unchanged.
-    const canvasEl = gl.canvas as HTMLCanvasElement
-    this.onCanvasResize = () => {
-      this.needsFullRedraw = true
-      this.scheduleDraw()
+    if (this.options.resizeSource) {
+      this.onCanvasResize = () => {
+        this.needsFullRedraw = true
+        this.scheduleDraw()
+      }
+      this.options.resizeSource.addEventListener('rasen:resize', this.onCanvasResize)
     }
-    canvasEl.addEventListener('rasen:resize', this.onCanvasResize)
 
-    const canvas = gl.canvas as HTMLCanvasElement
-    const logicalWidth = canvas.dataset.logicalWidth 
-      ? parseInt(canvas.dataset.logicalWidth, 10)
-      : (canvas.clientWidth || canvas.width)
-    const logicalHeight = canvas.dataset.logicalHeight
-      ? parseInt(canvas.dataset.logicalHeight, 10)
-      : (canvas.clientHeight || canvas.height)
+    const logicalWidth =
+      this.options.logicalWidth ?? gl.canvas.width
+    const logicalHeight =
+      this.options.logicalHeight ?? gl.canvas.height
     
     this.projectionMatrix = Mat4x4f.ortho(0, logicalWidth, 0, logicalHeight, -1000, 1000)
     this.viewMatrix = Mat4x4f.identity()
     
-    if (this.options.instancing && gl instanceof WebGL2RenderingContext) {
-      this.instancedRenderer = new InstancedRenderer(gl, this.projectionMatrix)
+    // WebGL2 能力探测：不依赖 DOM 全局 instanceof；in 收窄到 Gl2Context
+    if (this.options.instancing && 'drawArraysInstanced' in gl) {
+      this.instancedRenderer = new InstancedRenderer(gl as Gl2Context, this.projectionMatrix)
     } else if (this.options.batching) {
       this.batchRenderer = new BatchRenderer(gl, this.projectionMatrix)
     }
@@ -255,6 +281,18 @@ export class RenderContext {
     } else {
       gl.clear(gl.COLOR_BUFFER_BIT)
     }
+  }
+
+  /** 顶层组件挂载时注册为渲染根 */
+  addRoot(node: import('./node').GlNode): void {
+    this.roots.push(node)
+    this.markDirty()
+  }
+
+  removeRoot(node: import('./node').GlNode): void {
+    const i = this.roots.indexOf(node)
+    if (i >= 0) this.roots.splice(i, 1)
+    this.markDirty()
   }
 
   register(instance: ComponentInstance): symbol {
@@ -694,9 +732,8 @@ export class RenderContext {
     if (this.continuousRafId !== null) {
       cancelAnimationFrame(this.continuousRafId)
     }
-    const canvasEl = this.gl.canvas as HTMLCanvasElement
-    if (this.onCanvasResize) {
-      canvasEl.removeEventListener('rasen:resize', this.onCanvasResize)
+    if (this.onCanvasResize && this.options.resizeSource) {
+      this.options.resizeSource.removeEventListener('rasen:resize', this.onCanvasResize)
     }
     if (this.batchRenderer) {
       this.batchRenderer.destroy()
@@ -711,19 +748,19 @@ export class RenderContext {
 }
 
 const renderContextMap = new WeakMap<
-  WebGLRenderingContext | WebGL2RenderingContext,
+  GlContext,
   RenderContext
 >()
 
 export function setRenderContext(
-  gl: WebGLRenderingContext | WebGL2RenderingContext,
+  gl: GlContext,
   context: RenderContext
 ) {
   renderContextMap.set(gl, context)
 }
 
 export function getRenderContext(
-  gl: WebGLRenderingContext | WebGL2RenderingContext
+  gl: GlContext
 ): RenderContext {
   const context = renderContextMap.get(gl)
   if (!context) {
@@ -733,18 +770,18 @@ export function getRenderContext(
 }
 
 export function hasRenderContext(
-  gl: WebGLRenderingContext | WebGL2RenderingContext
+  gl: GlContext
 ): boolean {
   return renderContextMap.has(gl)
 }
 
 const groupContextStack = new WeakMap<
-  WebGLRenderingContext | WebGL2RenderingContext,
+  GlContext,
   GroupContext[]
 >()
 
 export function enterGroupContext(
-  gl: WebGLRenderingContext | WebGL2RenderingContext
+  gl: GlContext
 ): GroupContext {
   const groupContext: GroupContext = {
     childDrawFunctions: [],
@@ -770,7 +807,7 @@ export function enterGroupContext(
  * up in an orphaned context that is never drawn).
  */
 export function pushGroupContext(
-  gl: WebGLRenderingContext | WebGL2RenderingContext,
+  gl: GlContext,
   groupContext: GroupContext
 ): void {
   let stack = groupContextStack.get(gl)
@@ -782,7 +819,7 @@ export function pushGroupContext(
 }
 
 export function exitGroupContext(
-  gl: WebGLRenderingContext | WebGL2RenderingContext
+  gl: GlContext
 ): void {
   const stack = groupContextStack.get(gl)
   if (stack && stack.length > 0) {
@@ -791,7 +828,7 @@ export function exitGroupContext(
 }
 
 export function getCurrentGroupContext(
-  gl: WebGLRenderingContext | WebGL2RenderingContext
+  gl: GlContext
 ): GroupContext | null {
   const stack = groupContextStack.get(gl)
   if (stack && stack.length > 0) {

@@ -3,14 +3,10 @@
  */
 import type { Bounds } from '@rasenjs/core/utils'
 
-// Re-export common types from canvas-2d compatible definitions
-export interface Ref<T = unknown> {
-  value: T
-}
-
-export interface ReadonlyRef<T = unknown> {
-  readonly value: T
-}
+// Ref/ReadonlyRef 统一使用 core 的品牌化定义（消除双类型系统）：
+// 本地不再自行声明 { value } 造型，运行时 ref 由所选响应式运行时创建。
+export type { Ref, ReadonlyRef } from '@rasenjs/core'
+import type { Ref, ReadonlyRef } from '@rasenjs/core'
 
 export type MaybeRef<T> = T | Ref<T> | ReadonlyRef<T>
 

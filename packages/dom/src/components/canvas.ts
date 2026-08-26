@@ -1,5 +1,5 @@
-import type { PropValue, Mountable, HostContext } from '@rasenjs/core'
-import { getReactiveRuntime, toValue, provideHostContext } from '@rasenjs/core'
+import type { PropValue, Mountable, HostHooks } from '@rasenjs/core'
+import { getReactiveRuntime, toValue } from '@rasenjs/core'
 
 interface GPUAdapter {
   requestDevice: () => Promise<unknown>
@@ -96,7 +96,7 @@ export function canvas(props: {
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<CanvasRenderingContext2D>>
+  children: Array<Mountable<{ ctx: CanvasRenderingContext2D }>>
 }): Mountable<HTMLElement>
 
 export function canvas(props: {
@@ -104,10 +104,12 @@ export function canvas(props: {
   height: PropValue<number>
   contextType: 'webgl'
   contextOptions?: CanvasContextOptions
+  /** 渲染上下文配置（clearColor/continuousRender 等），经 node 注入 RenderContext */
+  renderOptions?: Record<string, unknown>
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<WebGLRenderingContext>>
+  children: Array<Mountable<{ ctx: WebGLRenderingContext }>>
 }): Mountable<HTMLElement>
 
 export function canvas(props: {
@@ -115,10 +117,12 @@ export function canvas(props: {
   height: PropValue<number>
   contextType: 'webgl2'
   contextOptions?: CanvasContextOptions
+  /** 渲染上下文配置（clearColor/continuousRender 等），经 node 注入 RenderContext */
+  renderOptions?: Record<string, unknown>
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<WebGL2RenderingContext>>
+  children: Array<Mountable<{ ctx: WebGL2RenderingContext }>>
 }): Mountable<HTMLElement>
 
 export function canvas<Ctx>(props: {
@@ -128,7 +132,7 @@ export function canvas<Ctx>(props: {
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<Ctx>>
+  children: Array<Mountable<{ ctx: Ctx }>>
 }): Mountable<HTMLElement>
 
 // 实现
@@ -137,11 +141,12 @@ export function canvas<Ctx>(props: {
   height: PropValue<number>
   contextType?: '2d' | 'webgl' | 'webgl2' | 'webgpu'
   contextOptions?: WebGLContextAttributes
+  renderOptions?: Record<string, unknown>
   getContext?: ContextGetter<Ctx>
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<Ctx>>
+  children: Array<Mountable<{ ctx: Ctx }>>
 }): Mountable<HTMLElement> {
   return (domHost: HTMLElement) => {
     // 创建 canvas 元素
@@ -163,15 +168,6 @@ export function canvas<Ctx>(props: {
     // CSS 样式使用逻辑像素
     canvasEl.style.width = `${width}px`
     canvasEl.style.height = `${height}px`
-    
-    // Store logical dimensions for WebGL projection matrix
-    canvasEl.dataset.logicalWidth = String(width)
-    canvasEl.dataset.logicalHeight = String(height)
-    
-    // Store context options for WebGL RenderContext
-    if (props.contextOptions) {
-      canvasEl.dataset.contextOptions = JSON.stringify(props.contextOptions)
-    }
 
     // 设置样式
     if (props.className) {
@@ -227,15 +223,13 @@ export function canvas<Ctx>(props: {
     // React to size changes: keep drawingBuffer + logical size in sync so the
     // visible area grows with the window instead of stretching.
     const runtime = getReactiveRuntime()
-    const stopSizeWatch = runtime.watch(
+    const stopSizeWatch = runtime.subscribe(
       () => [toValue(props.width), toValue(props.height), dpr] as const,
       ([w, h]) => {
         canvasEl.width = w * dpr
         canvasEl.height = h * dpr
         canvasEl.style.width = `${w}px`
         canvasEl.style.height = `${h}px`
-        canvasEl.dataset.logicalWidth = String(w)
-        canvasEl.dataset.logicalHeight = String(h)
         if (contextType === '2d' && !props.getContext) {
           // canvas.width reset clears the transform — re-apply DPR scale.
           const ctx2d = ctx as unknown as CanvasRenderingContext2D
@@ -247,12 +241,25 @@ export function canvas<Ctx>(props: {
       },
     )
 
-    // 挂载子组件到渲染上下文
-    // 用 provideHostContext 包裹：结构性组件（each/when）在 canvas 内
-    // 继承 canvas 的宿主上下文（canvas-2d/webgl 无需 marker 节点操作）。
-    const childCtx: HostContext<Ctx> = { hooks: {} }
+    // 构造宿主节点：ctx + 渲染配置（替代旧 dataset IPC）。
+    // 逻辑尺寸/尺寸变化源在此注入，渲染器不再自行触达 DOM。
+    const node = {
+      ctx,
+      rcOptions: {
+        logicalWidth: width,
+        logicalHeight: height,
+        resizeSource: canvasEl,
+        ...(props.renderOptions ?? {}),
+      },
+    }
+
+    // 挂载子组件到渲染上下文：canvas 子树无 marker 节点操作需求，
+    // 显式传空 hooks（全降级）——hooks 即上下文，显式传递。
     const childUnmounts = props.children.map((child) =>
-      provideHostContext(childCtx, () => child(ctx))
+      (child as Mountable<{ ctx: Ctx }>)(
+        node as { ctx: Ctx },
+        {} as HostHooks<{ ctx: Ctx }>,
+      )
     )
 
     // 返回 unmount 函数

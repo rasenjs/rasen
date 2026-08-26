@@ -77,16 +77,10 @@ export function watchProp<T>(
     }
   }
   
-  // 监听后续变化
-  const stop = runtime.watch(
-    getter,
-    (newValue) => {
-      setter(newValue)
-    },
-    { immediate: false }
-  )
-  
-  return stop
+  // 监听后续变化（subscribe：静态源零订阅 + 等值跳过，见
+  // ReactiveRuntime.subscribe 契约）。setter 直传——其 (value) 签名是
+  // subscribe 回调 (value, oldValue) 的前缀，无需再包一层箭头。
+  return runtime.subscribe(getter, setter)
 }
 
 /**

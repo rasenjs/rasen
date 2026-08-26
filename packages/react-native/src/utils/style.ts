@@ -83,7 +83,7 @@ export function applyStyle<S extends object = Record<string, unknown>>(
   apply()
 
   const stop = typeof style === 'function'
-    ? runtime.watch(() => {
+    ? runtime.subscribe(() => {
         // Touch reactive deps by resolving inside the watcher source.
         resolveStyle(style, getState() as never)
         return getState()

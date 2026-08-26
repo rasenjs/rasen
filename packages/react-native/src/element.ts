@@ -79,19 +79,19 @@ export function renderChildren(
       const initial = String(runtime.unref(child))
       const textNode = parent.ownerDocument.createTextNode(initial)
       parent.appendChild(textNode)
-      const stop = runtime.watch(
+      const stop = runtime.subscribe(
         () => String(runtime.unref(child)),
         (v) => { textNode.textContent = v },
       )
       unmounts.push(() => { stop(); parent.removeChild(textNode) })
     } else if (typeof child === 'function') {
       // Could be Mountable or reactive text getter — check return type
-      const result = child(parent as RNNode)
+      const result = child(parent as RNNode, undefined)
       if (typeof result === 'string' || typeof result === 'number') {
         // Reactive getter — create text node and watch for changes
         const textNode = parent.ownerDocument.createTextNode(String(result))
         parent.appendChild(textNode)
-        const stop = runtime.watch(
+        const stop = runtime.subscribe(
           child as () => string | number,
           (v) => { textNode.textContent = String(v) },
         )
@@ -136,16 +136,17 @@ export function element(
       if (typeof styleProp === 'function') {
         // Apply initial style immediately, then watch for changes.
         const runtime = getReactiveRuntime()
-        const stop = runtime.watch(
-          styleProp as () => Record<string, unknown>,
-          (next) => {
-            if (next && typeof next === 'object') {
-              for (const [k, v] of Object.entries(next)) {
-                el.style.setProperty(k, v)
-              }
+        const applyStyle = (next: unknown): void => {
+          if (next && typeof next === 'object') {
+            for (const [k, v] of Object.entries(next as Record<string, unknown>)) {
+              el.style.setProperty(k, String(v))
             }
-          },
-          { immediate: true },
+          }
+        }
+        applyStyle(styleProp as unknown as Record<string, unknown>)
+        const stop = runtime.subscribe(
+          styleProp as () => Record<string, unknown>,
+          (next) => applyStyle(next)
         )
         cleanups.push(stop)
       } else {
@@ -167,7 +168,7 @@ export function element(
       if (value === undefined) continue
 
       if (runtime.isRef(value)) {
-        const stop = runtime.watch(
+        const stop = runtime.subscribe(
           () => runtime.unref(value),
           (next) => {
             if (next == null) {

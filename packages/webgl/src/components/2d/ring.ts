@@ -2,11 +2,11 @@
  * Ring component (donut shape) (2D/3D unified)
  */
 
-import type { SyncComponent } from '@rasenjs/core'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
 import { element } from '../element'
+import type { Component3D, GlContext } from '../../node'
 
 export interface RingProps extends CommonDrawProps, Transform2DProps {
   x: MaybeRef<number>
@@ -75,10 +75,7 @@ function createRingGeometry(
 /**
  * Ring component
  */
-export const ring: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [RingProps]
-> = (props: RingProps) => {
+export const ring: Component3D<RingProps> = (props: RingProps) => {
   let cachedGeometry: Float32Array | null = null
   let cachedInnerRadius: number | null = null
   let cachedOuterRadius: number | null = null
@@ -112,7 +109,7 @@ export const ring: SyncComponent<
       return cachedBounds
     },
 
-    draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
+    draw: (gl: GlContext) => {
       const x = unref(props.x)
       const y = unref(props.y)
       const z = unref(props.z) ?? 0

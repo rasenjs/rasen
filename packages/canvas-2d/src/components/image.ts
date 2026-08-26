@@ -5,7 +5,8 @@ import {
   type CommonDrawProps,
   type TransformProps,
   withDrawProps,
-  collectDrawPropsDependencies
+  collectDrawPropsDependencies,
+  pointerHandlersFrom,
 } from '../utils'
 
 /**
@@ -120,6 +121,8 @@ export const image: Component2D<ImageProps> = (
         }
       )
     },
+
+    on: pointerHandlersFrom(props),
 
     deps: () => [
       unref(props.image),

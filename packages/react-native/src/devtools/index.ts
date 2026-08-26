@@ -17,7 +17,7 @@
  * }
  * ```
  *
- * Host notes:
+ * N notes:
  *  - iOS simulator:    http://localhost
  *  - Android emulator: http://10.0.2.2
  *  - physical device:  http://<Mac LAN IP>

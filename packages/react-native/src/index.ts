@@ -37,7 +37,6 @@ import type {
   RNEvent,
 } from '@rasenjs/rn-dom'
 import type { Mountable } from '@rasenjs/core'
-import { provideHostContext } from '@rasenjs/core'
 
 import { element, tag } from './element'
 import type { ElementProps, Child } from './element'
@@ -50,8 +49,8 @@ export type { ElementProps, Child }
 // Re-export types from rn-dom for convenience
 export type { RNNode, RNTextNode, RNCommentNode, RNStyle, RNEvent }
 
-/** Host node type for this renderer (alias for RNNode). */
-export type Host = RNNode
+/** N node type for this renderer (alias for RNNode). */
+export type N = RNNode
 
 // Utility exports from rn-dom
 export { dispatchCommand, sendAccessibilityEvent, findNodeHandle }
@@ -59,7 +58,7 @@ export { dispatchCommand, sendAccessibilityEvent, findNodeHandle }
 // Tag alias components
 export * from './components'
 
-// ── Host Hooks (internal, for registerApp) ────────────────────────────
+// ── N Hooks (internal, for registerApp) ────────────────────────────
 
 type RNAnyNode = RNNode | RNTextNode | RNCommentNode
 
@@ -168,8 +167,8 @@ export function registerApp(
   AppRegistry.registerRunnable(appName, ({ rootTag }: { rootTag: number }) => {
     const doc = RNDocument.getOrCreate(rootTag)
     rerender = () => {
-      // 内部提供 RN 宿主上下文，用户无感
-      provideHostContext({ hooks: hostHooks }, () => App()(doc.body))
+      // RN hooks 显式传递——hooks 即上下文
+      App()(doc.body, hostHooks as unknown as Parameters<typeof App>['length'] extends never ? never : Record<string, unknown> as never)
     }
     rerender()
   })

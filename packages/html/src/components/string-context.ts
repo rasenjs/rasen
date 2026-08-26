@@ -1,24 +1,22 @@
 /**
  * htmlContext 组件 - 提供 HTML 渲染上下文
  */
-import type { Mountable } from '@rasenjs/core'
-import { provideHostContext } from '@rasenjs/core'
-import type { StringHost } from '../types'
+import type { Mountable, HostHooks } from '@rasenjs/core'
 import { createStringHost } from '../types'
-import { htmlHostHooks } from '../host-hooks'
+import { htmlHostHooks, type SSRNode } from '../host-hooks'
 
 /**
  * 创建字符串渲染上下文
  */
 export function stringContext(props: {
-  children: Array<Mountable<StringHost>>
-}): Mountable<StringHost> {
-  return (host: StringHost) => {
+  children: Mountable<SSRNode>[]
+}): Mountable<SSRNode> {
+  return (node: SSRNode, hooks?: HostHooks<SSRNode>) => {
     const { children } = props
 
-    // 挂载所有子组件
+    // 挂载所有子组件（hooks 显式传递——hooks 即上下文）
     for (const child of children) {
-      child(host)
+      child(node, hooks)
     }
 
     // SSR 不需要 unmount
@@ -31,21 +29,19 @@ export function stringContext(props: {
  *
  * 这是 SSR 的主要入口
  */
-export function renderToString(component: Mountable<StringHost>): string {
+export function renderToString(component: Mountable<SSRNode>): string {
   const host = createStringHost()
-  provideHostContext({ hooks: htmlHostHooks }, () => component(host))
+  component(host, htmlHostHooks)
   return host.toString()
 }
 
 /**
  * 将多个组件渲染为 HTML 字符串
  */
-export function renderToStringMultiple(components: Mountable<StringHost>[]): string {
+export function renderToStringMultiple(components: Mountable<SSRNode>[]): string {
   const host = createStringHost()
-  provideHostContext({ hooks: htmlHostHooks }, () => {
-    for (const component of components) {
-      component(host)
-    }
-  })
+  for (const component of components) {
+    component(host, htmlHostHooks)
+  }
   return host.toString()
 }

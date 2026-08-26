@@ -2,12 +2,14 @@
  * Shader program management
  */
 
+import type { GlContext } from '../node'
+
 export class ShaderProgram {
   private program: WebGLProgram | null = null
   private uniformLocations = new Map<string, WebGLUniformLocation>()
   private attribLocations = new Map<string, number>()
 
-  constructor(private gl: WebGLRenderingContext | WebGL2RenderingContext) {}
+  constructor(private gl: GlContext) {}
 
   /**
    * Compile and link shader program

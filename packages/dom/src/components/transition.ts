@@ -1,4 +1,4 @@
-import { com, type Mountable, type PropValue } from '@rasenjs/core'
+import { com, type Mountable, type PropValue, type HostHooks } from '@rasenjs/core'
 import { watchProp, unref } from '../utils'
 
 export interface TransitionConfig {
@@ -12,8 +12,9 @@ export interface TransitionConfig {
   onAfterLeave?: (el: HTMLElement) => void
 }
 
-export const transition = com((config: TransitionConfig): Mountable<HTMLElement> => {
-  return (host: HTMLElement) => {
+export const transition = com((
+    config: TransitionConfig): Mountable<HTMLElement> => {
+  return (node: HTMLElement, hooks: HostHooks<HTMLElement> | undefined) => {
     const { when, children, name = 'v' } = config
     let el: HTMLElement | null = null
     let currentUnmount: (() => void) | undefined
@@ -58,8 +59,8 @@ export const transition = com((config: TransitionConfig): Mountable<HTMLElement>
       if (el || isLeaving) return
 
       const mountable = children()
-      currentUnmount = mountable(host)
-      el = host.firstElementChild as HTMLElement | null
+      currentUnmount = mountable(node, hooks as HostHooks<HTMLElement> | undefined)
+      el = node.firstElementChild as HTMLElement | null
 
       if (!el) return
 

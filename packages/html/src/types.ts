@@ -43,6 +43,6 @@ export function createStringHost(): StringHost {
 
 /**
  * 字符串渲染的 Mountable 类型
- * @deprecated 使用 Mountable<StringHost> 替代
+ * @deprecated 使用 Mountable<string> 替代
  */
-export type StringMountFunction = Mountable<StringHost>
+export type StringMountFunction = Mountable<string>

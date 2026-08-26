@@ -43,43 +43,38 @@ export function createReactiveRuntime(): ReactiveRuntime {
   }
 
   return {
-    watch<T>(
-      source: (() => T) | Ref<T> | ReadonlyRef<T>,
-      callback: (value: T, oldValue: T) => void,
-      options?: { immediate?: boolean; deep?: boolean }
+    subscribe<T>(
+      getter: () => T,
+      callback: (value: T, oldValue: T) => void
     ): () => void {
       let oldValue: T | undefined = undefined
-      let isFirstRun = true
+      let hasPrev = false
       let stopped = false
 
       // The Computed ONLY computes the value — it must NOT run the callback.
+      // Initial evaluation (below) establishes dependencies without firing;
+      // the binding layer applies the first value itself (watchProp).
       const effect = new Signal.Computed<T | undefined>(() => {
         if (stopped) return undefined
-        if (typeof source === 'function') return source()
-        // The ref IS the Signal itself (Signal.State / Signal.Computed)
-        if (Signal.isState(source) || Signal.isComputed(source)) {
-          return (source as unknown as Signal.State<T> | Signal.Computed<T>).get()
-        }
-        return source as unknown as T
+        return getter()
       })
 
       const run = () => {
         if (stopped) return
         const newValue = effect.get() as T
-        if (!isFirstRun && oldValue !== undefined) {
-          // Fine-grained reactivity: only fire when the value actually
-          // changed. Without this, every dependent re-runs on any dirty
-          // notification even when its computed value is unchanged (e.g. 1000
-          // rows each watching a global `selected` signal all re-fire on a
-          // single selection change). Skipping unchanged values keeps updates
-          // O(changed) instead of O(subscribers), matching Vue/Solid.
+        if (hasPrev) {
+          // Equal-value skip: unchanged computeds never re-fire callbacks,
+          // keeping updates O(changed) instead of O(subscribers)
+          // (e.g. 1000 rows watching one `selected` signal).
           if (!Object.is(newValue, oldValue)) {
-            callback(newValue, oldValue)
+            const old = oldValue as T
+            oldValue = newValue
+            callback(newValue, old)
+            return
           }
-        } else if (options?.immediate) {
-          callback(newValue, newValue)
+        } else {
+          hasPrev = true
         }
-        isFirstRun = false
         oldValue = newValue
       }
 
@@ -223,17 +218,6 @@ export function ref<T>(value: T): Ref<T> {
  */
 export function computed<T>(getter: () => T): ReadonlyRef<T> {
   return getRuntime().computed(getter)
-}
-
-/**
- * Convenient watch function
- */
-export function watch<T>(
-  source: () => T,
-  callback: (newValue: T, oldValue: T) => void,
-  options?: { immediate?: boolean }
-): () => void {
-  return getRuntime().watch(source, callback, options)
 }
 
 /**

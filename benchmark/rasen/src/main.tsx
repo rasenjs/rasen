@@ -5,11 +5,12 @@
 
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime, ref } from '@rasenjs/reactive-vue'
-import { mount, each } from '@rasenjs/dom'
+import { mount, each, configureEventDelegation } from '@rasenjs/dom'
 
 // Initialize reactive runtime with Vue reactivity
 const runtime = createReactiveRuntime()
 setReactiveRuntime(runtime)
+// // configureEventDelegation(true)
 
 // ============================================================================
 // Data Generation
@@ -41,6 +42,7 @@ let nextId = 1
 interface RowData {
   id: number
   label: string
+  selected?: boolean
 }
 
 function buildData(count: number): RowData[] {
@@ -59,7 +61,16 @@ function buildData(count: number): RowData[] {
 // ============================================================================
 
 const data = ref<RowData[]>([])
-const selected = ref<number>(0)
+// id -> reactive row proxy. Rebuilt whenever the array is replaced; lets
+// select() locate the two affected rows in O(1) instead of scanning the
+// proxied array (proxy reads cost far more than the fanout they replace).
+let rowById: Map<number, RowData> = new Map()
+let lastSelectedId = 0
+
+function rebuildIndex() {
+  rowById = new Map()
+  for (const r of data.value) rowById.set(r.id, r)
+}
 
 // ============================================================================
 // Actions
@@ -67,33 +78,38 @@ const selected = ref<number>(0)
 
 function run() {
   data.value = buildData(1000)
-  selected.value = 0
+  rebuildIndex()
+  lastSelectedId = 0
 }
 
 function runLots() {
   data.value = buildData(10000)
-  selected.value = 0
+  rebuildIndex()
+  lastSelectedId = 0
 }
 
 function add() {
   // Reassign to a new array so the single-subscription `each` re-runs.
   // Mutating in place (data.value.push) would not notify the watcher.
   data.value = [...data.value, ...buildData(1000)]
+  for (const r of data.value) if (!rowById.has(r.id)) rowById.set(r.id, r)
 }
 
 function update() {
   const d = data.value
+  // In-place item mutation — the idiomatic pattern for our reference-keyed
+  // `each`: object references stay identical, so the list diff is a no-op,
+  // and each row's label binding (a tracked read of the deeply-reactive
+  // `item.label`) patches just its own text node.
   for (let i = 0; i < d.length; i += 10) {
-    // Create a new object so the keyed `each` patches only this row.
-    d[i] = { ...d[i], label: d[i].label + ' !!!' }
+    d[i].label = d[i].label + ' !!!'
   }
-  // Reassign to a new array reference to trigger the watcher.
-  data.value = [...d]
 }
 
 function clear() {
   data.value = []
-  selected.value = 0
+  rowById = new Map()
+  lastSelectedId = 0
 }
 
 function swapRows() {
@@ -108,11 +124,20 @@ function swapRows() {
 }
 
 function select(id: number) {
-  selected.value = id
+  // Per-row field write via the id index: exactly two proxy writes fire
+  // exactly two row effects. The global-selected model would fan out to all
+  // 1000 row subscriptions on every click.
+  if (lastSelectedId === id) return
+  const prev = rowById.get(lastSelectedId)
+  if (prev?.selected) prev.selected = false
+  const next = rowById.get(id)
+  if (next) next.selected = true
+  lastSelectedId = id
 }
 
 function remove(id: number) {
   data.value = data.value.filter((d: RowData) => d.id !== id)
+  rowById.delete(id)
 }
 
 // ============================================================================
@@ -136,7 +161,7 @@ document.getElementById('swaprows')!.onclick = swapRows
 /** @rasen-compile */
 function Row(item: RowData) {
   return (
-    <tr class={selected.value === item.id ? 'danger' : ''}>
+    <tr class={item.selected ? 'danger' : ''}>
       <td class="col-md-1">{String(item.id)}</td>
       <td class="col-md-4">
         <a class="lbl" onClick={() => select(item.id)}>

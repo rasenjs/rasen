@@ -1,0 +1,23 @@
+{
+  "name": "benchmark-rasen-alien",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5174",
+    "build": "vite build",
+    "preview": "vite preview --port 5174",
+    "start": "node ../scripts/start-server.mjs"
+  },
+  "dependencies": {
+    "@rasenjs/compiler": "workspace:*",
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/dom": "workspace:*",
+    "@rasenjs/reactive-alien-signals": "workspace:*",
+    "alien-signals": "^3.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
+  }
+}

@@ -19,7 +19,7 @@
  *    reuse `each` for these cases too).
  */
 
-import { getReactiveRuntime, toValue, type Mountable, type Ref, each } from '@rasenjs/core'
+import {  getReactiveRuntime, toValue, type Mountable, type Ref, each , type HostHooks } from '@rasenjs/core'
 import type { RNNode } from '@rasenjs/rn-dom'
 import { element, renderChildren, type Child } from '../element'
 
@@ -76,6 +76,7 @@ function resolveComponentOrMountable(
 function renderList(
   parent: RNNode,
   getContent: () => Mountable<RNNode>[],
+  hooks?: HostHooks<RNNode>,
 ): () => void {
   const runtime = getReactiveRuntime()
   let unmounts: (() => void)[] = []
@@ -84,13 +85,13 @@ function renderList(
     for (const u of unmounts) u()
     unmounts = []
     for (const m of getContent()) {
-      const u = m(parent)
+      const u = m(parent, hooks)
       if (u) unmounts.push(u)
     }
   }
 
   render()
-  const stop = runtime.watch(getContent, render)
+  const stop = runtime.subscribe(getContent, render)
   return () => {
     stop()
     for (const u of unmounts) u()

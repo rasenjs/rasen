@@ -5,7 +5,8 @@ import {
   type CommonDrawProps,
   type TransformProps,
   withDrawProps,
-  collectDrawPropsDependencies
+  collectDrawPropsDependencies,
+  pointerHandlersFrom,
 } from '../utils'
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
@@ -74,6 +75,8 @@ export const sprite: Component2D<SpriteProps> = (
         }
       )
     },
+
+    on: pointerHandlersFrom(props),
 
     deps: () => [
       unref(props.image),

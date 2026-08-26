@@ -17,6 +17,7 @@
  */
 
 import { com, getReactiveRuntime, type Mountable } from '@rasenjs/core'
+import type { GlContext, GlNode } from '../../../node'
 import { Mat4x4f, Vec3f, vec3f } from '@rasenjs/math'
 import type { MaybeRef } from '../../../types'
 import { unref } from '../../../utils'
@@ -55,25 +56,19 @@ function toVec3(v: { x: number; y: number; z: number } | Vec3f): Vec3f {
   return v instanceof Vec3f ? v : vec3f(v.x, v.y, v.z)
 }
 
-export function canvasAspect(gl: WebGLRenderingContext | WebGL2RenderingContext): number {
-  const canvas = gl.canvas as HTMLCanvasElement
-  const logicalW = canvas.dataset.logicalWidth
-    ? parseInt(canvas.dataset.logicalWidth, 10)
-    : canvas.width
-  const logicalH = canvas.dataset.logicalHeight
-    ? parseInt(canvas.dataset.logicalHeight, 10)
-    : canvas.height
-  return logicalH > 0 ? logicalW / logicalH : 1
+export function canvasAspect(gl: GlContext): number {
+  const w = gl.canvas.width
+  const h = gl.canvas.height
+  return h > 0 ? w / h : 1
 }
 
 export function ensureRenderContext(
-  gl: WebGLRenderingContext | WebGL2RenderingContext,
+  gl: GlContext,
+  rcOptions?: import('../../../node').GlNode['rcOptions'],
 ): RenderContext {
   if (!hasRenderContext(gl)) {
-    const canvas = gl.canvas as HTMLCanvasElement
-    const optionsStr = canvas.dataset.contextOptions
-    const options = optionsStr ? JSON.parse(optionsStr) : {}
-    new RenderContext(gl, options)
+    // 配置由桥接方（dom <canvas>）经 node.rcOptions 注入；此处仅兜底默认值
+    new RenderContext(gl, rcOptions)
   }
   return getRenderContext(gl)
 }
@@ -82,9 +77,10 @@ export function ensureRenderContext(
  * PerspectiveCamera — 3D view with a perspective projection.
  */
 export const PerspectiveCamera = com(
-  (props: PerspectiveCameraProps): Mountable<WebGLRenderingContext | WebGL2RenderingContext> => {
-    return (gl) => {
-      const rc = ensureRenderContext(gl)
+  (props: PerspectiveCameraProps): Mountable<GlNode> => {
+    return (node) => {
+      const gl = node.ctx
+      const rc = ensureRenderContext(gl, node.rcOptions)
       rc.enableDepth()
 
       const apply = () => {
@@ -103,7 +99,7 @@ export const PerspectiveCamera = com(
       apply()
 
       const runtime = getReactiveRuntime()
-      const stopWatch = runtime.watch(
+      const stopWatch = runtime.subscribe(
         () => {
           const p = unref(props.position)
           const t = unref(props.target)
@@ -133,9 +129,10 @@ export const PerspectiveCamera = com(
  * OrthographicCamera — 3D view with an orthographic projection.
  */
 export const OrthographicCamera = com(
-  (props: OrthographicCameraProps): Mountable<WebGLRenderingContext | WebGL2RenderingContext> => {
-    return (gl) => {
-      const rc = ensureRenderContext(gl)
+  (props: OrthographicCameraProps): Mountable<GlNode> => {
+    return (node) => {
+      const gl = node.ctx
+      const rc = ensureRenderContext(gl, node.rcOptions)
       rc.enableDepth()
 
       const apply = () => {
@@ -156,7 +153,7 @@ export const OrthographicCamera = com(
       apply()
 
       const runtime = getReactiveRuntime()
-      const stopWatch = runtime.watch(
+      const stopWatch = runtime.subscribe(
         () => {
           const p = unref(props.position)
           const t = unref(props.target)

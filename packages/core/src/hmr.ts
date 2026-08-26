@@ -46,7 +46,8 @@ interface HotEntry {
 }
 
 interface HotInstance {
-  host: unknown
+  node: unknown
+  hooks: import('./host-context').HostHooks | undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any[]
   unmount: (() => void) | null

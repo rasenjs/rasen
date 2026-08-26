@@ -4,29 +4,39 @@
 
 import { vi } from 'vitest'
 import type { ReactiveRuntime } from '@rasenjs/core'
+import type { GlContext, GlNode } from '../node'
+
+// domlike GL 句柄别名（与 node.ts 的 Context 造型策略一致：自实现最小造型）
+type GlShader = object
+type GlProgram = object
+type GlBuffer = object
+type GlTexture = object
+type GlUniformLocation = object
 
 /**
  * Create mock WebGL context
+ *
+ * 返回对象同时满足 GlContext 与 GlNode（ctx 字段自引用），
+ * 因此测试里 mountable(gl) 可直接以 gl 作为宿主节点传入——
+ * 等价于真实场景的 mountable({ ctx })。
  */
-export function createMockWebGLContext(): WebGLRenderingContext {
-  const canvas = document.createElement('canvas')
-  canvas.width = 800
-  canvas.height = 600
-  
-  // Mock WebGL context for testing
-  const mockGL: Partial<WebGLRenderingContext> = {
+export function createMockWebGLContext(): GlContext & GlNode {
+  // domlike 表面：不再经 document.createElement
+  const canvas = { width: 800, height: 600 }
+
+  const mockGL = {
     canvas,
     drawingBufferWidth: 800,
     drawingBufferHeight: 600,
     
     // Mock WebGL methods
-    createShader: vi.fn(() => ({} as WebGLShader)),
+    createShader: vi.fn(() => ({} as GlShader)),
     shaderSource: vi.fn(),
     compileShader: vi.fn(),
     getShaderParameter: vi.fn(() => true),
     getShaderInfoLog: vi.fn(() => ''),
     deleteShader: vi.fn(),
-    createProgram: vi.fn(() => ({} as WebGLProgram)),
+    createProgram: vi.fn(() => ({} as GlProgram)),
     attachShader: vi.fn(),
     linkProgram: vi.fn(),
     getProgramParameter: vi.fn(() => true),
@@ -34,8 +44,8 @@ export function createMockWebGLContext(): WebGLRenderingContext {
     deleteProgram: vi.fn(),
     useProgram: vi.fn(),
     getAttribLocation: vi.fn(() => 0),
-    getUniformLocation: vi.fn(() => ({} as WebGLUniformLocation)),
-    createBuffer: vi.fn(() => ({} as WebGLBuffer)),
+    getUniformLocation: vi.fn(() => ({} as GlUniformLocation)),
+    createBuffer: vi.fn(() => ({} as GlBuffer)),
     bindBuffer: vi.fn(),
     bufferData: vi.fn(),
     deleteBuffer: vi.fn(),
@@ -51,7 +61,7 @@ export function createMockWebGLContext(): WebGLRenderingContext {
     uniform3fv: vi.fn(),
     uniform1i: vi.fn(),
     uniformMatrix4fv: vi.fn(),
-    createTexture: vi.fn(() => ({} as WebGLTexture)),
+    createTexture: vi.fn(() => ({} as GlTexture)),
     deleteTexture: vi.fn(),
     bindTexture: vi.fn(),
     activeTexture: vi.fn(),
@@ -71,6 +81,11 @@ export function createMockWebGLContext(): WebGLRenderingContext {
     blendFunc: vi.fn(),
     drawArrays: vi.fn(),
     flush: vi.fn(),
+    getParameter: vi.fn((param) => {
+      if (param === 0x8869) return 8 // MAX_VERTEX_ATTRIBS
+      if (param === 0x8DFB) return 16 // MAX_TEXTURE_IMAGE_UNITS
+      return 0
+    }),
     getParameter: vi.fn((param) => {
       if (param === 0x8869) return 8 // MAX_VERTEX_ATTRIBS
       if (param === 0x8DFB) return 16 // MAX_TEXTURE_IMAGE_UNITS
@@ -113,8 +128,11 @@ export function createMockWebGLContext(): WebGLRenderingContext {
     COLOR_ATTACHMENT0: 0x8CE0,
     DEPTH_ATTACHMENT: 0x8D00
   }
-  
-  return mockGL as WebGLRenderingContext
+
+  // 自引用为宿主节点：gl 即 GlNode（mountable(gl) 直传）
+  ;(mockGL as unknown as { ctx: unknown }).ctx = mockGL
+
+  return mockGL as GlContext & GlNode
 }
 
 /**
@@ -126,8 +144,7 @@ export function createMockReactiveRuntime(): ReactiveRuntime {
 
   return {
     ref: <T>(value: T) => ({ value }),
-    computed: (fn: () => any) => ({ value: fn() }),
-    watch: (source: any, callback: (newVal: any) => void, options?: any) => {
+    subscribe: (source: any, callback: (newVal: any) => void) => {
       const id = watcherId++
       const handler = () => {
         const newValue = typeof source === 'function' ? source() : source
@@ -136,17 +153,9 @@ export function createMockReactiveRuntime(): ReactiveRuntime {
       
       watchers.set(id, handler)
       
-      if (options?.immediate) {
-        handler()
-      }
-      
       return () => {
         watchers.delete(id)
       }
-    },
-    effect: (fn: () => void) => {
-      fn()
-      return () => {}
     },
     effectScope: () => ({
       run: (fn: () => any) => fn(),
@@ -175,8 +184,8 @@ export async function waitForAsync() {
  * Check if WebGL function was called
  */
 export function wasGLCalled(
-  gl: WebGLRenderingContext,
-  method: keyof WebGLRenderingContext
+  gl: GlContext,
+  method: keyof GlContext
 ): boolean {
   const spy = gl[method] as any
   return spy && typeof spy.mock !== 'undefined' && spy.mock.calls.length > 0
@@ -186,8 +195,8 @@ export function wasGLCalled(
  * Get WebGL function call arguments
  */
 export function getGLCallArgs(
-  gl: WebGLRenderingContext,
-  method: keyof WebGLRenderingContext,
+  gl: GlContext,
+  method: keyof GlContext,
   callIndex = 0
 ): any[] {
   const spy = gl[method] as any

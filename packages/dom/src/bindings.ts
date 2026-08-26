@@ -114,9 +114,18 @@ const noop = () => {}
 // HTML escaping / text semantics live in @rasenjs/core (shared with the
 // html string renderer); re-exported below for the compiler's import source.
 
-/** Normalize a reactive PropValue into a plain getter. dom's unref (= toValue)
- *  unwraps refs AND calls getters, so one wrapper covers both shapes. */
+/** Normalize a reactive PropValue into a plain getter.
+ *  Getter values are invoked directly (compiled code always passes plain
+ *  getters — skipping the unref dispatch); refs keep the unref path. */
 function toGetter<T>(value: PropValue<T>): () => T {
+  if (typeof value === 'function') {
+    const g = value as unknown as () => T
+    return () => {
+      const v = g()
+      // 返回原始值时跳过运行时解包调度（热路径）
+      return v === null || typeof v !== 'object' ? v : unref(v as T)
+    }
+  }
   return () => unref(value)
 }
 
@@ -158,7 +167,8 @@ export function bindClass(el: HTMLElement, value: PropValue<string>): () => void
   return watchProp(
     toGetter(value),
     (v) => {
-      const next = String(v || '')
+      // string 快速路径：编译产物与常见源都是字符串，跳过通用转换
+      const next = typeof v === 'string' ? v : String(v || '')
       if (current !== next) {
         el.className = next
         current = next
@@ -226,28 +236,52 @@ export function bindStyle(
   const getter = toGetter(value)
   let prev: Record<string, unknown> | null = null
   if (!isHydrating()) prev = applyStyle(el, getter(), null)
-  return getReactiveRuntime().watch(getter, (v) => {
+  return getReactiveRuntime().subscribe(getter, (v) => {
     prev = applyStyle(el, v, prev)
   })
 }
 
 /** Reactive text binding on a node (a Text node handle).
- *  Semantics mirror the element factory's children handling: a ref getter
- *  stays reactive (watched, unref'd on each run); a plain value is written
- *  once and no watcher is created. Hydration skips the initial write in
- *  both cases (server-rendered text is already in the DOM). */
+ *  One unified watch-based path for every expression shape: refs, signals,
+ *  getters that read refs, and plain static reads alike. Static sources cost
+ *  nothing beyond the initial write — the runtime's watch contract has
+ *  adapters drop subscriptions for sources that collect no reactive
+ *  dependencies (see ReactiveRuntime.watch). Hydration skips the initial
+ *  write.
+ *
+ * Fast path: primitives are never refs, so they skip the runtime.unref
+ * dispatch chain entirely (hot path for compiled text bindings). */
 export function bindText(node: Node, getter: () => unknown): () => void {
   const runtime = getReactiveRuntime()
-  const initial = getter()
-  if (runtime.isRef(initial)) {
-    const apply = () => {
-      node.textContent = String(runtime.unref(initial))
-    }
-    if (!isHydrating()) apply()
-    return runtime.watch(() => String(runtime.unref(initial)), apply)
+  const read = () => {
+    const v = getter()
+    // 原始值不可能是 ref，直接返回；仅对象走运行时解包
+    return v === null || typeof v !== 'object' ? v : runtime.unref(v)
   }
-  if (!isHydrating()) node.textContent = String(initial)
-  return () => {}
+  const apply = (v: unknown) => {
+    node.textContent = String(v)
+  }
+  if (!isHydrating()) apply(read())
+  return runtime.subscribe(read, apply)
+}
+
+/** Conditional class toggle — the fast path for `cond ? 'cls' : ''` bindings.
+ *  classList.toggle(bool) skips String conversion and full className
+ *  serialization that bindClass pays per trigger. Static conditions apply
+ *  once; hydration skips the initial application (server markup is truth). */
+export function bindClassToggle(
+  el: HTMLElement,
+  cond: PropValue<unknown>,
+  cls: string
+): () => void {
+  const apply = (v: unknown) => {
+    el.classList.toggle(cls, !!v)
+  }
+  if (!isReactiveValue(cond)) {
+    if (!isHydrating()) apply(cond)
+    return noop
+  }
+  return watchProp(toGetter(cond), apply, isHydrating())
 }
 
 /** Reactive DOM property binding (value / checked / selected …).

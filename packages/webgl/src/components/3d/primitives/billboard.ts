@@ -11,7 +11,7 @@
  * submitted straight to the BatchRenderer.
  */
 
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component3D } from '../../../node'
 import type { MaybeRef, CommonDrawProps } from '../../../types'
 import { unref, createTexture } from '../../../utils'
 import { getRenderContext } from '../../../render-context'
@@ -50,10 +50,7 @@ const QUAD_UV = new Float32Array([0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0])
  * <billboard x={100} y={0} z={0} width={16} height={16} texture={marioFrame} />
  * ```
  */
-export const billboard: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [BillboardProps]
-> = (props: BillboardProps) => {
+export const billboard: Component3D<BillboardProps> = (props: BillboardProps) => {
   let cachedVerts: Float32Array | null = null
   let cachedW: number | null = null
   let cachedH: number | null = null

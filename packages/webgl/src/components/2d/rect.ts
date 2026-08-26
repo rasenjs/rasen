@@ -2,7 +2,7 @@
  * Rectangle component (2D/3D unified)
  */
 
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component3D, GlContext } from '../../node'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
@@ -43,10 +43,7 @@ export interface RectProps extends CommonDrawProps, Transform2DProps {
 /**
  * Rectangle component
  */
-export const rect: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [RectProps]
-> = (props: RectProps) => {
+export const rect: Component3D<RectProps> = (props: RectProps) => {
   let cachedGeometry: Float32Array | null = null
   let cachedWidth: number | null = null
   let cachedHeight: number | null = null
@@ -86,7 +83,7 @@ export const rect: SyncComponent<
       return cachedBounds
     },
 
-    draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
+    draw: (gl: GlContext) => {
       const x = unref(props.x)
       const y = unref(props.y)
       const z = unref(props.z) ?? 0

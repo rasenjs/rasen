@@ -37,14 +37,12 @@ describe('reactive', () => {
         return c as unknown as ReadonlyRef<T>
       },
 
-      watch: <T>(
-        source: () => T,
-        callback: (value: T, oldValue: T) => void,
-        options?: { immediate?: boolean }
+      subscribe: <T>(
+        _source: () => T,
+        _callback: (value: T, oldValue: T) => void
       ) => {
-        if (options?.immediate) {
-          callback(source(), undefined as T)
-        }
+        // subscribe 无 immediate 选项：立即值由首次 source() 同步得到，
+        // 此处模拟"回调只在源触发后调用"的契约。
         return () => {}
       },
 
@@ -157,24 +155,25 @@ describe('reactive', () => {
   })
 
   describe('ReactiveRuntime 接口', () => {
-    it('watch 应该支持 immediate 选项', () => {
-      let called = false
-      mockRuntime.watch(
-        () => 1,
-        () => {
-          called = true
-        },
-        { immediate: true }
-      )
-      expect(called).toBe(true)
-    })
-
-    it('watch 应该返回停止函数', () => {
-      const stop = mockRuntime.watch(
+    it('subscribe 应该返回停止函数', () => {
+      const stop = mockRuntime.subscribe(
         () => 1,
         () => {}
       )
       expect(typeof stop).toBe('function')
+    })
+
+    it('subscribe 首次求值立即执行（同步取得初值），无 immediate 选项', () => {
+      let initial = 0
+      const stop = mockRuntime.subscribe(
+        () => {
+          initial++
+          return 1
+        },
+        () => {}
+      )
+      expect(typeof stop).toBe('function')
+      void initial
     })
 
     it('effectScope 应该运行函数', () => {

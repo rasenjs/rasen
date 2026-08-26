@@ -2,11 +2,11 @@
  * Wedge component (pie slice) (2D/3D unified)
  */
 
-import type { SyncComponent } from '@rasenjs/core'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
 import { element } from '../element'
+import type { Component3D, GlContext } from '../../node'
 
 export interface WedgeProps extends CommonDrawProps, Transform2DProps {
   x: MaybeRef<number>
@@ -58,10 +58,7 @@ function createWedgeGeometry(
   return vertices
 }
 
-export const wedge: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [WedgeProps]
-> = (props: WedgeProps) => {
+export const wedge: Component3D<WedgeProps> = (props: WedgeProps) => {
   let cachedGeometry: Float32Array | null = null
   let cachedRadius: number | null = null
   let cachedAngle: number | null = null
@@ -96,7 +93,7 @@ export const wedge: SyncComponent<
       return cachedBounds
     },
 
-    draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
+    draw: (gl: GlContext) => {
       const x = unref(props.x)
       const y = unref(props.y)
       const z = unref(props.z) ?? 0

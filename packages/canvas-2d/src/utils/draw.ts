@@ -1,6 +1,7 @@
 import type { Ref, ReadonlyRef } from '../types'
 import type { Context2D } from '../node'
 import { unref } from './ref'
+import type { CanvasEventHandlers, CanvasEventHandler } from '../events'
 
 /**
  * 通用绘图属性
@@ -15,6 +16,35 @@ export interface CommonDrawProps {
   opacity?: number | Ref<number> | ReadonlyRef<number>
   // 合成模式
   globalCompositeOperation?: string | Ref<string> | ReadonlyRef<string>
+  // 指针事件处理器（委托分发，不参与响应式依赖收集）
+  onClick?: CanvasEventHandler
+  onPointerDown?: CanvasEventHandler
+  onPointerUp?: CanvasEventHandler
+  onPointerMove?: CanvasEventHandler
+}
+
+/**
+ * Extract the pointer handlers declared on props into the node-level `on`
+ * record. Returns undefined when no handler is present so event listeners
+ * stay detached for purely visual scenes.
+ */
+export function pointerHandlersFrom(
+  props: Partial<CommonDrawProps>
+): CanvasEventHandlers | undefined {
+  if (
+    !props.onClick &&
+    !props.onPointerDown &&
+    !props.onPointerUp &&
+    !props.onPointerMove
+  ) {
+    return undefined
+  }
+  const on: CanvasEventHandlers = {}
+  if (props.onClick) on.click = props.onClick
+  if (props.onPointerDown) on.pointerdown = props.onPointerDown
+  if (props.onPointerUp) on.pointerup = props.onPointerUp
+  if (props.onPointerMove) on.pointermove = props.onPointerMove
+  return on
 }
 
 /**

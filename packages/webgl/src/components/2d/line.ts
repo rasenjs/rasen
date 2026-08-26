@@ -2,7 +2,7 @@
  * Line component (2D/3D unified)
  */
 
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component3D, GlContext } from '../../node'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
@@ -50,10 +50,7 @@ export interface LineProps extends CommonDrawProps, Transform2DProps {
 /**
  * Line component
  */
-export const line: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [LineProps]
-> = (props: LineProps) => {
+export const line: Component3D<LineProps> = (props: LineProps) => {
   let cachedGeometry: Float32Array | null = null
   let cachedX1: number | null = null
   let cachedY1: number | null = null
@@ -83,7 +80,7 @@ export const line: SyncComponent<
       }
     },
 
-    draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
+    draw: (gl: GlContext) => {
       const x1 = unref(props.x1)
       const y1 = unref(props.y1)
       const z = unref(props.z) ?? 0

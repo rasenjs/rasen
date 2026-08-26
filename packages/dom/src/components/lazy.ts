@@ -11,7 +11,7 @@ import type { HostHooks } from '../host-hooks'
 /**
  * DOM 版本的 lazy 配置 - 扩展 core 版本，支持 domHooks
  */
-export interface LazyConfig<Host = HTMLElement> extends CoreLazyConfig<Host> {
+export interface LazyConfig<N = HTMLElement> extends CoreLazyConfig<N> {
   /**
    * DOM 操作钩子（可选）
    * 用于精确控制 DOM 插入、移除等操作
@@ -24,9 +24,9 @@ export interface LazyConfig<Host = HTMLElement> extends CoreLazyConfig<Host> {
  * 
  * 在 core lazy 基础上增加了 domHooks 支持
  */
-export function lazy<Host = HTMLElement>(
-  config: LazyConfig<Host>
-): Mountable<Host> {
+export function lazy<N = HTMLElement>(
+  config: LazyConfig<N>
+): Mountable<N> {
   // 对于现在的实现，直接使用 core 的实现
   // 如果未来需要精确的 DOM 操作控制，可以在这里增强
   return coreLazy({
@@ -41,15 +41,15 @@ export function lazy<Host = HTMLElement>(
 /**
  * DOM 版本的 createLazy 工厂函数
  */
-export type CreateLazy = <Host = HTMLElement>(
-  loader: () => Promise<Mountable<Host>>,
-  options?: Omit<LazyConfig<Host>, 'loader'>
-) => () => Mountable<Host>
+export type CreateLazy = <N = HTMLElement>(
+  loader: () => Promise<Mountable<N>>,
+  options?: Omit<LazyConfig<N>, 'loader'>
+) => () => Mountable<N>
 
-export function createLazy<Host = HTMLElement>(
-  loader: () => Promise<Mountable<Host>>,
-  options?: Omit<LazyConfig<Host>, 'loader'>
-): () => Mountable<Host> {
+export function createLazy<N = HTMLElement>(
+  loader: () => Promise<Mountable<N>>,
+  options?: Omit<LazyConfig<N>, 'loader'>
+): () => Mountable<N> {
   return () => lazy({ loader, ...options })
 }
 

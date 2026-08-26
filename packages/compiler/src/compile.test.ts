@@ -18,8 +18,8 @@ const el = <div class="box"><span>hello</span></div>`
     expect(r.compiled).toBe(1)
     expect(r.fellBack).toBe(0)
     expect(r.code).toContain(`template('<div class="box"><span>hello</span></div>')`)
-    expect(r.code).toMatch(/_r0 = t\d+\(host\)/) // 水合感知的根获取
-    expect(r.code).not.toContain('host.appendChild') // append 由 tN(host) 负责
+    expect(r.code).toMatch(/_r0 = t\d+\(node\)/) // 水合感知的根获取
+    expect(r.code).not.toContain('appendChild') // append 由 tN(node) 负责
     expect(r.code).not.toContain('bindClass')
   })
 
@@ -39,6 +39,24 @@ const el = <div class={cls} style={st}>x</div>`
     const r = compileModule(code)!
     expect(r.code).toContain('bindClass(_r0, () => cls)')
     expect(r.code).toContain('bindStyle(_r0, () => st)')
+  })
+
+  it('class 三元 cond ? \'cls\' : \'\' 发射 bindClassToggle 快速路径', () => {
+    const code = `/** @rasen-compile */
+const el = <tr class={item.selected ? 'danger' : ''}>x</tr>`
+    const r = compileModule(code)!
+    expect(r.code).toContain('bindClassToggle(_r0, () => item.selected, "danger")')
+    expect(r.code).not.toContain('bindClass(')
+    // SSR 发射真值分支的 class（编译期转义）
+    expect(r.code).toContain('class="danger"')
+  })
+
+  it('非三元 class 表达式仍走 bindClass', () => {
+    const code = `/** @rasen-compile */
+const el = <div class={cls}>x</div>`
+    const r = compileModule(code)!
+    expect(r.code).toContain('bindClass(_r0, () => cls)')
+    expect(r.code).not.toContain('bindClassToggle')
   })
 
   it('事件处理器发射 on(el, event, handler)', () => {
@@ -135,7 +153,7 @@ const el = <tr class={cls}><td class="c">{item.label}</td></tr>`
     const r = compileModule(code)!
     expect(r.compiled).toBe(1)
     // StringHost 判别分支存在（带 __RASEN_SSR__ 编译期常量门控）
-    expect(r.code).toContain("(typeof __RASEN_SSR__ > 'u' || __RASEN_SSR__) && host.append !== undefined")
+    expect(r.code).toContain("(typeof __RASEN_SSR__ > 'u' || __RASEN_SSR__) && node.append !== undefined")
     // 开标签/闭标签完整
     expect(r.code).toContain('`<tr')
     expect(r.code).toContain('</td></tr>`')
@@ -157,7 +175,7 @@ const el = <tr class={cls}><td class="c">{item.label}</td></tr>`
 const el = <a href={href} onClick={go} ref={r}>x</a>`
     const r = compileModule(code)!
     // href 走 bindAttr 条件序列化；onClick/ref 不出现在 SSR 字符串中
-    const ssrLine = r.code.split('\n').find((l) => l.includes('host.append('))!
+    const ssrLine = r.code.split('\n').find((l) => l.includes('node.append('))!
     expect(ssrLine).not.toContain('onClick')
     expect(ssrLine).not.toContain('setValue')
     expect(ssrLine).toContain('href')

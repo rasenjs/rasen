@@ -11,7 +11,7 @@
  * the 3D camera components (PerspectiveCamera / OrthographicCamera).
  */
 
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component3D } from '../../../node'
 import type { MaybeRef, CommonDrawProps, TransformProps } from '../../../types'
 import { unref, parseColor, createTexture } from '../../../utils'
 import { getRenderContext } from '../../../render-context'
@@ -88,10 +88,7 @@ function quadToTriangles(
  * <box x={100} y={0} z={-50} width={32} height={32} depth={32} fill="#e33" />
  * ```
  */
-export const box: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [BoxProps]
-> = (props: BoxProps) => {
+export const box: Component3D<BoxProps> = (props: BoxProps) => {
   let cachedFaces: Array<{ vertices: Float32Array; brightness: number }> | null = null
   let cachedW: number | null = null
   let cachedH: number | null = null

@@ -51,6 +51,7 @@ interface GenContext {
   navStatements: string[]
   /** wiring statements (offs.push(...)) hoisted likewise */
   wireStatements: string[]
+
   /** SSR emission parts for the current component: literal HTML chunks and
    *  ${...} interpolation expressions, joined into one template literal. */
   ssrParts: string[]
@@ -238,6 +239,29 @@ function compileElement(
     const exprSrc = exprSrcOf(exprAst)
 
     if (name === 'class' || name === 'className') {
+      // Fast path: `cond ? 'cls' : ''` → boolean classList.toggle.
+      // Skips String conversion and full className serialization per trigger
+      // (the dominant cost of select-style interactions on large lists).
+      if (
+        exprAst.type === 'ConditionalExpression' &&
+        exprAst.consequent.type === 'StringLiteral' &&
+        exprAst.consequent.value !== '' &&
+        exprAst.alternate.type === 'StringLiteral' &&
+        exprAst.alternate.value === ''
+      ) {
+        const cls = exprAst.consequent.value
+        const testSrc = ctx.source.slice(exprAst.test.start!, exprAst.test.end!)
+        ctx.wireStatements.push(
+          `offs.push(bindClassToggle(${self}, () => (${testSrc}), ${JSON.stringify(cls)}))`
+        )
+        ctx.helpers.add('bindClassToggle')
+        // SSR: condition unknown at build time; emit the truthy branch's class
+        // (compile-time escaped, same as static StringLiteral attributes)
+        ctx.ssrParts.push(
+          escapeTemplateLiteral(` class="${escapeAttr(cls)}"`)
+        )
+        continue
+      }
       ctx.wireStatements.push(
         `offs.push(bindClass(${self}, () => (${exprSrcOf(exprAst)})))`
       )
@@ -389,6 +413,9 @@ function compileElement(
         const s = `_s${ctx.counter++}`
         ctx.helpers.add('child')
         ctx.helpers.add('mountSlot')
+        // Slot content is dynamic — the mounted region's node set changes at
+        // runtime, so node-pair bounds would go stale. Disqualifies the
+        // template from the static-region (marker-free) fast path.
         ctx.navStatements.push(`const ${s} = child(${holder}, ${childIndex})`)
         ctx.wireStatements.push(
           `offs.push(mountSlot(${s}, ${nameNode.name}({ ${propsSrc.trim()} })))`
@@ -492,20 +519,20 @@ export function transformProgram(
         // string literal dead-code-eliminate from client bundles. The typeof
         // guard keeps non-vite consumers (babel/metro, raw node) working via
         // duck-typing alone.
-        `  if ((typeof __RASEN_SSR__ > 'u' || __RASEN_SSR__) && host.append !== undefined && host.nodeType === undefined) {`,
-        `    host.append(${ssrLiteral})`,
+        `  if ((typeof __RASEN_SSR__ > 'u' || __RASEN_SSR__) && node.append !== undefined && node.nodeType === undefined) {`,
+        `    node.append(${ssrLiteral})`,
         `    return`,
         `  }`,
         ``,
       ]
       const mountableSrc = [
-        `(host) => {`,
+        `(node, hooks) => {`,
         ...ssrBlock,
         `  const offs = []`,
         // Root acquisition with hydration support: t0(host) claims the
         // server-rendered counterpart while hydrating, otherwise clones and
         // appends. Navigation and wiring below are mode-independent.
-        `  const ${rootVar} = ${tplName}(host)`,
+        `  const ${rootVar} = ${tplName}(node)`,
         navBlock,
         wireBlock,
         `  return () => { for (const f of offs) f() }`,

@@ -51,24 +51,6 @@ export function toValue<T>(value: PropValue<T>): T {
 }
 
 /**
- * Watch 回调函数（内部使用）
- */
-type WatchCallback<T = unknown> = (value: T, oldValue: T) => void
-
-/**
- * Watch 选项（内部使用）
- */
-interface WatchOptions {
-  immediate?: boolean
-  deep?: boolean
-}
-
-/**
- * Watch 停止函数（内部使用）
- */
-type WatchStopHandle = () => void
-
-/**
  * Effect Scope（内部使用）
  */
 interface EffectScope {
@@ -81,11 +63,25 @@ interface EffectScope {
  * 外部需要实现这个接口来提供响应式能力
  */
 export interface ReactiveRuntime {
-  watch<T>(
-    source: (() => T) | Ref<T> | ReadonlyRef<T>,
-    callback: WatchCallback<T>,
-    options?: WatchOptions
-  ): WatchStopHandle
+  /**
+   * 渲染层订阅原语（框架内部契约）——细粒度绑定的统一 watch 表达式。
+   *
+   * 契约（支撑「静态零开销」）：
+   * 1. 静态源零订阅：源首次求值未收集到任何响应式依赖（纯静态读取，
+   *    如普通对象属性访问）时，不建立持久订阅——回调永远不会被触发，
+   *    实现方应在首次求值后即释放追踪结构。
+   * 2. 等值跳过：源被触发但求值结果未变化（Object.is）时，不调用回调。
+   *
+   * 绑定层因此可以用统一的表达式绑定：无需预先区分静态与动态，
+   * 静态表达式自动退化为一次性写入。
+   *
+   * 业务开发者应直接使用其引入的响应式库 API（如 @rasenjs/reactive-vue
+   * 导出的 watch/ref）；仅确需框架原语时才走本运行时。
+   */
+  subscribe<T>(
+    getter: () => T,
+    callback: (value: T, oldValue: T) => void
+  ): () => void
 
   effectScope(): EffectScope
 
@@ -213,8 +209,8 @@ export function watchObjectProps(
         callback(key, unref(value as Ref<unknown>))
       }
       
-      const stop = runtime.watch(
-        value as Ref<unknown> | ReadonlyRef<unknown>,
+      const stop = runtime.subscribe(
+        () => unref(value as Ref<unknown> | ReadonlyRef<unknown>),
         (newValue) => {
           callback(key, newValue)
         }
@@ -226,7 +222,7 @@ export function watchObjectProps(
         callback(key, (value as () => unknown)())
       }
       
-      const stop = runtime.watch(
+      const stop = runtime.subscribe(
         value as () => unknown,
         (newValue) => {
           callback(key, newValue)

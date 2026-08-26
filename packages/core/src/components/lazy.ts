@@ -7,29 +7,29 @@
  * 2. 异步组件本身 - async function Component() { ... }
  */
 
-import type { Mountable } from '../types'
+import type { Mountable  , HostHooks} from '../types'
 
 /**
  * lazy 配置
  */
-export interface LazyConfig<Host = unknown> {
+export interface LazyConfig<N = unknown> {
   /**
-   * 返回 Promise<Mountable> 的加载函数
+   * 返回 Promise<Mountable<N>> 的加载函数
    * 可以是:
    * - () => import('./Component').then(m => m.default)  [异步加载]
    * - async () => (host) => { ... }                      [异步组件]
    */
-  loader: () => Promise<Mountable<Host>>
+  loader: () => Promise<Mountable<N>>
   
   /**
    * 加载中显示的组件（可选）
    */
-  loading?: () => Mountable<Host>
+  loading?: () => Mountable<N>
   
   /**
    * 加载失败显示的组件（可选）
    */
-  error?: (err: Error) => Mountable<Host>
+  error?: (err: Error) => Mountable<N>
   
   /**
    * 最小加载时间（ms），避免闪烁（可选，默认 0）
@@ -45,9 +45,9 @@ export interface LazyConfig<Host = unknown> {
 /**
  * lazy 组件的内部状态
  */
-interface LazyState<Host = unknown> {
+interface LazyState<N = unknown> {
   status: 'loading' | 'loaded' | 'error'
-  component?: Mountable<Host>
+  component?: Mountable<N>
   error?: Error
 }
 
@@ -78,16 +78,16 @@ interface LazyState<Host = unknown> {
  * })
  * ```
  */
-export function lazy<Host = unknown>(
-  config: LazyConfig<Host>
-): Mountable<Host> {
+export function lazy<N = unknown>(
+  config: LazyConfig<N>
+): Mountable<N> {
   const { loader, loading, error: errorHandler, minDelay = 0, timeout } = config
   
   // 创建响应式状态来追踪异步操作
-  let state: LazyState<Host> = { status: 'loading' }
-  let stateChangeCallbacks: Array<(state: LazyState<Host>) => void> = []
+  let state: LazyState<N> = { status: 'loading' }
+  let stateChangeCallbacks: Array<(state: LazyState<N>) => void> = []
   
-  const setState = (newState: LazyState<Host>) => {
+  const setState = (newState: LazyState<N>) => {
     state = newState
     stateChangeCallbacks.forEach(cb => cb(newState))
   }
@@ -109,7 +109,7 @@ export function lazy<Host = unknown>(
   
   // 异步加载
   loadPromise
-    .then(async (component: Mountable<Host>) => {
+    .then(async (component: Mountable<N>) => {
       // 确保最小加载时间（避免闪烁）
       const elapsed = Date.now() - startTime
       if (minDelay > 0 && elapsed < minDelay) {
@@ -123,7 +123,7 @@ export function lazy<Host = unknown>(
     })
   
   // 返回 Mountable 函数
-  return (host: Host) => {
+  return (node: N, hooks: HostHooks<N> | undefined) => {
     // 初始挂载时显示 loading 状态
     let currentUnmount: (() => void) | void | undefined
     
@@ -133,14 +133,14 @@ export function lazy<Host = unknown>(
       }
       
       if (state.status === 'loaded' && state.component) {
-        currentUnmount = state.component(host)
+        currentUnmount = state.component(node, hooks)
       } else if (state.status === 'error' && state.error) {
         if (errorHandler) {
-          currentUnmount = errorHandler(state.error)(host)
+          currentUnmount = errorHandler(state.error)(node, hooks)
         }
       } else if (state.status === 'loading') {
         if (loading) {
-          currentUnmount = loading()(host)
+          currentUnmount = loading()(node, hooks)
         }
       }
     }
@@ -149,7 +149,7 @@ export function lazy<Host = unknown>(
     updateView()
     
     // 监听状态变化
-    const unsubscribe = (callback: (state: LazyState<Host>) => void) => {
+    const unsubscribe = (callback: (state: LazyState<N>) => void) => {
       stateChangeCallbacks.push(callback)
       return () => {
         stateChangeCallbacks = stateChangeCallbacks.filter(cb => cb !== callback)
@@ -170,17 +170,17 @@ export function lazy<Host = unknown>(
 /**
  * 创建可复用的 lazy 组件工厂
  */
-export type CreateLazy = <Host = unknown>(
-  loader: () => Promise<Mountable<Host>>,
-  options?: Omit<LazyConfig<Host>, 'loader'>
-) => () => Mountable<Host>
+export type CreateLazy<N = unknown> = (
+  loader: () => Promise<Mountable<N>>,
+  options?: Omit<LazyConfig<N>, 'loader'>
+) => () => Mountable<N>
 
 /**
  * createLazy 工厂函数实现
  */
-export function createLazy<Host = unknown>(
-  loader: () => Promise<Mountable<Host>>,
-  options?: Omit<LazyConfig<Host>, 'loader'>
-): () => Mountable<Host> {
+export function createLazy<N = unknown>(
+  loader: () => Promise<Mountable<N>>,
+  options?: Omit<LazyConfig<N>, 'loader'>
+): () => Mountable<N> {
   return () => lazy({ loader, ...options })
 }

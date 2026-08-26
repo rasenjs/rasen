@@ -1,3 +1,5 @@
 reports
 report.json
 report.html
+traces
+.partial-results.json

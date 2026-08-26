@@ -2,7 +2,7 @@
  * Arrow component
  */
 
-import type { SyncComponent } from '@rasenjs/core'
+import type { Component3D, GlContext } from '../../node'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
 import { getRenderContext } from '../../render-context'
@@ -65,10 +65,7 @@ function createArrowGeometry(
   return new Float32Array(vertices)
 }
 
-export const arrow: SyncComponent<
-  WebGLRenderingContext | WebGL2RenderingContext,
-  [ArrowProps]
-> = (props: ArrowProps) => {
+export const arrow: Component3D<ArrowProps> = (props: ArrowProps) => {
   let cachedGeometry: Float32Array | null = null
   let cachedDx: number | null = null
   let cachedDy: number | null = null
@@ -98,7 +95,7 @@ export const arrow: SyncComponent<
       }
     },
 
-    draw: (gl: WebGLRenderingContext | WebGL2RenderingContext) => {
+    draw: (gl: GlContext) => {
       const x1 = unref(props.x1)
       const y1 = unref(props.y1)
       const z = unref(props.z) ?? 0

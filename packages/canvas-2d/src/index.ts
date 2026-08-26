@@ -27,9 +27,16 @@ export {
 } from './components'
 export {
   RenderContext,
+  getRenderContext,
+  hasRenderContext,
   type Bounds,
   type RenderContextOptions
 } from './render-context'
+export type {
+  CanvasPointerEvent,
+  CanvasEventHandler,
+  CanvasEventHandlers
+} from './events'
 export * from './utils'
 
 // 导出path相关类型

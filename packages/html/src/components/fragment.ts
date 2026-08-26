@@ -35,8 +35,8 @@ const hostHooks = {
  * Fragment function interface for HTML/SSR
  */
 interface FragmentFunction {
-  (config: { children: Array<Mountable<StringHost>> }): Mountable<StringHost>
-  (strings: TemplateStringsArray, ...values: FragmentChild<StringHost>[]): Mountable<StringHost>
+  (config: { children: Array<Mountable<StringHost>> }): Mountable<string>
+  (strings: TemplateStringsArray, ...values: FragmentChild<StringHost>[]): Mountable<string>
 }
 
 /**
@@ -58,7 +58,7 @@ interface FragmentFunction {
 export const fragment: FragmentFunction = (
   configOrStrings: { children: Array<Mountable<StringHost>> } | TemplateStringsArray,
   ...values: FragmentChild<StringHost>[]
-): Mountable<StringHost> => {
+): Mountable<string> => {
   const runtime = getReactiveRuntime()
   
   // 检测是否是 tagged template 调用

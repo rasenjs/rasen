@@ -4,6 +4,7 @@
  */
 
 import type { Color } from '../types'
+import type { GlContext } from '../node'
 import { ShaderProgram, DEFAULT_VERTEX_SHADER, DEFAULT_FRAGMENT_SHADER } from './shader'
 import { Mat4x4f, mat4x4f } from '@rasenjs/math'
 
@@ -58,7 +59,7 @@ export class BatchRenderer {
   private projectionMatrix: Mat4x4f
 
   constructor(
-    private gl: WebGLRenderingContext | WebGL2RenderingContext,
+    private gl: GlContext,
     projectionMatrix: Mat4x4f | number[]
   ) {
     this.shader = new ShaderProgram(gl)

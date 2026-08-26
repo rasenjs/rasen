@@ -5,7 +5,7 @@
  * Nanostores is a tiny state manager with many atomic tree-shakable stores
  */
 
-import { atom, computed as nanoComputed } from 'nanostores'
+import { atom } from 'nanostores'
 import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
 
 // Symbol for internal listen method
@@ -14,73 +14,73 @@ const LISTEN_SYMBOL = Symbol('rasen.nanostores.listen')
 // Track dependencies during getter execution
 let trackingContext: Set<ReturnType<typeof atom>> | null = null
 
+// Currently-active effect scope (set by effectScope().run). Subscriptions
+// created while a scope is active register their stop function into it, so
+// stopping the scope releases every effect created inside in one call —
+// mirrors the TC39 adapter's currentScope design.
+let activeScope: { addCleanup(cleanup: () => void): void } | null = null
+
 /**
  * Creates Nanostores reactive runtime
  */
 export function createReactiveRuntime(): ReactiveRuntime {
   return {
-    watch<T>(
-      source: (() => T) | Ref<T> | ReadonlyRef<T>,
-      callback: (value: T, oldValue: T) => void,
-      options?: { immediate?: boolean; deep?: boolean }
+    /**
+     * 渲染层订阅原语（契约见 ReactiveRuntime.subscribe）。依赖追踪通过
+     * 执行 getter 收集 atoms：静态 getter 收集不到任何 atom，订阅列表
+     * 为空——回调自然永不触发；等值跳过由 newValue !== lastValue 门控。
+     */
+    subscribe<T>(
+      getter: () => T,
+      onChange: (value: T, oldValue: T) => void
     ): () => void {
-      if (typeof source === 'function') {
-        // Track dependencies by executing the getter
-        const dependencies = new Set<ReturnType<typeof atom>>()
-        trackingContext = dependencies
-        let lastValue = source()
-        trackingContext = null
-        
-        // Call immediately if requested
-        if (options?.immediate) {
-          callback(lastValue, lastValue)
-        }
-        
-        // Subscribe to all dependencies
-        const unsubscribers = Array.from(dependencies).map(dep => {
-          return dep.listen(() => {
-            const newValue = source()
-            if (newValue !== lastValue) {
-              const oldValue = lastValue
-              lastValue = newValue
-              callback(newValue, oldValue)
-            }
-          })
-        })
-        
-        return () => {
-          unsubscribers.forEach(unsub => unsub())
-        }
-      } else {
-        // source is a wrapped ref/computed with internal listen method
-        const wrapper = source as unknown as { [LISTEN_SYMBOL]: (callback: (value: T) => void) => () => void; value: T }
-        let oldValue = wrapper.value
-        
-        const unsubscribe = wrapper[LISTEN_SYMBOL]((value) => {
-          callback(value, oldValue)
-          oldValue = value
-        })
+      // Track dependencies by executing the getter
+      const dependencies = new Set<ReturnType<typeof atom>>()
+      trackingContext = dependencies
+      let lastValue = getter()
+      trackingContext = null
 
-        if (options?.immediate) {
-          const current = wrapper.value
-          callback(current, current)
-        }
+      // Subscribe to all dependencies
+      const unsubscribers = Array.from(dependencies).map(dep => {
+        return dep.listen(() => {
+          const newValue = getter()
+          if (newValue !== lastValue) {
+            const oldValue = lastValue
+            lastValue = newValue
+            onChange(newValue, oldValue)
+          }
+        })
+      })
 
-        return unsubscribe
+      const stop = () => {
+        unsubscribers.forEach(unsub => unsub())
       }
+      // Auto-register into the enclosing effect scope (runtime contract):
+      // scope.stop() then bulk-releases this subscription.
+      if (activeScope) {
+        activeScope.addCleanup(stop)
+      }
+      return stop
     },
 
     effectScope() {
       const cleanups: Array<() => void> = []
       let isActive = true
 
-      return {
+      const scope = {
+        addCleanup(cleanup: () => void): void {
+          if (isActive) {
+            cleanups.push(cleanup)
+          }
+        },
         run<T>(fn: () => T): T | undefined {
           if (!isActive) return undefined
+          const prev = activeScope
+          activeScope = scope
           try {
             return fn()
           } finally {
-            // Keep scope active for subsequent runs
+            activeScope = prev
           }
         },
         stop() {
@@ -90,6 +90,7 @@ export function createReactiveRuntime(): ReactiveRuntime {
           cleanups.length = 0
         }
       }
+      return scope
     },
 
     ref<T>(value: T): Ref<T> {
@@ -114,61 +115,16 @@ export function createReactiveRuntime(): ReactiveRuntime {
       return wrapper as unknown as Ref<T>
     },
 
-    computed<T>(getter: () => T): ReadonlyRef<T> {
-      // Track dependencies during first execution
-      const dependencies = new Set<ReturnType<typeof atom>>()
-      trackingContext = dependencies
-      const initialValue = getter()
-      trackingContext = null
-      
-      // Use nanostores' computed if we have dependencies
-      if (dependencies.size > 0) {
-        const stores = Array.from(dependencies)
-        const computedStore = nanoComputed(stores, () => getter())
-        
-        // Create wrapper with .value getter
-        const wrapper = {
-          get value() {
-            if (trackingContext) {
-              trackingContext.add(computedStore as unknown as ReturnType<typeof atom>)
-            }
-            return computedStore.get()
-          },
-          // Internal method for watch implementation
-          [LISTEN_SYMBOL]: (callback: (value: T) => void) => computedStore.listen(callback)
-        }
-        
-        return wrapper as unknown as ReadonlyRef<T>
-      } else {
-        // No dependencies, create a simple computed
-        const store = atom<T>(initialValue)
-        
-        // Create wrapper with .value getter
-        const wrapper = {
-          get value() {
-            if (trackingContext) {
-              trackingContext.add(store)
-            }
-            return getter()
-          },
-          // Internal method for watch implementation
-          [LISTEN_SYMBOL]: (callback: (value: T) => void) => store.listen(callback)
-        }
-        
-        return wrapper as unknown as ReadonlyRef<T>
-      }
-    },
-
     unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
       // Vue 语义：只解包 ref，不调用 getter（getter 由 core 的 toValue 处理）
       if (this.isRef(value)) {
-        return (value as Ref<T>).value
+        return (value as unknown as { value: T }).value
       }
       return value as T
     },
 
     setValue<T>(ref: Ref<T>, value: T): void {
-      ;(ref as { value: T }).value = value
+      ;(ref as unknown as { value: T }).value = value
     },
 
     isRef(value: unknown): value is Ref<unknown> | ReadonlyRef<unknown> {

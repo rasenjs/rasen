@@ -6,7 +6,8 @@ import {
   type LineStyleProps,
   type TransformProps,
   withDrawProps,
-  collectDrawPropsDependencies
+  collectDrawPropsDependencies,
+  pointerHandlersFrom,
 } from '../utils'
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
@@ -105,6 +106,8 @@ export const ellipse: Component2D<EllipseProps> = (props: EllipseProps) => {
         }
       )
     },
+
+    on: pointerHandlersFrom(props),
 
     deps: () => [
       unref(props.x),

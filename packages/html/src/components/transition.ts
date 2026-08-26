@@ -10,7 +10,7 @@ import type { StringHost } from '../types'
 
 export interface TransitionConfig {
   when: PropValue<boolean>
-  children: () => Mountable<StringHost>
+  children: () => Mountable<string>
   name?: string
   appear?: boolean
   onEnter?: (el: unknown) => void
@@ -19,7 +19,7 @@ export interface TransitionConfig {
   onAfterLeave?: (el: unknown) => void
 }
 
-export const transition = com((config: TransitionConfig): Mountable<StringHost> => {
+export const transition = com((config: TransitionConfig): Mountable<string> => {
   const { when, children } = config
   
   return (host: StringHost) => {
