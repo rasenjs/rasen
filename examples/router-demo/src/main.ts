@@ -6,7 +6,8 @@
  */
 
 import { z } from 'zod'
-import { ref, type Mountable, com } from '@rasenjs/core'
+import { ref } from '@rasenjs/reactive-signals'
+import { com, type Mountable } from '@rasenjs/core'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import {
   div,

@@ -62,7 +62,8 @@ export function createCheckboxRoot(): (
       const disabled = props?.disabled ?? false
       const required = props?.required ?? false
 
-      const btn = document.createElement('div')
+      const btn = document.createElement('button')
+      btn.type = 'button'
       btn.setAttribute('role', 'checkbox')
       btn.setAttribute('tabindex', disabled ? '-1' : '0')
 
@@ -141,7 +142,7 @@ export function createCheckboxRoot(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children(getContext)(btn)
+        childUnmount = props.children(getContext)(btn, undefined)
       }
 
       host.appendChild(btn)
@@ -240,9 +241,9 @@ export function createCheckbox(): (
               forceMount: props?.forceMount
             },
             getContext
-          )(btn)
+          )(btn, undefined)
         }
-      })(host)
+      })(host, undefined)
     }
   }
 }

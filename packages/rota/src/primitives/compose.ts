@@ -21,7 +21,7 @@ export function compose(
       const unmounts: Array<() => void> = []
 
       for (const comp of components) {
-        const result = comp()(host)
+        const result = comp()(host, undefined)
         if (typeof result === 'function') {
           unmounts.push(result)
         }

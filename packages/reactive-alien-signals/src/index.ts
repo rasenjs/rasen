@@ -13,14 +13,13 @@
 // All alien-signals imports are prefixed like the Vue adapter does, so the
 // standalone convenience exports below (e.g. `computed`) never shadow them.
 import {
-  computed as alienComputed,
   effect as alienEffect,
   effectScope as alienEffectScope,
   isComputed as alienIsComputed,
   isSignal as alienIsSignal,
   signal as alienSignal
 } from 'alien-signals'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
+import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '@rasenjs/core'
 
 /**
  * Shape of an alien-signals writable signal: a callable that reads with no
@@ -47,7 +46,7 @@ function isSignalCallable(value: unknown): boolean {
  * Reads a ref-or-plain value. Plain values (including plain functions) are
  * returned as-is; only genuine alien-signals callables are invoked.
  */
-function readRef<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
+function readRef<T>(value: T | Ref<T>): T {
   if (isSignalCallable(value)) {
     return (value as unknown as SignalCallable<T>)()
   }
@@ -170,11 +169,6 @@ export function createReactiveRuntime(): ReactiveRuntime {
       return createValueSubscription(getter, onChange)
     },
 
-    computed<T>(getter: () => T): ReadonlyRef<T> {
-      // The alien Computed callable itself serves as the readonly ref.
-      return alienComputed(getter) as unknown as ReadonlyRef<T>
-    },
-
     effectScope() {
       // Each run() creates an alien-signals scope; effects created
       // synchronously inside link to it and are disposed by its stop handle.
@@ -251,7 +245,7 @@ export function ref<T>(value: T): Ref<T> {
 /**
  * Convenient unref function
  */
-export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
+export function unref<T>(value: T | Ref<T>): T {
   return getRuntime().unref(value)
 }
 
@@ -260,4 +254,14 @@ export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
  */
 export function isRef(value: unknown): boolean {
   return getRuntime().isRef(value)
+}
+
+/**
+ * 模块增强：让 core 的占位 `Ref<T>` 变成真实的 alien-signals 类型。
+ *
+ * 用户引入本包后，core 的 `Ref<T>` 即 `SignalCallable<T>`（可调用信号：
+ * `()` 读、`(v)` 写），与组件 props 期望的 core `Ref<T>` 完全一致。
+ */
+declare module '@rasenjs/core' {
+  interface Ref<T> extends SignalCallable<T> {}
 }

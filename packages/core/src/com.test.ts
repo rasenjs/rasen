@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { getReactiveRuntime, unref } from './reactive'
+import { getReactiveRuntime } from './reactive'
 import { com } from './com'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
@@ -22,7 +22,7 @@ describe('com - 内存泄漏检测', () => {
       const count = runtime.ref(0)
       
       return (_host: unknown) => {
-        runtime.subscribe(() => unref(count), () => {})
+        runtime.subscribe(() => runtime.unref(count), () => {})
         
         return () => {
           cleanupCalled = true
@@ -46,7 +46,7 @@ describe('com - 内存泄漏检测', () => {
       const value = runtime.ref(index)
       
       return (_host: unknown) => {
-        runtime.subscribe(() => unref(value), () => {})
+        runtime.subscribe(() => runtime.unref(value), () => {})
         
         return () => {
           cleanupFlags[index] = true
@@ -85,7 +85,7 @@ describe('com - 内存泄漏检测', () => {
       return (_host: unknown) => {
         // 为每个状态创建 watch - 由 scope 自动管理
         states.forEach(state => {
-          runtime.subscribe(() => unref(state), () => {})
+          runtime.subscribe(() => runtime.unref(state), () => {})
         })
         
         return () => {
@@ -111,7 +111,7 @@ describe('com - 内存泄漏检测', () => {
       const value = runtime.ref(id)
       
       return (_host: unknown) => {
-        runtime.subscribe(() => unref(value), () => {})
+        runtime.subscribe(() => runtime.unref(value), () => {})
         
         return () => {
           cleanupLog.push(`leaf-${id}`)
@@ -124,7 +124,7 @@ describe('com - 内存泄漏检测', () => {
       const state = runtime.ref(0)
       
       return (_host: unknown) => {
-        runtime.subscribe(() => unref(state), () => {})
+        runtime.subscribe(() => runtime.unref(state), () => {})
         
         // 创建子组件
         const childUnmounts: Array<() => void> = []
@@ -171,7 +171,7 @@ describe('com - 内存泄漏检测', () => {
         return (_host: unknown) => {
           // 监听所有项
           items.forEach(item => {
-            runtime.subscribe(() => unref(item), () => {})
+            runtime.subscribe(() => runtime.unref(item), () => {})
           })
           
           return () => {
@@ -204,8 +204,8 @@ describe('com - 内存泄漏检测', () => {
       const state = runtime.ref(id)
 
       return (_host: unknown) => {
-        runtime.subscribe(() => unref(state), () => {})
-        runtime.subscribe(() => unref(state) * 2, () => {})
+        runtime.subscribe(() => runtime.unref(state), () => {})
+        runtime.subscribe(() => runtime.unref(state) * 2, () => {})
 
         return () => {
           cleanupFlags[id] = true
@@ -249,13 +249,13 @@ describe('com - 内存泄漏检测', () => {
       const setupState = runtime.ref(0)
       
       // setup 阶段创建 watch - scope.stop() 会清理
-      runtime.subscribe(() => unref(setupState), () => {})
+      runtime.subscribe(() => runtime.unref(setupState), () => {})
       
       return (_host: unknown) => {
         const mountState = runtime.ref(10)
         
         // mount 阶段创建 watch - scope.stop() 也会清理
-        runtime.subscribe(() => unref(mountState), () => {})
+        runtime.subscribe(() => runtime.unref(mountState), () => {})
         
         return () => {
           cleanupCalled = true
@@ -281,8 +281,8 @@ describe('com - 内存泄漏检测', () => {
       const data = runtime.ref({ value: 42 })
       
       return (_host: unknown) => {
-        runtime.subscribe(() => unref(data).value, () => {})
-        runtime.subscribe(() => unref(data).value * 2, () => {})
+        runtime.subscribe(() => runtime.unref(data).value, () => {})
+        runtime.subscribe(() => runtime.unref(data).value * 2, () => {})
         
         return () => {
           cleanupCalled = true
@@ -309,7 +309,7 @@ describe('com - 内存泄漏检测', () => {
       
       return (_host: unknown) => {
         states.forEach(state => {
-          runtime.subscribe(() => unref(state), () => {})
+          runtime.subscribe(() => runtime.unref(state), () => {})
         })
         
         return () => {

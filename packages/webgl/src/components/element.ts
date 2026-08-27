@@ -1,18 +1,14 @@
 /**
  * Element component - base for all WebGL 2D components
+ *
+ * Thin adapter over the node mechanism: mounting creates a GlNode attached
+ * to the received host (a group node becomes its parent; a top-level raw
+ * host registers as a render root). Reactive deps → markDirty is handled
+ * by createNode.
  */
 
-import {
-  com,
-  getReactiveRuntime,
-  type Mountable
-} from '@rasenjs/core'
-import {
-  RenderContext,
-  getRenderContext,
-  hasRenderContext
-} from '../render-context'
-import type { GlNode } from '../node'
+import { com, type Mountable } from '@rasenjs/core'
+import { createNode, type GlNode } from '../node'
 import type { Bounds } from '../types'
 
 export interface ElementProps {
@@ -30,99 +26,24 @@ export interface ElementProps {
 
 /**
  * Element component - base for all WebGL shapes
- * 
+ *
  * Handles:
- * - Registration with RenderContext
- * - Reactive dependency tracking
- * - Dirty region marking
- * - Cleanup
+ * - Scene-tree attachment via createNode (RenderContext is ensured lazily)
+ * - Reactive dependency tracking (deps → markDirty, by createNode)
+ * - Cleanup (node removal detaches from the tree and stops subscriptions)
  */
 export const element = com(
   (props: ElementProps): Mountable<GlNode> => {
-    const { getBounds, draw, deps } = props
-
-    return (node: GlNode) => {
-      const gl = node.ctx
-      // Auto-create RenderContext if not exists（配置经 node.rcOptions 注入）
-      if (!hasRenderContext(gl)) {
-        new RenderContext(gl, node.rcOptions)
-      }
-
-      const renderContext = getRenderContext(gl)
-      let currentBounds: Bounds | null = null
-      
-      const drawFn = () => draw(gl)
-      
-      // Initialize bounds
-      currentBounds = getBounds()
-      
-      // Register component — register() itself marks the screen dirty, so a
-      // newly mounted component becomes visible without extra bookkeeping.
-      const componentId = renderContext.register({
-        bounds: () => currentBounds,
-        draw: drawFn
+    return (parentNode: GlNode) => {
+      const node = createNode(parentNode, {
+        draw: () => props.draw(parentNode.ctx),
+        bounds: props.getBounds,
+        deps: props.deps
       })
-      
-      // Watch for reactive changes - optimize: only update when deps actually change
-      const runtime = getReactiveRuntime()
-      let prevDeps: unknown[] = []
-      
-      const stopWatch = runtime.subscribe(
-        deps,
-        (newDeps) => {
-          // Check if deps actually changed (avoid unnecessary getBounds calls)
-          let changed = false
-          if (!prevDeps || prevDeps.length !== newDeps.length) {
-            changed = true
-          } else {
-            for (let i = 0; i < newDeps.length; i++) {
-              if (prevDeps[i] !== newDeps[i]) {
-                changed = true
-                break
-              }
-            }
-          }
-          
-          if (!changed) return
-          prevDeps = [...newDeps]
-          
-          const newBounds = getBounds()
-          
-          // Optimize: for position-only changes, reuse bounds object
-          // Most common case: x/y changed but size unchanged
-          if (currentBounds && newBounds && 
-              currentBounds.width === newBounds.width && 
-              currentBounds.height === newBounds.height) {
-            // Just update position in existing object (no new allocation)
-            const oldX = currentBounds.x
-            const oldY = currentBounds.y
-            currentBounds.x = newBounds.x
-            currentBounds.y = newBounds.y
-            
-            // Mark union of old and new position
-            const minX = Math.min(oldX, newBounds.x)
-            const minY = Math.min(oldY, newBounds.y)
-            const maxX = Math.max(oldX + currentBounds.width, newBounds.x + currentBounds.width)
-            const maxY = Math.max(oldY + currentBounds.height, newBounds.y + currentBounds.height)
-            
-            // Reuse newBounds object for dirty region (avoid new allocation)
-            newBounds.x = minX
-            newBounds.y = minY
-            newBounds.width = maxX - minX
-            newBounds.height = maxY - minY
-            renderContext.markDirty(newBounds)
-          } else {
-            // Size changed or first update - replace bounds
-            renderContext.markDirty(newBounds || currentBounds || undefined)
-            currentBounds = newBounds
-          }
-        }
-      )
-      
-      // Cleanup
+
+      // Cleanup: detach from the tree and stop reactive subscriptions
       return () => {
-        stopWatch()
-        renderContext.unregister(componentId)
+        node.remove()
       }
     }
   }

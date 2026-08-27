@@ -4,12 +4,31 @@
  */
 
 import { Signal } from 'signal-polyfill'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
+import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '@rasenjs/core'
 
-// The Signal itself IS the ref — a plain TC39 Signal.State / Signal.Computed
-// instance with no Rasen-specific wrapper. Values are read via `.get()` and
-// written via `.set()` (never `.value`), so the design does not depend on a
-// `.value` property. Detectable via `Signal.isState` / `Signal.isComputed`.
+// The Signal itself IS the ref — a TC39 Signal.State / Signal.Computed
+// subclass that ALSO exposes a `.value` accessor (delegating to get()/set()).
+// The native proposal only offers get()/set(); the `.value` alias keeps the
+// adapter drop-in compatible with code written against Vue-style refs.
+// Detectable via `Signal.isState` / `Signal.isComputed` (subclasses pass).
+
+/** Signal.State + `.value` 访问器（读 = get()，写 = set()） */
+class StateRef<T> extends Signal.State<T> {
+  get value(): T {
+    return this.get()
+  }
+
+  set value(next: T) {
+    this.set(next)
+  }
+}
+
+/** Signal.Computed + `.value` 访问器（读 = get()） */
+class ComputedRef<T> extends Signal.Computed<T> {
+  get value(): T {
+    return this.get()
+  }
+}
 
 // Create singleton runtime (lazily initialized)
 let runtime: ReactiveRuntime | undefined
@@ -147,16 +166,11 @@ export function createReactiveRuntime(): ReactiveRuntime {
     },
 
     ref: <T>(value: T): Ref<T> => {
-      // The Signal itself is the ref — a plain TC39 Signal.State instance.
-      return new Signal.State(value) as unknown as Ref<T>
+      // The Signal itself is the ref — Signal.State plus a `.value` alias.
+      return new StateRef(value) as unknown as Ref<T>
     },
 
-    computed: <T>(getter: () => T): ReadonlyRef<T> => {
-      // The Signal itself is the ref — a plain TC39 Signal.Computed instance.
-      return new Signal.Computed(getter) as unknown as ReadonlyRef<T>
-    },
-
-    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>): T => {
+    unref: <T>(value: T | Ref<T> | Ref<T>): T => {
       // The ref IS the Signal itself: read via Signal.get().
       if (value && typeof value === 'object') {
         if (Signal.isState(value) || Signal.isComputed(value)) {
@@ -207,23 +221,29 @@ function getRuntime(): ReactiveRuntime {
 }
 
 /**
- * Convenient ref function
+ * Convenient ref function — creates a Signal via the active runtime.
+ *
+ * The returned type is core's `Ref<T>`, which this package augments to
+ * extend the real `StateRef<T>` (a `Signal.State` subclass with a `.value`
+ * alias — see the `declare module` below), so `.value` / `.get()` / `.set()`
+ * all work directly.
  */
 export function ref<T>(value: T): Ref<T> {
   return getRuntime().ref(value)
 }
 
 /**
- * Convenient computed function
+ * Convenient computed function — returns the REAL Signal type
+ * (`ComputedRef<T>`, a `Signal.Computed` subclass with a `.value` alias).
  */
-export function computed<T>(getter: () => T): ReadonlyRef<T> {
-  return getRuntime().computed(getter)
+export function computed<T>(getter: () => T): ComputedRef<T> {
+  return new ComputedRef(getter)
 }
 
 /**
  * Convenient unref function
  */
-export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
+export function unref<T>(value: T | Ref<T> | Ref<T>): T {
   return getRuntime().unref(value)
 }
 
@@ -232,4 +252,15 @@ export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
  */
 export function isRef(value: unknown): boolean {
   return getRuntime().isRef(value)
+}
+
+/**
+ * 模块增强：让 core 的占位 `Ref<T>` 变成真实的 Signal 类型。
+ *
+ * 用户引入本包后，core 的 `Ref<T>` 即 `StateRef<T>`（`Signal.State`
+ * 子类 + `.value` 别名），`.value` / `.get()` / `.set()` 直接可用，
+ * 且与组件 props 期望的 core `Ref<T>` 完全一致。
+ */
+declare module '@rasenjs/core' {
+  interface Ref<T> extends StateRef<T> {}
 }

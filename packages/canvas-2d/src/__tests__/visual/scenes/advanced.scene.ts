@@ -27,7 +27,7 @@ export const shadowScene: VisualTestScene = {
     ctx.fillStyle = '#ff0000'
     ctx.fillRect(100, 50, 100, 100)
   },
-  render: (ctx) => {
+  render: (root) => {
     rect({
       x: 100,
       y: 50,
@@ -38,7 +38,7 @@ export const shadowScene: VisualTestScene = {
       shadowBlur: 10,
       shadowOffsetX: 5,
       shadowOffsetY: 5
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -57,14 +57,14 @@ export const linearGradientScene: VisualTestScene = {
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, 300, 200)
   },
-  render: (ctx) => {
+  render: (root) => {
     // 直接使用原生渐变API - 渐变是Canvas原生功能
-    const gradient = ctx.createLinearGradient(0, 0, 300, 0)
+    const gradient = root.ctx.createLinearGradient(0, 0, 300, 0)
     gradient.addColorStop(0, '#ff0000')
     gradient.addColorStop(0.5, '#00ff00')
     gradient.addColorStop(1, '#0000ff')
-    ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, 300, 200)
+    root.ctx.fillStyle = gradient
+    root.ctx.fillRect(0, 0, 300, 200)
   }
 }
 
@@ -82,13 +82,13 @@ export const radialGradientScene: VisualTestScene = {
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, 300, 300)
   },
-  render: (ctx) => {
+  render: (root) => {
     // 直接使用原生渐变API - 渐变是Canvas原生功能
-    const gradient = ctx.createRadialGradient(150, 150, 10, 150, 150, 100)
+    const gradient = root.ctx.createRadialGradient(150, 150, 10, 150, 150, 100)
     gradient.addColorStop(0, '#ffffff')
     gradient.addColorStop(1, '#000000')
-    ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, 300, 300)
+    root.ctx.fillStyle = gradient
+    root.ctx.fillRect(0, 0, 300, 300)
   }
 }
 
@@ -107,7 +107,7 @@ export const rotationScene: VisualTestScene = {
     ctx.fillRect(-40, -40, 80, 80)
     ctx.restore()
   },
-  render: (ctx) => {
+  render: (root) => {
     rect({
       x: 60,
       y: 60,
@@ -115,7 +115,7 @@ export const rotationScene: VisualTestScene = {
       height: 80,
       fill: '#ff6600',
       rotation: (45 * Math.PI) / 180
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -134,7 +134,7 @@ export const scaleScene: VisualTestScene = {
     ctx.fillRect(-40, -40, 80, 80)
     ctx.restore()
   },
-  render: (ctx) => {
+  render: (root) => {
     rect({
       x: 60,
       y: 60,
@@ -143,7 +143,7 @@ export const scaleScene: VisualTestScene = {
       fill: '#9900ff',
       scaleX: 1.5,
       scaleY: 0.75
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -176,7 +176,7 @@ export const dashedLineScene: VisualTestScene = {
     ctx.lineTo(280, 150)
     ctx.stroke()
   },
-  render: (ctx) => {
+  render: (root) => {
     line({
       x1: 20,
       y1: 50,
@@ -185,7 +185,7 @@ export const dashedLineScene: VisualTestScene = {
       stroke: '#333333',
       lineWidth: 3,
       lineDash: [10, 5]
-    })(ctx)
+    })(root, undefined)
 
     line({
       x1: 20,
@@ -195,7 +195,7 @@ export const dashedLineScene: VisualTestScene = {
       stroke: '#333333',
       lineWidth: 3,
       lineDash: [5, 10, 15]
-    })(ctx)
+    })(root, undefined)
 
     line({
       x1: 20,
@@ -205,7 +205,7 @@ export const dashedLineScene: VisualTestScene = {
       stroke: '#333333',
       lineWidth: 3,
       lineDash: [20, 5, 5, 5]
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -241,7 +241,7 @@ export const lineCapScene: VisualTestScene = {
     ctx.lineTo(250, 150)
     ctx.stroke()
   },
-  render: (ctx) => {
+  render: (root) => {
     // butt
     line({
       x1: 50,
@@ -251,7 +251,7 @@ export const lineCapScene: VisualTestScene = {
       stroke: '#0066cc',
       lineWidth: 15,
       lineCap: 'butt'
-    })(ctx)
+    })(root, undefined)
 
     // round
     line({
@@ -262,7 +262,7 @@ export const lineCapScene: VisualTestScene = {
       stroke: '#0066cc',
       lineWidth: 15,
       lineCap: 'round'
-    })(ctx)
+    })(root, undefined)
 
     // square
     line({
@@ -273,7 +273,7 @@ export const lineCapScene: VisualTestScene = {
       stroke: '#0066cc',
       lineWidth: 15,
       lineCap: 'square'
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -312,7 +312,7 @@ export const lineJoinScene: VisualTestScene = {
     ctx.lineTo(410, 50)
     ctx.stroke()
   },
-  render: (ctx) => {
+  render: (root) => {
     // miter
     path({
       points: [
@@ -323,7 +323,7 @@ export const lineJoinScene: VisualTestScene = {
       stroke: '#ff6600',
       lineWidth: 10,
       lineJoin: 'miter'
-    })(ctx)
+    })(root, undefined)
 
     // round
     path({
@@ -335,7 +335,7 @@ export const lineJoinScene: VisualTestScene = {
       stroke: '#ff6600',
       lineWidth: 10,
       lineJoin: 'round'
-    })(ctx)
+    })(root, undefined)
 
     // bevel
     path({
@@ -347,7 +347,7 @@ export const lineJoinScene: VisualTestScene = {
       stroke: '#ff6600',
       lineWidth: 10,
       lineJoin: 'bevel'
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -372,7 +372,7 @@ export const opacityScene: VisualTestScene = {
     ctx.fillStyle = '#0000ff'
     ctx.fillRect(100, 75, 100, 100)
   },
-  render: (ctx) => {
+  render: (root) => {
     // 背景
     rect({
       x: 0,
@@ -380,7 +380,7 @@ export const opacityScene: VisualTestScene = {
       width: 300,
       height: 200,
       fill: '#cccccc'
-    })(ctx)
+    })(root, undefined)
 
     // 半透明矩形
     rect({
@@ -390,7 +390,7 @@ export const opacityScene: VisualTestScene = {
       height: 100,
       fill: '#ff0000',
       opacity: 0.5
-    })(ctx)
+    })(root, undefined)
 
     rect({
       x: 100,
@@ -399,7 +399,7 @@ export const opacityScene: VisualTestScene = {
       height: 100,
       fill: '#0000ff',
       opacity: 0.3
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -420,7 +420,7 @@ export const compositeScene: VisualTestScene = {
     ctx.fillStyle = '#0000ff'
     ctx.fillRect(100, 75, 100, 100)
   },
-  render: (ctx) => {
+  render: (root) => {
     // 目标矩形
     rect({
       x: 50,
@@ -428,7 +428,7 @@ export const compositeScene: VisualTestScene = {
       width: 100,
       height: 100,
       fill: '#ff0000'
-    })(ctx)
+    })(root, undefined)
 
     // 使用 source-over 合成
     rect({
@@ -438,7 +438,7 @@ export const compositeScene: VisualTestScene = {
       height: 100,
       fill: '#0000ff',
       globalCompositeOperation: 'source-over'
-    })(ctx)
+    })(root, undefined)
   }
 }
 

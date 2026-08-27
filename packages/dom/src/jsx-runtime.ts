@@ -11,7 +11,7 @@
 import { jsx, jsxs, Fragment, configureTags, type TagComponent } from '@rasenjs/core'
 import type { Mountable } from '@rasenjs/core'
 import * as tags from './components'
-import type { CanvasContextOptions, ElementProps, HTMLTagName } from './components'
+import type { ElementProps, HTMLTagName } from './components'
 
 configureTags({ '': tags as unknown as Record<string, TagComponent> })
 
@@ -24,14 +24,24 @@ type HTMLIntrinsicElements = {
   [K in Exclude<HTMLTagName, 'canvas'>]: Omit<ElementProps<K>, 'tag'>
 } & {
   /**
-   * The `canvas` JSX tag maps to the Rasen canvas component (which creates the
-   * element itself and mounts host-specific children onto its context), so it
-   * additionally accepts `contextType` / `contextOptions`.
+   * The `canvas` JSX tag maps to the Rasen canvas component. contextType is a
+   * discriminant: children/renderOptions are typed per renderer (CanvasNode
+   * for '2d', GlNode for webgl/webgl2).
    */
-  canvas: Omit<ElementProps<'canvas'>, 'tag'> & {
-    contextType?: '2d' | 'webgl' | 'webgl2' | 'webgpu'
-    contextOptions?: CanvasContextOptions
-  }
+  canvas: Omit<ElementProps<'canvas'>, 'tag' | 'children'> &
+    (
+      | {
+          contextType?: '2d'
+          renderOptions?: import('@rasenjs/canvas-2d').RenderContextOptions
+          children?: Array<Mountable<import('@rasenjs/canvas-2d').CanvasNode>>
+        }
+      | {
+          contextType: 'webgl' | 'webgl2'
+          contextOptions?: WebGLContextAttributes
+          renderOptions?: import('@rasenjs/webgl').RenderContextOptions
+          children?: Array<Mountable<import('@rasenjs/webgl').GlNode>>
+        }
+    )
 }
 
 export namespace JSX {

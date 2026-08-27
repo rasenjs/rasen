@@ -1,5 +1,5 @@
 import { type Mountable, type HostHooks } from '../types'
-import { getReactiveRuntime, unref, type Ref } from '../reactive'
+import { getReactiveRuntime, type Ref } from '../reactive'
 import { MARKERS } from '../marker-constants'
 
 /**
@@ -22,7 +22,7 @@ export type FragmentChild<N = unknown> =
  * Fragment config
  */
 export interface FragmentConfig<N> {
-  children: Array<FragmentChild>
+  children: Array<FragmentChild<N>>
   hooks?: FragmentHostHooks<N>
 }
 
@@ -30,7 +30,7 @@ export interface FragmentConfig<N> {
  * Process a single child element
  */
 function processChild<N>(
-  child: FragmentChild,
+  child: FragmentChild<N>,
   hooks?: FragmentHostHooks<N>
 ): Mountable<N> {
   const runtime = getReactiveRuntime()
@@ -57,11 +57,11 @@ function processChild<N>(
     }
     const refChild = child as Ref<unknown>
     return (host: N) => {
-      const handle = hooks.createText!(host, String(unref(refChild)))
+      const handle = hooks.createText!(host, String(runtime.unref(refChild)))
       hooks.insert!(host, handle.node, null)
 
       const stop = runtime.subscribe(
-        () => unref(refChild),
+        () => runtime.unref(refChild),
         (newVal) => {
           handle.update(String(newVal))
         }

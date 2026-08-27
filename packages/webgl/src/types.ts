@@ -2,13 +2,12 @@
  * WebGL types - reusable across components
  */
 import type { Bounds } from '@rasenjs/core/utils'
+import type { PropValue } from '@rasenjs/core'
 
-// Ref/ReadonlyRef 统一使用 core 的品牌化定义（消除双类型系统）：
-// 本地不再自行声明 { value } 造型，运行时 ref 由所选响应式运行时创建。
-export type { Ref, ReadonlyRef } from '@rasenjs/core'
-import type { Ref, ReadonlyRef } from '@rasenjs/core'
+// 响应式属性值统一使用 core 的 PropValue（T | Ref<T> | Getter<T>）
+export type { PropValue, Ref } from '@rasenjs/core'
 
-export type MaybeRef<T> = T | Ref<T> | ReadonlyRef<T>
+export type MaybeRef<T> = PropValue<T>
 
 export interface Point {
   x: number
@@ -45,8 +44,8 @@ export type Mat3 = [
  * Common shape properties
  */
 export interface CommonDrawProps {
-  opacity?: number | Ref<number> | ReadonlyRef<number>
-  visible?: boolean | Ref<boolean> | ReadonlyRef<boolean>
+  opacity?: PropValue<number>
+  visible?: PropValue<boolean>
 }
 
 /**
@@ -56,15 +55,15 @@ export interface CommonDrawProps {
  * `Transform2DProps` subset instead, keeping their API free of 3D concerns.
  */
 export interface TransformProps {
-  z?: number | Ref<number> | ReadonlyRef<number>
-  rotation?: number | Ref<number> | ReadonlyRef<number>
-  rotationX?: number | Ref<number> | ReadonlyRef<number>
-  rotationY?: number | Ref<number> | ReadonlyRef<number>
-  rotationZ?: number | Ref<number> | ReadonlyRef<number>
-  scale?: number | Ref<number> | ReadonlyRef<number>
-  scaleX?: number | Ref<number> | ReadonlyRef<number>
-  scaleY?: number | Ref<number> | ReadonlyRef<number>
-  scaleZ?: number | Ref<number> | ReadonlyRef<number>
+  z?: PropValue<number>
+  rotation?: PropValue<number>
+  rotationX?: PropValue<number>
+  rotationY?: PropValue<number>
+  rotationZ?: PropValue<number>
+  scale?: PropValue<number>
+  scaleX?: PropValue<number>
+  scaleY?: PropValue<number>
+  scaleZ?: PropValue<number>
 }
 
 /**
@@ -79,8 +78,8 @@ export interface TransformProps {
  * they share the unified pipeline — but their public API stays 2D.
  */
 export interface Transform2DProps {
-  rotation?: number | Ref<number> | ReadonlyRef<number>
-  scaleX?: number | Ref<number> | ReadonlyRef<number>
-  scaleY?: number | Ref<number> | ReadonlyRef<number>
-  z?: number | Ref<number> | ReadonlyRef<number>
+  rotation?: PropValue<number>
+  scaleX?: PropValue<number>
+  scaleY?: PropValue<number>
+  z?: PropValue<number>
 }

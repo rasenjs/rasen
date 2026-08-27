@@ -1,10 +1,11 @@
-import { ref, unref, setValue, type Ref } from '@rasenjs/core'
+import { getReactiveRuntime, type Ref } from '@rasenjs/core'
 import type { FrameRef, FrameOptions } from './types'
 
 const DEFAULT_FRAME_RATE = 60
 
 function createFrameRef(options: FrameOptions): FrameRef & Ref<number> {
-  const valueRef: Ref<number> = ref(options.frames[0] ?? 0)
+  const runtime = getReactiveRuntime()
+  const valueRef: Ref<number> = runtime.ref<number>(options.frames[0] ?? 0)
   
   let frames = options.frames
   let frameRate = options.frameRate ?? DEFAULT_FRAME_RATE
@@ -44,13 +45,13 @@ function createFrameRef(options: FrameOptions): FrameRef & Ref<number> {
         } else {
           frameIndex = frames.length - 1
           isPlaying = false
-          setValue(valueRef, frames[frameIndex])
+          runtime.setValue(valueRef, frames[frameIndex])
           return
         }
       }
     }
 
-    setValue(valueRef, frames[frameIndex])
+    runtime.setValue(valueRef, frames[frameIndex])
 
     if (isPlaying) {
       rafId = requestAnimationFrame(tick)
@@ -85,22 +86,22 @@ function createFrameRef(options: FrameOptions): FrameRef & Ref<number> {
       rafId = null
     }
     
-    setValue(valueRef, frames[0] ?? 0)
+    runtime.setValue(valueRef, frames[0] ?? 0)
   }
 
-  const setFrames = (newFrames: number[], opts?: FrameOptions) => {
+  const setFrames = (newFrames: number[], opts?: Omit<FrameOptions, 'frames'>) => {
     frames = newFrames
     if (opts?.frameRate !== undefined) frameRate = opts.frameRate
     if (opts?.loop !== undefined) loop = opts.loop
     
     frameIndex = 0
     elapsed = 0
-    setValue(valueRef, frames[0] ?? 0)
+    runtime.setValue(valueRef, frames[0] ?? 0)
   }
 
-  const frameRef: FrameRef & Ref<number> = {
-    get value() { return unref(valueRef) },
-    set value(v: number) { setValue(valueRef, v) },
+  const frameRef = {
+    get value() { return runtime.unref(valueRef) },
+    set value(v: number) { runtime.setValue(valueRef, v) },
     get isAnimating() { return isPlaying && !isPaused },
     get isPlaying() { return isPlaying },
     get isPaused() { return isPaused },
@@ -110,7 +111,7 @@ function createFrameRef(options: FrameOptions): FrameRef & Ref<number> {
     pause,
     stop,
     setFrames
-  }
+  } as unknown as FrameRef & Ref<number>
 
   return frameRef
 }

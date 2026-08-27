@@ -1,5 +1,5 @@
 import { com, type Mountable, type Unmount } from '@rasenjs/core'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import type { CanvasNode } from '../node'
 import { createNode } from '../node'
 import { unref, type CommonDrawProps, type TransformProps, withDrawProps, collectDrawPropsDependencies } from '../utils'
@@ -9,8 +9,8 @@ export interface GroupProps
   // 子组件
   children: Array<Mountable<CanvasNode>>
   // 位置偏移
-  x?: number | Ref<number> | ReadonlyRef<number>
-  y?: number | Ref<number> | ReadonlyRef<number>
+  x?: PropValue<number>
+  y?: PropValue<number>
   // 裁剪区域(可选)
   clip?:
     | {
@@ -19,7 +19,7 @@ export interface GroupProps
         width: number
         height: number
       }
-    | Ref<{ x: number; y: number; width: number; height: number }>
+ | PropValue<{ x: number; y: number; width: number; height: number }>
 }
 
 /**

@@ -29,3 +29,14 @@ export interface CanvasEventHandlers {
   pointerup?: CanvasEventHandler
   pointermove?: CanvasEventHandler
 }
+
+/** Delegated pointer event types the renderer dispatches. */
+export type CanvasPointerEventType = keyof CanvasEventHandlers
+
+/** Canonical list of pointer event types (host adapters bind these). */
+export const CANVAS_POINTER_EVENT_TYPES: readonly CanvasPointerEventType[] = [
+  'click',
+  'pointerdown',
+  'pointerup',
+  'pointermove'
+]

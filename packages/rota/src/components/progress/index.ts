@@ -82,7 +82,7 @@ export function createProgressRoot(): (
       // 渲染 children
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children(getContext)(root)
+        childUnmount = props.children(getContext)(root, undefined)
       }
 
       host.appendChild(root)
@@ -171,7 +171,7 @@ export function createProgress(): (
             },
             getContext
           )
-      })(host)
+      })(host, undefined)
     }
   }
 }

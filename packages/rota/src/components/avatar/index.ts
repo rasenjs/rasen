@@ -273,7 +273,7 @@ export function createAvatar(): (props?: {
             const imgMount = Image(
               { src: props.src, alt: props.alt },
               getContext
-            )(container)
+            )(container, undefined)
             if (typeof imgMount === 'function') unmounts.push(imgMount)
           }
 
@@ -282,7 +282,7 @@ export function createAvatar(): (props?: {
             const fallbackMount = Fallback(
               { delayMs: 0 },
               getContext
-            )(container)
+            )(container, undefined)
             if (typeof fallbackMount === 'function')
               unmounts.push(fallbackMount)
           }
@@ -291,7 +291,7 @@ export function createAvatar(): (props?: {
             unmounts.forEach((u) => u())
           }
         }
-      })(host)
+      })(host, undefined)
 
       return rootMount
     }

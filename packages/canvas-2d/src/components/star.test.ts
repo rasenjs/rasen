@@ -11,15 +11,19 @@ import {
   createMockReactiveRuntime,
   waitForAsync
 } from '../test-utils'
+import { createRoot } from '../node'
+import type { CanvasNode, Context2D } from '../node'
 import { star } from './star'
 
 describe('star', () => {
-  let ctx: CanvasRenderingContext2D
+  let ctx: Context2D
+  let root: CanvasNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     ctx = createMockContext()
+    root = createRoot(ctx)
     cleanupFns = []
 
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -45,7 +49,7 @@ describe('star', () => {
         fill: 'yellow'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -71,7 +75,7 @@ describe('star', () => {
         fill: 'blue'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -93,7 +97,7 @@ describe('star', () => {
         lineWidth: 2
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

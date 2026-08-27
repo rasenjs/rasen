@@ -4,16 +4,20 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
+import type { GlContext, GlNode } from '../../node'
+import { createRoot } from '../../node'
 import { polygon } from './polygon'
 import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
 describe('polygon', () => {
-  let gl: WebGLRenderingContext
+  let gl: GlContext
+  let root: GlNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     gl = createMockWebGLContext()
+    root = createRoot(gl)
     cleanupFns = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       setTimeout(() => cb(performance.now()), 0)
@@ -37,7 +41,7 @@ describe('polygon', () => {
     })
 
     expect(component).toBeDefined()
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
   })
 
@@ -56,7 +60,7 @@ describe('polygon', () => {
       fill: '#00ff88'
     })
 
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
     expect(cleanup).toBeDefined()
   })

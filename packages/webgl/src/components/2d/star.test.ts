@@ -4,16 +4,20 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
+import type { GlContext, GlNode } from '../../node'
+import { createRoot } from '../../node'
 import { star } from './star'
 import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
 describe('star', () => {
-  let gl: WebGLRenderingContext
+  let gl: GlContext
+  let root: GlNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     gl = createMockWebGLContext()
+    root = createRoot(gl)
     cleanupFns = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       setTimeout(() => cb(performance.now()), 0)
@@ -30,14 +34,14 @@ describe('star', () => {
     const component = star({
       x: 100,
       y: 100,
-      points: 5,
+      numPoints: 5,
       innerRadius: 30,
       outerRadius: 60,
       fill: '#ffff00'
     })
 
     expect(component).toBeDefined()
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
   })
 
@@ -45,13 +49,13 @@ describe('star', () => {
     const component = star({
       x: 100,
       y: 100,
-      points: 8,
+      numPoints: 8,
       innerRadius: 30,
       outerRadius: 60,
       fill: '#ffff00'
     })
 
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
     expect(cleanup).toBeDefined()
   })

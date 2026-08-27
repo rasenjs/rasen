@@ -18,7 +18,8 @@ import {
   voxelRaycast,
 } from '@rasenjs/webgl'
 import { Blocks } from './blocks'
-import { createPointerLockControls, setupKeyboard, type MouseControls } from './input'
+import { bindLookControls, setupKeyboard } from './input'
+import type { BoundLookControls } from '@rasenjs/dom'
 import { Player } from './player'
 import { createApp } from './render'
 import { World } from './world'
@@ -140,7 +141,7 @@ function main() {
   // Mouse controls are created before the canvas exists; inject refs so the
   // scene can react to lock state immediately, then wire events after mount.
   const locked = ref(false)
-  const mouse: MouseControls = {
+  const mouse: BoundLookControls = {
     yaw: player.yaw,
     pitch: player.pitch,
     locked,
@@ -153,7 +154,11 @@ function main() {
 
   // Wire mouse after the canvas exists (mount is synchronous for the canvas).
   const canvas = document.querySelector('canvas') as HTMLCanvasElement
-  const controls = createPointerLockControls(canvas, { yaw: player.yaw, pitch: player.pitch, locked })
+  const controls = bindLookControls(canvas, {
+    yaw: player.yaw,
+    pitch: player.pitch,
+    locked,
+  })
   mouse.request = controls.request
   mouse.release = controls.release
   bindMouse(canvas, world, player, mouse, selectedBlock)

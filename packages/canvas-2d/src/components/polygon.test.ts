@@ -10,15 +10,19 @@ import {
   createMockReactiveRuntime,
   waitForAsync
 } from '../test-utils'
+import { createRoot } from '../node'
+import type { CanvasNode, Context2D } from '../node'
 import { polygon } from './polygon'
 
 describe('polygon', () => {
-  let ctx: CanvasRenderingContext2D
+  let ctx: Context2D
+  let root: CanvasNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     ctx = createMockContext()
+    root = createRoot(ctx)
     cleanupFns = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       setTimeout(() => cb(performance.now()), 0)
@@ -39,7 +43,7 @@ describe('polygon', () => {
         fill: 'red'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -68,7 +72,7 @@ describe('polygon', () => {
         closed: false
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -92,7 +96,7 @@ describe('polygon', () => {
         fill: 'blue'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -111,7 +115,7 @@ describe('polygon', () => {
         fill: 'green'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -131,7 +135,7 @@ describe('polygon', () => {
         fill: 'lightblue',
         stroke: 'darkblue'
       })
-      cleanupFns.push(mountable(ctx))
+      cleanupFns.push(mountable(root, undefined))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()

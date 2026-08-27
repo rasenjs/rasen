@@ -1,4 +1,4 @@
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import type { Context2D } from '../node'
 import { unref } from './ref'
 
@@ -15,11 +15,11 @@ export interface ColorStop {
  */
 export interface LinearGradientOptions {
   type: 'linear'
-  x0: number | Ref<number> | ReadonlyRef<number>
-  y0: number | Ref<number> | ReadonlyRef<number>
-  x1: number | Ref<number> | ReadonlyRef<number>
-  y1: number | Ref<number> | ReadonlyRef<number>
-  colorStops: ColorStop[] | Ref<ColorStop[]> | ReadonlyRef<ColorStop[]>
+  x0: PropValue<number>
+  y0: PropValue<number>
+  x1: PropValue<number>
+  y1: PropValue<number>
+  colorStops: PropValue<ColorStop[]>
 }
 
 /**
@@ -27,13 +27,13 @@ export interface LinearGradientOptions {
  */
 export interface RadialGradientOptions {
   type: 'radial'
-  x0: number | Ref<number> | ReadonlyRef<number>
-  y0: number | Ref<number> | ReadonlyRef<number>
-  r0: number | Ref<number> | ReadonlyRef<number>
-  x1: number | Ref<number> | ReadonlyRef<number>
-  y1: number | Ref<number> | ReadonlyRef<number>
-  r1: number | Ref<number> | ReadonlyRef<number>
-  colorStops: ColorStop[] | Ref<ColorStop[]> | ReadonlyRef<ColorStop[]>
+  x0: PropValue<number>
+  y0: PropValue<number>
+  r0: PropValue<number>
+  x1: PropValue<number>
+  y1: PropValue<number>
+  r1: PropValue<number>
+  colorStops: PropValue<ColorStop[]>
 }
 
 /**
@@ -122,11 +122,8 @@ export type PatternRepeat = 'repeat' | 'repeat-x' | 'repeat-y' | 'no-repeat'
  * 图案选项
  */
 export interface PatternOptions {
-  image:
-    | CanvasImageSource
-    | Ref<CanvasImageSource>
-    | ReadonlyRef<CanvasImageSource>
-  repeat?: PatternRepeat | Ref<PatternRepeat> | ReadonlyRef<PatternRepeat>
+  image: PropValue<CanvasImageSource>
+  repeat?: PropValue<PatternRepeat>
 }
 
 /**

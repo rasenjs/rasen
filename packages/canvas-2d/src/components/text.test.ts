@@ -12,15 +12,19 @@ import {
   createMockReactiveRuntime,
   waitForAsync
 } from '../test-utils'
+import { createRoot } from '../node'
+import type { CanvasNode, Context2D } from '../node'
 import { text } from './text'
 
 describe('text', () => {
-  let ctx: CanvasRenderingContext2D
+  let ctx: Context2D
+  let root: CanvasNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     ctx = createMockContext()
+    root = createRoot(ctx)
     cleanupFns = []
 
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -44,7 +48,7 @@ describe('text', () => {
         fill: '#333333'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -67,7 +71,7 @@ describe('text', () => {
         fill: 'black'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -85,7 +89,7 @@ describe('text', () => {
         textAlign: 'center'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -101,7 +105,7 @@ describe('text', () => {
         textBaseline: 'middle'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -118,7 +122,7 @@ describe('text', () => {
         y: 0
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -133,7 +137,7 @@ describe('text', () => {
         y: 0
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -148,7 +152,7 @@ describe('text', () => {
         y: 0
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -176,7 +180,7 @@ describe('text', () => {
         y: 10,
         textDecoration: 'underline'
       })
-      cleanupFns.push(mountable(ctx))
+      cleanupFns.push(mountable(root, undefined))
       await waitForAsync()
 
       expect(ctx.fillText).toHaveBeenCalledWith('Underlined Text', 10, 10)
@@ -193,7 +197,7 @@ describe('text', () => {
         y: 10,
         letterSpacing: 5
       })
-      cleanupFns.push(mountable(ctx))
+      cleanupFns.push(mountable(root, undefined))
       await waitForAsync()
 
       // 有字间距时,文本会被拆分为单个字符绘制

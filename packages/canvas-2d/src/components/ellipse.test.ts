@@ -12,15 +12,19 @@ import {
   createMockReactiveRuntime,
   waitForAsync
 } from '../test-utils'
+import { createRoot } from '../node'
+import type { CanvasNode, Context2D } from '../node'
 import { ellipse } from './ellipse'
 
 describe('ellipse', () => {
-  let ctx: CanvasRenderingContext2D
+  let ctx: Context2D
+  let root: CanvasNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     ctx = createMockContext()
+    root = createRoot(ctx)
     cleanupFns = []
 
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -45,7 +49,7 @@ describe('ellipse', () => {
         fill: '#ff0000'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -76,7 +80,7 @@ describe('ellipse', () => {
         lineWidth: 5
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -97,7 +101,7 @@ describe('ellipse', () => {
         lineWidth: 2
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -119,7 +123,7 @@ describe('ellipse', () => {
         endAngle: Math.PI
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -145,7 +149,7 @@ describe('ellipse', () => {
         anticlockwise: true
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -168,7 +172,7 @@ describe('ellipse', () => {
         stroke: 'black'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

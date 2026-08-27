@@ -1,4 +1,4 @@
-import type { Ref, ReadonlyRef } from './types'
+import type { PropValue } from './types'
 import type { Context2D } from './node'
 import { unref } from './utils'
 
@@ -7,14 +7,14 @@ import { unref } from './utils'
  */
 export interface CommonDrawProps {
   // 阴影属性
-  shadowColor?: string | Ref<string> | ReadonlyRef<string>
-  shadowBlur?: number | Ref<number> | ReadonlyRef<number>
-  shadowOffsetX?: number | Ref<number> | ReadonlyRef<number>
-  shadowOffsetY?: number | Ref<number> | ReadonlyRef<number>
+  shadowColor?: PropValue<string>
+  shadowBlur?: PropValue<number>
+  shadowOffsetX?: PropValue<number>
+  shadowOffsetY?: PropValue<number>
   // 透明度
-  opacity?: number | Ref<number> | ReadonlyRef<number>
+  opacity?: PropValue<number>
   // 合成模式
-  globalCompositeOperation?: string | Ref<string> | ReadonlyRef<string>
+  globalCompositeOperation?: PropValue<string>
 }
 
 /**
@@ -22,13 +22,13 @@ export interface CommonDrawProps {
  */
 export interface LineStyleProps {
   // 虚线
-  lineDash?: number[] | Ref<number[]> | ReadonlyRef<number[]>
-  lineDashOffset?: number | Ref<number> | ReadonlyRef<number>
+  lineDash?: PropValue<number[]>
+  lineDashOffset?: PropValue<number>
   // 线帽样式
-  lineCap?: CanvasLineCap | Ref<CanvasLineCap> | ReadonlyRef<CanvasLineCap>
+  lineCap?: PropValue<CanvasLineCap>
   // 线连接样式
-  lineJoin?: CanvasLineJoin | Ref<CanvasLineJoin> | ReadonlyRef<CanvasLineJoin>
-  miterLimit?: number | Ref<number> | ReadonlyRef<number>
+  lineJoin?: PropValue<CanvasLineJoin>
+  miterLimit?: PropValue<number>
 }
 
 /**
@@ -36,13 +36,13 @@ export interface LineStyleProps {
  */
 export interface TransformProps {
   // 旋转（弧度）
-  rotation?: number | Ref<number> | ReadonlyRef<number>
+  rotation?: PropValue<number>
   // 缩放
-  scaleX?: number | Ref<number> | ReadonlyRef<number>
-  scaleY?: number | Ref<number> | ReadonlyRef<number>
+  scaleX?: PropValue<number>
+  scaleY?: PropValue<number>
   // 平移（在旋转/缩放之前应用）
-  translateX?: number | Ref<number> | ReadonlyRef<number>
-  translateY?: number | Ref<number> | ReadonlyRef<number>
+  translateX?: PropValue<number>
+  translateY?: PropValue<number>
 }
 
 /**

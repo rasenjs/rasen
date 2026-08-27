@@ -1,5 +1,5 @@
 import type { Component2D } from '../node'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import {
   unref,
   type CommonDrawProps,
@@ -16,15 +16,15 @@ export interface ArcProps
     Partial<CommonDrawProps>,
     Partial<LineStyleProps>,
     Partial<TransformProps> {
-  x: number | Ref<number> | ReadonlyRef<number>
-  y: number | Ref<number> | ReadonlyRef<number>
-  radius: number | Ref<number> | ReadonlyRef<number>
-  startAngle: number | Ref<number> | ReadonlyRef<number>
-  endAngle: number | Ref<number> | ReadonlyRef<number>
-  anticlockwise?: boolean | Ref<boolean> | ReadonlyRef<boolean>
-  fill?: string | Ref<string> | ReadonlyRef<string>
-  stroke?: string | Ref<string> | ReadonlyRef<string>
-  lineWidth?: number | Ref<number> | ReadonlyRef<number>
+  x: PropValue<number>
+  y: PropValue<number>
+  radius: PropValue<number>
+  startAngle: PropValue<number>
+  endAngle: PropValue<number>
+  anticlockwise?: PropValue<boolean>
+  fill?: PropValue<string>
+  stroke?: PropValue<string>
+  lineWidth?: PropValue<number>
 }
 
 /**

@@ -1,35 +1,28 @@
 /**
- * Rasen 内部响应式类型定义
- * 不直接依赖 Vue，而是定义通用的响应式接口
+ * Rasen 响应式运行时 —— 用户接入的响应式库的适配契约。
  *
- * Ref 是一个「不透明」的响应式引用类型：它不规定任何具体形状
- * （Vue 的 ref 暴露 `.value`，TC39 Signal 暴露 `.get()`/`.set()`），
- * 因此与具体响应式库完全解耦。访问一律走 unref / setValue / isRef
- * （由运行时提供），或 core 的 toValue，禁止直接读 `.value`。
+ * 用户选择并接入自己的响应式库（@rasenjs/reactive-vue / reactive-signals /
+ * reactive-alien-signals …），框架只通过本接口消费它。业务代码直接用所选
+ * 库的原生 API（ref / computed / watch …），不经过本模块。
+ *
+ * Ref 是「用户提供的抽象类型」：core 只把它当作一个不透明的 object 占位符，
+ * 具体形状由所选库决定（Vue 的 .value、TC39 Signal 的 get()/set() …）。
+ * 各 reactive 适配包通过模块增强（declare module）让 core 的 Ref 变成对应
+ * 三方库的真实类型，因此引入适配包后 `.value` / `.get()` 等直接可用。
+ * 访问一律走运行时的 unref / setValue / isRef，禁止直接读 `.value`。
  */
 
-// 类型层品牌：仅用于在类型上把「响应式引用」和普通对象区分开，
-// 运行时并不依赖它（运行时判定走各适配器的 isRef）。
-declare const REF_BRAND: unique symbol
-declare const READONLY_REF_BRAND: unique symbol
-
 /**
- * 可读写的响应式引用接口（ref）
+ * 响应式引用 —— 用户提供的抽象类型（占位符）。
  *
- * 不暴露任何结构属性——具体形状由适配器决定。
- * 框架规范访问路径是 unref / setValue，禁止直接依赖 `.value`。
+ * core 不规定任何形状，只要求是 object。各 reactive 适配包通过
+ * `declare module '@rasenjs/core'` 让本接口 extends 对应三方库的真实类型
+ * （Vue Ref / Signal.State / alien callable …）。
+ *
+ * 泛型参数 T 仅用于类型层占位；空 interface 可被模块增强合并。
  */
-export interface Ref<T = unknown> {
-  readonly [REF_BRAND]: true
-  readonly __phantom?: T
-}
-
-/**
- * 只读的响应式引用接口（computed） */
-export interface ReadonlyRef<T = unknown> {
-  readonly [READONLY_REF_BRAND]: true
-  readonly __phantom?: T
-}
+// @ts-ignore -- 占位符：泛型参数 T 仅用于类型层，无实际成员
+export interface Ref<T = unknown> {}
 
 import type { PropValue } from './types'
 
@@ -38,9 +31,10 @@ import type { PropValue } from './types'
  * 先判断是否为 ref（尊重运行时 isRef 的权威判断），再处理 Getter 函数
  */
 export function toValue<T>(value: PropValue<T>): T {
+  const runtime = getReactiveRuntime()
   // 先判断是否为 ref（尊重运行时 isRef 的权威判断）
-  if (isRef(value)) {
-    return unref(value as Ref<T> | ReadonlyRef<T>)
+  if (runtime.isRef(value)) {
+    return runtime.unref<T>(value as Ref<T>)
   }
   // 再处理 Getter 函数
   if (typeof value === 'function') {
@@ -48,14 +42,6 @@ export function toValue<T>(value: PropValue<T>): T {
   }
   // 普通值原样返回
   return value as T
-}
-
-/**
- * Effect Scope（内部使用）
- */
-interface EffectScope {
-  run<T>(fn: () => T): T | undefined
-  stop(): void
 }
 
 /**
@@ -83,17 +69,20 @@ export interface ReactiveRuntime {
     callback: (value: T, oldValue: T) => void
   ): () => void
 
-  effectScope(): EffectScope
+  /** 组件生命周期作用域：com() 用它归集订阅，unmount 时一并 stop。 */
+  effectScope(): {
+    run<T>(fn: () => T): T | undefined
+    stop(): void
+  }
 
+  /** 创建响应式引用（框架内部状态用；业务直接用所选库的 ref） */
   ref<T>(value: T): Ref<T>
-
-  computed<T>(getter: () => T): ReadonlyRef<T>
 
   /**
    * 解包响应式引用
    * 是 ref 则读取值，否则原样返回（不调用 getter，getter 由 core 的 toValue 处理）
    */
-  unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T
+  unref<T>(value: T | Ref<T>): T
 
   /**
    * 写入响应式引用的值（setter）
@@ -131,64 +120,25 @@ export function getReactiveRuntime(): ReactiveRuntime {
 }
 
 /**
- * Ref 包装
- * 导出此函数是因为 Rasen 内部需要创建响应式引用
- * 用户可以直接从响应式库（如 Vue）导入 ref
- */
-export function ref<T>(value: T): Ref<T> {
-  return getReactiveRuntime().ref(value)
-}
-
-/**
- * Computed 包装
- */
-export function computed<T>(getter: () => T): ReadonlyRef<T> {
-  return getReactiveRuntime().computed(getter)
-}
-
-/**
- * 解包响应式引用
- * 是 ref 则读取值，否则原样返回（Vue 语义，不调用 getter）
- */
-export function unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
-  return getReactiveRuntime().unref(value)
-}
-
-/**
- * 写入响应式引用的值
- * 库代码应使用此函数而非 `.value`，实现与响应性库的解耦
- */
-export function setValue<T>(ref: Ref<T>, value: T): void {
-  getReactiveRuntime().setValue(ref, value)
-}
-
-/**
- * 判断是否为响应式引用
- */
-export function isRef(value: unknown): boolean {
-  return getReactiveRuntime().isRef(value)
-}
-
-/**
  * 监听对象属性的响应式更新
- * 
- * 遍历对象的每个属性，如果属性值是响应式的（Ref/ReadonlyRef/Getter），
+ *
+ * 遍历对象的每个属性，如果属性值是响应式的（Ref/Getter），
  * 则设置 watch 监听，当属性变化时调用回调函数。
- * 
+ *
  * @param obj - 要监听的对象
  * @param callback - 当任何响应式属性变化时的回调函数
  * @param immediate - 是否立即执行一次回调
  * @returns 清理函数，停止所有监听
- * 
+ *
  * @example
  * ```ts
  * const bgImage = ref('url(image1.png)')
  * const style = { 'background-image': bgImage, color: 'red' }
- * 
+ *
  * const stop = watchObjectProps(style, (key, value) => {
  *   element.style.setProperty(key, String(value))
  * })
- * 
+ *
  * bgImage.value = 'url(image2.png)' // 会触发回调
  * stop() // 清理监听
  * ```
@@ -200,17 +150,16 @@ export function watchObjectProps(
 ): () => void {
   const runtime = getReactiveRuntime()
   const stops: Array<() => void> = []
-  
+
   for (const [key, value] of Object.entries(obj)) {
     // 检查是否是响应式值
     if (runtime.isRef(value)) {
-      // Ref 或 ReadonlyRef
       if (immediate) {
-        callback(key, unref(value as Ref<unknown>))
+        callback(key, runtime.unref(value as Ref<unknown>))
       }
-      
+
       const stop = runtime.subscribe(
-        () => unref(value as Ref<unknown> | ReadonlyRef<unknown>),
+        () => runtime.unref(value as Ref<unknown>),
         (newValue) => {
           callback(key, newValue)
         }
@@ -221,7 +170,7 @@ export function watchObjectProps(
       if (immediate) {
         callback(key, (value as () => unknown)())
       }
-      
+
       const stop = runtime.subscribe(
         value as () => unknown,
         (newValue) => {
@@ -236,7 +185,7 @@ export function watchObjectProps(
       }
     }
   }
-  
+
   return () => {
     stops.forEach(stop => stop())
   }

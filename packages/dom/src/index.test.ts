@@ -1267,22 +1267,6 @@ describe('@rasenjs/dom', () => {
   })
 
   describe('repeat', () => {
-    it('should render list of values', () => {
-      const tags = ref(['red', 'blue', 'green'])
-
-      const unmount = mount(repeat(tags, (tag) =>
-        span({ children: tag })
-      ), container)
-
-      const spans = container.querySelectorAll('span')
-      expect(spans.length).toBe(3)
-      expect(spans[0].textContent).toBe('red')
-      expect(spans[1].textContent).toBe('blue')
-      expect(spans[2].textContent).toBe('green')
-
-      unmount?.()
-    })
-
     it('should render by count', () => {
       const count = ref(5)
 

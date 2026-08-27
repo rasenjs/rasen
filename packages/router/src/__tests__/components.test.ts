@@ -80,7 +80,7 @@ const TestAnchor: Anchor<HTMLElement> = (
       if (typeof child === 'string') {
         anchor.appendChild(document.createTextNode(child))
       } else if (typeof child === 'function') {
-        childUnmounts.push(child(anchor))
+        childUnmounts.push(child(anchor, undefined))
       }
     }
 
@@ -119,7 +119,7 @@ describe('createRouterLink', () => {
     const Link = createRouterLink(router, TestAnchor)
 
     const mountFn = Link({ to: routes.home }, 'Home')
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     const anchor = container.querySelector('a')
     expect(anchor).not.toBeNull()
@@ -134,7 +134,7 @@ describe('createRouterLink', () => {
     const Link = createRouterLink(router, TestAnchor)
 
     const mountFn = Link({ to: routes.user, params: { id: 'alice' } }, 'Alice')
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     const anchor = container.querySelector('a')
     expect(anchor?.href).toContain('/users/alice')
@@ -148,7 +148,7 @@ describe('createRouterLink', () => {
 
     const Link = createRouterLink(router, TestAnchor)
     const mountFn = Link({ to: routes.about }, 'About')
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     const anchor = container.querySelector('a')
     expect(anchor?.hasAttribute('data-active')).toBe(true)
@@ -162,7 +162,7 @@ describe('createRouterLink', () => {
 
     const Link = createRouterLink(router, TestAnchor)
     const mountFn = Link({ to: routes.about }, 'About')
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     const anchor = container.querySelector('a')
     expect(anchor?.hasAttribute('data-active')).toBe(false)
@@ -176,7 +176,7 @@ describe('createRouterLink', () => {
 
     const Link = createRouterLink(router, TestAnchor)
     const mountFn = Link({ to: routes.about }, 'About')
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     const anchor = container.querySelector('a')
 
@@ -198,7 +198,7 @@ describe('createRouterLink', () => {
 
     const Link = createRouterLink(router, TestAnchor)
     const mountFn = Link({ to: routes.about }, 'About')
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     const anchor = container.querySelector('a')
 
@@ -221,7 +221,7 @@ describe('createRouterLink', () => {
     const Link = createRouterLink(router, TestAnchor)
 
     const mountFn = Link({ to: routes.home }, 'Home')
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     expect(container.querySelector('a')).not.toBeNull()
 
@@ -243,7 +243,7 @@ describe('createRouterLink', () => {
     }
 
     const mountFn = Link({ to: routes.home }, icon, ' Home')
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     const anchor = container.querySelector('a')
     expect(anchor?.querySelector('.icon')?.textContent).toBe('🏠')
@@ -325,7 +325,7 @@ describe('createRouterView', () => {
     }
     const RouterView = createRouterView<typeof router.routes, HTMLElement>(router, views)
 
-    const unmount = RouterView()(container)
+    const unmount = RouterView()(container, undefined)
 
     expect(container.querySelector('.home-view')?.textContent).toBe('Home')
 
@@ -369,7 +369,7 @@ describe('createRouterView', () => {
       }
     })
 
-    const unmount = RouterView()(container)
+    const unmount = RouterView()(container, undefined)
 
     expect(container.querySelector('.not-found')?.textContent).toBe('404')
 
@@ -408,7 +408,7 @@ describe('createRouterView', () => {
     }
     const RouterView = createRouterView<typeof router.routes, HTMLElement>(router, views)
 
-    const unmount = RouterView()(container)
+    const unmount = RouterView()(container, undefined)
 
     expect(container.querySelector('.user-view')?.textContent).toBe(
       'User: alice'
@@ -448,7 +448,7 @@ describe('createRouterView', () => {
     }
     const RouterView = createRouterView<typeof router.routes, HTMLElement>(router, views)
 
-    const unmount = RouterView()(container)
+    const unmount = RouterView()(container, undefined)
 
     expect(container.querySelector('.home-view')).not.toBeNull()
 
@@ -483,7 +483,7 @@ describe('createRouterView', () => {
             const wrapper = document.createElement('div')
             wrapper.className = 'dashboard-layout'
             host.appendChild(wrapper)
-            const unmountChild = children()(wrapper)
+            const unmountChild = children()(wrapper, undefined)
             return () => {
               unmountChild?.()
               wrapper.remove()
@@ -509,7 +509,7 @@ describe('createRouterView', () => {
     // 导航到 dashboard/overview
     history.push('/dashboard/overview')
 
-    const unmount = RouterView()(container)
+    const unmount = RouterView()(container, undefined)
 
     // 应该调用了 layout
     expect(layoutSpy).toHaveBeenCalled()
@@ -550,7 +550,7 @@ describe('createLeaveGuard', () => {
     const guardSpy = vi.fn(() => true)
 
     const mountFn = leaveGuard({ guard: guardSpy })
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     await router.push(routes.about)
 
@@ -567,7 +567,7 @@ describe('createLeaveGuard', () => {
     const guardSpy = vi.fn(() => true)
 
     const mountFn = leaveGuard({ guard: guardSpy })
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     await router.push(routes.about)
     expect(guardSpy).toHaveBeenCalledTimes(1)
@@ -584,7 +584,7 @@ describe('createLeaveGuard', () => {
 
     const leaveGuard = createLeaveGuard(router)
     const mountFn = leaveGuard({ guard: () => false })
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     await expect(router.push(routes.about)).rejects.toThrow(
       NavigationAbortedError
@@ -600,7 +600,7 @@ describe('createLeaveGuard', () => {
 
     const leaveGuard = createLeaveGuard(router)
     const mountFn = leaveGuard({ guard: () => 'Unsaved changes' })
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     await expect(router.push(routes.about)).rejects.toThrow(
       'Unsaved changes'
@@ -615,7 +615,7 @@ describe('createLeaveGuard', () => {
 
     const leaveGuard = createLeaveGuard(router)
     const mountFn = leaveGuard({ guard: () => true })
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     await router.push(routes.about)
     expect(router.current?.route).toBe(routes.about)
@@ -634,7 +634,7 @@ describe('createLeaveGuard', () => {
         return true
       }
     })
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     await router.push(routes.about)
     expect(router.current?.route).toBe(routes.about)
@@ -660,7 +660,7 @@ describe('createLeaveGuard', () => {
         return true
       }
     })
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     await router.push(routes.about)
 
@@ -683,7 +683,7 @@ describe('createLeaveGuard', () => {
 
     // 然后在 about 页面挂载 leaveGuard
     const mountFn = leaveGuard({ guard: guardSpy })
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     // 此时从 about 导航到 user 应该触发守卫
     await router.push(routes.user, { params: { id: '123' } })
@@ -705,7 +705,7 @@ describe('createLeaveGuard', () => {
 
     // 在首页挂载 leaveGuard
     const mountFn = leaveGuard({ guard: guardSpy })
-    const unmount = mountFn(container)
+    const unmount = mountFn(container, undefined)
 
     // 离开首页到 about - 应该触发
     await router.push(routes.about)

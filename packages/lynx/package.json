@@ -1,0 +1,47 @@
+{
+  "name": "@rasenjs/lynx",
+  "version": "0.1.0-alpha",
+  "description": "Rasen Lynx renderer - main-thread rendering over Lynx Element PAPIs",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
+    "typecheck": "../../node_modules/.bin/tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "lynx",
+    "renderer",
+    "rasen"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/lynx"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/lynx",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT",
+  "dependencies": {
+    "@rasenjs/core": "workspace:^"
+  }
+}

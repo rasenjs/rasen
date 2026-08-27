@@ -4,6 +4,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
+import type { GlContext, GlNode } from '../../node'
+import { createRoot } from '../../node'
 import { group } from './group'
 import { circle } from './circle'
 import { rect } from './rect'
@@ -11,12 +13,14 @@ import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-ut
 import { getRenderContext } from '../../render-context'
 
 describe('group', () => {
-  let gl: WebGLRenderingContext
+  let gl: GlContext
+  let root: GlNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     gl = createMockWebGLContext()
+    root = createRoot(gl)
     cleanupFns = []
   })
 
@@ -47,7 +51,7 @@ describe('group', () => {
       ]
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     cleanupFns.push(unmount)
 
     expect(unmount).toBeDefined()
@@ -70,7 +74,7 @@ describe('group', () => {
       ]
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     cleanupFns.push(unmount)
     
     const renderContext = getRenderContext(gl)
@@ -95,7 +99,7 @@ describe('group', () => {
       ]
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     cleanupFns.push(unmount)
 
     expect(unmount).toBeDefined()
@@ -118,7 +122,7 @@ describe('group', () => {
       ]
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     cleanupFns.push(unmount)
     
     expect(unmount).toBeDefined()
@@ -139,7 +143,7 @@ describe('group', () => {
       ]
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     cleanupFns.push(unmount)
     
     expect(unmount).toBeDefined()
@@ -160,11 +164,11 @@ describe('group', () => {
       ]
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     cleanupFns.push(unmount)
     
     // Change visibility
-    visible.value = false
+    runtime.setValue(visible, false)
     
     expect(unmount).toBeDefined()
   })
@@ -179,7 +183,7 @@ describe('group', () => {
       ]
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     
     expect(unmount).toBeDefined()
     expect(typeof unmount).toBe('function')
@@ -212,7 +216,7 @@ describe('group', () => {
       ]
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     cleanupFns.push(unmount)
     
     const renderContext = getRenderContext(gl)
@@ -230,7 +234,7 @@ describe('group', () => {
       children: []
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     cleanupFns.push(unmount)
     
     expect(unmount).toBeDefined()
@@ -253,13 +257,13 @@ describe('group', () => {
       ]
     })
 
-    const unmount = component(gl)
+    const unmount = component(root, undefined)
     cleanupFns.push(unmount)
     
     // Update transforms
-    x.value = 200
-    y.value = 300
-    rotation.value = Math.PI / 2
+    runtime.setValue(x, 200)
+    runtime.setValue(y, 300)
+    runtime.setValue(rotation, Math.PI / 2)
     
     expect(unmount).toBeDefined()
   })

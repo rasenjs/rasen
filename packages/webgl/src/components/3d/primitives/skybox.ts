@@ -7,13 +7,13 @@
 
 import type { Component3D } from '../../../node'
 import type { MaybeRef, CommonDrawProps } from '../../../types'
-import { unref, createTexture } from '../../../utils'
+import { unref, createTexture, type BitmapSource } from '../../../utils'
 import { getRenderContext } from '../../../render-context'
 import { element } from '../../element'
 
 export interface SkyboxProps extends CommonDrawProps {
   /** Panoramic sky texture (equirectangular). */
-  texture: MaybeRef<TexImageSource | undefined>
+  texture: MaybeRef<BitmapSource | undefined>
   /** Radius of the sky sphere. Default 500. */
   radius?: MaybeRef<number>
   /** Camera eye position — skybox renders centered on this point. */

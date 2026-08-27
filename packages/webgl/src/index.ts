@@ -5,9 +5,9 @@
  */
 
 export { RenderContext, getRenderContext, type RenderContextOptions } from './render-context'
+export { createRoot, createNode, type GlNode, type GlContext } from './node'
 export type { InstanceData } from './renderer/instanced'
 export * from './components'
-export * from './controls'
 export * from './types'
 export * from './utils'
 export { loadGLB, loadGLBAssets } from './utils/gltf'

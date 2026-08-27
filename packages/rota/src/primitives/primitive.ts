@@ -17,9 +17,9 @@ export interface PrimitiveProps {
 /**
  * 创建一个基础组件
  */
-export function primitive<T extends HTMLElement = HTMLElement>(
+export function primitive(
   tag: string
-): (props: PrimitiveProps) => Mountable<HTMLElement, T> {
+): (props: PrimitiveProps) => Mountable<HTMLElement> {
   return (props: PrimitiveProps) => {
     return (host: HTMLElement) => {
       const el = document.createElement(tag)

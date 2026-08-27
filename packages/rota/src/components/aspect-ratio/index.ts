@@ -60,7 +60,7 @@ export function createAspectRatio(): (
       // 渲染子内容
       let unmount: (() => void) | undefined
       if (children) {
-        unmount = children()(content)
+        unmount = children()(content, undefined)
       }
 
       host.appendChild(container)

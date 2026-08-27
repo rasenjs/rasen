@@ -59,7 +59,7 @@ export async function waitForUpdate(renderContext: {
 }): Promise<void> {
   // Dynamically import Vue's nextTick (if available)
   try {
-    const { nextTick } = await import('@vue/reactivity')
+    const { nextTick } = await import('@vue/runtime-core')
     // Wait for Vue's nextTick
     await nextTick()
   } catch {

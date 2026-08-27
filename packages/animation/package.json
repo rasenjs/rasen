@@ -24,11 +24,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@rasenjs/core": "workspace:*"
-  },
-  "devDependencies": {
+    "@rasenjs/core": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*"
   },
+  "devDependencies": {},
   "keywords": [
     "animation",
     "tween",

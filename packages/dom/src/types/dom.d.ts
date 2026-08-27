@@ -78,7 +78,7 @@ export interface SignalLike<T> {
 	subscribe(fn: (value: T) => void): () => void;
 }
 
-// 直接使用 PropValue 类型，支持：直接值、Ref、ReadonlyRef、或 getter 函数
+// 直接使用 PropValue 类型，支持：直接值、Ref、或 getter 函数
 export type Signalish<T> = PropValue<T>;
 
 export type UnpackSignal<T> = T extends SignalLike<infer V> ? V : T;

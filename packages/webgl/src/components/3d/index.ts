@@ -25,8 +25,12 @@ export type {
   PerspectiveCameraProps,
   OrthographicCameraProps,
 } from './cameras/camera'
-export { FirstPersonCamera, forwardVector, rightVector } from './cameras/first-person-camera'
-export type { FirstPersonCameraProps } from './cameras/first-person-camera'
+export { FirstPersonCamera, forwardVector, rightVector, createLookControls } from './cameras/first-person-camera'
+export type {
+  FirstPersonCameraProps,
+  LookRefs,
+  LookControls,
+} from './cameras/first-person-camera'
 export { buildVoxelMesh, voxelRaycast } from './voxel/voxel'
 export type {
   VoxelFaces,

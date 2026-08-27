@@ -20,7 +20,7 @@
  *    the user handler.
  */
 
-import { getReactiveRuntime, ref, type Ref } from '@rasenjs/core'
+import { getReactiveRuntime, type Ref } from '@rasenjs/core'
 
 export interface PressHandlers {
   onPressIn?: ((e?: unknown) => void) | null
@@ -41,7 +41,7 @@ export function usePressability(handlers: PressHandlers): {
   pressEvents: PressEvents
 } {
   const runtime = getReactiveRuntime()
-  const pressed = ref(false)
+  const pressed = runtime.ref(false)
 
   function handlePressIn(e?: unknown): void {
     runtime.setValue(pressed, true)

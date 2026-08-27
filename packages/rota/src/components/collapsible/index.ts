@@ -59,7 +59,7 @@ export function createCollapsibleRoot(): (
       // 渲染 children
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(root)
+        childUnmount = props.children()(root, undefined)
       }
 
       host.appendChild(root)
@@ -127,7 +127,7 @@ export function createCollapsibleContent(): (
       // 渲染 children
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(content)
+        childUnmount = props.children()(content, undefined)
       }
 
       host.appendChild(content)
@@ -150,7 +150,7 @@ export function createCollapsible(): (
 
   return (props?: CollapsibleRootProps) => {
     return (host: HTMLElement) => {
-      return Root(props)(host)
+      return Root(props)(host, undefined)
     }
   }
 }

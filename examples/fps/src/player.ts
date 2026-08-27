@@ -6,7 +6,7 @@
  */
 
 import { computed, ref } from '@rasenjs/reactive-signals'
-import type { ReadonlyRef } from '@rasenjs/core'
+import type { Ref } from '@rasenjs/core'
 import { aabb, overlapsAabb, type Aabb } from '@rasenjs/math'
 import { forwardVector, rightVector } from '@rasenjs/webgl'
 import type { Wall } from './level'
@@ -63,8 +63,8 @@ export class Player {
   readonly maxHealth = 100
   readonly weaponIndex = ref(0)
   readonly lastShot = ref(0)
-  readonly eye: ReadonlyRef<{ x: number; y: number; z: number }>
-  readonly currentWeapon: ReadonlyRef<Weapon>
+  readonly eye: Ref<{ x: number; y: number; z: number }>
+  readonly currentWeapon: Ref<Weapon>
 
   private vel = { x: 0, y: 0, z: 0 }
   private onGround = false

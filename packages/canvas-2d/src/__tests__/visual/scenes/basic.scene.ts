@@ -20,14 +20,14 @@ export const rectFillScene: VisualTestScene = {
     ctx.fillStyle = '#ff0000'
     ctx.fillRect(50, 50, 100, 100)
   },
-  render: (ctx) => {
+  render: (root) => {
     rect({
       x: 50,
       y: 50,
       width: 100,
       height: 100,
       fill: '#ff0000'
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -43,7 +43,7 @@ export const rectStrokeScene: VisualTestScene = {
     ctx.lineWidth = 4
     ctx.strokeRect(50, 50, 100, 100)
   },
-  render: (ctx) => {
+  render: (root) => {
     rect({
       x: 50,
       y: 50,
@@ -51,7 +51,7 @@ export const rectStrokeScene: VisualTestScene = {
       height: 100,
       stroke: '#0000ff',
       lineWidth: 4
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -69,7 +69,7 @@ export const rectFillStrokeScene: VisualTestScene = {
     ctx.fillRect(50, 50, 100, 100)
     ctx.strokeRect(50, 50, 100, 100)
   },
-  render: (ctx) => {
+  render: (root) => {
     rect({
       x: 50,
       y: 50,
@@ -78,7 +78,7 @@ export const rectFillStrokeScene: VisualTestScene = {
       fill: '#00ff00',
       stroke: '#000000',
       lineWidth: 2
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -95,13 +95,13 @@ export const circleFillScene: VisualTestScene = {
     ctx.fillStyle = '#ff6600'
     ctx.fill()
   },
-  render: (ctx) => {
+  render: (root) => {
     circle({
       x: 100,
       y: 100,
       radius: 50,
       fill: '#ff6600'
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -119,14 +119,14 @@ export const circleStrokeScene: VisualTestScene = {
     ctx.lineWidth = 3
     ctx.stroke()
   },
-  render: (ctx) => {
+  render: (root) => {
     circle({
       x: 100,
       y: 100,
       radius: 50,
       stroke: '#9900ff',
       lineWidth: 3
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -145,7 +145,7 @@ export const lineBasicScene: VisualTestScene = {
     ctx.lineWidth = 2
     ctx.stroke()
   },
-  render: (ctx) => {
+  render: (root) => {
     line({
       x1: 20,
       y1: 20,
@@ -153,7 +153,7 @@ export const lineBasicScene: VisualTestScene = {
       y2: 180,
       stroke: '#333333',
       lineWidth: 2
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -186,7 +186,7 @@ export const lineMultipleScene: VisualTestScene = {
     ctx.lineTo(180, 20)
     ctx.stroke()
   },
-  render: (ctx) => {
+  render: (root) => {
     // 水平线
     line({
       x1: 20,
@@ -195,7 +195,7 @@ export const lineMultipleScene: VisualTestScene = {
       y2: 50,
       stroke: '#0066cc',
       lineWidth: 2
-    })(ctx)
+    })(root, undefined)
 
     // 垂直线
     line({
@@ -205,7 +205,7 @@ export const lineMultipleScene: VisualTestScene = {
       y2: 180,
       stroke: '#0066cc',
       lineWidth: 2
-    })(ctx)
+    })(root, undefined)
 
     // 对角线
     line({
@@ -215,7 +215,7 @@ export const lineMultipleScene: VisualTestScene = {
       y2: 20,
       stroke: '#0066cc',
       lineWidth: 2
-    })(ctx)
+    })(root, undefined)
   }
 }
 
@@ -231,14 +231,14 @@ export const textBasicScene: VisualTestScene = {
     ctx.fillStyle = '#000000'
     ctx.fillText('Hello Rasen!', 20, 50)
   },
-  render: (ctx) => {
+  render: (root) => {
     text({
       text: 'Hello Rasen!',
       x: 20,
       y: 50,
       font: '24px Arial, sans-serif',
       fill: '#000000'
-    })(ctx)
+    })(root, undefined)
   },
   // 文本渲染在不同环境可能有细微差异
   options: { maxDiffPercent: 5 }
@@ -274,7 +274,7 @@ export const textAlignScene: VisualTestScene = {
     ctx.textAlign = 'right'
     ctx.fillText('Right', 150, 120)
   },
-  render: (ctx) => {
+  render: (root) => {
     // 参考线
     line({
       x1: 150,
@@ -283,7 +283,7 @@ export const textAlignScene: VisualTestScene = {
       y2: 200,
       stroke: '#cccccc',
       lineWidth: 1
-    })(ctx)
+    })(root, undefined)
 
     // 左对齐
     text({
@@ -293,7 +293,7 @@ export const textAlignScene: VisualTestScene = {
       font: '16px Arial, sans-serif',
       fill: '#333333',
       textAlign: 'left'
-    })(ctx)
+    })(root, undefined)
 
     // 居中
     text({
@@ -303,7 +303,7 @@ export const textAlignScene: VisualTestScene = {
       font: '16px Arial, sans-serif',
       fill: '#333333',
       textAlign: 'center'
-    })(ctx)
+    })(root, undefined)
 
     // 右对齐
     text({
@@ -313,7 +313,7 @@ export const textAlignScene: VisualTestScene = {
       font: '16px Arial, sans-serif',
       fill: '#333333',
       textAlign: 'right'
-    })(ctx)
+    })(root, undefined)
   },
   options: { maxDiffPercent: 5 }
 }

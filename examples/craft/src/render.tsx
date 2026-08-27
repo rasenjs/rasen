@@ -80,7 +80,7 @@ const App = com((props: AppProps) => {
         width={viewW}
         height={viewH}
         contextType="webgl"
-        contextOptions={{ clearColor: '#87CEEB' }}
+        renderOptions={{ clearColor: "#87CEEB" }}
         style={{
           width: '100%',
           height: '100%',

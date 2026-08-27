@@ -2,7 +2,7 @@ import type { PropValue } from '@rasenjs/core'
 import { getReactiveRuntime, toValue, watchObjectProps as watchObjectPropsCore } from '@rasenjs/core'
 
 /**
- * 解包 Ref、ReadonlyRef 或 Getter
+ * 解包 Ref 或 Getter
  */
 export function unref<T>(value: PropValue<T>): T {
   return toValue(value)

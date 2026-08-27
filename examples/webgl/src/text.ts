@@ -1,4 +1,5 @@
-import { type MountFunction } from '@rasenjs/core'
+import type { Mountable } from '@rasenjs/core'
+import type { CanvasNode } from '@rasenjs/canvas-2d'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, h1, p, a, canvas, mount } from '@rasenjs/dom'
 import { text, line, circle } from '@rasenjs/canvas-2d'
@@ -24,7 +25,7 @@ function createExample(
   description: string,
   width: number,
   height: number,
-  children: MountFunction<CanvasRenderingContext2D>[]
+  children: Mountable<CanvasNode>[]
 ) {
   return div({
     class: 'example-card',

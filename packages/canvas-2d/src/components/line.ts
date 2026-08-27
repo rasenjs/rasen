@@ -1,5 +1,5 @@
 import type { Component2D } from '../node'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import {
   unref,
   type CommonDrawProps,
@@ -12,15 +12,15 @@ import { createNode, type CanvasNode, type Context2D } from '../node'
 
 export interface LineProps
   extends Partial<CommonDrawProps>, Partial<LineStyleProps> {
-  x1?: number | Ref<number> | ReadonlyRef<number>
-  y1?: number | Ref<number> | ReadonlyRef<number>
-  x2?: number | Ref<number> | ReadonlyRef<number>
-  y2?: number | Ref<number> | ReadonlyRef<number>
-  points?: number[] | Ref<number[]> | ReadonlyRef<number[]>
-  closed?: boolean | Ref<boolean> | ReadonlyRef<boolean>
-  tension?: number | Ref<number> | ReadonlyRef<number>
-  stroke?: string | Ref<string> | ReadonlyRef<string>
-  lineWidth?: number | Ref<number> | ReadonlyRef<number>
+  x1?: PropValue<number>
+  y1?: PropValue<number>
+  x2?: PropValue<number>
+  y2?: PropValue<number>
+  points?: PropValue<number[]>
+  closed?: PropValue<boolean>
+  tension?: PropValue<number>
+  stroke?: PropValue<string>
+  lineWidth?: PropValue<number>
 }
 
 /**

@@ -53,7 +53,7 @@ export function mountComponent(
   const doc = RNDocument.getOrCreate(1)
 
   const mountable = factory(props)
-  const unmount = mountable(doc.body) ?? (() => {})
+  const unmount = mountable(doc.body, undefined) ?? (() => {})
 
   // Component-rendered root = body's first child (component root element).
   const root = doc.body.firstChild as RNNode

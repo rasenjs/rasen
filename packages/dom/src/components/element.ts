@@ -1,4 +1,4 @@
-import { setValue, isRef, type PropValue, type Ref, type Mountable } from '@rasenjs/core'
+import { getReactiveRuntime, type PropValue, type Ref, type Mountable } from '@rasenjs/core'
 import { unref } from '../utils'
 import { warnInvalidEventCase } from '../utils/dev-warnings'
 import { getHydrationContext, claimElement } from '../hydration-context'
@@ -153,7 +153,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
             el.appendChild(textNode)
           }
           ;(childUnmounts ??= []).push(() => textNode.remove())
-        } else if (isRef(child)) {
+        } else if (getReactiveRuntime().isRef(child)) {
           // Ref 对象 - 创建或复用响应式文本节点；写入语义统一走共享绑定层
           // 的 bindText（ref → 响应式监听；水合时跳过首帧写入）
           let textNode: Text
@@ -223,7 +223,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 
     // ref - 设置元素引用
     if (props.ref) {
-      setValue(props.ref, el)
+      getReactiveRuntime().setValue(props.ref, el)
     }
 
     // 只有非 hydration 模式才需要 appendChild
@@ -235,7 +235,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
     const unmount = () => {
       // 清理 ref
       if (props.ref) {
-        setValue(props.ref, null)
+        getReactiveRuntime().setValue(props.ref, null)
       }
       stops?.forEach((stop) => stop())
       childUnmounts?.forEach((u, index) => {

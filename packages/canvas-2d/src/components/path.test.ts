@@ -10,15 +10,19 @@ import {
   createMockReactiveRuntime,
   waitForAsync
 } from '../test-utils'
+import { createRoot } from '../node'
+import type { CanvasNode, Context2D } from '../node'
 import { path } from './path'
 
 describe('path', () => {
-  let ctx: CanvasRenderingContext2D
+  let ctx: Context2D
+  let root: CanvasNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     ctx = createMockContext()
+    root = createRoot(ctx)
     cleanupFns = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       setTimeout(() => cb(performance.now()), 0)
@@ -38,7 +42,7 @@ describe('path', () => {
         data: 'M 10 10 L 50 50 L 90 10 Z',
         fill: 'green'
       })
-      cleanupFns.push(mountable(ctx))
+      cleanupFns.push(mountable(root, undefined))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -54,7 +58,7 @@ describe('path', () => {
         data: 'M 10 80 Q 95 10 180 80',
         stroke: 'blue'
       })
-      cleanupFns.push(mountable(ctx))
+      cleanupFns.push(mountable(root, undefined))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -69,7 +73,7 @@ describe('path', () => {
         stroke: 'red',
         fill: 'pink'
       })
-      cleanupFns.push(mountable(ctx))
+      cleanupFns.push(mountable(root, undefined))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -87,7 +91,7 @@ describe('path', () => {
         data: 'M 50 100 Q 150 20 250 100',
         stroke: 'blue'
       })
-      cleanupFns.push(mountable(ctx))
+      cleanupFns.push(mountable(root, undefined))
       await waitForAsync()
 
       // 验证曲线被正确绘制
@@ -103,7 +107,7 @@ describe('path', () => {
         stroke: 'red',
         fill: 'pink'
       })
-      cleanupFns.push(mountable(ctx))
+      cleanupFns.push(mountable(root, undefined))
       await waitForAsync()
 
       // 验证贝塞尔曲线被正确绘制

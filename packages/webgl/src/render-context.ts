@@ -3,21 +3,13 @@
  * Unified 2D/3D support
  */
 
-import type { Bounds } from './types'
 import type { Gl2Context, GlContext } from './node'
-import { boundsIntersect, mergeBounds } from '@rasenjs/core/utils'
 import { BatchRenderer } from './renderer/batch'
 import { InstancedRenderer } from './renderer/instanced'
 import { ShadowRenderer } from './renderer/shadow'
 import { ShaderProgram } from './renderer/shader'
 import { Mat4x4f } from '@rasenjs/math'
 import { parseColor } from './utils'
-
-export interface ComponentInstance {
-  bounds: () => Bounds | null
-  draw: () => void
-  lastDrawnBounds?: Bounds | null
-}
 
 /**
  * Transform state for group hierarchy (2D/3D unified)
@@ -35,14 +27,6 @@ export interface TransformState {
   scaleY: number
   scaleZ: number
   opacity: number
-}
-
-/**
- * Group context - collects child components
- */
-export interface GroupContext {
-  childDrawFunctions: (() => void)[]
-  childComponentIds: symbol[]
 }
 
 /**
@@ -71,25 +55,23 @@ export interface RenderContextOptions {
   logicalWidth?: number
   logicalHeight?: number
   /**
-   * 尺寸变化事件源：桥接方传入画布元素（监听 'rasen:resize'）。
-   * 缺省时不监听（测试/离屏场景）。
+   * 帧调度注入（宿主适配点）。返回值即取消函数——调度与取消一体。
+   * 缺省：环境有 requestAnimationFrame 用之；测试/SSR 环境退化为
+   * queueMicrotask。
    */
-  resizeSource?: {
-    addEventListener(type: 'rasen:resize', cb: () => void): void
-    removeEventListener(type: 'rasen:resize', cb: () => void): void
-  }
+  schedule?: (cb: () => void) => () => void
 }
 
 /**
  * WebGL Render Context
  */
 export class RenderContext {
-  private components = new Map<symbol, ComponentInstance>()
   /** 场景树渲染根（顶层组件挂载时注册） */
   private roots: import('./node').GlNode[] = []
-  private dirtyRegions: Bounds[] = []
-  private rafId: number | null = null
-  private onCanvasResize: (() => void) | null = null
+  /** 已调度但未执行的绘制取消函数（null = 无待执行绘制） */
+  private cancelScheduled: (() => void) | null = null
+  /** 连续渲染循环的取消函数 */
+  private cancelContinuous: (() => void) | null = null
   private needsFullRedraw: boolean = true
   private options: Omit<RenderContextOptions, 'dirtyTracking'> & {
     batching: boolean
@@ -98,13 +80,8 @@ export class RenderContext {
     clearColor: string
     continuousRender: boolean
   }
-  private batchRenderer: BatchRenderer | null = null
-  private instancedRenderer: InstancedRenderer | null = null
-  private projectionMatrix: Mat4x4f
-  private viewMatrix: Mat4x4f
-  private transformStack: TransformState[] = []
-  /** Continuous-render loop handle (see options.continuousRender). */
-  private continuousRafId: number | null = null
+  /** 解析后的帧调度器（构造期确定，不依赖全局探测时序） */
+  private readonly scheduleFrame: (cb: () => void) => () => void
   /** Shadow mapping state (light view-projection + renderer). */
   private shadowMatrix: Mat4x4f | null = null
   private shadowRenderer: ShadowRenderer | null = null
@@ -133,6 +110,12 @@ export class RenderContext {
     opacity: 1
   }
 
+  private batchRenderer: BatchRenderer | null = null
+  private instancedRenderer: InstancedRenderer | null = null
+  private projectionMatrix: Mat4x4f
+  private viewMatrix: Mat4x4f
+  private transformStack: TransformState[] = []
+
   constructor(
     private gl: GlContext,
     options: RenderContextOptions = {}
@@ -144,10 +127,22 @@ export class RenderContext {
       clearColor: options.clearColor ?? '#000000',
       continuousRender: options.continuousRender ?? false,
       logicalWidth: options.logicalWidth,
-      logicalHeight: options.logicalHeight,
-      resizeSource: options.resizeSource
+      logicalHeight: options.logicalHeight
     }
-    
+
+    // 帧调度：注入优先；缺省 rAF，环境缺失（测试/SSR）退化 queueMicrotask
+    this.scheduleFrame =
+      options.schedule ??
+      (typeof requestAnimationFrame !== 'undefined'
+        ? (cb) => {
+            const id = requestAnimationFrame(cb)
+            return () => cancelAnimationFrame(id)
+          }
+        : (cb) => {
+            queueMicrotask(cb)
+            return () => {}
+          })
+
     this.setupWebGL()
 
     // Continuous mode: redraw every frame regardless of dirty events. This is
@@ -157,36 +152,26 @@ export class RenderContext {
       const loop = () => {
         this.needsFullRedraw = true
         this.draw()
-        this.continuousRafId = requestAnimationFrame(loop)
+        this.cancelContinuous = this.scheduleFrame(loop)
       }
-      this.continuousRafId = requestAnimationFrame(loop)
-    }
-
-    // Repaint when the canvas' drawing buffer is resized (dispatched by the
-    // canvas component) — even if the aspect ratio is unchanged.
-    if (this.options.resizeSource) {
-      this.onCanvasResize = () => {
-        this.needsFullRedraw = true
-        this.scheduleDraw()
-      }
-      this.options.resizeSource.addEventListener('rasen:resize', this.onCanvasResize)
+      this.cancelContinuous = this.scheduleFrame(loop)
     }
 
     const logicalWidth =
       this.options.logicalWidth ?? gl.canvas.width
     const logicalHeight =
       this.options.logicalHeight ?? gl.canvas.height
-    
+
     this.projectionMatrix = Mat4x4f.ortho(0, logicalWidth, 0, logicalHeight, -1000, 1000)
     this.viewMatrix = Mat4x4f.identity()
-    
+
     // WebGL2 能力探测：不依赖 DOM 全局 instanceof；in 收窄到 Gl2Context
     if (this.options.instancing && 'drawArraysInstanced' in gl) {
       this.instancedRenderer = new InstancedRenderer(gl as Gl2Context, this.projectionMatrix)
     } else if (this.options.batching) {
       this.batchRenderer = new BatchRenderer(gl, this.projectionMatrix)
     }
-    
+
     setRenderContext(gl, this)
   }
 
@@ -295,79 +280,37 @@ export class RenderContext {
     this.markDirty()
   }
 
-  register(instance: ComponentInstance): symbol {
-    const id = Symbol()
-    
-    const groupContext = getCurrentGroupContext(this.gl)
-    if (groupContext) {
-      groupContext.childDrawFunctions.push(() => instance.draw())
-      groupContext.childComponentIds.push(id)
-    } else {
-      this.components.set(id, instance)
-    }
-
-    // Symmetric with unregister(): registering a component must refresh the
-    // screen or it would never appear until some unrelated change forces a
-    // redraw. 3D components return null bounds → full redraw.
-    this.markDirty(instance.bounds() ?? undefined)
-    
-    return id
-  }
-
-  unregister(id: symbol) {
-    this.components.delete(id)
-    // Also remove from any active group context so a dynamically-unmounted
-    // child (e.g. via `each`) stops being drawn by its parent group.
-    const stack = groupContextStack.get(this.gl)
-    if (stack) {
-      for (const gc of stack) {
-        const idx = gc.childComponentIds.indexOf(id)
-        if (idx !== -1) {
-          gc.childComponentIds.splice(idx, 1)
-          gc.childDrawFunctions.splice(idx, 1)
-        }
-      }
-    }
-    // CRITICAL: a removed component must refresh the screen. Without this,
-    // its pixels stay visible (with a stale camera-facing orientation) until
-    // some unrelated change triggers a redraw — e.g. hit impacts and enemy
-    // muzzle flashes that "never disappear" after the reactive list removes
-    // them. Full redraw (no bounds) since 3D components have no 2D bounds.
-    this.markDirty()
-  }
-
-  markDirty(bounds?: Bounds) {
-    if (this.options.dirtyTracking && bounds) {
-      if (this.dirtyRegions.length < 50) {
-        this.dirtyRegions.push(bounds)
-      } else {
-        this.needsFullRedraw = true
-      }
-    } else {
-      this.needsFullRedraw = true
-    }
+  /** 标脏：调度一次重绘（v1 一律全量重绘） */
+  markDirty() {
     this.scheduleDraw()
   }
 
-  manualUpdate() {
-    // In continuous mode the loop redraws every frame — a synchronous draw
-    // here would double-render. The caller has already updated the matrices
-    // it needs; the next loop frame picks them up.
-    if (this.options.continuousRender) return
+  /**
+   * 宿主显式请求重绘（如 dom <canvas> 改了绘图缓冲尺寸后调用）。
+   * 与 markDirty 的区别：无视 continuousRender 模式（连续模式下
+   * scheduleDraw 是 no-op，但宿主主动触发的重绘仍应执行）。
+   */
+  requestRedraw() {
     this.needsFullRedraw = true
-    this.draw()
+    this.scheduleDraw()
   }
 
   private scheduleDraw() {
     // Continuous mode redraws every frame — no need to schedule event-driven
     // redraws on top of that.
     if (this.options.continuousRender) return
-    if (this.rafId !== null) return
-    
-    this.rafId = requestAnimationFrame(() => {
-      this.rafId = null
+    if (this.cancelScheduled !== null) return
+
+    const cancel = this.scheduleFrame(() => {
+      this.cancelScheduled = null
       this.draw()
     })
+    // Wrap: external cancel must also reset the pending state, otherwise
+    // subsequent markDirty calls would be dead-locked.
+    this.cancelScheduled = () => {
+      cancel()
+      this.cancelScheduled = null
+    }
   }
 
   private draw() {
@@ -377,9 +320,12 @@ export class RenderContext {
 
     if (this.needsFullRedraw) {
       this.clearBuffers()
-      
-      for (const component of this.components.values()) {
-        component.draw()
+
+      // Pre-order traversal of the scene-tree roots. Group nodes push their
+      // transform before recursing children and pop afterwards, so subtree
+      // transforms compose naturally.
+      for (const root of this.roots) {
+        root.draw()
       }
 
       // Shadow pass: render scene depth from the light's view, then draw
@@ -411,40 +357,7 @@ export class RenderContext {
       }
 
       this.needsFullRedraw = false
-    } else if (this.dirtyRegions.length > 0) {
-      const dirtyBounds = mergeBounds(this.dirtyRegions)
-      
-      if (dirtyBounds) {
-        this.clearBuffers()
-        
-        for (const component of this.components.values()) {
-          const currentBounds = component.bounds()
-          const lastBounds = component.lastDrawnBounds
-          
-          let shouldDraw = false
-          if (currentBounds && boundsIntersect(currentBounds, dirtyBounds)) {
-            shouldDraw = true
-          }
-          if (!shouldDraw && lastBounds && boundsIntersect(lastBounds, dirtyBounds)) {
-            shouldDraw = true
-          }
-          
-          if (shouldDraw) {
-            component.draw()
-          }
-          
-          component.lastDrawnBounds = currentBounds ? { ...currentBounds } : null
-        }
-        
-        if (this.instancedRenderer) {
-          this.instancedRenderer.flush()
-        } else if (this.batchRenderer) {
-          this.batchRenderer.flush()
-        }
-      }
     }
-    
-    this.dirtyRegions = []
   }
 
   // --- Overlay pass helpers (dual-camera compositing) ---
@@ -726,14 +639,13 @@ export class RenderContext {
   }
 
   destroy() {
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId)
+    if (this.cancelScheduled !== null) {
+      this.cancelScheduled()
+      this.cancelScheduled = null
     }
-    if (this.continuousRafId !== null) {
-      cancelAnimationFrame(this.continuousRafId)
-    }
-    if (this.onCanvasResize && this.options.resizeSource) {
-      this.options.resizeSource.removeEventListener('rasen:resize', this.onCanvasResize)
+    if (this.cancelContinuous !== null) {
+      this.cancelContinuous()
+      this.cancelContinuous = null
     }
     if (this.batchRenderer) {
       this.batchRenderer.destroy()
@@ -741,7 +653,7 @@ export class RenderContext {
     if (this.instancedRenderer) {
       this.instancedRenderer.destroy()
     }
-    this.components.clear()
+    this.roots = []
     this.transformStack = []
     renderContextMap.delete(this.gl)
   }
@@ -773,66 +685,4 @@ export function hasRenderContext(
   gl: GlContext
 ): boolean {
   return renderContextMap.has(gl)
-}
-
-const groupContextStack = new WeakMap<
-  GlContext,
-  GroupContext[]
->()
-
-export function enterGroupContext(
-  gl: GlContext
-): GroupContext {
-  const groupContext: GroupContext = {
-    childDrawFunctions: [],
-    childComponentIds: []
-  }
-  
-  let stack = groupContextStack.get(gl)
-  if (!stack) {
-    stack = []
-    groupContextStack.set(gl, stack)
-  }
-  stack.push(groupContext)
-  
-  return groupContext
-}
-
-/**
- * Push an EXISTING group context onto the stack (without creating a new one).
- *
- * Used by `each` to re-enter the same group context when mounting/unmounting
- * dynamic children, so their draw functions register with the SAME context
- * that the parent's draw iterates (otherwise dynamically-added children end
- * up in an orphaned context that is never drawn).
- */
-export function pushGroupContext(
-  gl: GlContext,
-  groupContext: GroupContext
-): void {
-  let stack = groupContextStack.get(gl)
-  if (!stack) {
-    stack = []
-    groupContextStack.set(gl, stack)
-  }
-  stack.push(groupContext)
-}
-
-export function exitGroupContext(
-  gl: GlContext
-): void {
-  const stack = groupContextStack.get(gl)
-  if (stack && stack.length > 0) {
-    stack.pop()
-  }
-}
-
-export function getCurrentGroupContext(
-  gl: GlContext
-): GroupContext | null {
-  const stack = groupContextStack.get(gl)
-  if (stack && stack.length > 0) {
-    return stack[stack.length - 1]
-  }
-  return null
 }

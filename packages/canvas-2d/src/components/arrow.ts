@@ -1,5 +1,5 @@
 import type { Component2D } from '../node'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import {
   unref,
   type CommonDrawProps,
@@ -16,14 +16,14 @@ import { createNode, type CanvasNode, type Context2D } from '../node'
  */
 export interface ArrowProps
   extends CommonDrawProps, LineStyleProps, TransformProps {
-  points: number[] | Ref<number[]> | ReadonlyRef<number[]> // [x1, y1, x2, y2, ...]
-  pointerLength?: number | Ref<number> | ReadonlyRef<number> // 箭头长度
-  pointerWidth?: number | Ref<number> | ReadonlyRef<number> // 箭头宽度
-  pointerAtBeginning?: boolean | Ref<boolean> | ReadonlyRef<boolean> // 起点箭头
-  pointerAtEnding?: boolean | Ref<boolean> | ReadonlyRef<boolean> // 终点箭头
-  fill?: string | Ref<string> | ReadonlyRef<string>
-  stroke?: string | Ref<string> | ReadonlyRef<string>
-  lineWidth?: number | Ref<number> | ReadonlyRef<number>
+  points: PropValue<number[]> // [x1, y1, x2, y2, ...]
+  pointerLength?: PropValue<number> // 箭头长度
+  pointerWidth?: PropValue<number> // 箭头宽度
+  pointerAtBeginning?: PropValue<boolean> // 起点箭头
+  pointerAtEnding?: PropValue<boolean> // 终点箭头
+  fill?: PropValue<string>
+  stroke?: PropValue<string>
+  lineWidth?: PropValue<number>
 }
 
 /**

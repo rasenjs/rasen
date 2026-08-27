@@ -405,7 +405,7 @@ export function createAccordionRoot(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children(getContext)(root)
+        childUnmount = props.children(getContext)(root, undefined)
       }
 
       host.appendChild(root)
@@ -463,7 +463,7 @@ export function createAccordionItem(): (
       if (props?.children) {
         const getCtx = getContext ?? (() => undefined)
         const getItemCtx = () => itemContext
-        childUnmount = props.children(getCtx, getItemCtx)(item)
+        childUnmount = props.children(getCtx, getItemCtx)(item, undefined)
       }
 
       host.appendChild(item)
@@ -514,7 +514,7 @@ export function createAccordionHeader(): (
       if (props?.children) {
         const getCtx = getContext ?? (() => undefined)
         const getItemCtx = getItemContext ?? (() => getCurrentItemContext())
-        childUnmount = props.children(getCtx, getItemCtx)(header)
+        childUnmount = props.children(getCtx, getItemCtx)(header, undefined)
       }
 
       host.appendChild(header)
@@ -603,7 +603,7 @@ export function createAccordionTrigger(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(trigger)
+        childUnmount = props.children()(trigger, undefined)
       }
 
       host.appendChild(trigger)
@@ -673,7 +673,7 @@ export function createAccordionContent(): (
         const shouldRender =
           !ctx || !itemCtx || ctx.isOpen(itemCtx.value) || forceMount
         if (shouldRender) {
-          childUnmount = props.children()(content)
+          childUnmount = props.children()(content, undefined)
         }
       }
 
@@ -764,7 +764,7 @@ export function createAccordion(): (
                               },
                               getCtx2,
                               getItemCtx2
-                            )(triggerHost)
+                            )(triggerHost, undefined)
                             if (triggerUnmount)
                               headerEl.appendChild(triggerHost)
                             return () => {
@@ -775,7 +775,7 @@ export function createAccordion(): (
                       },
                       getCtx,
                       getItemCtx
-                    )(headerHost)
+                    )(headerHost, undefined)
                     if (headerUnmount) itemEl.appendChild(headerHost)
 
                     const contentHost = document.createElement('div')
@@ -789,7 +789,7 @@ export function createAccordion(): (
                       },
                       getCtx,
                       getItemCtx
-                    )(contentHost)
+                    )(contentHost, undefined)
                     if (contentUnmount) itemEl.appendChild(contentHost)
 
                     return () => {
@@ -801,7 +801,7 @@ export function createAccordion(): (
                   }
                 },
                 getContext
-              )(itemHost)
+              )(itemHost, undefined)
               if (itemUnmount) {
                 unmounts.push(itemUnmount)
                 root.appendChild(itemHost)
@@ -813,7 +813,7 @@ export function createAccordion(): (
             unmounts.forEach((u) => u())
           }
         }
-      })(host)
+      })(host, undefined)
     }
   }
 }

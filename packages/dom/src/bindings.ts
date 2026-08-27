@@ -21,7 +21,7 @@
  *    server-rendered markup is the source of truth for the first frame.
  */
 
-import { getReactiveRuntime, isRef, type PropValue } from '@rasenjs/core'
+import { getReactiveRuntime, type PropValue } from '@rasenjs/core'
 
 // Re-exported for the compiler's single import source
 // ('@rasenjs/dom/template' → bindings): generated SSR code references these.
@@ -106,7 +106,7 @@ export function getEventName(key: string): string {
  *  for both entry points (element factory passes raw props; compiled code
  *  passes getters). */
 function isReactiveValue(v: unknown): boolean {
-  return typeof v === 'function' || isRef(v)
+  return typeof v === 'function' || getReactiveRuntime().isRef(v)
 }
 
 const noop = () => {}

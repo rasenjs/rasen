@@ -2,14 +2,14 @@ import { configureTags, com, type Mountable } from '@rasenjs/core'
 import { mount, when } from '@rasenjs/dom'
 import { ref } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { FirstPersonCamera, group, mesh, skybox, billboard, each, createPointerLockControls, forwardVector, rightVector, getRenderContext } from '@rasenjs/webgl'
+import { FirstPersonCamera, group, mesh, skybox, billboard, each, forwardVector, rightVector, getRenderContext } from '@rasenjs/webgl'
 import { Mat4x4f, vec3f } from '@rasenjs/math'
 import { loadFPSAssets } from './assets'
 import { getLevelObjects, getEnemySpawns, getLevelWalls } from './level'
 import { Player, rayBoxIntersect } from './player'
 import { Enemy } from './enemy'
 import { weapon } from './weapon'
-import { setupKeyboard } from './input'
+import { setupKeyboard, bindLookControls } from './input'
 import { SoundManager } from './sound'
 import { createImpact, updateImpact, type Impact } from './impact'
 
@@ -99,7 +99,7 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <canvas className="fps-canvas" width={viewW} height={viewH}
-        contextType="webgl2" contextOptions={{ clearColor: '#87CEEB', preserveDrawingBuffer: true, continuousRender: true }}
+        contextType="webgl2" contextOptions={{ preserveDrawingBuffer: true }} renderOptions={{ clearColor: "#87CEEB", continuousRender: true }}
         style={{ width: '100%', height: '100%', display: 'block' }}>
         <firstPersonCamera position={player.eye} yaw={player.yaw} pitch={player.pitch}
           aspect={aspect} fov={(80 * Math.PI) / 180} near={0.1} far={200} />
@@ -309,7 +309,8 @@ async function start() {
 }
 
 function bindInput(canvas: HTMLCanvasElement, player: Player, mouse: { yaw: ReturnType<typeof ref<number>>; pitch: ReturnType<typeof ref<number>>; locked: ReturnType<typeof ref<boolean>>; request: () => void; release: () => void }, enemies: Enemy[], _locked: ReturnType<typeof ref<boolean>>, hitFrames: HTMLCanvasElement[], walls: ReturnType<typeof getLevelWalls>) {
-  const controls = createPointerLockControls(canvas, mouse)
+  // DOM 适配器负责 pointer-lock API 与事件监听；相机模块只提供纯状态机。
+  const controls = bindLookControls(canvas, mouse)
   mouse.request = controls.request; mouse.release = controls.release
   document.addEventListener('click', () => { if (!mouse.locked.value) mouse.request() })
   canvas.addEventListener('mousedown', (e) => {

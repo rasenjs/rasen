@@ -8,11 +8,11 @@
  * 4. unmount: 清理函数调用，移除监听器
  */
 
-import type { Ref, ReadonlyRef } from './reactive'
+import type { Ref } from './reactive'
 import type { HostHooks } from './host-context'
 
 // Re-export for convenience
-export type { Ref, ReadonlyRef }
+export type { Ref }
 export type { HostHooks, TextHandle } from './host-context'
 
 /**
@@ -93,8 +93,7 @@ export type Getter<T> = () => T
  * 组件属性值
  * 可以是：
  * - 普通值 T
- * - 可读写的响应式引用 Ref<T>
- * - 只读的响应式引用 ReadonlyRef<T>（如 computed）
+ * - 响应式引用 Ref<T>（含 computed —— 只读性由所选库的类型保证）
  * - Getter 函数 () => T（自动追踪依赖）
  *
  * @example
@@ -109,4 +108,4 @@ export type Getter<T> = () => T
  * <div class={() => `btn ${unref(variant)}`}>
  * <div class={() => unref(isActive) ? 'active' : ''}>
  */
-export type PropValue<T = unknown> = T | Ref<T> | ReadonlyRef<T> | Getter<T>
+export type PropValue<T = unknown> = T | Ref<T> | Getter<T>

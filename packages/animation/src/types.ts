@@ -63,7 +63,7 @@ export interface FrameRef extends AnimatedRef {
   readonly isPlaying: boolean
   readonly isPaused: boolean
   speed: number
-  setFrames(frames: number[], options?: FrameOptions): void
+  setFrames(frames: number[], options?: Omit<FrameOptions, 'frames'>): void
 }
 
 export type AnimationItem = 

@@ -1,5 +1,5 @@
 import type { Component2D } from '../node'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import {
   unref,
   type CommonDrawProps,
@@ -17,18 +17,18 @@ import { createNode, type CanvasNode, type Context2D } from '../node'
 export interface PolygonProps
   extends CommonDrawProps, LineStyleProps, TransformProps {
   // 自定义多边形: 点数组 [x1, y1, x2, y2, ...]
-  points?: number[] | Ref<number[]> | ReadonlyRef<number[]>
+  points?: PropValue<number[]>
   // 正多边形: 中心点、边数和半径
-  x?: number | Ref<number> | ReadonlyRef<number>
-  y?: number | Ref<number> | ReadonlyRef<number>
-  sides?: number | Ref<number> | ReadonlyRef<number>
-  radius?: number | Ref<number> | ReadonlyRef<number>
+  x?: PropValue<number>
+  y?: PropValue<number>
+  sides?: PropValue<number>
+  radius?: PropValue<number>
   // 通用属性
-  fill?: string | Ref<string> | ReadonlyRef<string>
-  stroke?: string | Ref<string> | ReadonlyRef<string>
-  lineWidth?: number | Ref<number> | ReadonlyRef<number>
-  closed?: boolean | Ref<boolean> | ReadonlyRef<boolean> // 是否闭合
-  cornerRadius?: number | Ref<number> | ReadonlyRef<number> // 圆角半径
+  fill?: PropValue<string>
+  stroke?: PropValue<string>
+  lineWidth?: PropValue<number>
+  closed?: PropValue<boolean> // 是否闭合
+  cornerRadius?: PropValue<number> // 圆角半径
 }
 
 /**

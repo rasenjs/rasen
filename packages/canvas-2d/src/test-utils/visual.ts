@@ -5,30 +5,19 @@
  * 参考 Konva.js, Fabric.js, PixiJS 的视觉测试实践
  */
 
-// @ts-expect-error - pixelmatch doesn't have type definitions
 import pixelmatch from 'pixelmatch'
 import { PNG } from 'pngjs'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { dirname, resolve } from 'path'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime, type Ref } from '@rasenjs/core'
 import { getRenderContext, hasRenderContext } from '../render-context'
+import { createRoot } from '../node'
 
 /**
  * 初始化 mock 响应式运行时
  */
 export function initMockReactiveRuntime(): void {
   setReactiveRuntime({
-    effect: (fn: () => void) => {
-      fn()
-      return () => {}
-    },
-    computed: <T>(getter: () => T) => {
-      return {
-        get value() {
-          return getter()
-        }
-      }
-    },
     ref: <T>(value: T) => {
       let _value = value
       return {
@@ -38,26 +27,32 @@ export function initMockReactiveRuntime(): void {
         set value(v: T) {
           _value = v
         }
+      } as unknown as Ref<T>
+    },
+    unref: <T>(value: T | Ref<T>) => {
+      if (value && typeof value === 'object' && 'value' in value) {
+        return (value as unknown as { value: T }).value
       }
+      return value as T
     },
-    unref: <T>(ref: T | { value: T }) => {
-      if (ref && typeof ref === 'object' && 'value' in ref) {
-        return ref.value
-      }
-      return ref as T
+    setValue: <T>(ref: Ref<T>, value: T): void => {
+      ;(ref as unknown as { value: T }).value = value
     },
-    setValue: <T>(ref: { value: T }, value: T): void => {
-      ref.value = value
-    },
-    watch: (_source: () => unknown, callback: () => void) => {
+    subscribe: <T>(
+      getter: () => T,
+      callback: (value: T, oldValue: T) => void
+    ) => {
       // 简单实现：立即执行一次 callback
-      callback()
+      const value = getter()
+      callback(value, value)
       return () => {}
     },
-    subscribe: (_source: () => unknown, callback: () => void) => {
-      // 简单实现：立即执行一次 callback
-      callback()
-      return () => {}
+    effectScope: () => ({
+      run: <T>(fn: () => T) => fn(),
+      stop: () => {}
+    }),
+    isRef: (value: unknown) => {
+      return value !== null && typeof value === 'object' && 'value' in value
     }
   })
 }
@@ -104,8 +99,8 @@ export interface VisualTestScene {
   height: number
   /** 基准渲染函数（使用原生 Canvas API，用于生成快照） */
   baseline: (ctx: CanvasRenderingContext2D) => void | Promise<void>
-  /** 测试渲染函数（使用 rasen 组件，用于验证） */
-  render: (ctx: CanvasRenderingContext2D) => void | Promise<void>
+  /** 测试渲染函数（收到 createRoot 物化的渲染根，用于验证） */
+  render: (root: import('../node').CanvasNode) => void | Promise<void>
   /** 测试选项 */
   options?: VisualTestOptions
   /** 是否跳过 */
@@ -296,19 +291,21 @@ export async function runVisualTest(
 ): Promise<VisualTestResult> {
   const ctx = canvas.getContext('2d')!
 
-  // 边界包装：ctx 自引用为宿主节点（CanvasNode），场景内 mountable(ctx) 直传
-  ;(ctx as unknown as { ctx: unknown }).ctx = ctx
-
   // 清空画布
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-  // 选择渲染函数：基准模式用 baseline，测试模式用 render
-  const renderFn = USE_BASELINE ? scene.baseline : scene.render
-  await renderFn(ctx)
+  // 选择渲染函数：基准模式用 baseline，测试模式用 render。
+  // 组件场景拿到的是官方入口物化的渲染根；基准场景直用原生 ctx。
+  if (USE_BASELINE) {
+    await scene.baseline(ctx)
+  } else {
+    await scene.render(createRoot(ctx))
+  }
 
   // 等待异步渲染完成（RenderContext 使用 queueMicrotask 调度渲染）
-  // 如果组件注册了 RenderContext，需要同步刷新以确保渲染完成
-  if (hasRenderContext(ctx)) {
+  // 仅当场景真的挂了组件树时才同步刷新 —— 否则 flushSync 的清屏
+  // 会抹掉场景用原生 API 直接绘制的内容（如渐变场景）。
+  if (hasRenderContext(ctx) && getRenderContext(ctx).nodeCount > 0) {
     getRenderContext(ctx).flushSync()
   }
 

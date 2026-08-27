@@ -23,7 +23,23 @@ export default defineConfig({
         'packages/reactive-signals/src/index.ts'
       ),
       '@rasenjs/webgl': path.resolve(__dirname, 'packages/webgl/src/index.ts'),
+      '@rasenjs/rota/components': path.resolve(
+        __dirname,
+        'packages/rota/src/components'
+      ),
+      '@rasenjs/rota/primitives': path.resolve(
+        __dirname,
+        'packages/rota/src/primitives'
+      ),
       '@rasenjs/rota': path.resolve(__dirname, 'packages/rota/src/index.ts'),
+      'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface': path.resolve(
+        __dirname,
+        'packages/rn-dom/src/__tests__/react-native-private-mock.ts'
+      ),
+      'react-native': path.resolve(
+        __dirname,
+        'packages/rn-dom/src/__tests__/react-native-mock.ts'
+      ),
       '@rasenjs/html': path.resolve(__dirname, 'packages/html/src/index.ts')
     }
   },

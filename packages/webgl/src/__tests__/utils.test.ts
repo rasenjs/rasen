@@ -13,6 +13,7 @@ import {
   unref
 } from '../utils'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import type { MaybeRef } from '../types'
 
 describe('@rasenjs/webgl utils', () => {
   // unref 依赖全局响应式运行时（isRef 判定），测试文件隔离后需自行安装
@@ -33,7 +34,7 @@ describe('@rasenjs/webgl utils', () => {
     })
 
     it('should return plain objects as-is (Vue unref semantics)', () => {
-      expect(unref({ value: 42 })).toEqual({ value: 42 })
+      expect(unref({ value: 42 } as unknown as MaybeRef<number>)).toEqual({ value: 42 })
     })
   })
 

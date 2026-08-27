@@ -1,19 +1,10 @@
 /**
  * Input — keyboard state for the FPS game.
+ *
+ * Mouse-look binding lives in the DOM adapter (@rasenjs/dom
+ * `bindLookControls`); the camera's pure look state machine lives with the
+ * camera (@rasenjs/webgl `createLookControls`). This module only re-exports
+ * them for the app.
  */
 
-export { createPointerLockControls } from '@rasenjs/webgl'
-
-/** Track held keys by `e.code`. */
-export function setupKeyboard(): Set<string> {
-  const keys = new Set<string>()
-  window.addEventListener('keydown', (e) => {
-    keys.add(e.code)
-    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
-      e.preventDefault()
-    }
-  })
-  window.addEventListener('keyup', (e) => keys.delete(e.code))
-  window.addEventListener('blur', () => keys.clear())
-  return keys
-}
+export { bindLookControls, setupKeyboard } from '@rasenjs/dom'

@@ -15,7 +15,7 @@
  */
 
 import { Platform, Keyboard } from 'react-native'
-import { getReactiveRuntime, ref, type Mountable } from '@rasenjs/core'
+import { getReactiveRuntime, type Mountable } from '@rasenjs/core'
 import type { RNNode } from '@rasenjs/rn-dom'
 import { renderChildren, type Child } from '../element'
 import { resolveStyle, applyStyleToNode, type StyleProp } from '../utils/style'
@@ -49,7 +49,7 @@ export interface KeyboardAvoidingViewProps {
 
 export function KeyboardAvoidingView(props: KeyboardAvoidingViewProps): Mountable<RNNode> {
   const runtime = getReactiveRuntime()
-  const keyboardHeight = ref(0)
+  const keyboardHeight = runtime.ref(0)
 
   return (host: RNNode) => {
     const el = host.ownerDocument.createElement('View')

@@ -4,16 +4,20 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
+import type { GlContext, GlNode } from '../../node'
+import { createRoot } from '../../node'
 import { rect } from './rect'
 import { createMockWebGLContext, createMockReactiveRuntime, waitForAsync } from '../../test-utils'
 
 describe('rect', () => {
-  let gl: WebGLRenderingContext
+  let gl: GlContext
+  let root: GlNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     gl = createMockWebGLContext()
+    root = createRoot(gl)
     cleanupFns = []
 
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -50,7 +54,7 @@ describe('rect', () => {
         fill: '#ff0000'
       })
 
-      const cleanup = component(gl)
+      const cleanup = component(root, undefined)
       expect(cleanup).toBeDefined()
       
       if (cleanup) {
@@ -71,17 +75,17 @@ describe('rect', () => {
         fill: '#ff0000'
       })
 
-      const cleanup = component(gl)
+      const cleanup = component(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
 
       // Update value
-      x.value = 50
+      runtime.setValue(x, 50)
 
       await waitForAsync()
 
-      expect(x.value).toBe(50)
+      expect(runtime.unref(x)).toBe(50)
     })
   })
 
@@ -96,7 +100,7 @@ describe('rect', () => {
         cornerRadius: 10
       })
 
-      const cleanup = component(gl)
+      const cleanup = component(root, undefined)
       cleanupFns.push(cleanup)
       
       expect(cleanup).toBeDefined()
@@ -112,7 +116,7 @@ describe('rect', () => {
         lineWidth: 2
       })
 
-      const cleanup = component(gl)
+      const cleanup = component(root, undefined)
       cleanupFns.push(cleanup)
       
       expect(cleanup).toBeDefined()
@@ -128,7 +132,7 @@ describe('rect', () => {
         visible: false
       })
 
-      const cleanup = component(gl)
+      const cleanup = component(root, undefined)
       cleanupFns.push(cleanup)
       
       expect(cleanup).toBeDefined()
@@ -144,7 +148,7 @@ describe('rect', () => {
         opacity: 0.5
       })
 
-      const cleanup = component(gl)
+      const cleanup = component(root, undefined)
       cleanupFns.push(cleanup)
       
       expect(cleanup).toBeDefined()

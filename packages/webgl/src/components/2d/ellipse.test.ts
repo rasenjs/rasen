@@ -4,16 +4,20 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
+import type { GlContext, GlNode } from '../../node'
+import { createRoot } from '../../node'
 import { ellipse } from './ellipse'
 import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
 describe('ellipse', () => {
-  let gl: WebGLRenderingContext
+  let gl: GlContext
+  let root: GlNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     gl = createMockWebGLContext()
+    root = createRoot(gl)
     cleanupFns = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       setTimeout(() => cb(performance.now()), 0)
@@ -36,7 +40,7 @@ describe('ellipse', () => {
     })
 
     expect(component).toBeDefined()
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
   })
 
@@ -50,7 +54,7 @@ describe('ellipse', () => {
       rotation: Math.PI / 4
     })
 
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
     expect(cleanup).toBeDefined()
   })

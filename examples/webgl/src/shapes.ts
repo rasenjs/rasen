@@ -1,4 +1,5 @@
-import { type MountFunction } from '@rasenjs/core'
+import type { Mountable } from '@rasenjs/core'
+import type { GlNode } from '@rasenjs/webgl'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div, h1, p, a, canvas, mount } from '@rasenjs/dom'
 import {
@@ -21,8 +22,8 @@ function createExample(
   width: number,
   height: number,
   content:
-    | MountFunction<WebGLRenderingContext | WebGL2RenderingContext>
-    | MountFunction<WebGLRenderingContext | WebGL2RenderingContext>[]
+    | Mountable<GlNode>
+    | Mountable<GlNode>[]
 ) {
   return div({
     class: 'example-card',

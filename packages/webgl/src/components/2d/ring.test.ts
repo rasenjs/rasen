@@ -4,16 +4,20 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
+import type { GlContext, GlNode } from '../../node'
+import { createRoot } from '../../node'
 import { ring } from './ring'
 import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
 
 describe('ring', () => {
-  let gl: WebGLRenderingContext
+  let gl: GlContext
+  let root: GlNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     gl = createMockWebGLContext()
+    root = createRoot(gl)
     cleanupFns = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       setTimeout(() => cb(performance.now()), 0)
@@ -36,22 +40,21 @@ describe('ring', () => {
     })
 
     expect(component).toBeDefined()
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
   })
 
-  it('should support angle range', () => {
+  it('should support segments', () => {
     const component = ring({
       x: 100,
       y: 100,
       innerRadius: 30,
       outerRadius: 50,
       fill: '#00ffff',
-      startAngle: 0,
-      endAngle: Math.PI
+      segments: 48
     })
 
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
     expect(cleanup).toBeDefined()
   })

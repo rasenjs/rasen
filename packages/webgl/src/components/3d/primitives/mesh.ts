@@ -9,7 +9,7 @@
 
 import type { Component3D } from '../../../node'
 import type { MaybeRef, CommonDrawProps, TransformProps } from '../../../types'
-import { unref, createTexture } from '../../../utils'
+import { unref, createTexture, type BitmapSource } from '../../../utils'
 import { getRenderContext } from '../../../render-context'
 import { element } from '../../element'
 
@@ -26,7 +26,7 @@ export interface MeshProps extends CommonDrawProps, TransformProps {
   geometry: MaybeRef<MeshGeometry>
   x?: MaybeRef<number>
   y?: MaybeRef<number>
-  texture?: MaybeRef<TexImageSource | undefined> | undefined
+  texture?: MaybeRef<BitmapSource | undefined> | undefined
 }
 
 /**

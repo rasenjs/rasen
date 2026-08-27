@@ -5,5 +5,6 @@ export { Mat3x3f, mat3x3f, multiply as multiplyMat3x3, transpose as transposeMat
 export { Mat4x4f, mat4x4f, multiply as multiplyMat4x4, transpose as transposeMat4x4, determinant as determinantMat4x4, inverse as inverseMat4x4 } from './mat4x4'
 export { Quatf, quatf, add as addQuat, subtract as subtractQuat, multiply as multiplyQuat, dot as dotQuat, length as lengthQuat, lengthSquared as lengthSquaredQuat, normalize as normalizeQuat, conjugate, inverse as inverseQuat, lerp as lerpQuat, slerp } from './quat'
 export { SimplexNoise, fbm2 } from './noise'
+export { forwardVector, rightVector } from './direction'
 export { aabb, intersectsAabb, overlapsAabb, containsPointAabb } from './aabb'
 export type { Aabb } from './aabb'

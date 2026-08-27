@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, unref, setValue, type ReactiveRuntime, type Ref, type ReadonlyRef } from '../reactive'
+import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
 import { when } from './when'
 
 // ============================================
@@ -28,12 +28,6 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
       return r as unknown as Ref<T>
     },
 
-    computed: <T>(getter: () => T) => ({
-      get value() {
-        return getter()
-      }
-    } as unknown as ReadonlyRef<T>),
-
     subscribe: <T>(
       source: () => T,
       callback: (value: T, oldValue: T) => void
@@ -55,7 +49,7 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
       stop: () => {}
     }),
 
-    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
+    unref: <T>(value: T | Ref<T>) => {
       if (value && typeof value === 'object' && 'value' in value) {
         return (value as unknown as { value: T }).value
       }
@@ -175,23 +169,7 @@ describe('when', () => {
       expect(thenMounted).toHaveBeenCalled()
     })
 
-    it('应该支持 computed 类型的条件', () => {
-      const value = runtime.ref(10)
-      const condition = runtime.computed(() => unref(value) > 5)
-      const thenMounted = vi.fn()
 
-      const result = when({
-        condition,
-        then: () => (() => {
-          thenMounted()
-          return () => {}
-        })
-      })
-
-      result({}, undefined)
-
-      expect(thenMounted).toHaveBeenCalled()
-    })
 
     it('应该支持函数类型的条件并追踪依赖变化', () => {
       const count = runtime.ref(0)
@@ -199,7 +177,7 @@ describe('when', () => {
       const elseMounted = vi.fn()
 
       const result = when({
-        condition: () => unref(count) > 5,
+        condition: () => runtime.unref(count) > 5,
         then: () => (() => {
           thenMounted()
           return () => {}
@@ -215,7 +193,7 @@ describe('when', () => {
       expect(thenMounted).not.toHaveBeenCalled()
       expect(elseMounted).toHaveBeenCalled()
 
-      setValue(count, 10)
+      runtime.setValue(count, 10)
       runtime.triggerWatchers()
 
       expect(thenMounted).toHaveBeenCalled()
@@ -229,7 +207,7 @@ describe('when', () => {
       const elseMounted = vi.fn()
 
       const result = when({
-        condition: () => unref(a) + unref(b) > 2,
+        condition: () => runtime.unref(a) + runtime.unref(b) > 2,
         then: () => (() => {
           thenMounted()
           return () => {}
@@ -244,12 +222,12 @@ describe('when', () => {
 
       expect(thenMounted).toHaveBeenCalled()
 
-      setValue(a, 10)
+      runtime.setValue(a, 10)
       runtime.triggerWatchers()
 
       expect(thenMounted).toHaveBeenCalledTimes(1)
 
-      setValue(b, -20)
+      runtime.setValue(b, -20)
       runtime.triggerWatchers()
 
       expect(thenMounted).toHaveBeenCalledTimes(1)
@@ -307,7 +285,7 @@ describe('when', () => {
       expect(thenUnmounted).not.toHaveBeenCalled()
       expect(elseUnmounted).not.toHaveBeenCalled()
 
-      setValue(condition, false)
+      runtime.setValue(condition, false)
       runtime.triggerWatchers()
 
       expect(thenUnmounted).toHaveBeenCalled()
@@ -333,7 +311,7 @@ describe('when', () => {
       result({}, undefined)
       expect(elseUnmounted).not.toHaveBeenCalled()
 
-      setValue(condition, true)
+      runtime.setValue(condition, true)
       runtime.triggerWatchers()
 
       expect(elseUnmounted).toHaveBeenCalled()

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, setValue, type ReactiveRuntime, type Ref, type ReadonlyRef } from '../reactive'
+import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
 import { each, repeat } from './each'
 import { when } from './when'
 
@@ -47,19 +47,12 @@ function createMockReactiveRuntime(): ReactiveRuntime & {
       }
     },
 
-    computed: <T>(getter: () => T) =>
-      ({
-        get value() {
-          return getter()
-        }
-      } as unknown as ReadonlyRef<T>),
-
     effectScope: () => ({
       run: <T>(fn: () => T) => fn(),
       stop: () => {}
     }),
 
-    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
+    unref: <T>(value: T | Ref<T>) => {
       if (value && typeof value === 'object' && 'value' in value) {
         return (value as unknown as { value: T }).value
       }
@@ -269,14 +262,14 @@ describe('each', () => {
       const c = { id: 3 }
       const d = { id: 4 }
       const e = { id: 5 }
-      setValue(items, [a, b, c, d, e])
+      runtime.setValue(items, [a, b, c, d, e])
       runtime.triggerWatchers()
 
       expect(mounted).toEqual([1, 2, 3, 4, 5])
 
       // 中间移除 + 尾部追加混合
       const f = { id: 6 }
-      setValue(items, [a, c, e, f])
+      runtime.setValue(items, [a, c, e, f])
       runtime.triggerWatchers()
 
       expect(mounted).toEqual([1, 2, 3, 4, 5, 6])
@@ -628,40 +621,6 @@ describe('repeat', () => {
 
       repeatMountable({}, undefined)
       expect(mounted).toEqual([])
-    })
-  })
-
-  describe('值数组模式', () => {
-    it('应该渲染值数组', () => {
-      const items = runtime.ref(['a', 'b', 'c'])
-      const mounted: string[] = []
-
-      const repeatMountable = repeat(items, (item) =>
-        (() => {
-          mounted.push(item)
-          return () => {}
-        })
-      )
-
-      repeatMountable({}, undefined)
-      expect(mounted).toEqual(['a', 'b', 'c'])
-    })
-
-    it('应该支持 getter 返回数组', () => {
-      const items = ['x', 'y']
-      const mounted: string[] = []
-
-      const repeatMountable = repeat(
-        () => items,
-        (item) =>
-          (() => {
-            mounted.push(item)
-            return () => {}
-          })
-      )
-
-      repeatMountable({}, undefined)
-      expect(mounted).toEqual(['x', 'y'])
     })
   })
 

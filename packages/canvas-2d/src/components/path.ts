@@ -1,5 +1,5 @@
 import type { Mountable } from '@rasenjs/core'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue, Ref } from '../types'
 import {
   unref,
   type CommonDrawProps,
@@ -17,18 +17,12 @@ import { createNode, type CanvasNode, type Context2D } from '../node'
  */
 export interface PathPoint {
   // 点的位置
-  x: number | Ref<number> | ReadonlyRef<number>
-  y: number | Ref<number> | ReadonlyRef<number>
+  x: PropValue<number>
+  y: PropValue<number>
   // 入手柄(相对于点的偏移)
-  handleIn?:
-    | { x: number; y: number }
-    | Ref<{ x: number; y: number }>
-    | ReadonlyRef<{ x: number; y: number }>
+  handleIn?: PropValue<{ x: number; y: number }>
   // 出手柄(相对于点的偏移)
-  handleOut?:
-    | { x: number; y: number }
-    | Ref<{ x: number; y: number }>
-    | ReadonlyRef<{ x: number; y: number }>
+  handleOut?: PropValue<{ x: number; y: number }>
   // 曲线类型标记（用于区分二次贝塞尔曲线）
   curveType?: 'quadratic'
 }
@@ -36,15 +30,15 @@ export interface PathPoint {
 export interface PathProps
   extends Partial<CommonDrawProps>, Partial<LineStyleProps> {
   // 方式1: 直接传入points数组(响应式数据)
-  points?: PathPoint[] | Ref<PathPoint[]> | ReadonlyRef<PathPoint[]>
+  points?: PropValue<PathPoint[]>
   // 方式2: 使用SVG路径数据(会被转换成points)
-  data?: string | Ref<string> | ReadonlyRef<string>
+  data?: PropValue<string>
   // 方式3: 使用子组件(point组件,会收集成points数组)
   children?: Array<Mountable<CanvasNode>>
-  stroke?: string | Ref<string> | ReadonlyRef<string>
-  fill?: string | Ref<string> | ReadonlyRef<string>
-  lineWidth?: number | Ref<number> | ReadonlyRef<number>
-  closed?: boolean | Ref<boolean> | ReadonlyRef<boolean>
+  stroke?: PropValue<string>
+  fill?: PropValue<string>
+  lineWidth?: PropValue<number>
+  closed?: PropValue<boolean>
 }
 
 /**
@@ -71,12 +65,12 @@ export const point = (
   }
 }
 
-const resolveNum = (v: number | Ref<number> | ReadonlyRef<number>): number =>
+const resolveNum = (v: PropValue<number>): number =>
   typeof v === 'number' ? v : (unref(v as Ref<number>) as unknown as number)
 
 type Handle = { x: number; y: number }
 const resolveHandle = (
-  v: Handle | Ref<Handle> | ReadonlyRef<Handle>
+  v: PropValue<Handle>
 ): Handle => {
   const h = unref(v as Ref<Handle>) as unknown as Handle
   return h
@@ -93,7 +87,7 @@ function renderPoints(
   if (points.length === 0) return
 
   const firstSeg = points[0]
-  const resolveNum = (v: number | Ref<number> | ReadonlyRef<number>): number =>
+  const resolveNum = (v: PropValue<number>): number =>
     typeof v === 'number' ? v : (unref(v as Ref<number>) as unknown as number)
   const firstX = resolveNum(firstSeg.x)
   const firstY = resolveNum(firstSeg.y)

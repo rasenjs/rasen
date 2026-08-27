@@ -13,6 +13,7 @@ export interface PinInputContext {
   length: number
   type: PinInputType
   disabled: boolean
+  otp?: boolean
   focusedIndex: number
   setValue: (value: string) => void
   setFocusedIndex: (index: number) => void
@@ -64,7 +65,6 @@ export function createPinInputRoot(): (
       const length = props?.length ?? 4
       const type = props?.type ?? 'numeric'
       const disabled = props?.disabled ?? false
-      const placeholder = props?.placeholder ?? ''
 
       // 状态管理
       const isControlled = props?.value !== undefined
@@ -130,7 +130,7 @@ export function createPinInputRoot(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children(getContext)(root)
+        childUnmount = props.children(getContext)(root, undefined)
       }
 
       host.appendChild(root)
@@ -404,7 +404,7 @@ export function createPinInput(): (
           const inputs: (() => void)[] = []
 
           for (let i = 0; i < length; i++) {
-            const inputHost = document.createElement('div')
+            const inputHost = document.createElement('input')
             const unmount = Input(
               {
                 index: i,
@@ -412,8 +412,8 @@ export function createPinInput(): (
                 style: props?.inputStyle
               },
               getContext
-            )(inputHost)
-            inputs.push(unmount)
+            )(inputHost, undefined)
+            if (unmount) inputs.push(unmount)
             host.appendChild(inputHost)
           }
 
@@ -421,7 +421,7 @@ export function createPinInput(): (
             inputs.forEach((unmount) => unmount())
           }
         }
-      })(host)
+      })(host, undefined)
     }
   }
 }

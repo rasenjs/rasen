@@ -22,12 +22,16 @@
  * ```
  */
 
-import { com, getReactiveRuntime, type Mountable } from '@rasenjs/core'
+import { com, getReactiveRuntime, type Mountable, type Ref } from '@rasenjs/core'
 import type { GlNode } from '../../../node'
-import { Mat4x4f, Vec3f, vec3f } from '@rasenjs/math'
+import { Mat4x4f, Vec3f, vec3f, forwardVector } from '@rasenjs/math'
 import type { MaybeRef } from '../../../types'
 import { unref } from '../../../utils'
 import { ensureRenderContext, canvasAspect } from './camera'
+
+// forwardVector / rightVector moved to @rasenjs/math (pure math, host-agnostic);
+// re-exported here for backwards compatibility.
+export { forwardVector, rightVector } from '@rasenjs/math'
 
 export interface FirstPersonCameraProps {
   /** Eye position. */
@@ -43,28 +47,6 @@ export interface FirstPersonCameraProps {
   aspect?: MaybeRef<number>
   near?: MaybeRef<number>
   far?: MaybeRef<number>
-}
-
-/**
- * Unit forward vector for a yaw/pitch pair.
- *
- * @example
- * ```ts
- * const dir = forwardVector(yaw.value, pitch.value)
- * // move forward: pos += dir * speed
- * ```
- */
-export function forwardVector(yaw: number, pitch: number): Vec3f {
-  const cp = Math.cos(pitch)
-  return vec3f(cp * Math.sin(yaw), Math.sin(pitch), -cp * Math.cos(yaw))
-}
-
-/**
- * Unit right vector (perpendicular to forward, flat on the XZ plane).
- * Useful for strafing.
- */
-export function rightVector(yaw: number): Vec3f {
-  return vec3f(Math.cos(yaw), 0, Math.sin(yaw))
 }
 
 function toVec3(v: { x: number; y: number; z: number } | Vec3f): Vec3f {
@@ -96,7 +78,7 @@ export const FirstPersonCamera = com(
 
         rc.setProjectionMatrix(Mat4x4f.perspective(fov, aspect, near, far))
         rc.setViewMatrix(Mat4x4f.lookAt(eye, target, up))
-        rc.manualUpdate()
+        rc.requestRedraw()
       }
       apply()
 
@@ -126,3 +108,56 @@ export const FirstPersonCamera = com(
     }
   },
 )
+
+// ── Look 状态机（纯逻辑，零事件 API）────────────────────────────────
+//
+// 视角控制的本质是「delta → yaw/pitch 推进 + 俯仰限位」，与输入来源无关：
+// pointer-lock 的 movementX/Y、拖拽的 clientX 差值、手柄摇杆、触屏滑动，
+// 最终都归结为一次 applyDelta。DOM 绑定（pointerlockchange/mousemove 监听）
+// 属于宿主适配器（@rasenjs/dom），不在此处。
+
+/** Look 状态机驱动的响应式 refs（标准 Rasen opaque Ref）。 */
+export interface LookRefs {
+  /** Rotation around world +Y in radians. */
+  yaw: Ref<number>
+  /** Pitch around the camera right axis in radians. */
+  pitch: Ref<number>
+}
+
+export interface LookControls {
+  /** Apply a look delta (pointer movement or drag distance), then clamp pitch. */
+  applyDelta(dx: number, dy: number): void
+  /** Clamp pitch into [-limit, +limit]. */
+  clampPitch(): void
+}
+
+const LOOK_SENSITIVITY = 0.0022
+const PITCH_LIMIT = Math.PI / 2 - 0.01
+
+/**
+ * Create the pure look state machine for a FirstPersonCamera.
+ *
+ * Host-agnostic: reads/writes go through the runtime's unref/setValue
+ * (opaque Ref contract — never `.value`), and never touches events/DOM —
+ * the host adapter feeds it.
+ */
+export function createLookControls(
+  refs: LookRefs,
+  opts?: { sensitivity?: number; pitchLimit?: number },
+): LookControls {
+  const sensitivity = opts?.sensitivity ?? LOOK_SENSITIVITY
+  const limit = opts?.pitchLimit ?? PITCH_LIMIT
+
+  const clampPitch = () => {
+    getReactiveRuntime().setValue(refs.pitch, Math.max(-limit, Math.min(limit, unref(refs.pitch))))
+  }
+
+  return {
+    applyDelta(dx, dy) {
+      getReactiveRuntime().setValue(refs.yaw, unref(refs.yaw) + dx * sensitivity)
+      getReactiveRuntime().setValue(refs.pitch, unref(refs.pitch) - dy * sensitivity)
+      clampPitch()
+    },
+    clampPitch,
+  }
+}

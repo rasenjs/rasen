@@ -6,6 +6,13 @@ export * from './components'
 export { watchProp } from './utils'
 export { hostHooks, type HostHooks } from './host-hooks'
 export { MARKERS, isMarkerMatch, MARKER_DEBUG_MAP } from './marker-constants'
+export {
+  bindLookControls,
+  setupKeyboard,
+  type LookControlRefs,
+  type BoundLookControls,
+  type BindLookControlsOptions,
+} from './input'
 
 import type { Mountable, HostHooks } from '@rasenjs/core'
 import { mount as coreMount } from '@rasenjs/core'

@@ -7,8 +7,7 @@
 
 import type { Context2D } from './node'
 import type { CanvasNode } from './node'
-import type { CanvasSurface } from './node'
-import type { CanvasEventHandlers } from './events'
+import type { CanvasPointerEventType } from './events'
 
 export interface Bounds {
   x: number
@@ -19,11 +18,11 @@ export interface Bounds {
 
 export interface RenderContextOptions {
   /**
-   * 绘制调度注入（domlike 环境适配点）。缺省时使用
-   * requestAnimationFrame，环境缺失（测试/SSR）退化为 queueMicrotask。
+   * 绘制调度注入（domlike 环境适配点）。返回值即取消函数——
+   * 调度与取消一体。缺省：环境有 requestAnimationFrame 用之；
+   * 测试/SSR 环境退化为 queueMicrotask。
    */
-  schedule?: (cb: () => void) => unknown
-  cancel?: (handle: unknown) => void
+  schedule?: (cb: () => void) => () => void
   /**
    * Device pixel ratio of the backing store (default 1). When >1, every
    * frame starts from a scaled base transform so drawing code keeps using
@@ -50,24 +49,29 @@ export function getRenderContext(ctx: Context2D): RenderContext {
  */
 export class RenderContext {
   private roots: CanvasNode[] = []
-  private rafId: number | null = null
-  private options: RenderContextOptions
+  /** 已调度但未执行的绘制取消函数（null = 无待执行绘制） */
+  private cancelScheduled: (() => void) | null = null
   private readonly resolution: number
-  private eventListenersAttached = false
-
-  private static readonly EVENT_TYPES = [
-    'click',
-    'pointerdown',
-    'pointerup',
-    'pointermove'
-  ] as const
+  /** 解析后的帧调度器（构造期确定，不依赖全局探测时序） */
+  private readonly scheduleFrame: (cb: () => void) => () => void
 
   constructor(
     private ctx: Context2D,
     options: RenderContextOptions = {}
   ) {
-    this.options = options
     this.resolution = options.resolution ?? 1
+    // 帧调度：注入优先；缺省 rAF，环境缺失（测试/SSR）退化 queueMicrotask
+    this.scheduleFrame =
+      options.schedule ??
+      (typeof requestAnimationFrame !== 'undefined'
+        ? (cb) => {
+            const id = requestAnimationFrame(cb)
+            return () => cancelAnimationFrame(id)
+          }
+        : (cb) => {
+            queueMicrotask(cb)
+            return () => {}
+          })
     contextMap.set(ctx, this)
   }
 
@@ -90,32 +94,60 @@ export class RenderContext {
     this.markDirty()
   }
 
+  /** 场景中实际挂载的组件节点数（不含 createRoot 的裸根容器） */
+  get nodeCount(): number {
+    let n = 0
+    const walk = (node: CanvasNode): void => {
+      for (const c of node.children) {
+        n++
+        walk(c)
+      }
+    }
+    for (const r of this.roots) walk(r)
+    return n
+  }
+
   /** 标脏：v1 一律全画布重绘 */
   markDirty(): void {
     this.scheduleDraw()
   }
 
-  private scheduleDraw() {
-    if (this.rafId !== null) return
+  /**
+   * Signal that the scene now contains nodes with pointer handlers.
+   * The host adapter polls this (or subscribes via its own bookkeeping) to
+   * decide when to bind native listeners; the renderer stays event-free.
+   */
+  markNeedsPointerBinding(): void {
+    this.needsPointerBinding = true
+  }
 
-    // 注入的调度器优先；缺省 rAF，环境缺失（测试/SSR）退化 queueMicrotask
-    if (this.options.schedule) {
-      this.rafId = this.options.schedule(() => {
-        this.rafId = null
-        this.draw()
-      }) as unknown as number
-    } else if (typeof requestAnimationFrame !== 'undefined') {
-      this.rafId = requestAnimationFrame(() => {
-        this.rafId = null
-        this.draw()
-      })
-    } else {
-      // Test environment
-      this.rafId = 1 as unknown as number
-      queueMicrotask(() => {
-        this.rafId = null
-        this.draw()
-      })
+  /** Whether any mounted node declared pointer handlers (host adapter reads). */
+  get needsPointerEvents(): boolean {
+    return this.needsPointerBinding
+  }
+
+  private needsPointerBinding = false
+
+  /**
+   * 宿主显式请求重绘（如 dom <canvas> 改了绘图缓冲尺寸后调用）。
+   * 当前与 markDirty 等价；保留独立入口以承载未来的尺寸相关处理。
+   */
+  requestRedraw(): void {
+    this.scheduleDraw()
+  }
+
+  private scheduleDraw() {
+    if (this.cancelScheduled !== null) return
+
+    const cancel = this.scheduleFrame(() => {
+      this.cancelScheduled = null
+      this.draw()
+    })
+    // Wrap: external cancel must also reset the pending state, otherwise
+    // subsequent markDirty calls would be dead-locked.
+    this.cancelScheduled = () => {
+      cancel()
+      this.cancelScheduled = null
     }
   }
 
@@ -182,72 +214,34 @@ export class RenderContext {
   }
 
   /**
-   * Attach delegated listeners on the canvas surface. Called lazily by
-   * createNode when the first node registers pointer handlers; a no-op on
-   * hosts whose surface has no event support (tests, SSR).
-   */
-  ensureEventListeners(): void {
-    if (this.eventListenersAttached) return
-    const surface = this.ctx.canvas as CanvasSurface & {
-      addEventListener?: (type: string, h: (e: unknown) => void) => void
-    }
-    if (typeof surface.addEventListener !== 'function') return
-    for (const type of RenderContext.EVENT_TYPES) {
-      surface.addEventListener(type, (native) =>
-        this.dispatch(type, native)
-      )
-    }
-    this.eventListenersAttached = true
-  }
-
-  /**
    * Hit-test the point and bubble the event from the target up the ancestor
    * chain, firing the first handler found for this type.
+   *
+   * PUBLIC entry for host adapters: the adapter owns native event listeners
+   * and coordinate translation, then calls this with canvas-local CSS
+   * coordinates. The renderer never sees native event objects.
    */
-  private dispatch(type: keyof CanvasEventHandlers, native: unknown): void {
-    const pt = this.eventPoint(native)
-    if (!pt) return
-    const target = this.hitTest(pt.x, pt.y)
+  dispatchPointer(type: CanvasPointerEventType, x: number, y: number): void {
+    const target = this.hitTest(x, y)
     if (!target) return
     let node: CanvasNode | null = target
     while (node) {
       const handler = node.on?.[type]
       if (handler) {
-        handler({ x: pt.x, y: pt.y, node: target, nativeEvent: native })
+        handler({ x, y, node: target, nativeEvent: undefined })
         return
       }
       node = node.parent
     }
   }
 
-  /** Canvas-local CSS coordinates from a host event. */
-  private eventPoint(native: unknown): { x: number; y: number } | null {
-    const e = native as { offsetX?: unknown; offsetY?: unknown }
-    if (typeof e.offsetX === 'number' && typeof e.offsetY === 'number') {
-      return { x: e.offsetX, y: e.offsetY }
-    }
-    // Fallback: clientX/Y minus the canvas rect (DOM hosts without offsetX).
-    const ce = native as { clientX?: unknown; clientY?: unknown }
-    const surface = this.ctx.canvas as CanvasSurface & {
-      getBoundingClientRect?: () => { left: number; top: number }
-    }
-    if (
-      typeof ce.clientX === 'number' &&
-      typeof ce.clientY === 'number' &&
-      typeof surface.getBoundingClientRect === 'function'
-    ) {
-      const r = surface.getBoundingClientRect()
-      return { x: ce.clientX - r.left, y: ce.clientY - r.top }
-    }
-    return null
-  }
-
   /**
    * Manually trigger full redraw (bypasses watch system)
    */
   flushSync() {
-    if (this.rafId !== null) {
-      this.rafId = null
+    if (this.cancelScheduled !== null) {
+      this.cancelScheduled()
+      this.cancelScheduled = null
     }
     this.draw()
   }
@@ -256,7 +250,10 @@ export class RenderContext {
    * Cleanup
    */
   destroy() {
-    this.rafId = null
+    if (this.cancelScheduled !== null) {
+      this.cancelScheduled()
+      this.cancelScheduled = null
+    }
     this.roots = []
     contextMap.delete(this.ctx)
   }

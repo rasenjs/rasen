@@ -1,5 +1,5 @@
 import type { Component2D } from '../node'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import {
   unref,
   type CommonDrawProps,
@@ -11,15 +11,15 @@ import {
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
 export interface SpriteProps extends CommonDrawProps, TransformProps {
-  image: CanvasImageSource | Ref<CanvasImageSource> | ReadonlyRef<CanvasImageSource>
-  x: number | Ref<number> | ReadonlyRef<number>
-  y: number | Ref<number> | ReadonlyRef<number>
+  image: PropValue<CanvasImageSource>
+  x: PropValue<number>
+  y: PropValue<number>
   frameWidth: number
   frameHeight: number
-  frame: number | Ref<number> | ReadonlyRef<number>
+  frame: PropValue<number>
   columns?: number
-  width?: number | Ref<number> | ReadonlyRef<number>
-  height?: number | Ref<number> | ReadonlyRef<number>
+  width?: PropValue<number>
+  height?: PropValue<number>
 }
 
 export const sprite: Component2D<SpriteProps> = (

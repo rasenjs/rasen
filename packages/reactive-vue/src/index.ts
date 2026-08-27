@@ -6,7 +6,6 @@
  */
 
 import {
-  computed as vueComputed,
   effectScope as vueEffectScope,
   ref as vueRef,
   unref as vueUnref,
@@ -15,7 +14,9 @@ import {
   type Ref as VueRef,
   type ComputedRef
 } from '@vue/reactivity'
-import { setReactiveRuntime, getReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
+import { setReactiveRuntime, getReactiveRuntime, type ReactiveRuntime, type Ref } from '@rasenjs/core'
+
+export type { Ref } from '@rasenjs/core'
 
 /**
  * Creates Vue reactive runtime
@@ -71,15 +72,11 @@ export function createReactiveRuntime(): ReactiveRuntime {
       }
     },
 
-    computed<T>(getter: () => T): ReadonlyRef<T> {
-      return vueComputed(getter) as unknown as ReadonlyRef<T>
-    },
-
     ref<T>(value: T): Ref<T> {
       return vueRef(value) as unknown as Ref<T>
     },
 
-    unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
+    unref<T>(value: T | Ref<T>): T {
       // Vue 语义：只解包 ref，不调用 getter（getter 由 core 的 toValue 处理）
       return (isRef(value) ? vueUnref(value as unknown as VueRef<T> | ComputedRef<T>) : value) as T
     },
@@ -90,7 +87,7 @@ export function createReactiveRuntime(): ReactiveRuntime {
       ;(ref as unknown as VueRef<T>).value = value
     },
 
-    isRef(value: unknown): value is Ref<unknown> | ReadonlyRef<unknown> {
+    isRef(value: unknown): value is Ref<unknown> | Ref<unknown> {
       // Vue 原生 isRef 已覆盖 ref 和 computed（通过 __v_isRef 标记）
       return isRef(value)
     }
@@ -112,9 +109,38 @@ export function useReactiveRuntime(): void {
 }
 
 /**
- * Convenient ref function — mirrors @rasenjs/reactive-signals' standalone `ref`.
- * Creates a Vue ref via the active runtime.
+ * Convenient ref function — creates a Vue ref via the active runtime.
+ *
+ * The returned type is core's `Ref<T>`, which this package augments to
+ * extend `@vue/reactivity`'s real `Ref<T>` (see the `declare module` below),
+ * so `.value` works directly.
  */
 export function ref<T>(value: T): Ref<T> {
   return getReactiveRuntime().ref(value)
+}
+
+/**
+ * Convenient unref — unwraps a Vue ref via the active runtime.
+ */
+export function unref<T>(value: T | Ref<T>): T {
+  return getReactiveRuntime().unref(value)
+}
+
+/**
+ * Convenient setValue — writes a Vue ref via the active runtime.
+ */
+export function setValue<T>(ref: Ref<T>, value: T): void {
+  getReactiveRuntime().setValue(ref, value)
+}
+
+/**
+ * 模块增强：让 core 的占位 `Ref<T>` 变成 Vue 的真实 `Ref<T>`。
+ *
+ * 用户引入本包后，core 的 `Ref<T>` 即 `@vue/reactivity` 的 `Ref<T>`
+ * （带 `.value` / `__v_isRef` 等），`ref().value` 直接可用，且与
+ * 组件 props 期望的 core `Ref<T>` 完全一致。
+ */
+declare module '@rasenjs/core' {
+  type VueRefType<T> = import('@vue/reactivity').Ref<T>
+  interface Ref<T> extends VueRefType<T> {}
 }

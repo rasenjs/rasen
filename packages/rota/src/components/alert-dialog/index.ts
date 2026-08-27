@@ -168,7 +168,7 @@ export function createAlertDialogRoot(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children(getContext)(root)
+        childUnmount = props.children(getContext)(root, undefined)
       }
 
       host.appendChild(root)
@@ -211,13 +211,7 @@ export function createAlertDialogTrigger(): (
           ctx.setOpen(true)
         })
 
-        // Watch for open state changes
-        const observer = new MutationObserver(() => {
-          // State updates are handled via context
-        })
-
         // Update data-state when open changes
-        const originalSetOpen = ctx.setOpen
         const checkState = (): void => {
           trigger.setAttribute('data-state', ctx.open ? 'open' : 'closed')
         }
@@ -227,7 +221,7 @@ export function createAlertDialogTrigger(): (
 
         let childUnmount: (() => void) | undefined
         if (props?.children) {
-          childUnmount = props.children()(trigger)
+          childUnmount = props.children()(trigger, undefined)
         }
 
         host.appendChild(trigger)
@@ -241,7 +235,7 @@ export function createAlertDialogTrigger(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(trigger)
+        childUnmount = props.children()(trigger, undefined)
       }
 
       host.appendChild(trigger)
@@ -288,7 +282,7 @@ export function createAlertDialogOverlay(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(overlay)
+        childUnmount = props.children()(overlay, undefined)
       }
 
       host.appendChild(overlay)
@@ -393,7 +387,7 @@ export function createAlertDialogContent(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children(getContext)(content)
+        childUnmount = props.children(getContext!)(content, undefined)
       }
 
       host.appendChild(content)
@@ -439,7 +433,7 @@ export function createAlertDialogTitle(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(title)
+        childUnmount = props.children()(title, undefined)
       }
 
       host.appendChild(title)
@@ -485,7 +479,7 @@ export function createAlertDialogDescription(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(description)
+        childUnmount = props.children()(description, undefined)
       }
 
       host.appendChild(description)
@@ -534,7 +528,7 @@ export function createAlertDialogAction(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(action)
+        childUnmount = props.children()(action, undefined)
       }
 
       host.appendChild(action)
@@ -583,7 +577,7 @@ export function createAlertDialogCancel(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(cancel)
+        childUnmount = props.children()(cancel, undefined)
       }
 
       host.appendChild(cancel)
@@ -602,27 +596,37 @@ export function createAlertDialogCancel(): (
 /**
  * AlertDialog 组合组件
  */
-export function createAlertDialog(): (props?: {
-  open?: boolean
-  defaultOpen?: boolean
-  onOpenChange?: (open: boolean) => void
-  onEscapeKeyDown?: (event: KeyboardEvent) => void
-  onOpenAutoFocus?: (event: Event) => void
-  onCloseAutoFocus?: (event: Event) => void
-  triggerText?: string
-  triggerClass?: string
-  overlayClass?: string
-  contentClass?: string
-  titleClass?: string
-  descriptionClass?: string
-  actionsClass?: string
-  cancelClass?: string
-  actionClass?: string
-  title?: string
-  description?: string
-  cancelText?: string
-  confirmText?: string
-}) => Mountable<HTMLElement> {
+export function createAlertDialog(): {
+  Root: (props?: AlertDialogRootProps) => Mountable<HTMLElement>
+  Trigger: (
+    props?: AlertDialogTriggerProps,
+    getContext?: () => AlertDialogContext | undefined
+  ) => Mountable<HTMLElement>
+  Overlay: (
+    props?: AlertDialogOverlayProps,
+    getContext?: () => AlertDialogContext | undefined
+  ) => Mountable<HTMLElement>
+  Content: (
+    props?: AlertDialogContentProps,
+    getContext?: () => AlertDialogContext | undefined
+  ) => Mountable<HTMLElement>
+  Title: (
+    props?: AlertDialogTitleProps,
+    getContext?: () => AlertDialogContext | undefined
+  ) => Mountable<HTMLElement>
+  Description: (
+    props?: AlertDialogDescriptionProps,
+    getContext?: () => AlertDialogContext | undefined
+  ) => Mountable<HTMLElement>
+  Action: (
+    props?: AlertDialogActionProps,
+    getContext?: () => AlertDialogContext | undefined
+  ) => Mountable<HTMLElement>
+  Cancel: (
+    props?: AlertDialogCancelProps,
+    getContext?: () => AlertDialogContext | undefined
+  ) => Mountable<HTMLElement>
+} {
   const Root = createAlertDialogRoot()
   const Trigger = createAlertDialogTrigger()
   const Overlay = createAlertDialogOverlay()
@@ -632,174 +636,7 @@ export function createAlertDialog(): (props?: {
   const Action = createAlertDialogAction()
   const Cancel = createAlertDialogCancel()
 
-  return (props?: {
-    open?: boolean
-    defaultOpen?: boolean
-    onOpenChange?: (open: boolean) => void
-    onEscapeKeyDown?: (event: KeyboardEvent) => void
-    onOpenAutoFocus?: (event: Event) => void
-    onCloseAutoFocus?: (event: Event) => void
-    triggerText?: string
-    triggerClass?: string
-    overlayClass?: string
-    contentClass?: string
-    titleClass?: string
-    descriptionClass?: string
-    actionsClass?: string
-    cancelClass?: string
-    actionClass?: string
-    title?: string
-    description?: string
-    cancelText?: string
-    confirmText?: string
-  }) => {
-    return (host: HTMLElement) => {
-      return Root({
-        open: props?.open,
-        defaultOpen: props?.defaultOpen,
-        onOpenChange: props?.onOpenChange,
-        children: (getContext) => (root: HTMLElement) => {
-          const unmounts: (() => void)[] = []
-
-          // Create trigger
-          const triggerHost = document.createElement('div')
-          const triggerUnmount = Trigger(
-            {
-              class: props?.triggerClass,
-              children: () => (trigger: HTMLElement) => {
-                trigger.textContent = props?.triggerText ?? 'Open Dialog'
-                return () => {}
-              }
-            },
-            getContext
-          )(triggerHost)
-          if (triggerUnmount) {
-            unmounts.push(triggerUnmount)
-            root.appendChild(triggerHost)
-          }
-
-          // Create overlay
-          const overlayHost = document.createElement('div')
-          const overlayUnmount = Overlay(
-            { class: props?.overlayClass },
-            getContext
-          )(overlayHost)
-          if (overlayUnmount) {
-            unmounts.push(overlayUnmount)
-            root.appendChild(overlayHost)
-          }
-
-          // Create content
-          const contentHost = document.createElement('div')
-          const contentUnmount = Content(
-            {
-              class: props?.contentClass,
-              onEscapeKeyDown: props?.onEscapeKeyDown,
-              onOpenAutoFocus: props?.onOpenAutoFocus,
-              onCloseAutoFocus: props?.onCloseAutoFocus,
-              children: (getCtx) => (content: HTMLElement) => {
-                const innerUnmounts: (() => void)[] = []
-
-                // Create title
-                if (props?.title) {
-                  const titleHost = document.createElement('div')
-                  const titleUnmount = Title(
-                    {
-                      class: props?.titleClass,
-                      children: () => (title: HTMLElement) => {
-                        title.textContent = props.title ?? ''
-                        return () => {}
-                      }
-                    },
-                    getCtx
-                  )(titleHost)
-                  if (titleUnmount) {
-                    innerUnmounts.push(titleUnmount)
-                    content.appendChild(titleHost)
-                  }
-                }
-
-                // Create description
-                if (props?.description) {
-                  const descHost = document.createElement('div')
-                  const descUnmount = Description(
-                    {
-                      class: props?.descriptionClass,
-                      children: () => (desc: HTMLElement) => {
-                        desc.textContent = props.description ?? ''
-                        return () => {}
-                      }
-                    },
-                    getCtx
-                  )(descHost)
-                  if (descUnmount) {
-                    innerUnmounts.push(descUnmount)
-                    content.appendChild(descHost)
-                  }
-                }
-
-                // Create actions container
-                const actionsHost = document.createElement('div')
-                if (props?.actionsClass) {
-                  actionsHost.className = props.actionsClass
-                }
-
-                // Create cancel button
-                const cancelHost = document.createElement('div')
-                const cancelUnmount = Cancel(
-                  {
-                    class: props?.cancelClass,
-                    children: () => (cancel: HTMLElement) => {
-                      cancel.textContent = props?.cancelText ?? 'Cancel'
-                      return () => {}
-                    }
-                  },
-                  getCtx
-                )(cancelHost)
-                if (cancelUnmount) {
-                  innerUnmounts.push(cancelUnmount)
-                  actionsHost.appendChild(cancelHost)
-                }
-
-                // Create action button
-                const actionHost = document.createElement('div')
-                const actionUnmount = Action(
-                  {
-                    class: props?.actionClass,
-                    children: () => (action: HTMLElement) => {
-                      action.textContent = props?.confirmText ?? 'Confirm'
-                      return () => {}
-                    }
-                  },
-                  getCtx
-                )(actionHost)
-                if (actionUnmount) {
-                  innerUnmounts.push(actionUnmount)
-                  actionsHost.appendChild(actionHost)
-                }
-
-                content.appendChild(actionsHost)
-
-                return () => {
-                  innerUnmounts.forEach((u) => u())
-                  actionsHost.remove()
-                }
-              }
-            },
-            getContext
-          )(contentHost)
-          if (contentUnmount) {
-            unmounts.push(contentUnmount)
-            root.appendChild(contentHost)
-          }
-
-          return () => {
-            unmounts.forEach((u) => u())
-          }
-        }
-      })(host)
-    }
-  }
+  return { Root, Trigger, Overlay, Content, Title, Description, Action, Cancel }
 }
 
 export const alertDialog = createAlertDialog()

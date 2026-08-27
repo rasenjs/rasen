@@ -203,7 +203,8 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <canvas className="racing-canvas" width={viewW} height={viewH}
         contextType="webgl2"
-        contextOptions={{ clearColor: '#ACC3F8', preserveDrawingBuffer: true, continuousRender: true } as never}
+        contextOptions={{ preserveDrawingBuffer: true }}
+        renderOptions={{ clearColor: "#ACC3F8", continuousRender: true }}
         style={{ width: '100%', height: '100%', display: 'block' }}>
         {sceneChildren}
       </canvas>

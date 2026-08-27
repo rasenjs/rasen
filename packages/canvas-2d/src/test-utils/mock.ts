@@ -5,17 +5,17 @@
  */
 
 import { vi } from 'vitest'
-import type { ReactiveRuntime } from '@rasenjs/core'
-import type { CanvasNode, Context2D } from '../node'
+import type { ReactiveRuntime, Ref } from '@rasenjs/core'
+import type { Context2D } from '../node'
 
 /**
  * 创建模拟的 domlike 2D 绘制上下文
  *
- * 返回对象同时满足 Context2D 与 CanvasNode（ctx 字段自引用），
- * 因此测试里 mountable(ctx) 可直接以 ctx 作为宿主节点传入——
- * 等价于真实场景的 mountable({ ctx })。
+ * 返回纯粋的 domlike Context2D（不再自引用为节点）。
+ * 测试里用官方入口物化渲染根：`const root = createRoot(mockCtx)`，
+ * 组件挂到 root 下 —— 与真实场景完全同构。
  */
-export function createMockContext(): Context2D & CanvasNode {
+export function createMockContext(): Context2D {
   const canvas = {
     width: 800,
     height: 600
@@ -130,10 +130,7 @@ export function createMockContext(): Context2D & CanvasNode {
     getContextAttributes: vi.fn(() => ({})),
     drawFocusIfNeeded: vi.fn(),
     roundRect: vi.fn()
-  } as unknown as Context2D & CanvasNode
-
-  // 自引用为宿主节点：ctx 即 CanvasNode（mountable(ctx) 直传）
-  ;(ctx as unknown as { ctx: unknown }).ctx = ctx
+  } as unknown as Context2D
 
   return ctx
 }
@@ -224,40 +221,26 @@ export function clearMockCalls(ctx: Context2D): void {
  */
 export function createMockReactiveRuntime(): ReactiveRuntime {
   return {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    watch: (source: any, callback: any, options?: any) => {
-      // 立即执行一次以建立依赖关系
-      const value = source()
-      if (options?.immediate) {
-        callback(value, value)
-      }
-      // 返回停止函数
-      return () => {}
-    },
     subscribe: (source: any, callback: any) => {
       // 渲染层订阅原语：与 watch 一致的桩实现
       const value = source()
       void value
+      void callback
       return () => {}
     },
     effectScope: () => ({
       run: <T>(fn: () => T) => fn(),
       stop: () => {}
     }),
-    ref: <T>(value: T) => ({ value }),
-    computed: <T>(getter: () => T) => ({
-      get value() {
-        return getter()
-      }
-    }),
-    unref: <T>(value: T) => {
+    ref: <T>(value: T) => ({ value } as unknown as Ref<T>),
+    unref: <T>(value: T | Ref<T>) => {
       if (value && typeof value === 'object' && 'value' in value) {
-        return (value as { value: T }).value
+        return (value as unknown as { value: T }).value
       }
-      return value
+      return value as T
     },
-    setValue: <T>(ref: { value: T }, value: T): void => {
-      ref.value = value
+    setValue: <T>(ref: Ref<T>, value: T): void => {
+      ;(ref as unknown as { value: T }).value = value
     },
     isRef: (value: unknown) => {
       return value !== null && typeof value === 'object' && 'value' in value

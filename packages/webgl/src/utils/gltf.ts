@@ -7,10 +7,11 @@
  */
 
 import type { MeshGeometry } from '../components/3d/primitives/mesh'
+import type { BitmapSource } from '../utils'
 import { Mat4x4f } from '@rasenjs/math'
 
 export interface LoadedGLTF extends MeshGeometry {
-  texture?: TexImageSource
+  texture?: BitmapSource
   bounds: { min: [number, number, number]; max: [number, number, number] }
 }
 
@@ -90,16 +91,39 @@ function readAccessor(
   }
 }
 
-// TODO(domlike): new Image()/fetch 属浏览器运行时 API，待资产加载器
-// 注入设计落地后由此处移除（类型面已先行收敛到 TexImageSource）。
-function loadImage(url: string): Promise<TexImageSource> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error(`Failed to load image: ${url}`))
-    img.src = url
-  })
+/**
+ * Default bitmap loader — browser hosts get an Image-based implementation.
+ * Non-DOM hosts (tests, native) should inject `loadBitmap` instead; calling
+ * loadGLB without it there throws honestly rather than touching `document`.
+ */
+const defaultLoadBitmap = typeof Image !== 'undefined'
+  ? (url: string): Promise<BitmapSource> =>
+      new Promise((resolve, reject) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve(img)
+        img.onerror = () => reject(new Error(`Failed to load image: ${url}`))
+        img.src = url
+      })
+  : undefined
+
+/** Options threaded through the GLB loading helpers. */
+export interface GltfLoadOptions {
+  /**
+   * 位图资产加载注入（宿主适配点）。缺省用浏览器 Image 实现；
+   * 非 DOM 宿主（测试/原生）必须注入。
+   */
+  loadBitmap?: (url: string) => Promise<BitmapSource>
+}
+
+function resolveLoader(opts?: GltfLoadOptions): (url: string) => Promise<BitmapSource> {
+  const loader = opts?.loadBitmap ?? defaultLoadBitmap
+  if (!loader) {
+    throw new Error(
+      '[rasen/webgl] No bitmap loader available. Pass { loadBitmap } in a non-DOM host.'
+    )
+  }
+  return loader
 }
 
 /**
@@ -113,8 +137,10 @@ function loadImage(url: string): Promise<TexImageSource> {
 export async function loadGLB(
   url: string,
   textureUrl?: string,
-  sharedTexture?: TexImageSource,
+  sharedTexture?: BitmapSource,
+  opts?: GltfLoadOptions,
 ): Promise<LoadedGLTF> {
+  const loadBitmap = resolveLoader(opts)
   const resp = await fetch(url)
   const buf = await resp.arrayBuffer()
   const view = new DataView(buf)
@@ -225,14 +251,14 @@ export async function loadGLB(
   const normals = allNorm.length ? new Float32Array(allNorm) : undefined
 
   // --- Texture ---
-  let texture: TexImageSource | undefined
+  let texture: BitmapSource | undefined
   if (sharedTexture) {
     // Use the caller-provided shared texture (same Image object for all
     // models) so the batch renderer groups them into ONE draw call — this
     // keeps depth ordering correct between models sharing a texture.
     texture = sharedTexture
   } else if (textureUrl) {
-    texture = await loadImage(textureUrl).catch(() => undefined)
+    texture = await loadBitmap(textureUrl).catch(() => undefined)
   } else {
     const mat = json.materials?.[0]
     const texIdx = mat?.pbrMetallicRoughness?.baseColorTexture?.index
@@ -240,7 +266,7 @@ export async function loadGLB(
       const imgInfo = json.images?.[json.textures?.[texIdx]?.source]
       if (imgInfo?.uri) {
         const base = url.substring(0, url.lastIndexOf('/') + 1)
-        texture = await loadImage(base + imgInfo.uri).catch(() => undefined)
+        texture = await loadBitmap(base + imgInfo.uri).catch(() => undefined)
       }
     }
   }
@@ -278,11 +304,12 @@ function quatToMat4(q: [number, number, number, number]): Mat4x4f {
 export async function loadGLBAssets(
   assets: Array<{ name: string; url: string; textureUrl?: string }>,
   onProgress?: (loaded: number, total: number) => void,
+  opts?: GltfLoadOptions,
 ): Promise<Map<string, LoadedGLTF>> {
   const result = new Map<string, LoadedGLTF>()
   let loaded = 0
   for (const a of assets) {
-    result.set(a.name, await loadGLB(a.url, a.textureUrl))
+    result.set(a.name, await loadGLB(a.url, a.textureUrl, undefined, opts))
     loaded++
     onProgress?.(loaded, assets.length)
   }

@@ -3381,8 +3381,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/dom@workspace:packages/dom"
   dependencies:
+    "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/reactive-vue": "workspace:*"
+    "@rasenjs/webgl": "workspace:*"
     "@vue/reactivity": "npm:^3.5.25"
   languageName: unknown
   linkType: soft
@@ -3577,6 +3579,14 @@ __metadata:
       optional: true
   bin:
     rasen-lvgl: ./bin/rasen-lvgl.cjs
+  languageName: unknown
+  linkType: soft
+
+"@rasenjs/lynx@workspace:packages/lynx":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/lynx@workspace:packages/lynx"
+  dependencies:
+    "@rasenjs/core": "workspace:^"
   languageName: unknown
   linkType: soft
 

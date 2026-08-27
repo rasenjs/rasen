@@ -13,7 +13,12 @@
  */
 
 import { getReactiveRuntime } from '@rasenjs/core'
-import { RenderContext, hasRenderContext, type Bounds } from './render-context'
+import {
+  RenderContext,
+  hasRenderContext,
+  type Bounds,
+  type RenderContextOptions
+} from './render-context'
 import type { CanvasEventHandlers } from './events'
 
 /**
@@ -74,47 +79,43 @@ export interface CanvasNodeOptions {
   deps?: () => unknown[]
 }
 
-function ensureRenderContext(ctx: Context2D): RenderContext {
+function ensureRenderContext(ctx: Context2D, options?: RenderContextOptions): RenderContext {
   if (!hasRenderContext(ctx)) {
-    return new RenderContext(ctx)
+    return new RenderContext(ctx, options)
   }
   return RenderContext.for(ctx)
 }
 
 /**
- * 创建场景节点并挂到 parent 下。
- *
- * @param parent 接收到的挂载宿主——group 节点（有 children 数组）时成为
- *               其子节点；顶层裸宿主（桥接/mock 的 {ctx}）时注册为渲染根。
+ * 共享的节点构造：挂到 parent 下（parent 为 null 时注册为渲染根）。
  */
-export function createNode(
-  parent: CanvasNode | { ctx: Context2D },
-  opts: CanvasNodeOptions
+function attachNode(
+  rc: RenderContext,
+  ctx: Context2D,
+  parent: CanvasNode | null,
+  opts?: CanvasNodeOptions
 ): CanvasNode {
-  const ctx = parent.ctx
-  const rc = ensureRenderContext(ctx)
-
-  const treeNode = parent as CanvasNode
-  const attachedToTree = Array.isArray(treeNode.children)
-
   const children: CanvasNode[] = []
+  // 根节点自身无绘制逻辑 —— 纯容器，直接递归子树
+  const drawSelf = opts?.draw ?? (() => {})
+
   const node: CanvasNode = {
     ctx,
-    parent: attachedToTree ? treeNode : null,
+    parent,
     children,
     // Adapt the ctx-taking provider to the public zero-arg shape.
-    bounds: opts.bounds ? () => opts.bounds!(ctx) : undefined,
-    hit: opts.hit ?? undefined,
-    on: opts.on ?? undefined,
+    bounds: opts?.bounds ? () => opts.bounds!(ctx) : undefined,
+    hit: opts?.hit ?? undefined,
+    on: opts?.on ?? undefined,
     draw(ctx2: Context2D) {
-      opts.draw(ctx2)
+      drawSelf(ctx2)
       for (const c of children) c.draw(ctx2)
     },
     remove() {
       stop?.()
-      if (attachedToTree) {
-        const i = treeNode.children.indexOf(node)
-        if (i >= 0) treeNode.children.splice(i, 1)
+      if (parent) {
+        const i = parent.children.indexOf(node)
+        if (i >= 0) parent.children.splice(i, 1)
       } else {
         rc.removeRoot(node)
       }
@@ -122,24 +123,60 @@ export function createNode(
     }
   }
 
-  // Handlers on any node lazily attach the context's delegated listeners.
-  if (opts.on) {
-    rc.ensureEventListeners()
+  // Handlers on any node signal the host adapter to bind listeners.
+  // The renderer itself never touches addEventListener — the host
+  // (dom canvas / tests) decides how to feed dispatchPointer.
+  if (opts?.on) {
+    rc.markNeedsPointerBinding()
   }
 
-  if (attachedToTree) {
-    treeNode.children.push(node)
+  if (parent) {
+    parent.children.push(node)
+    // 结构变化即标脏：向已有子树追加节点必须触发重绘
+    // （根路径的 addRoot 内部已 markDirty）
+    rc.markDirty()
   } else {
     rc.addRoot(node)
   }
 
   // 依赖 → 标脏（v1 全画布重绘；per-node 脏区后续优化）
   let stop: (() => void) | undefined
-  if (opts.deps) {
+  if (opts?.deps) {
     stop = getReactiveRuntime().subscribe(opts.deps, () => rc.markDirty())
   }
 
   return node
+}
+
+/**
+ * 创建渲染根 —— 官方的「从裸 ctx 得到根节点」入口。
+ *
+ * dom <canvas> 桥与测试都经此把一个原始绘制上下文物化成真实的
+ * 场景树根；组件一律通过 createNode 挂在这棵树下。
+ *
+ * 返回的根节点额外携带 `requestRedraw()`：宿主改了绘图缓冲尺寸等
+ * 环境状态后显式请求重绘（替代旧的 'rasen:resize' 事件契约）。
+ */
+export function createRoot(
+  ctx: Context2D,
+  options?: RenderContextOptions
+): CanvasNode & { requestRedraw(): void } {
+  const rc = ensureRenderContext(ctx, options)
+  const root = attachNode(rc, ctx, null)
+  return Object.assign(root, {
+    requestRedraw: () => rc.requestRedraw()
+  })
+}
+
+/**
+ * 创建场景节点并挂到 parent 下（纯树操作）。
+ *
+ * @param parent 接收到的挂载宿主——group 节点则成为其子节点；
+ *               顶层组件的宿主是 createRoot 物化的渲染根。
+ */
+export function createNode(parent: CanvasNode, opts: CanvasNodeOptions): CanvasNode {
+  const rc = ensureRenderContext(parent.ctx)
+  return attachNode(rc, parent.ctx, parent, opts)
 }
 
 /**

@@ -1,5 +1,5 @@
 import { createNode, type Component2D, type CanvasNode, type Context2D } from '../node'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import {
   unref,
   type CommonDrawProps,
@@ -23,15 +23,12 @@ export interface ImageCrop {
  * image 组件属性
  */
 export interface ImageProps extends CommonDrawProps, TransformProps {
-  image:
-    | CanvasImageSource
-    | Ref<CanvasImageSource>
-    | ReadonlyRef<CanvasImageSource>
-  x: number | Ref<number> | ReadonlyRef<number>
-  y: number | Ref<number> | ReadonlyRef<number>
-  width?: number | Ref<number> | ReadonlyRef<number>
-  height?: number | Ref<number> | ReadonlyRef<number>
-  crop?: ImageCrop | Ref<ImageCrop> | ReadonlyRef<ImageCrop> // 裁剪区域
+  image: PropValue<CanvasImageSource>
+  x: PropValue<number>
+  y: PropValue<number>
+  width?: PropValue<number>
+  height?: PropValue<number>
+  crop?: PropValue<ImageCrop> // 裁剪区域
 }
 
 /**
@@ -43,16 +40,16 @@ export const image: Component2D<ImageProps> = (
   return (node: CanvasNode) => {
     const n = createNode(node, {
     bounds: () => {
-      const img = unref(props.image) as CanvasImageSource
+      const img = unref(props.image) as CanvasImageSource | undefined
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const crop = props.crop ? (unref(props.crop) as ImageCrop) : undefined
 
       let imgWidth = 0
       let imgHeight = 0
-      if ('width' in img && 'height' in img) {
-        imgWidth = img.width as number
-        imgHeight = img.height as number
+      if (img && typeof img === 'object' && 'width' in img && 'height' in img) {
+        imgWidth = (img as { width: number }).width
+        imgHeight = (img as { height: number }).height
       }
 
       const width = props.width
@@ -70,16 +67,20 @@ export const image: Component2D<ImageProps> = (
     },
 
     draw: (ctx: Context2D) => {
-      const img = unref(props.image) as CanvasImageSource
+      const img = unref(props.image) as CanvasImageSource | undefined
       const x = unref(props.x) as number
       const y = unref(props.y) as number
       const crop = props.crop ? (unref(props.crop) as ImageCrop) : undefined
 
+      // Source not ready yet (async load / pool slot not initialized) —
+      // skip this frame instead of crashing on `'width' in undefined`.
+      if (!img || typeof img !== 'object') return
+
       let imgWidth = 0
       let imgHeight = 0
       if ('width' in img && 'height' in img) {
-        imgWidth = img.width as number
-        imgHeight = img.height as number
+        imgWidth = (img as { width: number }).width
+        imgHeight = (img as { height: number }).height
       }
 
       const width = props.width

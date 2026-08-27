@@ -23,6 +23,15 @@ export const gGlobal = globalThis as unknown as {
 // RN 运行时 __DEV__ 是打包器注入的全局;Node 测试环境补上(RN Modal.js 等用)。
 ;(globalThis as { __DEV__?: boolean }).__DEV__ = true
 
+// jsdom 的 rAF 在下一帧触发,导致 scheduleFlush 的提交时序不稳定
+// (setTimeout(0) 等不到)。让 rAF 走微任务,flush 在微任务队列中同步完成。
+;(globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = (
+  cb: FrameRequestCallback
+) => {
+  queueMicrotask(() => cb(0))
+  return 0
+}
+
 /** Fabric mock 节点结构(替代 as any)。 */
 export interface MockFabricNode {
   reactTag: number
@@ -213,7 +222,7 @@ const vc = (name: string, attrs: Record<string, unknown>, extra: Record<string, 
 
 vc('RCTView', { style: true, onTouchEnd: true })
 vc('RCTText', { style: true, onTouchEnd: true })
-vc('RCTImageView', { style: true, src: true, resizeMode: true })
+vc('RCTImageView', { style: true, src: true, source: true, resizeMode: true })
 vc('RCTScrollView', { style: true })
 vc('RCTSwitch', { style: true })
 vc('RCTSafeAreaView', { style: true })

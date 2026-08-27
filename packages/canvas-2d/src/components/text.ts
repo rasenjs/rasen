@@ -1,5 +1,5 @@
 import type { Component2D } from '../node'
-import type { ReadonlyRef, Ref } from '@rasenjs/core'
+import type { PropValue } from '../types'
 import { unref, pointerHandlersFrom, type CommonDrawProps } from '../utils'
 import { createNode, type CanvasNode, type Context2D } from '../node'
 
@@ -7,21 +7,15 @@ import { createNode, type CanvasNode, type Context2D } from '../node'
  * text 组件属性
  */
 export interface TextProps extends Partial<CommonDrawProps> {
-  text: string | Ref<string> | ReadonlyRef<string>
-  x: number | Ref<number> | ReadonlyRef<number>
-  y: number | Ref<number> | ReadonlyRef<number>
-  fill?: string | Ref<string> | ReadonlyRef<string>
-  font?: string | Ref<string> | ReadonlyRef<string>
-  textAlign?:
-    | CanvasTextAlign
-    | Ref<CanvasTextAlign>
-    | ReadonlyRef<CanvasTextAlign>
-  textBaseline?:
-    | CanvasTextBaseline
-    | Ref<CanvasTextBaseline>
-    | ReadonlyRef<CanvasTextBaseline>
-  letterSpacing?: number | Ref<number> | ReadonlyRef<number>
-  textDecoration?: 'underline' | Ref<'underline'> | ReadonlyRef<'underline'>
+  text: PropValue<string>
+  x: PropValue<number>
+  y: PropValue<number>
+  fill?: PropValue<string>
+  font?: PropValue<string>
+  textAlign?: PropValue<CanvasTextAlign>
+  textBaseline?: PropValue<CanvasTextBaseline>
+  letterSpacing?: PropValue<number>
+  textDecoration?: PropValue<'underline'>
 }
 
 /**

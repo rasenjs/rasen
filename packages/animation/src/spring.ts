@@ -1,4 +1,4 @@
-import { ref, unref, setValue, type Ref } from '@rasenjs/core'
+import { getReactiveRuntime, type Ref } from '@rasenjs/core'
 import type { SpringRef, SpringOptions } from './types'
 
 const DEFAULT_STIFFNESS = 100
@@ -7,7 +7,8 @@ const DEFAULT_MASS = 1
 const SETTLE_THRESHOLD = 0.001
 
 function createSpringRef(initial: number, options?: SpringOptions): SpringRef {
-  const valueRef: Ref<number> = ref(initial)
+  const runtime = getReactiveRuntime()
+  const valueRef: Ref<number> = runtime.ref<number>(initial)
   
   let velocity = options?.velocity ?? 0
   let isAnimating = false
@@ -20,20 +21,20 @@ function createSpringRef(initial: number, options?: SpringOptions): SpringRef {
   let resolve: (() => void) | null = null
 
   const tick = () => {
-    const displacement = unref(valueRef) - target
+    const displacement = runtime.unref(valueRef) - target
     const springForce = -stiffness * displacement
     const dampingForce = -damping * velocity
     const acceleration = (springForce + dampingForce) / mass
     
     velocity += acceleration * 0.016
-    setValue(valueRef, unref(valueRef) + velocity * 0.016)
+    runtime.setValue(valueRef, runtime.unref(valueRef) + velocity * 0.016)
     
     const settled = 
       Math.abs(velocity) < SETTLE_THRESHOLD && 
       Math.abs(displacement) < SETTLE_THRESHOLD
     
     if (settled) {
-      setValue(valueRef, target)
+      runtime.setValue(valueRef, target)
       velocity = 0
       isAnimating = false
       isSettled = true
@@ -75,7 +76,7 @@ function createSpringRef(initial: number, options?: SpringOptions): SpringRef {
 
   const set = (value: number) => {
     stop()
-    setValue(valueRef, value)
+    runtime.setValue(valueRef, value)
     velocity = 0
     target = value
     isSettled = true
@@ -83,14 +84,14 @@ function createSpringRef(initial: number, options?: SpringOptions): SpringRef {
 
   const setWithVelocity = (value: number, v: number) => {
     stop()
-    setValue(valueRef, value)
+    runtime.setValue(valueRef, value)
     velocity = v
     target = value
     isSettled = Math.abs(v) < SETTLE_THRESHOLD
   }
 
   return {
-    get value() { return unref(valueRef) },
+    get value() { return runtime.unref(valueRef) },
     get velocity() { return velocity },
     get isAnimating() { return isAnimating },
     get isSettled() { return isSettled },

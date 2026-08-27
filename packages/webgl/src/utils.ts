@@ -2,15 +2,31 @@
  * Utility functions
  */
 
-import type { Ref, ReadonlyRef, MaybeRef, Color } from './types'
+import type { Ref, MaybeRef, Color } from './types'
 import type { GlContext } from './node'
-import { unref as coreUnref } from '@rasenjs/core'
+import { getReactiveRuntime } from '@rasenjs/core'
 
 /**
- * Unwrap a potentially reactive value
+ * Unwrap a potentially reactive value.
+ *
+ * Deep unwrap: the JSX compiler emits attribute getters (`() => expr`) and
+ * `expr` may ITSELF be a ref/computed (e.g. `position={player.eye}`), so a
+ * single toValue pass is not enough — keep unwrapping refs and getters
+ * until a plain value settles.
  */
 export function unref<T>(value: MaybeRef<T>): T {
-  return coreUnref(value as T | Ref<T> | ReadonlyRef<T>) as T
+  let v: unknown = value
+  const rt = getReactiveRuntime()
+  for (let depth = 0; depth < 5; depth++) {
+    if (v !== null && typeof v === 'object' && rt.isRef(v)) {
+      v = rt.unref(v as Ref<unknown>)
+    } else if (typeof v === 'function') {
+      v = (v as () => unknown)()
+    } else {
+      break
+    }
+  }
+  return v as T
 }
 
 // Color cache for frequently used colors
@@ -166,8 +182,23 @@ export function createOrthoMatrix(
 // a page reload (new context) reusing a cached texture fails to bind.
 const textureCache = new WeakMap<
   GlContext,
-  Map<TexImageSource, Map<string, WebGLTexture>>
+  Map<BitmapSource, Map<string, WebGLTexture>>
 >()
+
+/**
+ * 位图纹理源 —— 本包自有的最小造型（不复用 DOM 的 TexImageSource）。
+ *
+ * 只定义与纹理上传真正相关的成员：texImage2D 接受的位图源
+ * （HTMLImageElement / HTMLCanvasElement / ImageBitmap / OffscreenCanvas …）
+ * 天然满足该结构，DOM 宿主无需适配即可传入；非 DOM 宿主提供等价物。
+ * 刻意不声明 width/height 等无关成员——造型只定义自己用到的部分，
+ * 避免把 DOM 类型面拖进本包。
+ *
+ * 实现：texImage2D 的位图源都是平台对象，精确形状因宿主而异；类型层
+ * 只要求「是对象」，上传时经 `as TexImageSource` 交给 GL 校验。该 cast
+ * 是本包与 DOM lib.dom 类型面的唯一接触点，且被隔离在此处。
+ */
+export type BitmapSource = object
 
 /**
  * Texture sampling options (overrides the pixelated sprite defaults).
@@ -184,16 +215,15 @@ export interface TextureOptions {
 }
 
 /**
- * Upload a TexImageSource (HTMLImageElement / HTMLCanvasElement / …) as a
- * WebGLTexture (cached per gl context, pixelated filtering for crisp sprite
- * look, clamp-to-edge wrapping).
+ * Upload a bitmap source as a WebGLTexture (cached per gl context, pixelated
+ * filtering for crisp sprite look, clamp-to-edge wrapping).
  *
  * Pass options for a smooth/repeat texture (e.g. skybox panoramas should use
  * LINEAR filtering + REPEAT wrapping so the equirectangular seam is seamless).
  */
 export function createTexture(
   gl: GlContext,
-  source: TexImageSource,
+  source: BitmapSource,
   options?: TextureOptions
 ): WebGLTexture {
   let perContext = textureCache.get(gl)
@@ -219,7 +249,9 @@ export function createTexture(
 
   gl.bindTexture(gl.TEXTURE_2D, texture)
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source)
+  // The single DOM-lib touchpoint: BitmapSource is structurally a
+  // texImage2D-acceptable bitmap; the GL call validates at runtime.
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, options?.wrapS ?? gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, options?.wrapT ?? gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, options?.minFilter ?? gl.NEAREST)

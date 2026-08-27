@@ -7,19 +7,19 @@
  * - PixiJS: 样式转换
  */
 
-import type { Ref, ReadonlyRef } from '@rasenjs/core'
+import type { PropValue } from '@rasenjs/core'
 
-// Ref/ReadonlyRef 统一使用 core 的品牌化定义（消除双类型系统）
-export type { Ref, ReadonlyRef } from '@rasenjs/core'
+// 响应式属性值统一使用 core 的 PropValue（T | Ref<T> | Getter<T>）
+export type { PropValue, Ref } from '@rasenjs/core'
 
 // ============================================================================
 // 基础类型
 // ============================================================================
 
 /**
- * 支持响应式的属性值类型
+ * 支持响应式的属性值类型（core PropValue 的别名）
  */
-export type MaybeRef<T> = T | Ref<T> | ReadonlyRef<T>
+export type MaybeRef<T> = PropValue<T>
 
 /**
  * 点坐标

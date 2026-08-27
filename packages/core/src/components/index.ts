@@ -4,12 +4,8 @@
 
 export {
   each,
-  eachImpl,
   repeat,
-  repeatImpl,
-  type EachProps,
-  type EachImplConfig,
-  type RepeatImplConfig
+  type EachProps
 } from './each'
 export { when, type WhenConfig } from './when'
 export { match, switchCase, type MatchConfig } from './match'

@@ -11,9 +11,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createCanvas } from '@napi-rs/canvas'
 import { ref } from '@vue/reactivity'
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { rect, RenderContext } from '../../index'
+import { rect, RenderContext, createRoot } from '../../index'
+import type { CanvasNode } from '../../node'
 import {
   isRegionEmpty,
   hasContent,
@@ -30,15 +29,15 @@ describe('动画和脏区域检测', () => {
   let canvas: any
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let ctx: any
+  let root: CanvasNode
   let renderContext: RenderContext
 
   beforeEach(() => {
     canvas = createCanvas(400, 300)
     ctx = canvas.getContext('2d')
-    // 边界包装：ctx 自引用为宿主节点（CanvasNode）
-    ;(ctx as unknown as { ctx: unknown }).ctx = ctx
-    // 创建 RenderContext 并关联到 ctx
-    renderContext = new RenderContext(ctx)
+    // 官方入口：从裸 ctx 物化渲染根（内部创建 RenderContext）
+    root = createRoot(ctx)
+    renderContext = RenderContext.for(ctx)
   })
 
   it('基础矩形移动 - 旧位置应被清除', async () => {
@@ -46,7 +45,7 @@ describe('动画和脏区域检测', () => {
     const y = ref(50)
 
     // 绘制初始矩形
-    rect({ x, y, width: 50, height: 50, fill: '#ff0000' })(ctx)
+    rect({ x, y, width: 50, height: 50, fill: '#ff0000' })(root, undefined)
     await waitForUpdate(renderContext)
 
     // 验证初始位置有内容
@@ -77,7 +76,7 @@ describe('动画和脏区域检测', () => {
       shadowBlur: 10,
       shadowOffsetX: 10,
       shadowOffsetY: 10
-    })(ctx)
+    })(root, undefined)
     await waitForUpdate(renderContext)
 
     // 验证初始位置和阴影区域都有内容
@@ -109,7 +108,7 @@ describe('动画和脏区域检测', () => {
       height: 40,
       fill: '#00ff00',
       rotation: (45 * Math.PI) / 180
-    })(ctx)
+    })(root, undefined)
     await waitForUpdate(renderContext)
 
     // 验证旋转后的区域有内容（45度旋转的正方形会占据更大的边界框）
@@ -140,7 +139,7 @@ describe('动画和脏区域检测', () => {
       fill: '#0000ff',
       scaleX,
       scaleY
-    })(ctx)
+    })(root, undefined)
     await waitForUpdate(renderContext)
 
     // 验证初始大小有内容
@@ -162,7 +161,7 @@ describe('动画和脏区域检测', () => {
   it('连续快速移动 - 所有中间位置都应被清除', async () => {
     const x = ref(50)
 
-    rect({ x, y: 50, width: 30, height: 30, fill: '#ff00ff' })(ctx)
+    rect({ x, y: 50, width: 30, height: 30, fill: '#ff00ff' })(root, undefined)
     await waitForUpdate(renderContext)
 
     // 快速连续移动
@@ -184,10 +183,10 @@ describe('动画和脏区域检测', () => {
     const x = ref(50)
 
     // 静态矩形（蓝色）
-    rect({ x: 150, y: 50, width: 50, height: 50, fill: '#0000ff' })(ctx)
+    rect({ x: 150, y: 50, width: 50, height: 50, fill: '#0000ff' })(root, undefined)
 
     // 移动矩形（红色）
-    rect({ x, y: 50, width: 50, height: 50, fill: '#ff0000' })(ctx)
+    rect({ x, y: 50, width: 50, height: 50, fill: '#ff0000' })(root, undefined)
     await waitForUpdate(renderContext)
 
     // 验证两个矩形都存在
@@ -211,7 +210,7 @@ describe('动画和脏区域检测', () => {
   it('颜色变化 - 不应产生拖影', async () => {
     const fill = ref('#ff0000')
 
-    rect({ x: 100, y: 100, width: 50, height: 50, fill })(ctx)
+    rect({ x: 100, y: 100, width: 50, height: 50, fill })(root, undefined)
     await waitForUpdate(renderContext)
 
     // 获取初始颜色的像素数�?

@@ -1,5 +1,5 @@
 import type { Component2D } from '../node'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import {
   unref,
   type CommonDrawProps,
@@ -16,14 +16,14 @@ import { createNode, type CanvasNode, type Context2D } from '../node'
  */
 export interface WedgeProps
   extends CommonDrawProps, LineStyleProps, TransformProps {
-  x: number | Ref<number> | ReadonlyRef<number>
-  y: number | Ref<number> | ReadonlyRef<number>
-  radius: number | Ref<number> | ReadonlyRef<number>
-  angle: number | Ref<number> | ReadonlyRef<number> // 角度（度数）
-  rotation?: number | Ref<number> | ReadonlyRef<number> // 旋转角度（弧度）
-  fill?: string | Ref<string> | ReadonlyRef<string>
-  stroke?: string | Ref<string> | ReadonlyRef<string>
-  lineWidth?: number | Ref<number> | ReadonlyRef<number>
+  x: PropValue<number>
+  y: PropValue<number>
+  radius: PropValue<number>
+  angle: PropValue<number> // 角度（度数）
+  rotation?: PropValue<number> // 旋转角度（弧度）
+  fill?: PropValue<string>
+  stroke?: PropValue<string>
+  lineWidth?: PropValue<number>
 }
 
 /**

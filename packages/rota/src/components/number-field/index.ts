@@ -67,7 +67,6 @@ export function createNumberFieldRoot(): (
       const max = props?.max ?? 100
       const step = props?.step ?? 1
       const disabled = props?.disabled ?? false
-      const required = props?.required ?? false
 
       // Set up initial value
       const isControlled = props?.value !== undefined
@@ -114,7 +113,7 @@ export function createNumberFieldRoot(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children(getContext)(root)
+        childUnmount = props.children(getContext)(root, undefined)
       }
 
       host.appendChild(root)
@@ -133,12 +132,12 @@ export function createNumberFieldRoot(): (
 export function createNumberFieldInput(): (
   props?: NumberFieldInputProps,
   getContext?: () => NumberFieldContext | undefined
-) => Mountable<HTMLInputElement> {
+) => Mountable<HTMLElement> {
   return (
     props?: NumberFieldInputProps,
     getContext?: () => NumberFieldContext | undefined
   ) => {
-    return (host: HTMLInputElement) => {
+    return (host: HTMLElement) => {
       const input = document.createElement('input')
       input.type = 'text' // Use text to support formatting
       input.inputMode = 'decimal' // Better mobile keyboard for decimals
@@ -213,12 +212,12 @@ export function createNumberFieldInput(): (
 export function createNumberFieldIncrement(): (
   props?: NumberFieldIncrementProps,
   getContext?: () => NumberFieldContext | undefined
-) => Mountable<HTMLButtonElement> {
+) => Mountable<HTMLElement> {
   return (
     props?: NumberFieldIncrementProps,
     getContext?: () => NumberFieldContext | undefined
   ) => {
-    return (host: HTMLButtonElement) => {
+    return (host: HTMLElement) => {
       const button = document.createElement('button')
       button.type = 'button'
 
@@ -277,12 +276,12 @@ export function createNumberFieldIncrement(): (
 export function createNumberFieldDecrement(): (
   props?: NumberFieldDecrementProps,
   getContext?: () => NumberFieldContext | undefined
-) => Mountable<HTMLButtonElement> {
+) => Mountable<HTMLElement> {
   return (
     props?: NumberFieldDecrementProps,
     getContext?: () => NumberFieldContext | undefined
   ) => {
-    return (host: HTMLButtonElement) => {
+    return (host: HTMLElement) => {
       const button = document.createElement('button')
       button.type = 'button'
 
@@ -395,7 +394,7 @@ export function createNumberField(): (
               style: props?.inputStyle
             },
             getContext
-          )(inputHost)
+          )(inputHost, undefined)
 
           // Create decrement button
           const decrementHost = document.createElement('div')
@@ -406,7 +405,7 @@ export function createNumberField(): (
               children: props?.decrementChildren
             },
             getContext
-          )(decrementHost)
+          )(decrementHost, undefined)
 
           // Create increment button
           const incrementHost = document.createElement('div')
@@ -417,7 +416,7 @@ export function createNumberField(): (
               children: props?.incrementChildren
             },
             getContext
-          )(incrementHost)
+          )(incrementHost, undefined)
 
           // Append all elements in the right order
           wrapper.appendChild(inputHost)
@@ -427,13 +426,13 @@ export function createNumberField(): (
           host.appendChild(wrapper)
 
           return () => {
-            inputUnmount()
-            incrementUnmount()
-            decrementUnmount()
+            inputUnmount?.()
+            incrementUnmount?.()
+            decrementUnmount?.()
             wrapper.remove()
           }
         }
-      })(host)
+      })(host, undefined)
     }
   }
 }

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setReactiveRuntime, getReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '../reactive'
+import { setReactiveRuntime, getReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
 import { fragment, type FragmentHostHooks } from './fragment'
 
 // ============================================
@@ -27,19 +27,12 @@ function createMockReactiveRuntime(): ReactiveRuntime {
       return () => {}
     },
 
-    computed: <T>(getter: () => T) =>
-      ({
-        get value() {
-          return getter()
-        }
-      } as unknown as ReadonlyRef<T>),
-
     effectScope: () => ({
       run: <T>(fn: () => T) => fn(),
       stop: () => {}
     }),
 
-    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
+    unref: <T>(value: T | Ref<T>) => {
       if (value && typeof value === 'object' && 'value' in value) {
         return (value as unknown as { value: T }).value
       }

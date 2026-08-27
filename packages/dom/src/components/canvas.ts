@@ -1,153 +1,69 @@
-import type { PropValue, Mountable, HostHooks } from '@rasenjs/core'
+import type { PropValue, Mountable } from '@rasenjs/core'
 import { getReactiveRuntime, toValue } from '@rasenjs/core'
-
-interface GPUAdapter {
-  requestDevice: () => Promise<unknown>
-}
-
-interface NavigatorWithGPU extends Navigator {
-  gpu?: {
-    requestAdapter: () => Promise<GPUAdapter | null>
-  }
-}
+import type {
+  CanvasNode,
+  RenderContextOptions as Canvas2DRenderOptions
+} from '@rasenjs/canvas-2d'
+import type { GlNode, GlContext } from '@rasenjs/webgl'
+import { createRoot as createCanvas2DRoot } from '@rasenjs/canvas-2d'
+import { createRoot as createGlRoot } from '@rasenjs/webgl'
 
 /**
- * 获取 Canvas 渲染上下文的函数类型
+ * contextType → 渲染器节点与配置的类型映射。
+ *
+ * 仅类型层引用（运行时直接调用各渲染器包导出的 createRoot），
+ * 用户写 `contextType: 'webgl'` 即自动获得 `Mountable<GlNode>` 的
+ * children 约束与强类型的 renderOptions —— 无字符串口袋、无 cast。
  */
-export type ContextGetter<Ctx> = (canvas: HTMLCanvasElement) => Ctx | null
-
-/**
- * Canvas context options — standard WebGL attributes plus Rasen renderer
- * options (`clearColor`) which the RenderContext reads from the canvas.
- */
-export type CanvasContextOptions = WebGLContextAttributes & {
-  clearColor?: string
+interface HostTypes {
+  '2d': { node: CanvasNode; rc: Canvas2DRenderOptions }
+  webgl: { node: GlNode; rc: import('@rasenjs/webgl').RenderContextOptions }
+  webgl2: { node: GlNode; rc: import('@rasenjs/webgl').RenderContextOptions }
 }
 
-/**
- * 预定义的上下文获取器
- */
-export const contextGetters = {
-  '2d': (canvas: HTMLCanvasElement) => canvas.getContext('2d'),
-  webgl: (canvas: HTMLCanvasElement) => canvas.getContext('webgl'),
-  webgl2: (canvas: HTMLCanvasElement) => canvas.getContext('webgl2'),
-  webgpu: async (canvas: HTMLCanvasElement) => {
-    const nav = navigator as NavigatorWithGPU
-    if (!nav.gpu) return null
-    const adapter = await nav.gpu.requestAdapter()
-    if (!adapter) return null
-    await adapter.requestDevice()
-    return canvas.getContext('webgpu')
-  }
-} as const
+export interface CanvasProps<T extends keyof HostTypes = '2d'> {
+  width: PropValue<number>
+  height: PropValue<number>
+  /** 渲染上下文类型；缺省 '2d'。决定 children 与 renderOptions 的类型 */
+  contextType?: T
+  /** WebGL 上下文属性（preserveDrawingBuffer 等）；'2d' 不接受 */
+  contextOptions?: T extends '2d' ? never : WebGLContextAttributes
+  /** 渲染器配置（clearColor/continuousRender 等），强类型，直通 createRoot */
+  renderOptions?: HostTypes[T]['rc']
+  dpr?: number
+  className?: PropValue<string>
+  style?: PropValue<Record<string, string | number>>
+  children: Array<Mountable<HostTypes[T]['node']>>
+}
 
 /**
  * canvas - Canvas 元素组件
  *
- * 在 DOM 中创建 canvas 元素，并将子组件桥接到指定的渲染上下文
- * 支持 2D、WebGL、WebGL2、WebGPU 等多种上下文
+ * 创建 `<canvas>` 元素并桥接到指定渲染上下文。子组件挂载在渲染器包
+ * `createRoot` 物化的真实渲染根下 —— node 就是 node，没有中间造型。
  *
  * @example
  * ```typescript
- * import { div, canvas, contextGetters } from '~/app/utils/rasen'
- * import { rect, text } from '~/app/utils/rasen'
+ * import { canvas } from '@rasenjs/dom'
+ * import { rect } from '@rasenjs/canvas-2d'
+ * import { mesh } from '@rasenjs/webgl'
  *
- * const MyComponent = () => {
- *   return div({
- *     children: [
- *       // Canvas 2D
- *       canvas({
- *         width: 400,
- *         height: 400,
- *         contextType: '2d',
- *         children: [
- *           rect({ x: 0, y: 0, width: 100, height: 100, fill: 'red' }),
- *           text({ text: 'Hello Canvas', x: 50, y: 50 })
- *         ]
- *       }),
+ * // 2D（缺省）
+ * canvas({ width: 400, height: 400, children: [rect({ ... })] })
  *
- *       // WebGL
- *       canvas({
- *         width: 400,
- *         height: 400,
- *         contextType: 'webgl',
- *         children: [
- *           webglComponent({ ... })
- *         ]
- *       }),
- *
- *       // 自定义上下文获取器
- *       canvas({
- *         width: 400,
- *         height: 400,
- *         getContext: (canvas) => canvas.getContext('bitmaprenderer'),
- *         children: [...]
- *       })
- *     ]
- *   })
- * }
+ * // WebGL —— children 自动收窄为 Mountable<GlNode>[]
+ * canvas({
+ *   width: 800,
+ *   height: 600,
+ *   contextType: 'webgl',
+ *   renderOptions: { clearColor: '#87CEEB', continuousRender: true },
+ *   children: [mesh({ ... })]
+ * })
  * ```
  */
-// 函数重载：根据 contextType 推断 Ctx 类型
-export function canvas(props: {
-  width: PropValue<number>
-  height: PropValue<number>
-  contextType?: '2d'
-  dpr?: number
-  className?: PropValue<string>
-  style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<{ ctx: CanvasRenderingContext2D }>>
-}): Mountable<HTMLElement>
-
-export function canvas(props: {
-  width: PropValue<number>
-  height: PropValue<number>
-  contextType: 'webgl'
-  contextOptions?: CanvasContextOptions
-  /** 渲染上下文配置（clearColor/continuousRender 等），经 node 注入 RenderContext */
-  renderOptions?: Record<string, unknown>
-  dpr?: number
-  className?: PropValue<string>
-  style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<{ ctx: WebGLRenderingContext }>>
-}): Mountable<HTMLElement>
-
-export function canvas(props: {
-  width: PropValue<number>
-  height: PropValue<number>
-  contextType: 'webgl2'
-  contextOptions?: CanvasContextOptions
-  /** 渲染上下文配置（clearColor/continuousRender 等），经 node 注入 RenderContext */
-  renderOptions?: Record<string, unknown>
-  dpr?: number
-  className?: PropValue<string>
-  style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<{ ctx: WebGL2RenderingContext }>>
-}): Mountable<HTMLElement>
-
-export function canvas<Ctx>(props: {
-  width: PropValue<number>
-  height: PropValue<number>
-  getContext: ContextGetter<Ctx>
-  dpr?: number
-  className?: PropValue<string>
-  style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<{ ctx: Ctx }>>
-}): Mountable<HTMLElement>
-
-// 实现
-export function canvas<Ctx>(props: {
-  width: PropValue<number>
-  height: PropValue<number>
-  contextType?: '2d' | 'webgl' | 'webgl2' | 'webgpu'
-  contextOptions?: WebGLContextAttributes
-  renderOptions?: Record<string, unknown>
-  getContext?: ContextGetter<Ctx>
-  dpr?: number
-  className?: PropValue<string>
-  style?: PropValue<Record<string, string | number>>
-  children: Array<Mountable<{ ctx: Ctx }>>
-}): Mountable<HTMLElement> {
+export function canvas<T extends keyof HostTypes = '2d'>(
+  props: CanvasProps<T>
+): Mountable<HTMLElement> {
   return (domHost: HTMLElement) => {
     // 创建 canvas 元素
     const canvasEl = document.createElement('canvas')
@@ -187,42 +103,62 @@ export function canvas<Ctx>(props: {
     // 挂载到 DOM
     domHost.appendChild(canvasEl)
 
-    // 获取渲染上下文
-    let ctx: Ctx | null
-    if (props.getContext) {
-      // 使用自定义上下文获取器
-      ctx = props.getContext(canvasEl)
+    // 获取渲染上下文（原生获取内联；不对外暴露 getter）
+    const contextType = props.contextType ?? ('2d' as T)
+    let ctx: unknown
+    if (contextType === '2d') {
+      ctx = canvasEl.getContext('2d')
     } else {
-      // 使用预定义的上下文类型
-      const contextType = props.contextType || '2d'
-      if (props.contextOptions && contextType !== '2d') {
-        // Pass WebGL context attributes through (preserveDrawingBuffer, …).
-        ctx = canvasEl.getContext(
-          contextType,
-          props.contextOptions,
-        ) as Ctx
-      } else {
-        const getter = contextGetters[contextType]
-        ctx = getter(canvasEl) as Ctx
-      }
-    }
-
-    if (!ctx) {
-      throw new Error(
-        `Failed to get canvas context: ${props.contextType || 'custom'}`
+      ctx = canvasEl.getContext(
+        contextType,
+        props.contextOptions as WebGLContextAttributes | undefined
       )
     }
 
+    if (!ctx) {
+      throw new Error(`Failed to get canvas context: ${String(contextType)}`)
+    }
+
     // 对 2D context 应用 DPR 缩放
-    const contextType = props.contextType || '2d'
-    if (contextType === '2d' && !props.getContext) {
-      const ctx2d = ctx as unknown as CanvasRenderingContext2D
-      ctx2d.scale(dpr, dpr)
+    if (contextType === '2d') {
+      ;(ctx as CanvasRenderingContext2D).scale(dpr, dpr)
     }
 
     // React to size changes: keep drawingBuffer + logical size in sync so the
     // visible area grows with the window instead of stretching.
     const runtime = getReactiveRuntime()
+
+    // 具象化真实渲染根：由对应渲染器包的官方入口完成。
+    // 此后子组件挂在这棵真实的场景树下 —— node 就是 node。
+    // 帧调度注入：宿主提供 rAF（渲染器不再触达全局 BOM）。
+    const schedule = (cb: () => void): (() => void) => {
+      const id = requestAnimationFrame(cb)
+      return () => cancelAnimationFrame(id)
+    }
+    const glOptions = {
+      logicalWidth: width,
+      logicalHeight: height,
+      schedule,
+      ...(props.renderOptions ?? {}),
+    }
+    const root =
+      contextType === '2d'
+        ? createCanvas2DRoot(ctx as Parameters<typeof createCanvas2DRoot>[0], { schedule })
+        : createGlRoot(ctx as GlContext, glOptions)
+    // 两个渲染包的 createRoot 都返回带 requestRedraw 的根节点
+    const requestRedraw = root.requestRedraw.bind(root)
+
+    // 指针事件绑定（仅 2D 渲染器有组件级指针事件）：DOM 适配器的职责——
+    // 监听原生事件、换算画布本地坐标，再喂给渲染器的纯 dispatchPointer 入口。
+    // 渲染器自身不认识 addEventListener / PointerEvent。
+    const unbindPointer =
+      contextType === '2d'
+        ? bindCanvasPointerEvents(
+            canvasEl,
+            root as unknown as Parameters<typeof bindCanvasPointerEvents>[1],
+          )
+        : null
+
     const stopSizeWatch = runtime.subscribe(
       () => [toValue(props.width), toValue(props.height), dpr] as const,
       ([w, h]) => {
@@ -230,43 +166,65 @@ export function canvas<Ctx>(props: {
         canvasEl.height = h * dpr
         canvasEl.style.width = `${w}px`
         canvasEl.style.height = `${h}px`
-        if (contextType === '2d' && !props.getContext) {
+        if (contextType === '2d') {
           // canvas.width reset clears the transform — re-apply DPR scale.
-          const ctx2d = ctx as unknown as CanvasRenderingContext2D
-          ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0)
+          ;(ctx as CanvasRenderingContext2D).setTransform(dpr, 0, 0, dpr, 0, 0)
         }
-        // Notify renderers (RenderContext listens) so the viewport + projection
-        // are recomputed even when the aspect ratio is unchanged.
-        canvasEl.dispatchEvent(new Event('rasen:resize'))
+        // Drawing buffer was cleared by the resize — ask the renderer to
+        // repaint (direct call; replaces the old 'rasen:resize' event).
+        requestRedraw()
       },
     )
 
-    // 构造宿主节点：ctx + 渲染配置（替代旧 dataset IPC）。
-    // 逻辑尺寸/尺寸变化源在此注入，渲染器不再自行触达 DOM。
-    const node = {
-      ctx,
-      rcOptions: {
-        logicalWidth: width,
-        logicalHeight: height,
-        resizeSource: canvasEl,
-        ...(props.renderOptions ?? {}),
-      },
-    }
-
-    // 挂载子组件到渲染上下文：canvas 子树无 marker 节点操作需求，
+    // 挂载子组件到渲染根：canvas 子树无 marker 节点操作需求，
     // 显式传空 hooks（全降级）——hooks 即上下文，显式传递。
     const childUnmounts = props.children.map((child) =>
-      (child as Mountable<{ ctx: Ctx }>)(
-        node as { ctx: Ctx },
-        {} as HostHooks<{ ctx: Ctx }>,
-      )
+      (child as Mountable<unknown>)(root, undefined)
     )
 
     // 返回 unmount 函数
     return () => {
       stopSizeWatch()
+      unbindPointer?.()
       childUnmounts.forEach((unmount) => unmount?.())
+      root.remove()
       canvasEl.remove()
+    }
+  }
+}
+
+/**
+ * Bind delegated pointer listeners on the canvas element and feed the
+ * renderer's pure dispatchPointer entry. Lives here (not in the renderer)
+ * because addEventListener / coordinate translation are DOM knowledge.
+ */
+function bindCanvasPointerEvents(
+  canvasEl: HTMLCanvasElement,
+  root: { dispatchPointer(type: string, x: number, y: number): void; needsPointerEvents?: boolean },
+): () => void {
+  const toLocal = (e: PointerEvent & { offsetX?: number; offsetY?: number }): { x: number; y: number } | null => {
+    if (typeof e.offsetX === 'number' && typeof e.offsetY === 'number') {
+      return { x: e.offsetX, y: e.offsetY }
+    }
+    if (typeof e.clientX === 'number' && typeof e.clientY === 'number') {
+      const r = canvasEl.getBoundingClientRect()
+      return { x: e.clientX - r.left, y: e.clientY - r.top }
+    }
+    return null
+  }
+
+  const types = ['click', 'pointerdown', 'pointerup', 'pointermove'] as const
+  const handlers = types.map((type) => {
+    const fn = (native: Event) => {
+      const pt = toLocal(native as PointerEvent)
+      if (pt) root.dispatchPointer(type, pt.x, pt.y)
+    }
+    canvasEl.addEventListener(type, fn)
+    return { type, fn }
+  })
+  return () => {
+    for (const { type, fn } of handlers) {
+      canvasEl.removeEventListener(type, fn)
     }
   }
 }

@@ -106,7 +106,7 @@ export function runReactiveRuntimeTests(
         const b = runtime.ref(2)
         const callback = vi.fn()
 
-        runtime.subscribe(() => runtime.unref(a) + runtime.unref(b), callback)
+        runtime.subscribe(() => runtime.unref<number>(a) + runtime.unref<number>(b), callback)
 
         runtime.setValue(a, 10)
         await tick()

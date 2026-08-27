@@ -10,15 +10,19 @@ import {
   createMockReactiveRuntime,
   waitForAsync
 } from '../test-utils/mock'
+import { createRoot } from '../node'
+import type { CanvasNode, Context2D } from '../node'
 import { sprite } from './sprite'
 
 describe('sprite', () => {
-  let ctx: CanvasRenderingContext2D
+  let ctx: Context2D
+  let root: CanvasNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     ctx = createMockContext()
+    root = createRoot(ctx)
     cleanupFns = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       setTimeout(() => cb(performance.now()), 0)
@@ -49,7 +53,7 @@ describe('sprite', () => {
         columns: 4
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -87,7 +91,7 @@ describe('sprite', () => {
         columns: 4
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -121,7 +125,7 @@ describe('sprite', () => {
         columns: 4
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -151,7 +155,7 @@ describe('sprite', () => {
         height: 256
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -178,7 +182,7 @@ describe('sprite', () => {
         // columns 默认为 1
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -208,7 +212,7 @@ describe('sprite', () => {
         columns: 4
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

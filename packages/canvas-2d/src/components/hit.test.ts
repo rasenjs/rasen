@@ -10,18 +10,22 @@ import {
   createMockReactiveRuntime,
   waitForAsync
 } from '../test-utils'
+import { createRoot } from '../node'
+import type { CanvasNode, Context2D } from '../node'
 import { getRenderContext } from '../render-context'
 import { rect } from './rect'
 import { circle } from './circle'
 import { ellipse } from './ellipse'
 
 describe('RenderContext.hitTest', () => {
-  let ctx: CanvasRenderingContext2D
+  let ctx: Context2D
+  let root: CanvasNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     ctx = createMockContext()
+    root = createRoot(ctx)
     cleanupFns = []
 
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -37,7 +41,7 @@ describe('RenderContext.hitTest', () => {
   })
 
   it('hits the exact geometry of a circle (inside yes, corner no)', async () => {
-    cleanupFns.push(circle({ x: 100, y: 100, radius: 50, fill: '#f00' })(ctx))
+    cleanupFns.push(circle({ x: 100, y: 100, radius: 50, fill: '#f00' })(root, undefined))
     await waitForAsync()
 
     const rc = getRenderContext(ctx)
@@ -48,7 +52,7 @@ describe('RenderContext.hitTest', () => {
   })
 
   it('hits the exact geometry of a rect', async () => {
-    cleanupFns.push(rect({ x: 10, y: 20, width: 100, height: 50, fill: '#0f0' })(ctx))
+    cleanupFns.push(rect({ x: 10, y: 20, width: 100, height: 50, fill: '#0f0' })(root, undefined))
     await waitForAsync()
 
     const rc = getRenderContext(ctx)
@@ -60,8 +64,8 @@ describe('RenderContext.hitTest', () => {
 
   it('returns the visually topmost shape (reverse draw order)', async () => {
     // A covers the whole area; B sits on top of A's corner.
-    cleanupFns.push(rect({ x: 0, y: 0, width: 300, height: 300, fill: '#00f' })(ctx))
-    cleanupFns.push(rect({ x: 250, y: 250, width: 40, height: 40, fill: '#f00' })(ctx))
+    cleanupFns.push(rect({ x: 0, y: 0, width: 300, height: 300, fill: '#00f' })(root, undefined))
+    cleanupFns.push(rect({ x: 250, y: 250, width: 40, height: 40, fill: '#f00' })(root, undefined))
     await waitForAsync()
 
     const rc = getRenderContext(ctx)
@@ -75,7 +79,7 @@ describe('RenderContext.hitTest', () => {
   it('falls back to bounds AABB for shapes without an exact hit closure', async () => {
     // ellipse has no hit closure yet → AABB fallback via its bounds
     cleanupFns.push(
-      ellipse({ x: 100, y: 100, radiusX: 80, radiusY: 40, fill: '#ff0' })(ctx)
+      ellipse({ x: 100, y: 100, radiusX: 80, radiusY: 40, fill: '#ff0' })(root, undefined)
     )
     await waitForAsync()
 

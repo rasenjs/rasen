@@ -94,7 +94,7 @@ export const PerspectiveCamera = com(
 
         rc.setProjectionMatrix(Mat4x4f.perspective(fov, aspect, near, far))
         rc.setViewMatrix(Mat4x4f.lookAt(eye, target, up))
-        rc.manualUpdate()
+        rc.requestRedraw()
       }
       apply()
 
@@ -148,7 +148,7 @@ export const OrthographicCamera = com(
         const top = unref(props.top) ?? 100
         rc.setProjectionMatrix(Mat4x4f.ortho(left, right, bottom, top, near, far))
         rc.setViewMatrix(Mat4x4f.lookAt(eye, target, up))
-        rc.manualUpdate()
+        rc.requestRedraw()
       }
       apply()
 

@@ -6,7 +6,7 @@
  */
 
 import { atom } from 'nanostores'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref, type ReadonlyRef } from '@rasenjs/core'
+import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '@rasenjs/core'
 
 // Symbol for internal listen method
 const LISTEN_SYMBOL = Symbol('rasen.nanostores.listen')
@@ -115,7 +115,7 @@ export function createReactiveRuntime(): ReactiveRuntime {
       return wrapper as unknown as Ref<T>
     },
 
-    unref<T>(value: T | Ref<T> | ReadonlyRef<T>): T {
+    unref<T>(value: T | Ref<T>): T {
       // Vue 语义：只解包 ref，不调用 getter（getter 由 core 的 toValue 处理）
       if (this.isRef(value)) {
         return (value as unknown as { value: T }).value
@@ -127,7 +127,7 @@ export function createReactiveRuntime(): ReactiveRuntime {
       ;(ref as unknown as { value: T }).value = value
     },
 
-    isRef(value: unknown): value is Ref<unknown> | ReadonlyRef<unknown> {
+    isRef(value: unknown): value is Ref<unknown> | Ref<unknown> {
       return (
         value !== null && 
         typeof value === 'object' && 
@@ -149,4 +149,15 @@ export function createReactiveRuntime(): ReactiveRuntime {
  */
 export function useReactiveRuntime(): void {
   setReactiveRuntime(createReactiveRuntime())
+}
+
+/**
+ * 模块增强：让 core 的占位 `Ref<T>` 变成 nanostores 的真实 ref 形状
+ * （带 `.value` 读写 + 内部监听符号），与组件 props 期望的 core `Ref<T>`
+ * 完全一致。
+ */
+declare module '@rasenjs/core' {
+  interface Ref<T> {
+    value: T
+  }
 }

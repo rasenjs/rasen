@@ -4,16 +4,20 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
+import type { GlContext, GlNode } from '../../node'
+import { createRoot } from '../../node'
 import { circle } from './circle'
 import { createMockWebGLContext, createMockReactiveRuntime, waitForAsync } from '../../test-utils'
 
 describe('circle', () => {
-  let gl: WebGLRenderingContext
+  let gl: GlContext
+  let root: GlNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     gl = createMockWebGLContext()
+    root = createRoot(gl)
     cleanupFns = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       setTimeout(() => cb(performance.now()), 0)
@@ -35,14 +39,14 @@ describe('circle', () => {
     })
 
     expect(component).toBeDefined()
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
   })
 
   it('should handle reactive radius', async () => {
     const runtime = createMockReactiveRuntime()
     setReactiveRuntime(runtime)
-    
+
     const radius = runtime.ref(50)
     const component = circle({
       x: 100,
@@ -51,14 +55,14 @@ describe('circle', () => {
       fill: '#00ff00'
     })
 
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
 
     await waitForAsync()
-    radius.value = 100
+    runtime.setValue(radius, 100)
     await waitForAsync()
 
-    expect(radius.value).toBe(100)
+    expect(runtime.unref(radius)).toBe(100)
   })
 
   it('should support segments', () => {
@@ -70,7 +74,7 @@ describe('circle', () => {
       segments: 16
     })
 
-    const cleanup = component(gl)
+    const cleanup = component(root, undefined)
     cleanupFns.push(cleanup)
     expect(cleanup).toBeDefined()
   })

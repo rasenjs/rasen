@@ -176,7 +176,7 @@ export function createTabsRoot(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children(getContext)(root)
+        childUnmount = props.children(getContext)(root, undefined)
       }
 
       host.appendChild(root)
@@ -220,7 +220,7 @@ export function createTabsList(): (
       let childUnmount: (() => void) | undefined
       if (props?.children) {
         const getCtx = getContext ?? (() => undefined)
-        childUnmount = props.children(getCtx)(list)
+        childUnmount = props.children(getCtx)(list, undefined)
       }
 
       host.appendChild(list)
@@ -280,7 +280,7 @@ export function createTabsTrigger(): (
       // Render children
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children()(trigger)
+        childUnmount = props.children()(trigger, undefined)
       }
 
       host.appendChild(trigger)
@@ -352,7 +352,7 @@ export function createTabsContent(): (
       if (props?.children || forceMount) {
         const shouldRender = !ctx || ctx.value === props.value || forceMount
         if (shouldRender && props?.children) {
-          childUnmount = props.children()(content)
+          childUnmount = props.children()(content, undefined)
         }
       }
 
@@ -437,7 +437,7 @@ export function createTabs(): (
                         }
                       },
                       getCtx
-                    )(triggerHost)
+                    )(triggerHost, undefined)
                     if (triggerUnmount) triggerUnmounts.push(triggerUnmount)
                     list.appendChild(triggerHost)
 
@@ -453,7 +453,7 @@ export function createTabs(): (
                         }
                       },
                       getCtx
-                    )(contentHost)
+                    )(contentHost, undefined)
                     if (contentUnmount) contentUnmounts.push(contentUnmount)
                     root.appendChild(contentHost)
                   })
@@ -466,7 +466,7 @@ export function createTabs(): (
               }
             },
             getContext
-          )(listHost)
+          )(listHost, undefined)
           if (listUnmount) unmounts.push(listUnmount)
           root.appendChild(listHost)
 
@@ -474,7 +474,7 @@ export function createTabs(): (
             unmounts.forEach((u) => u())
           }
         }
-      })(host)
+      })(host, undefined)
     }
   }
 }

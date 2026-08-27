@@ -6,6 +6,7 @@ import { SyncComponent } from '@rasenjs/core'
 import type { CanvasNode } from './node'
 
 export type { CanvasNode, Context2D, CanvasSurface } from './node'
+export { createRoot, createNode } from './node'
 
 export {
   rect,

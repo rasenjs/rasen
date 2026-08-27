@@ -63,7 +63,9 @@
   "author": "Rasen Contributors",
   "license": "MIT",
   "dependencies": {
-    "@rasenjs/core": "workspace:^"
+    "@rasenjs/canvas-2d": "workspace:*",
+    "@rasenjs/core": "workspace:^",
+    "@rasenjs/webgl": "workspace:*"
   },
   "devDependencies": {
     "@rasenjs/reactive-vue": "workspace:*",

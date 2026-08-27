@@ -13,7 +13,7 @@
 
 import type { Component3D } from '../../../node'
 import type { MaybeRef, CommonDrawProps, TransformProps } from '../../../types'
-import { unref, parseColor, createTexture } from '../../../utils'
+import { unref, parseColor, createTexture, type BitmapSource } from '../../../utils'
 import { getRenderContext } from '../../../render-context'
 import { element } from '../../element'
 
@@ -27,10 +27,10 @@ export interface BoxProps extends CommonDrawProps, TransformProps {
   /** Base color; per-face brightness is derived from it automatically. */
   fill?: MaybeRef<string>
   /**
-   * Optional texture (TexImageSource, e.g. a cropped sprite tile). When
+   * Optional texture (BitmapSource, e.g. a cropped sprite tile). When
    * set, it is sampled on every face and `fill` acts as a tint (default white).
    */
-  texture?: MaybeRef<TexImageSource>
+  texture?: MaybeRef<BitmapSource>
 }
 
 interface Face {

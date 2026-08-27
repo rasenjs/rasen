@@ -185,7 +185,7 @@ export function createTagsInputRoot(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children) {
-        childUnmount = props.children(getContext)(root)
+        childUnmount = props.children(getContext)(root, undefined)
       }
 
       host.appendChild(root)
@@ -383,7 +383,7 @@ export function createTagsInputItem(): (
 
       let childUnmount: (() => void) | undefined
       if (props?.children && getContext) {
-        childUnmount = props.children(getContext)(item)
+        childUnmount = props.children(getContext)(item, undefined)
       }
 
       host.appendChild(item)
@@ -552,7 +552,7 @@ export function createTagsInput(): (
                       style: props?.itemTextStyle
                     },
                     getCtx
-                  )(textHost)
+                  )(textHost, undefined)
                   textHost.textContent = items[i]
                   item.appendChild(textHost)
                   if (textUnmount) innerUnmounts.push(textUnmount)
@@ -565,7 +565,7 @@ export function createTagsInput(): (
                       children: props?.itemDeleteChildren
                     },
                     getCtx
-                  )(deleteHost)
+                  )(deleteHost, undefined)
                   item.appendChild(deleteHost)
                   if (deleteUnmount) innerUnmounts.push(deleteUnmount)
 
@@ -577,7 +577,7 @@ export function createTagsInput(): (
                 }
               },
               getContext
-            )(itemHost)
+            )(itemHost, undefined)
             root.appendChild(itemHost)
             if (itemUnmount) unmounts.push(itemUnmount)
           }
@@ -606,7 +606,7 @@ export function createTagsInput(): (
               placeholder: props?.inputPlaceholder
             },
             getContext
-          )(inputHost)
+          )(inputHost, undefined)
           root.appendChild(inputHost)
           if (inputUnmount) unmounts.push(inputUnmount)
 
@@ -689,7 +689,7 @@ export function createTagsInput(): (
             }
           }
         }
-      })(host)
+      })(host, undefined)
     }
   }
 }

@@ -290,7 +290,7 @@ describe('animation', () => {
       let callCount = 0
       
       const runtime = getReactiveRuntime()
-      runtime.watch(() => x.value, () => {
+      runtime.subscribe(() => x.value, () => {
         callCount++
       })
       
@@ -303,7 +303,7 @@ describe('animation', () => {
       let callCount = 0
       
       const runtime = getReactiveRuntime()
-      runtime.watch(() => x.value, () => {
+      runtime.subscribe(() => x.value, () => {
         callCount++
       })
       
@@ -316,7 +316,7 @@ describe('animation', () => {
       let callCount = 0
       
       const runtime = getReactiveRuntime()
-      runtime.watch(() => f.value, () => {
+      runtime.subscribe(() => f.value, () => {
         callCount++
       })
       

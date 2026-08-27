@@ -12,15 +12,19 @@ import {
   createMockReactiveRuntime,
   waitForAsync
 } from '../test-utils'
+import { createRoot } from '../node'
+import type { CanvasNode, Context2D } from '../node'
 import { line } from './line'
 
 describe('line', () => {
-  let ctx: CanvasRenderingContext2D
+  let ctx: Context2D
+  let root: CanvasNode
   let cleanupFns: Array<(() => void) | undefined>
 
   beforeEach(() => {
     setReactiveRuntime(createMockReactiveRuntime())
     ctx = createMockContext()
+    root = createRoot(ctx)
     cleanupFns = []
 
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -45,7 +49,7 @@ describe('line', () => {
         stroke: '#000000'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -72,7 +76,7 @@ describe('line', () => {
         lineWidth: 5
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -91,7 +95,7 @@ describe('line', () => {
         y2: 100
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -107,7 +111,7 @@ describe('line', () => {
         y2: 100
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -123,7 +127,7 @@ describe('line', () => {
         stroke: 'red'
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -151,7 +155,7 @@ describe('line', () => {
         closed: true
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -166,7 +170,7 @@ describe('line', () => {
         tension: 0.5,
         stroke: 'blue'
       })
-      cleanupFns.push(mountable(ctx))
+      cleanupFns.push(mountable(root, undefined))
       await waitForAsync()
 
       expect(ctx.beginPath).toHaveBeenCalled()
@@ -188,7 +192,7 @@ describe('line', () => {
         lineDash: [10, 5]
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()
@@ -211,7 +215,7 @@ describe('line', () => {
         lineDashOffset: 5
       })
 
-      const cleanup = mountable(ctx)
+      const cleanup = mountable(root, undefined)
       cleanupFns.push(cleanup)
 
       await waitForAsync()

@@ -2,7 +2,7 @@
  * @rasenjs/router - Router
  */
 
-import { getReactiveRuntime, unref, setValue } from '@rasenjs/core'
+import { getReactiveRuntime } from '@rasenjs/core'
 import type { Ref } from '@rasenjs/core'
 import { template, isTemplate, type Template } from '@rasenjs/core/utils'
 import type {
@@ -344,7 +344,7 @@ export function createRouter<TConfig extends RoutesConfig>(
    */
   function getCurrentMatch(): RouteMatch | null {
     if (currentMatchRef) {
-      return unref(currentMatchRef)
+      return runtime.unref(currentMatchRef)
     }
     return null
   }
@@ -354,7 +354,7 @@ export function createRouter<TConfig extends RoutesConfig>(
    */
   function setCurrentMatch(newMatch: RouteMatch | null) {
     if (currentMatchRef) {
-      setValue(currentMatchRef, newMatch)
+      runtime.setValue(currentMatchRef, newMatch)
     }
   }
 
@@ -363,7 +363,7 @@ export function createRouter<TConfig extends RoutesConfig>(
    */
   function getIsNavigating(): boolean {
     if (isNavigatingRef) {
-      return unref(isNavigatingRef)
+      return runtime.unref(isNavigatingRef)
     }
     return false
   }
@@ -373,7 +373,7 @@ export function createRouter<TConfig extends RoutesConfig>(
    */
   function setIsNavigating(value: boolean) {
     if (isNavigatingRef) {
-      setValue(isNavigatingRef, value)
+      runtime.setValue(isNavigatingRef, value)
     }
   }
 

@@ -1,5 +1,5 @@
 import type { Component2D } from '../node'
-import type { Ref, ReadonlyRef } from '../types'
+import type { PropValue } from '../types'
 import {
   unref,
   type CommonDrawProps,
@@ -16,13 +16,13 @@ export interface RingProps
     Partial<CommonDrawProps>,
     Partial<LineStyleProps>,
     Partial<TransformProps> {
-  x: number | Ref<number> | ReadonlyRef<number>
-  y: number | Ref<number> | ReadonlyRef<number>
-  innerRadius: number | Ref<number> | ReadonlyRef<number>
-  outerRadius: number | Ref<number> | ReadonlyRef<number>
-  fill?: string | Ref<string> | ReadonlyRef<string>
-  stroke?: string | Ref<string> | ReadonlyRef<string>
-  lineWidth?: number | Ref<number> | ReadonlyRef<number>
+  x: PropValue<number>
+  y: PropValue<number>
+  innerRadius: PropValue<number>
+  outerRadius: PropValue<number>
+  fill?: PropValue<string>
+  stroke?: PropValue<string>
+  lineWidth?: PropValue<number>
 }
 
 /**
