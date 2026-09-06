@@ -43,7 +43,7 @@
   "license": "MIT",
   "dependencies": {
     "@rasenjs/core": "workspace:^",
-    "@rasenjs/spine": "workspace:*"
+    "@rasenjs/assets": "workspace:*"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.83",

@@ -63,6 +63,7 @@
   "author": "Rasen Contributors",
   "license": "MIT",
   "dependencies": {
+    "@rasenjs/assets": "workspace:*",
     "@rasenjs/canvas-2d": "workspace:*",
     "@rasenjs/core": "workspace:^",
     "@rasenjs/webgl": "workspace:*"

@@ -9,7 +9,7 @@ import { configureTags, com, type Mountable } from '@rasenjs/core'
 import { mount, when } from '@rasenjs/dom'
 import { ref, computed } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { PerspectiveCamera, group, mesh, billboard, each, getRenderContext } from '@rasenjs/webgl'
+import { group, mesh, billboard, each, getRenderContext, type CameraConfig } from '@rasenjs/webgl'
 import { Mat4x4f, vec3f } from '@rasenjs/math'
 import { loadRacingAssets, type RacingAssets } from './assets'
 import { trackPieces, aiTrucks, trackCenterline } from './level-data'
@@ -19,7 +19,7 @@ import { SoundManager } from './sound'
 import { TrailManager, type SmokePuff } from './trail'
 
 useReactiveRuntime()
-configureTags({ '': { perspectiveCamera: PerspectiveCamera, mesh, group, billboard, each } })
+configureTags({ '': { mesh, group, billboard, each } })
 
 // === Reactive state (drives the 3D scene + HUD every frame) ===
 const viewW = ref(window.innerWidth)
@@ -38,6 +38,17 @@ const frontYaw = ref(0)
 // Chase camera
 const camPos = ref({ x: 0, y: 0, z: 0 })
 const camTarget = ref({ x: 0, y: 0, z: 0 })
+
+// Flat camera config consumed by <canvas camera={...}> — a plain getter keeps
+// the config reactive (re-evaluated on every dep change) while avoiding the
+// ComputedRef/PropValue structural mismatch.
+const camera = (): CameraConfig => ({
+  x: camPos.value.x, y: camPos.value.y, z: camPos.value.z,
+  target: camTarget.value,
+  fov: (40 * Math.PI) / 180,
+  near: 0.1,
+  far: 200,
+})
 
 // HUD
 const speed = ref(0)
@@ -188,8 +199,6 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
   // type is `Mountable<HTMLElement>`; WebGL components are `Mountable<WebGL…>`,
   // so we widen to `Mountable<any>[]` (the JSX.Element type) to satisfy it.
   const sceneChildren: Mountable<any>[] = [
-    <perspectiveCamera position={camPos} target={camTarget} aspect={aspect}
-      fov={(40 * Math.PI) / 180} near={0.1} far={200} />,
     <group children={trackMeshes as Mountable[]} />,
     <group children={truckMeshes as Mountable[]} />,
     ...vehicleChildren,
@@ -203,6 +212,7 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <canvas className="racing-canvas" width={viewW} height={viewH}
         contextType="webgl2"
+        camera={camera}
         contextOptions={{ preserveDrawingBuffer: true }}
         renderOptions={{ clearColor: "#ACC3F8", continuousRender: true }}
         style={{ width: '100%', height: '100%', display: 'block' }}>

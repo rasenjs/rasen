@@ -77,6 +77,14 @@ export interface RenderContextOptions {
 /**
  * WebGL Render Context
  */
+export type GlPointerEventType = 'click' | 'pointerdown'
+
+/**
+ * Pointer handler registered by scene components (e.g. the spine pick).
+ * Receives canvas-local CSS coordinates. Returns true if the event was
+ * consumed (stops bubbling to remaining handlers).
+ */
+export type GlPointerHandler = (type: GlPointerEventType, x: number, y: number) => boolean
 export class RenderContext {
   /** 场景树渲染根（顶层组件挂载时注册） */
   private roots: import('./node').GlNode[] = []
@@ -127,6 +135,8 @@ export class RenderContext {
   private projectionMatrix: Mat4x4f
   private viewMatrix: Mat4x4f
   private transformStack: TransformState[] = []
+  /** Scene-registered pointer handlers (pure — fed by the host adapter). */
+  private pointerHandlers = new Set<GlPointerHandler>()
 
   constructor(
     private gl: GlContext,
@@ -696,7 +706,31 @@ export class RenderContext {
     return { ...this.currentTransform }
   }
 
+  /**
+   * Register a scene pointer handler (pure — the host adapter owns native
+   * listeners and feeds canvas-local CSS coordinates via dispatchPointer).
+   * Returns an unregister function.
+   */
+  addPointerHandler(handler: GlPointerHandler): () => void {
+    this.pointerHandlers.add(handler)
+    return () => {
+      this.pointerHandlers.delete(handler)
+    }
+  }
+
+  /**
+   * PUBLIC entry for host adapters: dispatch a pointer event (canvas-local
+   * CSS coordinates) to registered scene handlers. The renderer never sees
+   * native event objects — same contract as the canvas-2d dispatchPointer.
+   */
+  dispatchPointer(type: GlPointerEventType, x: number, y: number): void {
+    for (const handler of this.pointerHandlers) {
+      if (handler(type, x, y)) return
+    }
+  }
+
   destroy() {
+    this.pointerHandlers.clear()
     if (this.cancelScheduled !== null) {
       this.cancelScheduled()
       this.cancelScheduled = null

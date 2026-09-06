@@ -8,5 +8,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
-  external: ['@rasenjs/spine', '@rasenjs/math'],
+  external: ['@rasenjs/math'],
 })

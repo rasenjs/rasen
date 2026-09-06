@@ -9,7 +9,6 @@
 import type {
   BillboardProps,
   BoxProps,
-  FirstPersonCameraProps,
   GroupProps,
   MeshProps,
   RectProps,
@@ -18,7 +17,6 @@ import type {
 declare module '@rasenjs/dom/jsx-runtime' {
   namespace JSX {
     interface IntrinsicElements {
-      firstPersonCamera: FirstPersonCameraProps
       mesh: MeshProps
       box: BoxProps
       billboard: BillboardProps

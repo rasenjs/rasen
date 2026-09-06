@@ -22,7 +22,7 @@ import {
   AnimationState,
   type SkeletonData,
   type SpineAtlas
-} from '@rasenjs/spine'
+} from '@rasenjs/assets'
 import { spine as SpineWebgl } from '@rasenjs/webgl'
 import { spine as SpineCanvas } from '@rasenjs/canvas-2d'
 
@@ -336,6 +336,7 @@ const Stage = com(() => (
           width={VIEW}
           height={VIEW}
           contextType="2d"
+          camera={camera}
         >
           <SpineCanvas
             skeleton={skeleton}
@@ -347,7 +348,6 @@ const Stage = com(() => (
             frame={frame}
             width={VIEW}
             height={VIEW}
-            camera={camera}
             bg={bg}
           />
         </canvas>

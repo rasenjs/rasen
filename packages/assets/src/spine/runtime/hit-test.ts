@@ -1,4 +1,5 @@
-import { computeAttachmentWorldVertices, type AttachmentData, type SpineAtlas } from '@rasenjs/assets'
+import { computeAttachmentWorldVertices, type SpineAtlas } from '../parsers/atlas'
+import type { AttachmentData } from '../types'
 import type { Skeleton, Slot, Bone } from './skeleton'
 
 /** Result of a spine hit-test: the topmost slot/attachment under a world point. */

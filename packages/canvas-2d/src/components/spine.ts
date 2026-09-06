@@ -7,10 +7,10 @@
  * `<spine skeleton={...} atlas={...} ... />` inside a `<canvas>`.
  *
  * Usage:
- *   <canvas contextType="2d" width={VIEW} height={VIEW}>
+ *   <canvas contextType="2d" width={VIEW} height={VIEW} camera={{ x, y, zoom }}>
  *     <spine
  *       skeleton={skeleton} atlas={atlas} atlasImg={atlasImg} state={state}
- *       camera={camera} bg={bg} showBones={showBones}
+ *       bg={bg} showBones={showBones}
  *       frame={frame} width={VIEW} height={VIEW}
  *     />
  *   </canvas>
@@ -19,6 +19,7 @@
 import { com, type Mountable } from '@rasenjs/core'
 import type { PropValue } from '@rasenjs/core'
 import { createNode, type CanvasNode, type Context2D } from '../node'
+import { getRenderContext } from '../render-context'
 import { unref } from '../utils/ref'
 import type { CanvasCameraConfig } from '../types'
 import type { CanvasEventHandlers } from '../events'
@@ -31,7 +32,7 @@ import {
   type SpineEvent,
   type Slot,
   type Bone
-} from '@rasenjs/spine'
+} from '@rasenjs/assets'
 
 /** Payload delivered to `onPick` / `onClick`. `slot`/`attachment`/`bone` are
  * null (via the event being null) when the pointer misses the skeleton. */
@@ -68,12 +69,6 @@ export interface SpineProps {
   frame: PropValue<number>
   width: PropValue<number>
   height: PropValue<number>
-  /**
-   * Canvas-level camera config (same object passed to <canvas camera={...}>).
-   * Canvas2D has no RenderContext, so the component reads it directly and
-   * applies translate/scale.
-   */
-  camera?: PropValue<CanvasCameraConfig>
   /**
    * Opaque backdrop painted before the skeleton. The canvas itself is
    * transparent, so without this the page background shows through the
@@ -245,11 +240,19 @@ function drawTexturedTriangles(
 
 export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
   return (parent: CanvasNode) => {
-    // Keeps the latest camera so pointer handlers can invert screen→world.
-    let lastCamera: CanvasCameraConfig | undefined
+    // Camera is canvas-level (RenderContext), never a component prop. The
+    // latest config is read from the parent's RenderContext so pointer
+    // handlers can invert screen→world.
+    const resolveCamera = (): CanvasCameraConfig | undefined => {
+      try {
+        return getRenderContext(parent.ctx).camera
+      } catch {
+        return undefined
+      }
+    }
 
     const pickAt = (x: number, y: number): SpinePickEvent | null => {
-      const cam = lastCamera
+      const cam = resolveCamera()
       const W = unref(props.width) as number
       const H = unref(props.height) as number
       const Z = cam?.zoom ?? 1
@@ -300,37 +303,38 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
         const width = unref(props.width) as number
         const height = unref(props.height) as number
 
-        ctx.save()
+        // The canvas-level camera (RenderContext.camera) applies plain
+        // pan/zoom — no axis flip (that is the drawn content's business).
+        // Spine is a Y-up world against a Y-down canvas, so the component
+        // applies its own flip here, exactly like the WebGL projection does:
+        //   screen = translate(W/2,H/2) ∘ scale(Z,-Z) ∘ translate(-cx,-cy)
+        // with cx/cy = camera pan (world point at the screen center). The
+        // backdrop is painted BEFORE the flip in plain screen coordinates.
+        const cam = resolveCamera()
+        const Z = cam?.zoom ?? 1
+        const CX = cam?.x ?? 0
+        const CY = cam?.y ?? 0
 
-        // Paint an opaque backdrop so semi-transparent edges composite against
-        // a dark stage (matching the WebGL viewer) instead of the page bg.
         const bg = unref(props.bg) as string | null | undefined
         if (bg) {
           ctx.fillStyle = bg
           ctx.fillRect(0, 0, width, height)
         }
 
-        // Camera is canvas-level: the config already contains the spine fit,
-        // center offset and user pan/zoom (computed by the viewer). Apply it:
-        //   screen = translate(W/2, H/2) ∘ scale(Z, -Z) ∘ translate(-cx, -cy)
-        // where cx/cy are the camera's world-pan (flat x/y fields).
-        const cam = unref(props.camera) as CanvasCameraConfig | undefined
-        lastCamera = cam
-        const Z = cam?.zoom ?? 1
-        const CX = cam?.x ?? 0
-        const CY = cam?.y ?? 0
-        // Overdraw (screen px) meant to hide the anti-aliased clip seam between
-        // adjacent triangles. Measured: 0 is best. Any positive value makes
-        // neighbours overlap by ~2x that many px, producing a colour BAND along
-        // the shared edge that is MORE visible than the hairline seam it hides
-        // (e.g. a 3px-thick line under the blush at 1.2px). The residual 1px
-        // seam is inherent to Canvas2D per-triangle clipping — the official
-        // spine-canvas renderer has it too, and worse.
-        const expandWorld = 0
+        // Save BEFORE the camera transform — the matching restore at the end
+        // of this draw must reset the transform, otherwise the pan/zoom/flip
+        // leaks and ACCUMULATES across frames (visual: repeated flipped
+        // half-scale copies marching to the right).
+        ctx.save()
+
         ctx.translate(width / 2, height / 2)
         // Spine is Y-up; canvas is Y-down.
         ctx.scale(Z, -Z)
         ctx.translate(-CX, -CY)
+
+        // Overdraw (screen px) meant to hide the anti-aliased clip seam between
+        // adjacent triangles. Measured: 0 is best.
+        const expandWorld = 0
 
         // Draw every attachment once. The canvas itself stays transparent — the
         // background is supplied by CSS on the host element (see viewer.tsx).
@@ -377,7 +381,9 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
         }
 
         if (unref(props.showBones)) {
-          ctx.lineWidth = 1 / Z
+          // Bones are 1px in world units (the camera's zoom scales them on
+          // screen, since the canvas-level camera is applied outside).
+          ctx.lineWidth = 1
           ctx.strokeStyle = 'rgba(120, 170, 255, 0.35)'
           ctx.beginPath()
           for (const bone of sk.bones) {
@@ -408,7 +414,6 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
         unref(props.atlas),
         unref(props.atlasImg),
         unref(props.state),
-        unref(props.camera),
         unref(props.animation),
         unref(props.skin),
         unref(props.showBones),

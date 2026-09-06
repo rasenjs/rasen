@@ -32,8 +32,7 @@ import {
   readCurve1D,
   readCurve2D,
   readCurveN,
-  rgbaToHex,
-  type Curve
+  rgbaToHex
 } from './binary-common'
 
 /** Merge X-only / Y-only 1D timelines into a single 2D timeline. */

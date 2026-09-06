@@ -15,7 +15,7 @@
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*",
-    "@rasenjs/spine": "workspace:*",
+    "@rasenjs/assets": "workspace:*",
     "@vue/reactivity": "^3.5.25"
   },
   "devDependencies": {

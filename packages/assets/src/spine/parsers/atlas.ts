@@ -13,7 +13,7 @@
 
 import type { AttachmentData, RegionAttachmentData, SkinData } from '../types'
 
-// Minimal interfaces so atlas.ts doesn't depend on @rasenjs/spine runtime.
+// Minimal interfaces so atlas.ts doesn't depend on @rasenjs/assets runtime.
 // The actual Skeleton/Slot classes satisfy these interfaces.
 interface BoneRef {
   a: number; b: number; c: number; d: number

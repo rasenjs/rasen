@@ -9,3 +9,10 @@ export { parseDragonBonesJson, parseDragonBonesJsonString, parseDragonBonesAtlas
 
 // --- Atlas types ---
 export type { AtlasPage, AtlasRegion, SpineAtlas, AttachmentGeometry } from './parsers/atlas'
+
+// --- Runtime (pose solving, animation state, path constraints, hit testing) ---
+// The former @rasenjs/assets package was merged into here: assets = parsing +
+// runtime, host renderer packages (canvas-2d / webgl) own the components.
+export { Skeleton, type Bone, type Slot, type IkConstraintRuntime, type PathConstraintRuntime } from './runtime/skeleton'
+export { AnimationState, applyAnimation, getAnimationDuration, type SpineEvent } from './runtime/animation'
+export { hitTestSpine, type SpineHit } from './runtime/hit-test'

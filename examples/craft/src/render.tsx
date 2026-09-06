@@ -14,6 +14,8 @@ import { createAtlas } from './blocks'
 import type { MouseControls } from './input'
 import type { Player } from './player'
 import type { VoxelChunk, World } from './world'
+import type { CameraConfig } from '@rasenjs/webgl'
+import { forwardVector } from '@rasenjs/math'
 
 // Texture atlas is static — build once.
 const atlas = createAtlas()
@@ -65,6 +67,25 @@ export function createApp(
 // `com` must be called at module top level (vite-plugin-rasen HMR contract).
 const App = com((props: AppProps) => {
   const { world, player, mouse, selectedBlock, fps } = props
+
+  // Camera — flat CameraConfig consumed by <canvas camera={...}> (replaces
+  // the FirstPersonCamera component). The lookAt target is the eye plus the
+  // yaw/pitch forward vector. A plain getter keeps it reactive while avoiding
+  // the ComputedRef/PropValue structural mismatch.
+  const camera = (): CameraConfig => {
+    const ep = player.eye.value
+    const yaw = player.yaw.value
+    const pitch = player.pitch.value
+    const fwd = forwardVector(yaw, pitch)
+    return {
+      x: ep.x, y: ep.y, z: ep.z,
+      target: { x: ep.x + fwd.x, y: ep.y + fwd.y, z: ep.z + fwd.z },
+      fov: Math.PI / 3,
+      near: 0.1,
+      far: 400,
+    }
+  }
+
   return (
     <div
       style={{
@@ -80,6 +101,7 @@ const App = com((props: AppProps) => {
         width={viewW}
         height={viewH}
         contextType="webgl"
+        camera={camera}
         renderOptions={{ clearColor: "#87CEEB" }}
         style={{
           width: '100%',
@@ -89,15 +111,6 @@ const App = com((props: AppProps) => {
           touchAction: 'none',
         }}
       >
-        <firstPersonCamera
-          position={player.eye}
-          yaw={player.yaw}
-          pitch={player.pitch}
-          aspect={aspect}
-          fov={Math.PI / 3}
-          near={0.1}
-          far={400}
-        />
         {each(world.chunks, (c: VoxelChunk) => (
           <mesh
             geometry={c.geo}

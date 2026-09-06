@@ -8,7 +8,7 @@ import {
   Skeleton,
   applyAnimation,
   getAnimationDuration
-} from './index'
+} from '../index'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const skelBuf = new Uint8Array(readFileSync(join(here, '__fixtures__', 'c310.skel')))

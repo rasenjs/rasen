@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url'
 const here = dirname(fileURLToPath(import.meta.url))
 
 describe('Spine parsers', () => {
-  const fixtureDir = resolve(here, '../../spine/src/__fixtures__')
+  const fixtureDir = resolve(here, './spine/runtime/__fixtures__')
   const skelBuf = new Uint8Array(readFileSync(resolve(fixtureDir, 'c310.skel')))
   const atlasText = readFileSync(resolve(fixtureDir, 'c310.atlas'), 'utf8')
 

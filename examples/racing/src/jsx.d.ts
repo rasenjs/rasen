@@ -7,7 +7,6 @@ import type {
   BoxProps,
   GroupProps,
   MeshProps,
-  PerspectiveCameraProps,
 } from '@rasenjs/webgl'
 
 declare module '@rasenjs/dom/jsx-runtime' {
@@ -17,7 +16,6 @@ declare module '@rasenjs/dom/jsx-runtime' {
       box: BoxProps
       billboard: BillboardProps
       group: GroupProps
-      perspectiveCamera: PerspectiveCameraProps
     }
   }
 }

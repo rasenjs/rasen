@@ -31,7 +31,7 @@ import {
   type AttachmentData,
   type SpineEvent,
   type SpineHit
-} from '@rasenjs/spine'
+} from '@rasenjs/assets'
 
 /**
  * Whether the atlas uses premultiplied-alpha blending.
@@ -341,21 +341,18 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
     return total
   }
 
-  // Pointer picking: GlNode has no event API, so we attach delegated DOM
-  // listeners to the underlying canvas. The listener is created lazily on the
-  // first draw (where `gl` is available) and removed on unmount.
-  let clickHandler: ((e: PointerEvent) => void) | null = null
-  let pickHandler: ((e: PointerEvent) => void) | null = null
-  let pickCanvas: HTMLCanvasElement | null = null
+  // Pointer picking — same contract as canvas-2d: the component registers a
+  // PURE handler on the RenderContext (no DOM event API here); the host
+  // adapter owns native listeners, translates to canvas-local CSS coordinates
+  // and feeds rc.dispatchPointer. Registered lazily on the first draw (where
+  // `gl` is available); unregistered on unmount.
+  let unregisterPick: (() => void) | null = null
 
   const attachPick = (gl: GlContext): void => {
-    if (clickHandler || !gl.canvas) return
-    const canvas = gl.canvas as HTMLCanvasElement
-    const resolve = (e: PointerEvent): SpineWebglPickEvent | null => {
-      const rect = canvas.getBoundingClientRect()
-      const sx = e.clientX - rect.left
-      const sy = e.clientY - rect.top
-      const cam = getRenderContext(gl).camera
+    if (unregisterPick) return
+    const rc = getRenderContext(gl)
+    const resolve = (sx: number, sy: number): SpineWebglPickEvent | null => {
+      const cam = rc.camera
       const W = toValue(props.width) as number
       const H = toValue(props.height) as number
       const Z = cam?.zoom ?? 1
@@ -370,21 +367,19 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       const hit = hitTestSpine(sk, at, worldX, worldY)
       return hit ? { ...hit, x: sx, y: sy, worldX, worldY } : null
     }
-    clickHandler = (e) => toValue(props.onClick)?.(resolve(e))
-    pickHandler = (e) => toValue(props.onPick)?.(resolve(e))
-    canvas.addEventListener('click', clickHandler)
-    canvas.addEventListener('pointerdown', pickHandler)
-    pickCanvas = canvas
+    unregisterPick = rc.addPointerHandler((type, x, y) => {
+      const hit = resolve(x, y)
+      if (type === 'click') toValue(props.onClick)?.(hit)
+      else toValue(props.onPick)?.(hit)
+      // Consumed: this component claims all pointer events for its canvas
+      // (matching the canvas-2d `hit: () => true` behaviour).
+      return true
+    })
   }
 
   const detachPick = (): void => {
-    if (pickCanvas && clickHandler && pickHandler) {
-      pickCanvas.removeEventListener('click', clickHandler)
-      pickCanvas.removeEventListener('pointerdown', pickHandler)
-    }
-    clickHandler = null
-    pickHandler = null
-    pickCanvas = null
+    unregisterPick?.()
+    unregisterPick = null
   }
 
   const mountable = element({

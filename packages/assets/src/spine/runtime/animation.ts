@@ -13,7 +13,7 @@
  */
 
 import type { Skeleton } from './skeleton'
-import type { AnimationData } from '@rasenjs/assets'
+import type { AnimationData } from '../types'
 
 const EPSILON = 1e-6
 

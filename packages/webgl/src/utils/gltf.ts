@@ -120,11 +120,15 @@ function resolveLoader(opts?: GltfLoadOptions): (url: string) => Promise<BitmapS
   const loader = opts?.loadBitmap ?? defaultLoadBitmap
   if (!loader) {
     throw new Error(
-      '[rasen/webgl] No bitmap loader available. Pass { loadBitmap } in a non-DOM host.'
+      '[rasen/webgl] No bitmap loader available. Pass { loadBitmap } in a non-DO\rM host.'
     )
   }
   return loader
 }
+
+// NOTE: fetch itself is a cross-platform standard (browsers / Node 18+ /
+// Deno / Bun all provide it as a global) — it is NOT a DOM coupling. The
+// renderer calls global fetch directly; no injection knob needed.
 
 /**
  * Load a GLB (glTF 2.0 Binary) file and extract geometry + optional texture.

@@ -13,14 +13,14 @@ import {
   computeAttachmentWorld,
   computeAttachmentWorldVertices,
   type SkeletonData
-} from './index'
+} from '../index'
 
 // --- Shared fixtures ---
 const here = dirname(fileURLToPath(import.meta.url))
 
 // spineboy-pro (JSON)
-const jsonPath = resolve(here, '../../../examples/canvas-2d/src/spineboy-pro.json')
-const atlasPath = resolve(here, '../../../examples/canvas-2d/images/spineboy.atlas')
+const jsonPath = resolve(here, '../../../../../examples/canvas-2d/src/spineboy-pro.json')
+const atlasPath = resolve(here, '../../../../../examples/canvas-2d/images/spineboy.atlas')
 const data = parseSpineJson(JSON.parse(readFileSync(jsonPath, 'utf8')))
 const atlas = parseSpineAtlas(readFileSync(atlasPath, 'utf8'))
 
@@ -28,7 +28,7 @@ const atlas = parseSpineAtlas(readFileSync(atlasPath, 'utf8'))
 const data777 = parseSpineBinary(new Uint8Array(readFileSync(join(here, '__fixtures__', '777.skel'))))
 
 // 777 atlas (for FFD deform vertex tests)
-const dir777 = resolve(here, '../../../examples/nikke-viewer/public')
+const dir777 = resolve(here, '../../../../../examples/nikke-viewer/public')
 const atlas777 = parseSpineAtlas(readFileSync(resolve(dir777, '777.atlas'), 'utf8'))
 const data777Full = parseSpineBinary(new Uint8Array(readFileSync(resolve(dir777, '777.skel'))))
 

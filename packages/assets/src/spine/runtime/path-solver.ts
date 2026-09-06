@@ -2,8 +2,8 @@
  * Path constraint solver — distributes bones along a bezier path.
  */
 
-import type { AttachmentData } from '@rasenjs/assets'
-import type { Bone, Slot, PathConstraintRuntime } from './skeleton'
+import type { AttachmentData } from '../types'
+import type { Slot, PathConstraintRuntime } from './skeleton'
 import { DEG2RAD, boneUpdateAppliedTransform } from './skeleton'
 // Path constraint solving (ported from Spine's PathConstraint)
 // ---------------------------------------------------------------------------

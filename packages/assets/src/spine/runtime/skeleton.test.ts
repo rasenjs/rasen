@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { Skeleton, type Bone } from './skeleton'
-import type { BoneData, IkConstraintData, TransformConstraintData, SkeletonData } from '@rasenjs/assets'
+import type { BoneData, IkConstraintData, TransformConstraintData, SkeletonData } from '../types'
 
 // ---------------------------------------------------------------------------
 // Helpers to build a tiny 2-bone hierarchy for unit tests.

@@ -43,7 +43,7 @@
   "dependencies": {
     "@rasenjs/core": "workspace:^",
     "@rasenjs/math": "workspace:^",
-    "@rasenjs/spine": "workspace:*"
+    "@rasenjs/assets": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

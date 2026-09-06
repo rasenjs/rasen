@@ -17,7 +17,7 @@
  * file.
  */
 
-import type { SkeletonData, BoneData } from '@rasenjs/assets'
+import type { SkeletonData, BoneData } from '../types'
 import { applyPathConstraint } from './path-solver'
 
 // ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ export interface Bone {
   shearX: number
   shearY: number
   /** Inheritance mode (Spine `transform` field). */
-  transform: import('@rasenjs/assets').BoneTransformMode
+  transform: import('../types').BoneTransformMode
   /** Setup length (used by IK). */
   length: number
   /** Depth in the bone hierarchy (root = 0). Used to order constraints. */
@@ -84,7 +84,7 @@ export interface Bone {
 
 /** A live slot instance. */
 export interface Slot {
-  data: import('@rasenjs/assets').SlotData
+  data: import('../types').SlotData
   bone: Bone
   color: string
   attachment: string | undefined
@@ -104,7 +104,7 @@ export interface Slot {
 
 /** Runtime state for an IK constraint (animated by `ik` timelines). */
 export interface IkConstraintRuntime {
-  data: import('@rasenjs/assets').IkConstraintData
+  data: import('../types').IkConstraintData
   bones: Bone[]
   target: Bone
   mix: number
@@ -120,7 +120,7 @@ export interface IkConstraintRuntime {
 
 /** Runtime state for a transform constraint (animated by `transform` timelines). */
 export interface TransformConstraintRuntime {
-  data: import('@rasenjs/assets').TransformConstraintData
+  data: import('../types').TransformConstraintData
   bones: Bone[]
   target: Bone
   mixRotate: number
@@ -135,7 +135,7 @@ export interface TransformConstraintRuntime {
 
 /** Runtime state for a path constraint (animated by `path` timelines). */
 export interface PathConstraintRuntime {
-  data: import('@rasenjs/assets').PathConstraintData
+  data: import('../types').PathConstraintData
   bones: Bone[]
   target: Slot
   position: number
@@ -1255,7 +1255,7 @@ export class Skeleton {
   }
 
   /** Find an attachment for a slot under the active skin (falls back to default). */
-  findAttachment(slotName: string, attachmentName: string): import('@rasenjs/assets').AttachmentData | undefined {
+  findAttachment(slotName: string, attachmentName: string): import('../types').AttachmentData | undefined {
     const skin = this.data.skins.find((s) => s.name === this.skin)
     const def = this.data.skins.find((s) => s.name === 'default')
     const lookup = (s?: typeof skin) => s?.attachments[slotName]?.[attachmentName]

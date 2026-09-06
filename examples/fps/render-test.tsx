@@ -18,10 +18,11 @@ import { configureTags, com } from '@rasenjs/core'
 import { mount } from '@rasenjs/dom'
 import { ref } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { FirstPersonCamera, billboard, getRenderContext } from '@rasenjs/webgl'
+import { billboard, getRenderContext, type CameraConfig } from '@rasenjs/webgl'
+import { forwardVector } from '@rasenjs/math'
 
 useReactiveRuntime()
-configureTags({ '': { firstPersonCamera: FirstPersonCamera, billboard } })
+configureTags({ '': { billboard } })
 
 const log = document.getElementById('log')!
 
@@ -34,6 +35,21 @@ const by = ref(1.6)
 const bz = ref(-4)
 const bVisible = ref(true)
 const bTexture = ref(makeTex('#ff0000'))
+
+// Camera config from yaw/pitch (replaces the FirstPersonCamera component).
+// A plain getter keeps it reactive while avoiding the ComputedRef/PropValue
+// structural mismatch.
+const camera = (): CameraConfig => {
+  const ep = eye.value
+  const fwd = forwardVector(yaw.value, pitch.value)
+  return {
+    x: ep.x, y: ep.y, z: ep.z,
+    target: { x: ep.x + fwd.x, y: ep.y + fwd.y, z: ep.z + fwd.z },
+    fov: (80 * Math.PI) / 180,
+    near: 0.1,
+    far: 200,
+  }
+}
 
 function makeTex(color: string): HTMLCanvasElement {
   const c = document.createElement('canvas')
@@ -53,9 +69,9 @@ const App = com((_p: unknown) => {
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
       <canvas width={800} height={600} contextType="webgl2"
+        camera={camera}
         contextOptions={{ clearColor: '#87CEEB', preserveDrawingBuffer: true }}
         style={{ width: '100%', height: '100%', display: 'block' }}>
-        <firstPersonCamera position={eye} yaw={yaw} pitch={pitch} fov={(80 * Math.PI) / 180} near={0.1} far={200} />
         <billboard x={bx} y={by} z={bz} width={0.5} height={0.5} texture={bTexture} visible={bVisible} mode="full" />
       </canvas>
     </div>

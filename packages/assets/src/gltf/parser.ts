@@ -252,13 +252,12 @@ export function parseGLB(bytes: Uint8Array): GLTFLoadResult {
  * Detects whether the response is JSON (gltf) or binary (glb) by checking
  * the first bytes, then delegates to `parseGLB` for binary or `parseGLTF`
  * for JSON.
+ *
+ * fetch is a cross-platform standard (browsers / Node 18+ / Deno / Bun) —
+ * called directly, no injection knob.
  */
-export async function loadGLTF(
-  url: string,
-  fetchFn?: typeof fetch
-): Promise<GLTFLoadResult> {
-  const _fetch = fetchFn ?? globalThis.fetch
-  const resp = await _fetch(url)
+export async function loadGLTF(url: string): Promise<GLTFLoadResult> {
+  const resp = await fetch(url)
   if (!resp.ok) throw new Error(`Failed to fetch GLTF: ${url} (${resp.status})`)
   const buf = new Uint8Array(await resp.arrayBuffer())
 
@@ -267,7 +266,6 @@ export async function loadGLTF(
   if (magic === 0x46546C67) return parseGLB(buf)
 
   // Otherwise treat as JSON GLTF (resolve relative URIs against base URL).
-  const gltf = JSON.parse(new TextDecoder().decode(buf))
   // TODO: implement JSON GLTF with buffer/URI resolution.
   throw new Error('JSON GLTF not yet implemented — use GLB format')
 }

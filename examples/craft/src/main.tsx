@@ -8,15 +8,14 @@ import { mount } from '@rasenjs/dom'
 import { ref } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import {
-  FirstPersonCamera,
   billboard,
   box,
-  forwardVector,
   group,
   mesh,
   rect,
   voxelRaycast,
 } from '@rasenjs/webgl'
+import { forwardVector } from '@rasenjs/math'
 import { Blocks } from './blocks'
 import { bindLookControls, setupKeyboard } from './input'
 import type { BoundLookControls } from '@rasenjs/dom'
@@ -30,7 +29,6 @@ useReactiveRuntime()
 // and WebGL share one JSX syntax.
 configureTags({
   '': {
-    firstPersonCamera: FirstPersonCamera,
     mesh,
     box,
     billboard,

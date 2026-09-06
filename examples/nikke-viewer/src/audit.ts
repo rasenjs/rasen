@@ -1,5 +1,5 @@
 /**
- * NIKKE asset audit — compares OUR Spine parser (@rasenjs/spine) against the
+ * NIKKE asset audit — compares OUR Spine parser (@rasenjs/assets) against the
  * OFFICIAL spine-webgl runtime for every character asset, to surface edge-case
  * differences (bone/slot/attachment/animation/skin counts, atlas regions).
  *
@@ -9,7 +9,7 @@
  * Results are written to #out and to window.__audit for programmatic reading.
  */
 
-import { parseSpineBinary, parseSpineAtlas } from '@rasenjs/spine'
+import { parseSpineBinary, parseSpineAtlas } from '@rasenjs/assets'
 
 const RAW_BASE = 'https://raw.githubusercontent.com/Nikke-db/Nikke-db.github.io/main/l2d'
 const SUFFIXES = ['_00', '_01', '', '_02', '_03']

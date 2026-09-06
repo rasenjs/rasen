@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { parseSpineJsonString } from '@rasenjs/assets'
+import { parseSpineJsonString } from '../parsers/spine-json'
 import { Skeleton } from './skeleton'
 
 const here = dirname(fileURLToPath(import.meta.url))

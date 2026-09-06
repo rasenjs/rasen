@@ -5,6 +5,10 @@
 export * from './components'
 export { watchProp } from './utils'
 export { hostHooks, type HostHooks } from './host-hooks'
+// Side-effect import: registers the browser image adapter with
+// @rasenjs/assets (the assets package itself is DOM-free).
+import './image-adapter'
+export { domImageAdapter } from './image-adapter'
 export { MARKERS, isMarkerMatch, MARKER_DEBUG_MAP } from './marker-constants'
 export {
   bindLookControls,

@@ -1,5 +1,5 @@
 /**
- * Canvas-mode viewer — renders 777 with @rasenjs/canvas-2d + @rasenjs/spine so
+ * Canvas-mode viewer — renders 777 with @rasenjs/canvas-2d + @rasenjs/assets so
  * the Canvas2D renderer (examples/nikke-viewer/src/spine.ts) can be inspected
  * for the dark/bright seam issue independently of the WebGL renderer.
  *
@@ -18,7 +18,7 @@ import {
   AnimationState,
   type SkeletonData,
   type SpineAtlas
-} from '@rasenjs/spine'
+} from '@rasenjs/assets'
 import { spine as Spine } from '@rasenjs/canvas-2d'
 
 const VIEW = 2048
@@ -74,13 +74,13 @@ const Stage = com(() => (
     width={VIEW}
     height={VIEW}
     contextType="2d"
+    camera={{ x: 0, y: 0, zoom: 1 }}
   >
     <Spine
       skeleton={skeleton}
       atlas={atlas}
       atlasImg={atlasImg}
       state={state}
-      camera={{ x: 0, y: 0, zoom: 1 }}
       showBones={ref(false)}
       frame={frame}
       width={VIEW}

@@ -24,7 +24,7 @@ export default defineConfig({
       '@rasenjs/dom': resolve(__dirname, '../../packages/dom/src'),
       '@rasenjs/canvas-2d': resolve(__dirname, '../../packages/canvas-2d/src'),
       '@rasenjs/reactive-vue': resolve(__dirname, '../../packages/reactive-vue/src'),
-      '@rasenjs/spine': resolve(__dirname, '../../packages/spine/src')
+      '@rasenjs/assets': resolve(__dirname, '../../packages/assets/src')
     }
   }
 })

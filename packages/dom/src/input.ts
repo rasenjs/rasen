@@ -1,15 +1,14 @@
 /**
  * Input adapters — DOM bindings for host-agnostic input state machines.
  *
- * The look state machine lives with the camera (@rasenjs/webgl
- * `createLookControls`): pure delta → yaw/pitch logic, zero event API.
- * This module is the DOM side: pointer-lock API, event listeners, keyboard
- * state. Games assemble one line here instead of hand-rolling listeners.
+ * The look state machine (`createLookControls`) lives here: pure
+ * delta → yaw/pitch logic, zero event API. This module is the DOM side:
+ * pointer-lock API, event listeners, keyboard state. Games assemble one line
+ * here instead of hand-rolling listeners.
  */
 
 import { getReactiveRuntime } from '@rasenjs/core'
 import type { Ref } from '@rasenjs/core'
-import { createLookControls } from '@rasenjs/webgl'
 
 /** Refs the look controls drive (standard Rasen opaque refs). */
 export interface LookControlRefs {
@@ -17,6 +16,41 @@ export interface LookControlRefs {
   pitch: Ref<number>
   /** True once mouse control is active (pointer lock or drag fallback). */
   locked: Ref<boolean>
+}
+
+export interface LookControls {
+  /** Apply a look delta (pointer movement or drag distance), then clamp pitch. */
+  applyDelta(dx: number, dy: number): void
+  /** Clamp pitch into [-limit, +limit]. */
+  clampPitch(): void
+}
+
+const LOOK_SENSITIVITY = 0.0022
+const PITCH_LIMIT = Math.PI / 2 - 0.01
+
+/**
+ * Pure look state machine: delta → yaw/pitch, pitch clamped. Host-agnostic:
+ * reads/writes go through the runtime's opaque Ref contract, never events/DOM
+ * — the host adapter feeds it.
+ */
+export function createLookControls(
+  refs: { yaw: Ref<number>; pitch: Ref<number> },
+  opts?: { sensitivity?: number; pitchLimit?: number },
+): LookControls {
+  const rt = getReactiveRuntime()
+  const sensitivity = opts?.sensitivity ?? LOOK_SENSITIVITY
+  const limit = opts?.pitchLimit ?? PITCH_LIMIT
+  const clampPitch = () => {
+    rt.setValue(refs.pitch, Math.max(-limit, Math.min(limit, rt.unref(refs.pitch))))
+  }
+  return {
+    applyDelta(dx, dy) {
+      rt.setValue(refs.yaw, rt.unref(refs.yaw) + dx * sensitivity)
+      rt.setValue(refs.pitch, rt.unref(refs.pitch) - dy * sensitivity)
+      clampPitch()
+    },
+    clampPitch,
+  }
 }
 
 export interface BoundLookControls {

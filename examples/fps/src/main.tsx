@@ -2,8 +2,8 @@ import { configureTags, com, type Mountable } from '@rasenjs/core'
 import { mount, when } from '@rasenjs/dom'
 import { ref } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { FirstPersonCamera, group, mesh, skybox, billboard, each, forwardVector, rightVector, getRenderContext } from '@rasenjs/webgl'
-import { Mat4x4f, vec3f } from '@rasenjs/math'
+import { group, mesh, skybox, billboard, each, getRenderContext, type CameraConfig } from '@rasenjs/webgl'
+import { Mat4x4f, vec3f, forwardVector, rightVector } from '@rasenjs/math'
 import { loadFPSAssets } from './assets'
 import { getLevelObjects, getEnemySpawns, getLevelWalls } from './level'
 import { Player, rayBoxIntersect } from './player'
@@ -14,7 +14,7 @@ import { SoundManager } from './sound'
 import { createImpact, updateImpact, type Impact } from './impact'
 
 useReactiveRuntime()
-configureTags({ '': { firstPersonCamera: FirstPersonCamera, mesh, group, skybox, weapon, billboard, each } })
+configureTags({ '': { mesh, group, skybox, weapon, billboard, each } })
 
 const viewW = ref(window.innerWidth)
 const viewH = ref(window.innerHeight)
@@ -56,6 +56,23 @@ interface AppProps {
 
 const App = com((p: AppProps): Mountable<HTMLElement> => {
   const { player, enemies, assets, levelObjs, muzzleFlash: mf, locked: lk, impacts, muzzleFlashes, hitFrames } = p
+  // Main camera — flat CameraConfig consumed by <canvas camera={...}>. The
+  // lookAt target is the eye plus the yaw/pitch forward vector. A plain
+  // getter keeps the config reactive (re-evaluated on every dep change)
+  // while avoiding the ComputedRef/PropValue structural mismatch.
+  const camera = (): CameraConfig => {
+    const ep = player.eye.value
+    const yaw = player.yaw.value
+    const pitch = player.pitch.value
+    const fwd = forwardVector(yaw, pitch)
+    return {
+      x: ep.x, y: ep.y, z: ep.z,
+      target: { x: ep.x + fwd.x, y: ep.y + fwd.y, z: ep.z + fwd.z },
+      fov: (80 * Math.PI) / 180,
+      near: 0.1,
+      far: 200,
+    }
+  }
   const levelMeshes: Mountable[] = []
   for (const obj of levelObjs) {
     const geo = assets.models.get(obj.model)
@@ -99,10 +116,8 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <canvas className="fps-canvas" width={viewW} height={viewH}
-        contextType="webgl2" contextOptions={{ preserveDrawingBuffer: true }} renderOptions={{ clearColor: "#87CEEB", continuousRender: true }}
+        contextType="webgl2" camera={camera} contextOptions={{ preserveDrawingBuffer: true }} renderOptions={{ clearColor: "#87CEEB", continuousRender: true }}
         style={{ width: '100%', height: '100%', display: 'block' }}>
-        <firstPersonCamera position={player.eye} yaw={player.yaw} pitch={player.pitch}
-          aspect={aspect} fov={(80 * Math.PI) / 180} near={0.1} far={200} />
         {/* Skybox FIRST so it renders as background (before scene geometry) */}
         <skybox texture={assets.textures.get('skybox')} radius={150} position={player.eye} />
         <group children={levelMeshes as Mountable[]} />
@@ -189,6 +204,7 @@ async function start() {
   })
   const player = new Player(); const keys = setupKeyboard()
   const locked = ref(false)
+
   const enemies = getEnemySpawns().map(s => new Enemy(s.x, s.y, s.z))
   const walls = getLevelWalls()
   const mouse = { yaw: player.yaw, pitch: player.pitch, locked, request: () => {}, release: () => {} }
