@@ -24,6 +24,13 @@
 // @ts-ignore -- 占位符：泛型参数 T 仅用于类型层，无实际成员
 export interface Ref<T = unknown> {}
 
+/** 只读响应式引用（computed 返回值类型） */
+// @ts-ignore
+export interface ReadonlyRef<T = unknown> {}
+
+/** Internal marker for builtin callable refs. */
+export const REF_MARKER = Symbol('rasen.ref')
+
 import type { PropValue } from './types'
 
 /**
@@ -96,7 +103,305 @@ export interface ReactiveRuntime {
 }
 
 /**
- * 全局响应式运行时
+ * ============================================================
+ * Built-in reactive runtime (zero-dependency, default fallback)
+ * ============================================================
+ *
+ * Callable-ref model: `ref(v)` returns a function.
+ *   count()   → read
+ *   count(5)  → write
+ *
+ * Convenience wrappers (ref / unref / setValue / computed) are
+ * exported from this module so users don't need the runtime
+ * object for basic operations.
+ */
+
+// ─── Dependency tracking ───
+
+let activeEffect: (() => void) | null = null
+
+const depMap = new Map<object, Map<string | symbol, Set<() => void>>>()
+
+function track(target: object, key: string | symbol) {
+  if (!activeEffect) return
+  let m = depMap.get(target)
+  if (!m) depMap.set(target, (m = new Map()))
+  let s = m.get(key)
+  if (!s) m.set(key, (s = new Set()))
+  s.add(activeEffect)
+}
+
+function trigger(target: object, key: string | symbol) {
+  depMap.get(target)?.get(key)?.forEach(job => job())
+}
+
+// ─── Scope stack ───
+
+let currentScope: BuiltinEffectScope | null = null
+
+interface BuiltinEffectScope {
+  effects: (() => void)[]
+  run<T>(fn: () => T): T | undefined
+  stop(): void
+}
+
+function builtinEffectScope(): BuiltinEffectScope {
+  const scope: BuiltinEffectScope = {
+    effects: [],
+    run(fn) {
+      const prev = currentScope
+      currentScope = scope
+      try {
+        return fn()
+      } finally {
+        currentScope = prev
+      }
+    },
+    stop() {
+      for (const cleanup of scope.effects) cleanup()
+      scope.effects.length = 0
+    },
+  }
+  return scope
+}
+
+// ─── effect ───
+
+function builtinEffect(fn: () => void): () => void {
+  const e = () => {
+    activeEffect = e
+    fn()
+    activeEffect = null
+  }
+  e()
+
+  if (currentScope) {
+    currentScope.effects.push(() => {
+      // remove e from all dep sets
+      depMap.forEach((m: Map<string | symbol, Set<() => void>>) =>
+        m.forEach((s: Set<() => void>) => s.delete(e))
+      )
+    })
+  }
+
+  return () => {
+    activeEffect = null
+    depMap.forEach((m: Map<string | symbol, Set<() => void>>) =>
+      m.forEach((s: Set<() => void>) => s.delete(e))
+    )
+  }
+}
+
+// ─── Builtin ReactiveRuntime ───
+
+function createBuiltinRuntime(): ReactiveRuntime {
+  return {
+    subscribe<T>(
+      getter: () => T,
+      callback: (value: T, oldValue: T) => void
+    ): () => void {
+      let oldValue: T
+      let stopped = false
+
+      // Collector: re-evaluate getter, fire callback on change
+      const collector = () => {
+        if (stopped) return
+        const v = getter()
+        if (!Object.is(v, oldValue)) {
+          const prev = oldValue
+          oldValue = v
+          callback(v, prev)
+        }
+      }
+
+      // Tracking effect: reads getter to collect deps
+      const tracker = () => {
+        if (stopped) return
+        getter()
+      }
+
+      // First run: seed baseline
+      const saved = activeEffect
+      activeEffect = null
+      oldValue = getter()
+      activeEffect = saved
+
+      // Second run with tracker to collect deps
+      activeEffect = tracker
+      getter()
+      activeEffect = null
+
+      // Check if tracker collected any deps
+      let hasDeps = false
+      depMap.forEach((m: Map<string | symbol, Set<() => void>>) => {
+        m.forEach((s: Set<() => void>) => {
+          if (s.has(tracker)) hasDeps = true
+        })
+      })
+
+      // Static source: no deps → cleanup tracker and skip
+      if (!hasDeps) {
+        return () => {}
+      }
+
+      // Move deps from tracker → collector
+      depMap.forEach((m: Map<string | symbol, Set<() => void>>) => {
+        m.forEach((s: Set<() => void>) => {
+          if (s.has(tracker)) {
+            s.delete(tracker)
+            s.add(collector)
+          }
+        })
+      })
+
+      return () => {
+        stopped = true
+        depMap.forEach((m: Map<string | symbol, Set<() => void>>) => {
+          m.forEach((s: Set<() => void>) => s.delete(collector))
+        })
+      }
+    },
+
+    effectScope(): { run<T>(fn: () => T): T | undefined; stop(): void } {
+      return builtinEffectScope()
+    },
+
+    ref<T>(value: T): Ref<T> {
+      return ref(value) as unknown as Ref<T>
+    },
+
+    unref<T>(value: T | Ref<T>): T {
+      return unref(value as T | CallableRef<T> | { value: T })
+    },
+
+    setValue<T>(ref: Ref<T>, value: T): void {
+      setValue(ref as unknown as CallableRef<T> | { value: T }, value)
+    },
+
+    isRef(value: unknown): boolean {
+      return (
+        typeof value === 'function' &&
+        REF_MARKER in (value as object)
+      )
+    },
+  }
+}
+
+// ─── Convenience API ───
+
+/** Callable ref — ref(v), read with ref(), write with ref(v). */
+export interface CallableRef<T> {
+  (): T
+  (value: T): void
+  [REF_MARKER]: true
+}
+
+/**
+ * Create a reactive ref (callable).
+ *
+ * ```ts
+ * const count = ref(0)
+ * count()     // read → 0
+ * count(5)    // write → 5
+ * ```
+ */
+export function ref<T>(initial: T): CallableRef<T> {
+  const scope = currentScope
+  let value = initial
+
+  function r(): T
+  function r(v: T): void
+  function r(v?: T): T | void {
+    if (arguments.length === 0) {
+      track(r, REF_MARKER)
+      return value
+    }
+    if (!Object.is(v, value)) {
+      value = v!
+      trigger(r, REF_MARKER)
+    }
+  }
+
+  Object.defineProperty(r, REF_MARKER, { value: true as const })
+
+  if (scope) {
+    scope.effects.push(() => {
+      depMap.delete(r)
+    })
+  }
+
+  return r as unknown as CallableRef<T>
+}
+
+/**
+ * Unwrap a ref: callable ref → invoke, .value object → read .value, plain value → pass through.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function unref<T>(value: T | CallableRef<T> | { value: T }): T {
+  if (typeof value === 'function' && REF_MARKER in (value as object)) {
+    return (value as CallableRef<T>)()
+  }
+  if (value !== null && typeof value === 'object' && 'value' in (value as object)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (value as any).value as T
+  }
+  return value as T
+}
+
+/**
+ * Write a ref's value: callable ref → invoke with value, .value object → set .value.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function setValue<T>(target: any, value: T): void {
+  if (typeof target === 'function' && REF_MARKER in (target as object)) {
+    ;(target as { (v: T): void })(value)
+  } else {
+    ;(target as { value: T }).value = value
+  }
+}
+
+/**
+ * Computed ref — lazy evaluation, cached, auto-tracks dependencies.
+ *
+ * ```ts
+ * const doubled = computed(() => count() * 2)
+ * doubled()    // reads, re-evaluates only when count changes
+ * ```
+ */
+export function computed<T>(getter: () => T): ReadonlyRef<T> & (() => T) {
+  let dirty = true
+  let cached: T
+
+  const c = (() => {
+    if (dirty) {
+      cached = getter()
+      dirty = false
+    }
+    track(c, 'value')
+    return cached
+  }) as ReadonlyRef<T> & (() => T)
+
+  Object.defineProperty(c, REF_MARKER, { value: true as const })
+
+  builtinEffect(() => {
+    getter()
+    if (dirty) return // first run, already computed above
+    dirty = true
+    trigger(c, 'value')
+  })
+
+  if (currentScope) {
+    currentScope.effects.push(() => {
+      depMap.delete(c)
+    })
+  }
+
+  return c
+}
+
+/**
+ * Global reactive runtime — defaults to the builtin implementation.
+ * Call `setReactiveRuntime()` to override with an adapter.
  */
 let globalRuntime: ReactiveRuntime | null = null
 
@@ -108,13 +413,11 @@ export function setReactiveRuntime(runtime: ReactiveRuntime) {
 }
 
 /**
- * 获取响应式运行时
+ * 获取响应式运行时（未设置时自动使用 builtin 实现）
  */
 export function getReactiveRuntime(): ReactiveRuntime {
   if (!globalRuntime) {
-    throw new Error(
-      'Reactive runtime not set. Call setReactiveRuntime() before using Rasen.'
-    )
+    globalRuntime = createBuiltinRuntime()
   }
   return globalRuntime
 }

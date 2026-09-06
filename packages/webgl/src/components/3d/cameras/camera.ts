@@ -1,6 +1,17 @@
 /**
  * Camera components — 3D view / projection (Rasen 3D roadmap: Phase 1.1).
  *
+ * @deprecated Use the `camera` prop on `<canvas>` instead:
+ * ```tsx
+ * <canvas camera={{ position: {...}, target: {...}, fov: Math.PI/3 }}>
+ *   <mesh ... />
+ * </canvas>
+ * ```
+ *
+ * These components are kept for backward compatibility with existing examples.
+ * They delegate to `RenderContext.setProjectionMatrix/setViewMatrix` which
+ * the new `camera` prop also uses internally.
+ *
  * A camera is a reactive component: on mount it switches the RenderContext
  * into 3D mode, computes the view (lookAt) and projection matrices and pushes
  * them into the renderer. When any camera prop changes it recomputes and

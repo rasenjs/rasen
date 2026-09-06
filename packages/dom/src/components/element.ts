@@ -37,7 +37,10 @@ type TagToElement<T extends HTMLTagName> = HTMLElementTagNameMap[T]
  */
 interface BaseElementProps {
   ref?: unknown
-  children?: PropValue<string> | Array<string | (() => string | number) | Mountable<HTMLElement>>
+  children?:
+    | PropValue<string>
+    | Mountable<HTMLElement>
+    | Array<string | (() => string | number) | Mountable<HTMLElement>>
 }
 
 /**
@@ -47,7 +50,7 @@ interface BaseElementProps {
 type ElementProps<T extends HTMLTagName> = {
   tag: T
 } & BaseElementProps &
-  HTMLTagAttributes<T> &
+  Omit<HTMLTagAttributes<T>, 'children'> &
   ClassAttributes<TagToElement<T>>
 
 /**

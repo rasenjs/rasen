@@ -4,9 +4,9 @@ import type {
   CanvasNode,
   RenderContextOptions as Canvas2DRenderOptions
 } from '@rasenjs/canvas-2d'
-import type { GlNode, GlContext } from '@rasenjs/webgl'
+import type { GlNode, GlContext, CameraConfig } from '@rasenjs/webgl'
 import { createRoot as createCanvas2DRoot } from '@rasenjs/canvas-2d'
-import { createRoot as createGlRoot } from '@rasenjs/webgl'
+import { createRoot as createGlRoot, getRenderContext } from '@rasenjs/webgl'
 
 /**
  * contextType → 渲染器节点与配置的类型映射。
@@ -30,6 +30,16 @@ export interface CanvasProps<T extends keyof HostTypes = '2d'> {
   contextOptions?: T extends '2d' ? never : WebGLContextAttributes
   /** 渲染器配置（clearColor/continuousRender 等），强类型，直通 createRoot */
   renderOptions?: HostTypes[T]['rc']
+  /**
+   * Camera configuration — intrinsic to the canvas, not a child component.
+   *
+   * - 2D (default): `{ x?, y?, zoom? }` or omit entirely
+   * - 3D perspective: `{ x, y, z, target, fov, ... }`
+   * - 3D orthographic: `{ x, y, z, target }` (no fov)
+   *
+   * Merged into `renderOptions.camera` for WebGL contexts.
+   */
+  camera?: import('@rasenjs/webgl').CameraConfig
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
@@ -140,6 +150,9 @@ export function canvas<T extends keyof HostTypes = '2d'>(
       logicalHeight: height,
       schedule,
       ...(props.renderOptions ?? {}),
+      // camera prop merges into renderOptions.camera (top-level prop wins)
+      // Resolve reactive ref to plain object before passing to RenderContext
+      camera: toValue(props.camera) ?? (props.renderOptions as any)?.camera,
     }
     const root =
       contextType === '2d'
@@ -147,6 +160,10 @@ export function canvas<T extends keyof HostTypes = '2d'>(
         : createGlRoot(ctx as GlContext, glOptions)
     // 两个渲染包的 createRoot 都返回带 requestRedraw 的根节点
     const requestRedraw = root.requestRedraw.bind(root)
+
+    // WebGL: capture the RenderContext once for reactive camera updates.
+    const glRc =
+      contextType === '2d' ? null : getRenderContext(ctx as GlContext)
 
     // 指针事件绑定（仅 2D 渲染器有组件级指针事件）：DOM 适配器的职责——
     // 监听原生事件、换算画布本地坐标，再喂给渲染器的纯 dispatchPointer 入口。
@@ -182,8 +199,22 @@ export function canvas<T extends keyof HostTypes = '2d'>(
       (child as Mountable<unknown>)(root, undefined)
     )
 
+    // Watch for camera prop changes and push them into the RenderContext.
+    // The getter re-evaluates the camera ref; a new config object each change
+    // defeats Object.is equality → setCamera fires → projection recomputed.
+    let stopCameraWatch: (() => void) | null = null
+    if (glRc) {
+      stopCameraWatch = runtime.subscribe(
+        () => toValue(props.camera),
+        (cam) => {
+          if (cam) glRc.setCamera(cam as CameraConfig)
+        },
+      )
+    }
+
     // 返回 unmount 函数
     return () => {
+      stopCameraWatch?.()
       stopSizeWatch()
       unbindPointer?.()
       childUnmounts.forEach((unmount) => unmount?.())
@@ -217,7 +248,9 @@ function bindCanvasPointerEvents(
   const handlers = types.map((type) => {
     const fn = (native: Event) => {
       const pt = toLocal(native as PointerEvent)
-      if (pt) root.dispatchPointer(type, pt.x, pt.y)
+      if (pt && typeof root.dispatchPointer === 'function') {
+        root.dispatchPointer(type, pt.x, pt.y)
+      }
     }
     canvasEl.addEventListener(type, fn)
     return { type, fn }

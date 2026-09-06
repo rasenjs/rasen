@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>NIKKE asset audit — mine vs official Spine</title>
+    <style>
+      html, body { margin: 0; background: #0b1020; color: #d4d4d8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+      #out { padding: 12px; white-space: pre-wrap; line-height: 1.5; }
+      .ok { color: #4ade80; } .bad { color: #f87171; } .warn { color: #fbbf24; }
+    </style>
+  </head>
+  <body>
+    <div id="out">booting…</div>
+    <!-- official spine-webgl runtime (served from the compare server) -->
+    <script src="http://localhost:5199/spine-webgl.js"></script>
+    <script type="module" src="/src/audit.ts"></script>
+  </body>
+</html>

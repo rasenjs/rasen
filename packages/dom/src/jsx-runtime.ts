@@ -9,7 +9,7 @@
  * ```
  */
 import { jsx, jsxs, Fragment, configureTags, type TagComponent } from '@rasenjs/core'
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import * as tags from './components'
 import type { ElementProps, HTMLTagName } from './components'
 
@@ -32,14 +32,30 @@ type HTMLIntrinsicElements = {
     (
       | {
           contextType?: '2d'
+          /** Device pixel ratio for the backing store. Higher = crisper render
+           * (supersampling) at the cost of fill cost. Defaults to
+           * window.devicePixelRatio. */
+          dpr?: number
           renderOptions?: import('@rasenjs/canvas-2d').RenderContextOptions
-          children?: Array<Mountable<import('@rasenjs/canvas-2d').CanvasNode>>
+          /** Camera configuration for 2D rendering */
+          camera?: PropValue<{ x?: number; y?: number; zoom?: number }>
+          children?:
+            | Mountable<import('@rasenjs/canvas-2d').CanvasNode>
+            | Array<Mountable<import('@rasenjs/canvas-2d').CanvasNode>>
         }
       | {
           contextType: 'webgl' | 'webgl2'
+          /** Device pixel ratio for the backing store. Higher = crisper render
+           * (supersampling) at the cost of fill cost. Defaults to
+           * window.devicePixelRatio. */
+          dpr?: number
           contextOptions?: WebGLContextAttributes
           renderOptions?: import('@rasenjs/webgl').RenderContextOptions
-          children?: Array<Mountable<import('@rasenjs/webgl').GlNode>>
+          /** Camera configuration for WebGL rendering */
+          camera?: PropValue<import('@rasenjs/webgl').CameraConfig>
+          children?:
+            | Mountable<import('@rasenjs/webgl').GlNode>
+            | Array<Mountable<import('@rasenjs/webgl').GlNode>>
         }
     )
 }

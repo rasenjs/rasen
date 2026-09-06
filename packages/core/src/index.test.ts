@@ -7,12 +7,14 @@ import {
   setReactiveRuntime,
   getReactiveRuntime,
   toValue,
+  unref,
   fragment,
   each,
   repeat,
   when,
   type ReactiveRuntime,
-  type Ref
+  type Ref,
+  type ReadonlyRef
 } from './index'
 
 // ============================================
@@ -39,6 +41,16 @@ function createMockReactiveRuntime(): ReactiveRuntime {
       return r as unknown as Ref<T>
     },
 
+    computed: <T>(getter: () => T) => {
+      const c = {
+        get value() {
+          return getter()
+        }
+      }
+      refs.add(c)
+      return c as unknown as ReadonlyRef<T>
+    },
+
     subscribe: <T>(
       source: () => T,
       callback: (value: T, oldValue: T) => void
@@ -62,7 +74,7 @@ function createMockReactiveRuntime(): ReactiveRuntime {
       stop: () => {}
     }),
 
-    unref: <T>(value: T | Ref<T>) => {
+    unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
       if (value && typeof value === 'object' && 'value' in value) {
         return (value as unknown as { value: T }).value
       }
@@ -74,11 +86,7 @@ function createMockReactiveRuntime(): ReactiveRuntime {
     },
 
     isRef: (value: unknown): boolean => {
-      return (
-        value !== null &&
-        typeof value === 'object' &&
-        refs.has(value as { value: unknown })
-      )
+      return value !== null && typeof value === 'object' && refs.has(value as { value: unknown })
     }
   }
 
@@ -119,10 +127,13 @@ describe('@rasenjs/core', () => {
       expect(runtime).toBe(mockRuntime)
     })
 
-    it('在没有设置运行时时应该抛出错误', () => {
-      // 重置运行时
+    it('在没有设置运行时时应该返回 builtin 运行时', () => {
       setReactiveRuntime(null as unknown as ReactiveRuntime)
-      expect(() => getReactiveRuntime()).toThrow()
+      const runtime = getReactiveRuntime()
+      expect(runtime).toBeDefined()
+      expect(typeof runtime.subscribe).toBe('function')
+      expect(typeof runtime.effectScope).toBe('function')
+      expect(typeof runtime.ref).toBe('function')
     })
   })
 
@@ -137,6 +148,11 @@ describe('@rasenjs/core', () => {
       expect(toValue('hello')).toBe('hello')
     })
 
+    it('应该返回 computed 的值', () => {
+      const ref = mockRuntime.ref(10)
+      const computed = mockRuntime.computed(() => unref(ref) * 2)
+      expect(toValue(computed)).toBe(20)
+    })
   })
 
   // ============================================
@@ -417,6 +433,22 @@ describe('@rasenjs/core', () => {
       expect(mountedIndices).toEqual([0, 1, 2])
     })
 
+    it('应该支持值数组', () => {
+      const items = mockRuntime.ref([{ name: 'a' }, { name: 'b' }, { name: 'c' }])
+      const mountedItems: string[] = []
+
+      const mountable = each(items, (item: { name: string }) =>
+        (() => {
+          mountedItems.push(item.name)
+          return () => {}
+        })
+      )
+
+      mountable({}, undefined)
+
+      expect(mountedItems).toEqual(['a', 'b', 'c'])
+    })
+
     it('应该支持 getter 函数返回数量', () => {
       const mountedIndices: number[] = []
 
@@ -432,6 +464,24 @@ describe('@rasenjs/core', () => {
       repeatMountable({}, undefined)
 
       expect(mountedIndices).toEqual([0, 1])
+    })
+
+    it('应该支持 getter 函数返回数组', () => {
+      const items = [{ name: 'x' }, { name: 'y' }]
+      const mountedItems: string[] = []
+
+      const mountable = each(
+        () => items,
+        (item: { name: string }) =>
+          (() => {
+            mountedItems.push(item.name)
+            return () => {}
+          })
+      )
+
+      mountable({}, undefined)
+
+      expect(mountedItems).toEqual(['x', 'y'])
     })
 
     it('unmount 时应该清理所有子组件', () => {
@@ -463,7 +513,7 @@ describe('@rasenjs/core', () => {
       const ref = mockRuntime.ref(1)
 
       expect(typeof mountFn).toBe('function')
-      expect(mockRuntime.unref(ref)).toBe(1)
+      expect(unref(ref)).toBe(1)
     })
   })
 })

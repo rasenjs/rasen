@@ -10,6 +10,8 @@ import { ShadowRenderer } from './renderer/shadow'
 import { ShaderProgram } from './renderer/shader'
 import { Mat4x4f } from '@rasenjs/math'
 import { parseColor } from './utils'
+import type { CameraConfig } from './camera'
+import { computeCameraMatrix, isLookAtCamera } from './camera'
 
 /**
  * Transform state for group hierarchy (2D/3D unified)
@@ -54,6 +56,16 @@ export interface RenderContextOptions {
    */
   logicalWidth?: number
   logicalHeight?: number
+  /**
+   * Camera configuration — intrinsic to the canvas, not a child component.
+   *
+   * - 2D (default): `{ x?, y?, zoom? }` or omit entirely
+   * - 3D perspective: `{ x, y, z, target, fov, ... }`
+   * - 3D orthographic: `{ x, y, z, target }` (no fov)
+   *
+   * @see CameraConfig
+   */
+  camera?: CameraConfig
   /**
    * 帧调度注入（宿主适配点）。返回值即取消函数——调度与取消一体。
    * 缺省：环境有 requestAnimationFrame 用之；测试/SSR 环境退化为
@@ -127,7 +139,8 @@ export class RenderContext {
       clearColor: options.clearColor ?? '#000000',
       continuousRender: options.continuousRender ?? false,
       logicalWidth: options.logicalWidth,
-      logicalHeight: options.logicalHeight
+      logicalHeight: options.logicalHeight,
+      camera: options.camera
     }
 
     // 帧调度：注入优先；缺省 rAF，环境缺失（测试/SSR）退化 queueMicrotask
@@ -162,8 +175,19 @@ export class RenderContext {
     const logicalHeight =
       this.options.logicalHeight ?? gl.canvas.height
 
-    this.projectionMatrix = Mat4x4f.ortho(0, logicalWidth, 0, logicalHeight, -1000, 1000)
-    this.viewMatrix = Mat4x4f.identity()
+    // Compute camera matrices from config (2D default: ortho with pan/zoom)
+    const { projection, view } = computeCameraMatrix(
+      options.camera,
+      logicalWidth,
+      logicalHeight
+    )
+    this.projectionMatrix = projection
+    this.viewMatrix = view
+
+    // Enable depth testing for 3D (lookAt) cameras
+    if (isLookAtCamera(options.camera)) {
+      gl.enable(gl.DEPTH_TEST)
+    }
 
     // WebGL2 能力探测：不依赖 DOM 全局 instanceof；in 收窄到 Gl2Context
     if (this.options.instancing && 'drawArraysInstanced' in gl) {
@@ -282,6 +306,7 @@ export class RenderContext {
 
   /** 标脏：调度一次重绘（v1 一律全量重绘） */
   markDirty() {
+    this.needsFullRedraw = true
     this.scheduleDraw()
   }
 
@@ -503,6 +528,8 @@ export class RenderContext {
     normals?: Float32Array,
     layer?: number,
     skipTonemap?: boolean,
+    premultiplied?: boolean,
+    blendMode?: import('./renderer/batch').BlendMode,
   ) {
     const matrix = this.createTransformMatrix(
       transform.tx,
@@ -517,7 +544,7 @@ export class RenderContext {
     )
     
     if (this.batchRenderer) {
-      this.batchRenderer.addShape(vertices, color, matrix, uv, texture, vertexColors, depthWrite, normals, layer, skipTonemap)
+      this.batchRenderer.addShape(vertices, color, matrix, uv, texture, vertexColors, depthWrite, normals, layer, skipTonemap, premultiplied, blendMode)
     }
   }
 
@@ -556,9 +583,13 @@ export class RenderContext {
   }
 
   setProjectionMatrix(matrix: Mat4x4f) {
+    console.log('RenderContext.setProjectionMatrix:', Array.from(matrix.source.slice(0, 4)))
     this.projectionMatrix = matrix
     if (this.batchRenderer) {
+      console.log('BatchRenderer.setProjectionMatrix:', Array.from(matrix.source.slice(0, 4)))
       this.batchRenderer.setProjectionMatrix(matrix)
+    } else {
+      console.log('BatchRenderer is null!')
     }
     if (this.instancedRenderer) {
       this.instancedRenderer.setProjectionMatrix(matrix)
@@ -589,6 +620,33 @@ export class RenderContext {
     if (this.instancedRenderer) {
       this.instancedRenderer.setViewMatrix(matrix)
     }
+  }
+
+  /**
+   * Update camera from a configuration object. Recomputes projection and
+   * view matrices, then requests a redraw.
+   *
+   * For 2D: pass `{ x, y, zoom }`.
+   * For 3D: pass `{ x, y, z, target, fov?, ... }`.
+   */
+  setCamera(config: CameraConfig) {
+    const w = this.options.logicalWidth ?? this.gl.canvas.width
+    const h = this.options.logicalHeight ?? this.gl.canvas.height
+    const { projection, view } = computeCameraMatrix(config, w, h)
+    this.setProjectionMatrix(projection)
+    this.setViewMatrix(view)
+    // Depth test for 3D (lookAt) cameras
+    if (isLookAtCamera(config)) {
+      this.gl.enable(this.gl.DEPTH_TEST)
+    } else {
+      this.gl.disable(this.gl.DEPTH_TEST)
+    }
+    this.requestRedraw()
+  }
+
+  /** Get the current camera configuration (undefined if default 2D). */
+  get camera(): CameraConfig | undefined {
+    return this.options.camera
   }
 
   pushTransform(transform: Partial<TransformState>) {

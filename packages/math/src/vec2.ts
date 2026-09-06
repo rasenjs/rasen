@@ -116,6 +116,23 @@ export class Vec2f {
   static fromArray(arr: number[] | Float32Array): Vec2f {
     return new Vec2f(arr[0], arr[1])
   }
+
+  /** Create a Vec2f from an angle in radians (WGSL: vec2(cos, sin)). */
+  static fromAngle(radians: number): Vec2f {
+    return new Vec2f(Math.cos(radians), Math.sin(radians))
+  }
+
+  /** Return the angle of this vector in radians (WGSL: atan(v.y, v.x)). */
+  angle(): number {
+    return Math.atan2(this.y, this.x)
+  }
+
+  /** Rotate this vector by an angle in radians. */
+  rotate(radians: number): Vec2f {
+    const c = Math.cos(radians)
+    const s = Math.sin(radians)
+    return new Vec2f(this.x * c - this.y * s, this.x * s + this.y * c)
+  }
 }
 
 export function vec2f(x: number, y: number): Vec2f {

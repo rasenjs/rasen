@@ -9,4 +9,7 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   external: ['@rasenjs/core', '@rasenjs/canvas-2d', '@rasenjs/webgl'],
+  // Bundle @rasenjs/math into the dist so the standalone viewer copy
+  // (tools/spine-compare/spine-dist) stays self-contained.
+  noExternal: ['@rasenjs/math'],
 })

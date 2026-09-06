@@ -9,7 +9,7 @@
 
 import type { Component3D } from '../../../node'
 import type { MaybeRef, CommonDrawProps, TransformProps } from '../../../types'
-import { unref, createTexture, type BitmapSource } from '../../../utils'
+import { unref, createTexture, type BitmapSource, type TextureOptions } from '../../../utils'
 import { getRenderContext } from '../../../render-context'
 import { element } from '../../element'
 
@@ -27,6 +27,8 @@ export interface MeshProps extends CommonDrawProps, TransformProps {
   x?: MaybeRef<number>
   y?: MaybeRef<number>
   texture?: MaybeRef<BitmapSource | undefined> | undefined
+  /** Texture sampling options (e.g. LINEAR filtering for smooth meshes). */
+  textureOptions?: MaybeRef<TextureOptions | undefined> | undefined
 }
 
 /**
@@ -44,6 +46,7 @@ export const mesh: Component3D<MeshProps> = (props: MeshProps) => {
     draw: (gl) => {
       const geo = unref(props.geometry)
       const textureSource = unref(props.texture)
+      const textureOptions = unref(props.textureOptions)
       const visible = unref(props.visible) ?? true
       const opacity = unref(props.opacity) ?? 1
 
@@ -65,7 +68,7 @@ export const mesh: Component3D<MeshProps> = (props: MeshProps) => {
       if (!batch) return
 
       const transform = renderContext.getCurrentTransform()
-      const texture = textureSource ? createTexture(gl, textureSource) : null
+      const texture = textureSource ? createTexture(gl, textureSource, textureOptions) : null
 
       // Lighting is computed per-pixel in the fragment shader from world-space
       // normals (passed via `normals`). No CPU-side vertex color baking here.
@@ -97,6 +100,7 @@ export const mesh: Component3D<MeshProps> = (props: MeshProps) => {
     deps: () => [
       unref(props.geometry),
       unref(props.texture),
+      unref(props.textureOptions),
       unref(props.x),
       unref(props.y),
       unref(props.z),

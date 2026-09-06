@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import { resolve } from 'path'
 
 export default defineConfig({
-  root: '.',
+  root: __dirname,
   build: {
     outDir: 'dist',
     rollupOptions: {
@@ -13,7 +13,8 @@ export default defineConfig({
         transforms: './transforms.html',
         text: './text.html',
         advanced: './advanced.html',
-        performance: './performance.html'
+        performance: './performance.html',
+        spine: './spine.html'
       }
     }
   },
@@ -22,7 +23,8 @@ export default defineConfig({
       '@rasenjs/core': resolve(__dirname, '../../packages/core/src'),
       '@rasenjs/dom': resolve(__dirname, '../../packages/dom/src'),
       '@rasenjs/canvas-2d': resolve(__dirname, '../../packages/canvas-2d/src'),
-      '@rasenjs/reactive-vue': resolve(__dirname, '../../packages/reactive-vue/src')
+      '@rasenjs/reactive-vue': resolve(__dirname, '../../packages/reactive-vue/src'),
+      '@rasenjs/spine': resolve(__dirname, '../../packages/spine/src')
     }
   }
 })

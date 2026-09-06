@@ -8,6 +8,9 @@ import type { GlContext } from '../node'
 import { ShaderProgram, DEFAULT_VERTEX_SHADER, DEFAULT_FRAGMENT_SHADER } from './shader'
 import { Mat4x4f, mat4x4f } from '@rasenjs/math'
 
+/** Spine-style blend mode (affects the GL blend function). */
+export type BlendMode = 'normal' | 'additive' | 'multiply' | 'screen'
+
 interface BatchItem {
   vertices: Float32Array
   color: Color
@@ -24,6 +27,12 @@ interface BatchItem {
   layer?: number
   /** Skip tonemapping (e.g. skybox keeps its original vivid colours). */
   skipTonemap?: boolean
+  /** Use premultiplied-alpha blending (ONE, ONE_MINUS_SRC_ALPHA). Required
+   *  for atlases exported with premultiplied alpha (pma:true). Default false
+   *  uses straight-alpha blending (SRC_ALPHA, ONE_MINUS_SRC_ALPHA). */
+  premultiplied?: boolean
+  /** Spine blend mode (normal/additive/multiply/screen). Default normal. */
+  blendMode?: BlendMode
 }
 
 export class BatchRenderer {
@@ -137,12 +146,14 @@ export class BatchRenderer {
     normals?: Float32Array,
     layer?: number,
     skipTonemap?: boolean,
+    premultiplied?: boolean,
+    blendMode?: BlendMode,
   ) {
     const transformMatrix = transform instanceof Mat4x4f
       ? transform
       : mat4x4f(transform instanceof Float32Array ? Array.from(transform) : transform)
 
-    this.batchItems.push({ vertices, color, transform: transformMatrix, uv, texture, vertexColors, depthWrite, normals, layer: layer ?? 0, skipTonemap })
+    this.batchItems.push({ vertices, color, transform: transformMatrix, uv, texture, vertexColors, depthWrite, normals, layer: layer ?? 0, skipTonemap, premultiplied, blendMode })
 
     if (this.getTotalVertices() >= this.maxBatchSize) {
       this.flush()
@@ -165,20 +176,23 @@ export class BatchRenderer {
       : this.batchItems.filter((it) => it.layer === filterLayer)
     if (toDraw.length === 0) return
 
-    // Group by texture so each group is one draw call with its texture bound.
-    const groups = new Map<WebGLTexture | null, BatchItem[]>()
-    for (const item of toDraw) {
-      const key = item.texture ?? null
-      let arr = groups.get(key)
-      if (!arr) {
-        arr = []
-        groups.set(key, arr)
+    // Split into CONTIGUOUS runs of (texture, blendMode). This preserves the
+    // caller's draw order (Spine drawOrder!) while switching the blend function
+    // / texture at boundaries. Grouping by key (Map) instead would reorder
+    // additive/multiply effects relative to normal items → wrong stacking.
+    let start = 0
+    let curTexture = toDraw[0].texture ?? null
+    let curBlend: BlendMode = toDraw[0].blendMode ?? 'normal'
+    for (let i = 1; i <= toDraw.length; i++) {
+      const item = i < toDraw.length ? toDraw[i] : null
+      const tex = item ? item.texture ?? null : null
+      const blend: BlendMode = item ? item.blendMode ?? 'normal' : curBlend
+      if (i === toDraw.length || tex !== curTexture || blend !== curBlend) {
+        this.drawGroup(toDraw.slice(start, i), curTexture)
+        start = i
+        curTexture = tex
+        curBlend = blend
       }
-      arr.push(item)
-    }
-
-    for (const [texture, items] of groups) {
-      this.drawGroup(items, texture)
     }
 
     // Remove flushed items, keep other layers queued for later passes.
@@ -193,6 +207,27 @@ export class BatchRenderer {
     const gl = this.gl
     const totalVertices = items.reduce((sum, item) => sum + item.vertices.length / 3, 0)
     const hasTexture = texture !== null
+
+    // Spine blend modes (matches official `PolygonBatcher.blendModesGL`).
+    // `premultiplied` swaps the src RGB factor for PMA atlases (ONE instead of
+    // SRC_ALPHA). A group shares one texture + blend mode, so all its items
+    // agree on the flags.
+    const blendMode = items[0]?.blendMode ?? 'normal'
+    const pma = items.some((it) => it.premultiplied === true)
+    const srcRgb = pma ? gl.ONE : gl.SRC_ALPHA
+    switch (blendMode) {
+      case 'additive':
+        gl.blendFuncSeparate(srcRgb, gl.ONE, gl.ONE, gl.ONE)
+        break
+      case 'multiply':
+        gl.blendFuncSeparate(gl.DST_COLOR, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+        break
+      case 'screen':
+        gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_COLOR, gl.ONE, gl.ONE_MINUS_SRC_COLOR)
+        break
+      default:
+        gl.blendFuncSeparate(srcRgb, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    }
 
     if (!this.positionsArray || this.currentCapacity < totalVertices) {
       this.currentCapacity = Math.max(totalVertices, Math.ceil(this.currentCapacity * 1.5))
@@ -341,6 +376,7 @@ export class BatchRenderer {
     if (depthWrite) gl.depthMask(false)
 
     gl.drawArrays(gl.TRIANGLES, 0, totalVertices)
+    console.log('BatchRenderer.drawGroup: drew', totalVertices, 'vertices')
 
     if (depthWrite) gl.depthMask(true)
   }

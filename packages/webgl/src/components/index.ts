@@ -17,6 +17,7 @@ export { polygon } from './2d/polygon'
 export { arrow } from './2d/arrow'
 export { group } from './2d/group'
 export { each } from './each'
+export { spine, type SpineWebglProps } from './spine'
 
 // 3D Components
 export * from './3d'

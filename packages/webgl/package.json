@@ -42,7 +42,8 @@
   "license": "MIT",
   "dependencies": {
     "@rasenjs/core": "workspace:^",
-    "@rasenjs/math": "workspace:^"
+    "@rasenjs/math": "workspace:^",
+    "@rasenjs/spine": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

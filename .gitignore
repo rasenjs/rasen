@@ -63,6 +63,17 @@ Thumbs.db
 *.png
 *.jpg
 
+# Generated comparison artifacts (vector-recreation pixel-alignment studio)
+recreate.html
+tools/recreate/recreate.html
+tools/recreate/output/
+
+# Generated comparison artifacts (spine runtime diff viewers + downloaded runtimes + char data)
+tools/spine-compare/output/
+
+# Local / personal state (memory system scratch — not project code)
+memories/
+
 # Example build outputs
 examples/*/android/.gradle/
 examples/*/android/app/build/

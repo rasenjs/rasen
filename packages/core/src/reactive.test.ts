@@ -7,8 +7,12 @@ import {
   setReactiveRuntime,
   getReactiveRuntime,
   toValue,
+  unref,
+  setValue,
+  ref,
   type ReactiveRuntime,
-  type Ref
+  type Ref,
+  type ReadonlyRef
 } from './reactive'
 
 describe('reactive', () => {
@@ -21,6 +25,16 @@ describe('reactive', () => {
         const r = { value }
         refs.add(r)
         return r as unknown as Ref<T>
+      },
+
+      computed: <T>(getter: () => T) => {
+        const c = {
+          get value() {
+            return getter()
+          }
+        }
+        refs.add(c)
+        return c as unknown as ReadonlyRef<T>
       },
 
       subscribe: <T>(
@@ -37,7 +51,7 @@ describe('reactive', () => {
         stop: () => {}
       }),
 
-      unref: <T>(value: T | Ref<T>) => {
+      unref: <T>(value: T | Ref<T> | ReadonlyRef<T>) => {
         if (value && typeof value === 'object' && 'value' in value) {
           return (value as { value: T }).value
         }
@@ -82,11 +96,13 @@ describe('reactive', () => {
       expect(getReactiveRuntime()).toBe(mockRuntime)
     })
 
-    it('未设置运行时时应该抛出错误', () => {
+    it('未设置运行时时应该返回 builtin 运行时', () => {
       setReactiveRuntime(null as unknown as ReactiveRuntime)
-      expect(() => getReactiveRuntime()).toThrow(
-        'Reactive runtime not set. Call setReactiveRuntime() before using Rasen.'
-      )
+      const runtime = getReactiveRuntime()
+      expect(runtime).toBeDefined()
+      expect(typeof runtime.subscribe).toBe('function')
+      expect(typeof runtime.effectScope).toBe('function')
+      expect(typeof runtime.ref).toBe('function')
     })
   })
 
@@ -103,6 +119,12 @@ describe('reactive', () => {
       expect(toValue(undefined)).toBe(undefined)
     })
 
+    it('应该解包 computed 值', () => {
+      const r = mockRuntime.ref(10)
+      const c = mockRuntime.computed(() => unref(r) * 2)
+      expect(toValue(c)).toBe(20)
+    })
+
     it('应该处理复杂对象', () => {
       const obj = { a: 1, b: 2 }
       const r = mockRuntime.ref(obj)
@@ -112,25 +134,25 @@ describe('reactive', () => {
 
   describe('ref', () => {
     it('应该创建响应式引用', () => {
-      const r = mockRuntime.ref(10)
-      expect(mockRuntime.unref(r)).toBe(10)
+      const r = ref(10)
+      expect(unref(r)).toBe(10)
     })
 
     it('应该允许修改值', () => {
-      const r = mockRuntime.ref(0)
-      mockRuntime.setValue(r, 5)
-      expect(mockRuntime.unref(r)).toBe(5)
+      const r = ref(0)
+      setValue(r, 5)
+      expect(unref(r)).toBe(5)
     })
 
     it('应该支持任意类型', () => {
-      const objRef = mockRuntime.ref({ x: 1 })
-      expect(mockRuntime.unref(objRef)).toEqual({ x: 1 })
+      const objRef = ref({ x: 1 })
+      expect(unref(objRef)).toEqual({ x: 1 })
 
-      const arrRef = mockRuntime.ref([1, 2, 3])
-      expect(mockRuntime.unref(arrRef)).toEqual([1, 2, 3])
+      const arrRef = ref([1, 2, 3])
+      expect(unref(arrRef)).toEqual([1, 2, 3])
 
-      const nullRef = mockRuntime.ref(null)
-      expect(mockRuntime.unref(nullRef)).toBe(null)
+      const nullRef = ref(null)
+      expect(unref(nullRef)).toBe(null)
     })
   })
 
@@ -175,5 +197,13 @@ describe('reactive', () => {
       expect(mockRuntime.isRef(null)).toBe(false)
     })
 
+    it('computed 应该正确计算值', () => {
+      const r = mockRuntime.ref(5)
+      const c = mockRuntime.computed(() => unref(r) + 10)
+      expect(unref(c)).toBe(15)
+
+      setValue(r, 10)
+      expect(unref(c)).toBe(20)
+    })
   })
 })

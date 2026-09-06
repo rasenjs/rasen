@@ -5,6 +5,8 @@
  */
 
 export { RenderContext, getRenderContext, type RenderContextOptions } from './render-context'
+export type { CameraConfig } from './camera'
+export { isLookAtCamera, computeCameraMatrix } from './camera'
 export { createRoot, createNode, type GlNode, type GlContext } from './node'
 export type { InstanceData } from './renderer/instanced'
 export * from './components'

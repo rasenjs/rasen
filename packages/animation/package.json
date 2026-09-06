@@ -27,7 +27,6 @@
     "@rasenjs/core": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*"
   },
-  "devDependencies": {},
   "keywords": [
     "animation",
     "tween",

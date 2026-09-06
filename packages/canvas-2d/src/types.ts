@@ -469,4 +469,21 @@ export interface GroupConfig extends BaseConfig {
   transform?: MaybeRef<TransformConfig>
 }
 
+// ============================================================================
+// Canvas 2D Camera Config
+// ============================================================================
+
+/**
+ * Canvas 2D 相机配置
+ * 用于控制 Canvas 2D 渲染的平移和缩放
+ */
+export interface CanvasCameraConfig {
+  /** 相机世界 X 坐标 (平移) */
+  x?: number
+  /** 相机世界 Y 坐标 (平移) */
+  y?: number
+  /** 正交缩放倍数 */
+  zoom?: number
+}
+
 

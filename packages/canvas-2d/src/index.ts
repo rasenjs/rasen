@@ -24,7 +24,8 @@ export {
   sprite,
   path,
   point,
-  group
+  group,
+  spine
 } from './components'
 export {
   RenderContext,
@@ -43,6 +44,9 @@ export * from './utils'
 // 导出path相关类型
 export type { PathPoint } from './components/path'
 
+// Canvas 2D Camera Config
+export type { CanvasCameraConfig } from './types'
+
 // 组件 props 类型（供 JSX 增强、组合等场景引用实际组件属性）
 export type { RectProps } from './components/rect'
 export type { TextProps } from './components/text'
@@ -57,6 +61,7 @@ export type { PolygonProps } from './components/polygon'
 export type { ArrowProps } from './components/arrow'
 export type { ImageProps } from './components/image'
 export type { SpriteProps } from './components/sprite'
+export type { SpineProps } from './components/spine'
 export type { PathProps } from './components/path'
 export type { GroupProps } from './components/group'
 

@@ -13,7 +13,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "yarn clean && ../../node_modules/.bin/tsup",
     "dev": "../../node_modules/.bin/tsup --watch",
@@ -21,17 +23,28 @@
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
     "clean": "rm -rf dist"
   },
-  "keywords": ["spine", "dragonbones", "loongbones", "skeleton", "animation", "rasen"],
+  "keywords": [
+    "spine",
+    "dragonbones",
+    "loongbones",
+    "skeleton",
+    "animation",
+    "rasen"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/rasenjs/rasen.git",
     "directory": "packages/spine"
   },
   "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/spine",
-  "bugs": { "url": "https://github.com/rasenjs/rasen/issues" },
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
   "license": "MIT",
   "dependencies": {
-    "@rasenjs/core": "workspace:*"
+    "@rasenjs/assets": "workspace:*",
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/math": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
