@@ -62,7 +62,7 @@ export function com<C extends (...args: any[]) => any>(component: C): C {
   // HMR 未激活时退化到普通 mount（无实例追踪）
   // HMR 激活时启用实例追踪 + remount
   // ================================================================
-  if (!hmrState.active) {
+  if (!hmrState.active || hmrState.stack.length === 0) {
     return ((...args: unknown[]) => {
       const scope = getReactiveRuntime().effectScope()
       let result: unknown

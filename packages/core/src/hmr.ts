@@ -21,6 +21,12 @@ export function enterHmrModule(id: string): void {
 
 export function exitHmrModule(): void {
   hmrState.stack.pop()
+  if (hmrState.stack.length === 0) {
+    // All wrapped modules have finished evaluating — back to runtime mode.
+    // Without this, com() called later (e.g. inside component bodies) would
+    // still take the HMR path and read a nonexistent stack frame.
+    hmrState.active = false
+  }
 }
 
 // 组件注册表（com() 内部使用，不导出到 public API）
