@@ -13,9 +13,11 @@ import { StaticLayer } from './StaticLayer'
 import { Hud } from './Hud'
 import { MarioSprite } from './Mario'
 import { GoombaSprite } from './Goomba'
+import { KoopaSprite } from './Koopa'
 import { CoinSprite } from './Coin'
 import { BlockSprite } from './Block'
-import { ParticleSprite } from './Particle'
+import { ItemSprite } from './Item'
+import { ParticleSprite, ScorePopSprite } from './Particle'
 
 const SCALE = 3
 const W = VIEW_W * SCALE
@@ -26,6 +28,10 @@ const H = VIEW_H * SCALE
  */
 export const View2D = com((props: { game: Game }) => {
   const game = props.game
+  // Hoist to a local so the JSX prop is an identifier — the rasen compiler
+  // wraps member-expression props into getters, which MarioSprite would
+  // then receive as a function instead of the Mario instance.
+  const mario = game.mario
   return (
     <canvas
       width={VIEW_W}
@@ -38,12 +44,18 @@ export const View2D = com((props: { game: Game }) => {
       {each(game.blocks, (b) => <BlockSprite block={b} />)}
       {/* Spinning coins */}
       {each(game.coins, (c) => <CoinSprite coin={c} />)}
-      {/* Coin popup particles */}
+      {/* Power-up items */}
+      {each(game.items, (i) => <ItemSprite item={i} />)}
+      {/* Coin popups & brick shrapnel */}
       {each(game.particles, (p) => <ParticleSprite particle={p} />)}
       {/* Goombas */}
       {each(game.goombas, (g) => <GoombaSprite goomba={g} />)}
+      {/* Koopas */}
+      {each(game.koopas, (k) => <KoopaSprite koopa={k} />)}
+      {/* Score pops */}
+      {each(game.scorePops, (p) => <ScorePopSprite pop={p} />)}
       {/* Player */}
-      <MarioSprite mario={game.mario} />
+      <MarioSprite mario={mario} />
       {/* HUD (reactive canvas text) */}
       <Hud game={game} />
     </canvas>

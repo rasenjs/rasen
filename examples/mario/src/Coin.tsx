@@ -9,13 +9,10 @@
 import { com } from '@rasenjs/core'
 import { ref } from '@rasenjs/reactive-signals'
 import { TILE } from './constants'
-import { TILE_IDX } from './sprites'
 import { blankFrame, overlap, type World } from './world'
 import type { Mario } from './Mario'
 
-// Frame indices on the 16px grid of tiles.png (16 columns, 16px frames)
-const FRAME_SEQUENCE = [TILE_IDX.coin1, TILE_IDX.coin1, TILE_IDX.coin2, TILE_IDX.coin3] as const
-
+// Frame sequence relative to the theme coin base index (3 frames, 16 apart)
 export class Coin {
   // Screen coordinates & sprite frame index (refs the renderer consumes)
   rx = ref(-1000)
@@ -33,16 +30,19 @@ export class Coin {
   active = false
   wx = 0
   wy = 0
-  w = 16
+  w = 12
   h = 16
   animTime = 0
+  /** theme coin frame base (grid index of frame 1) */
+  base = 15
 
   constructor(private world: World) {}
 
-  spawn(tx: number, ty: number) {
+  spawn(tx: number, ty: number, base = 15) {
     this.active = true
-    this.wx = tx * TILE
+    this.wx = tx * TILE + 2
     this.wy = ty * TILE
+    this.base = base
     this.animTime = Math.random() * 0.4
   }
 
@@ -54,7 +54,8 @@ export class Coin {
     if (!this.active) return
     this.animTime += dt
     const phase = Math.floor(this.animTime / 0.14) % 4
-    const idx = FRAME_SEQUENCE[phase]
+    // NES coin spin pulses by shading: bright → mid → dark → mid
+    const idx = this.base + [0, 16, 32, 16][phase]
     this.frame.value = idx
     this.frameTex.value = this.world.assets.tileBank.tile(idx)
   }

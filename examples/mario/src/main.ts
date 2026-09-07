@@ -28,9 +28,14 @@ configureTags({
 function startLoop(game: Game) {
   let last = performance.now()
   const loop = (now: number) => {
-    const dt = Math.min((now - last) / 1000, 1 / 30)
-    last = now
-    game.update(dt)
+    try {
+      const dt = Math.min((now - last) / 1000, 1 / 30)
+      last = now
+      game.update(dt)
+    } catch (err) {
+      // 显示异常但不停止循环（否则 rAF 链断掉，画面永久冻结）
+      window.dispatchEvent(new ErrorEvent('error', { message: String(err) }))
+    }
     requestAnimationFrame(loop)
   }
   requestAnimationFrame(loop)
@@ -38,6 +43,32 @@ function startLoop(game: Game) {
 
 async function main() {
   const container = document.getElementById('app')!
+
+  // Debug: surface any uncaught error on the page (canvas rendering can fail
+  // silently when an rAF callback throws). Remove after diagnosing.
+  window.addEventListener('error', (e) => {
+    let el = document.getElementById('error-banner')
+    if (!el) {
+      el = document.createElement('div')
+      el.id = 'error-banner'
+      el.style.cssText =
+        'position:fixed;top:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;font:12px monospace;padding:6px 10px;white-space:pre-wrap;'
+      document.body.appendChild(el)
+    }
+    el.textContent = `ERROR: ${e.message}\n${e.filename}:${e.lineno}`
+  })
+  window.addEventListener('unhandledrejection', (e) => {
+    let el = document.getElementById('error-banner')
+    if (!el) {
+      el = document.createElement('div')
+      el.id = 'error-banner'
+      el.style.cssText =
+        'position:fixed;top:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;font:12px monospace;padding:6px 10px;white-space:pre-wrap;'
+      document.body.appendChild(el)
+    }
+    el.textContent = `UNHANDLED REJECTION: ${String(e.reason)}`
+  })
+
   container.textContent = 'Loading Mario assets…'
 
   try {
@@ -46,6 +77,7 @@ async function main() {
     setupKeyboard(input)
 
     const game = new Game(assets, input)
+    await game.preload()
     startLoop(game)
 
     // Debug hook (handy for console inspection)

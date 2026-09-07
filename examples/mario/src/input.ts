@@ -9,6 +9,8 @@ export class Input {
   left = false
   right = false
   jump = false
+  run = false
+  down = false
   private jumpEdge = false
 
   pressLeft() {
@@ -30,6 +32,18 @@ export class Input {
   releaseJump() {
     this.jump = false
   }
+  pressRun() {
+    this.run = true
+  }
+  releaseRun() {
+    this.run = false
+  }
+  pressDown() {
+    this.down = true
+  }
+  releaseDown() {
+    this.down = false
+  }
   /** Consume a fresh jump press (returns true exactly once per press). */
   consumeJump(): boolean {
     const edge = this.jumpEdge
@@ -38,7 +52,10 @@ export class Input {
   }
 }
 
-const KEYMAP: Record<string, 'left' | 'right' | 'jump'> = {
+const KEYMAP: Record<
+  string,
+  'left' | 'right' | 'jump' | 'run' | 'down'
+> = {
   ArrowLeft: 'left',
   KeyA: 'left',
   ArrowRight: 'right',
@@ -46,6 +63,11 @@ const KEYMAP: Record<string, 'left' | 'right' | 'jump'> = {
   ArrowUp: 'jump',
   KeyW: 'jump',
   Space: 'jump',
+  KeyX: 'run',
+  ShiftLeft: 'run',
+  ShiftRight: 'run',
+  ArrowDown: 'down',
+  KeyS: 'down',
 }
 
 export function setupKeyboard(input: Input): void {
@@ -55,6 +77,8 @@ export function setupKeyboard(input: Input): void {
     e.preventDefault()
     if (action === 'left') input.pressLeft()
     else if (action === 'right') input.pressRight()
+    else if (action === 'run') input.pressRun()
+    else if (action === 'down') input.pressDown()
     else input.pressJump()
   }
   const onUp = (e: KeyboardEvent) => {
@@ -62,6 +86,8 @@ export function setupKeyboard(input: Input): void {
     if (!action) return
     if (action === 'left') input.releaseLeft()
     else if (action === 'right') input.releaseRight()
+    else if (action === 'run') input.releaseRun()
+    else if (action === 'down') input.releaseDown()
     else input.releaseJump()
   }
   window.addEventListener('keydown', onDown)
@@ -69,7 +95,8 @@ export function setupKeyboard(input: Input): void {
   window.addEventListener('blur', () => {
     input.left = false
     input.right = false
-    input.jump = false
+    input.run = false
+    input.down = false
     input.releaseJump()
   })
 }

@@ -13,18 +13,49 @@ export interface FrameRect {
   h: number
 }
 
-/** Frames inside sprites.png (characters) */
+/** Frames inside sprites.png (characters & items) — coordinates from the
+ * Meth Meth Method Super Mario sprite tables. */
 export const SPRITE_FRAMES = {
+  // Small Mario (16x16)
   marioIdle: { x: 0, y: 88, w: 16, h: 16 },
   marioRun1: { x: 16, y: 88, w: 16, h: 16 },
   marioRun2: { x: 32, y: 88, w: 16, h: 16 },
   marioRun3: { x: 48, y: 88, w: 16, h: 16 },
-  marioBreak: { x: 64, y: 88, w: 16, h: 16 },
+  marioSkid: { x: 64, y: 88, w: 16, h: 16 },
   marioJump: { x: 80, y: 88, w: 16, h: 16 },
   marioDie: { x: 96, y: 88, w: 16, h: 16 },
+  marioClimb1: { x: 0, y: 104, w: 16, h: 16 },
+  marioClimb2: { x: 16, y: 104, w: 16, h: 16 },
+  // Large Mario (16x32)
+  marioLargeIdle: { x: 112, y: 88, w: 16, h: 32 },
+  marioLargeRun1: { x: 128, y: 88, w: 16, h: 32 },
+  marioLargeRun2: { x: 144, y: 88, w: 16, h: 32 },
+  marioLargeRun3: { x: 160, y: 88, w: 16, h: 32 },
+  marioLargeSkid: { x: 176, y: 88, w: 16, h: 32 },
+  marioLargeJump: { x: 192, y: 88, w: 16, h: 32 },
+  marioLargeCrouch: { x: 0, y: 120, w: 16, h: 32 },
+  // Goombas (16x16) — brown (overworld) & blue (underworld)
   goombaWalk1: { x: 80, y: 0, w: 16, h: 16 },
   goombaWalk2: { x: 96, y: 0, w: 16, h: 16 },
   goombaFlat: { x: 112, y: 0, w: 16, h: 16 },
+  goombaBlueWalk1: { x: 80, y: 16, w: 16, h: 16 },
+  goombaBlueWalk2: { x: 96, y: 16, w: 16, h: 16 },
+  goombaBlueFlat: { x: 112, y: 16, w: 16, h: 16 },
+  // Koopa Troopas (16x24) — green (overworld) & blue (underworld)
+  koopaGreenWalk1: { x: 224, y: 0, w: 16, h: 24 },
+  koopaGreenWalk2: { x: 240, y: 0, w: 16, h: 24 },
+  koopaGreenShell: { x: 208, y: 168, w: 16, h: 24 },
+  koopaGreenShellLegs: { x: 208, y: 192, w: 16, h: 24 },
+  koopaBlueWalk1: { x: 224, y: 48, w: 16, h: 24 },
+  koopaBlueWalk2: { x: 240, y: 48, w: 16, h: 24 },
+  koopaBlueShell: { x: 240, y: 168, w: 16, h: 24 },
+  koopaBlueShellLegs: { x: 240, y: 192, w: 16, h: 24 },
+  // Items (16x16, grid-aligned) — verified against the sheet:
+  //   mushroom (80,0) red cap; oneUp (80,16) green variant
+  //   flower (0,64) orange petals + green stem
+  mushroom: { x: 80, y: 0, w: 16, h: 16 },
+  oneUp: { x: 80, y: 16, w: 16, h: 16 },
+  flower: { x: 0, y: 64, w: 16, h: 16 },
 } as const satisfies Record<string, FrameRect>
 
 export type SpriteKey = keyof typeof SPRITE_FRAMES

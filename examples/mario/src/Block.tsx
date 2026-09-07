@@ -2,21 +2,25 @@
  * Block — brick / `?` block entity.
  *
  * Self-contained class: owns its bump animation, the `?` spin animation, the
- * used-state transition and what happens when the player bumps it from below.
- * Its render component `BlockSprite` lives in this same module.
+ * used-state transition and what happens when the player bumps it from below
+ * (coin / power-up contents, brick breaking when Mario is large). Its render
+ * component `BlockSprite` lives in this same module.
  */
 
 import { com } from '@rasenjs/core'
 import { ref } from '@rasenjs/reactive-signals'
 import { sfx } from './audio'
-import { SCORE_BLOCK_COIN, TILE } from './constants'
-import { TILE_IDX } from './sprites'
-import { type World } from './world'
+import {
+  SCORE_BLOCK_COIN,
+  SCORE_BRICK,
+  TILE,
+  SPRITE_GRID_COLUMNS,
+} from './constants'
+import type { LevelData } from './level-data'
+import { THEME_BLOCK_FRAMES } from './themes'
+import type { World } from './world'
 
 const BUMP_TIME = 0.18
-const CHANCE_SEQUENCE = ['chance1', 'chance1', 'chance2', 'chance3'] as const
-
-export type BlockType = 'brick' | 'chance'
 
 export class Block {
   // Screen coordinates & sprite frame index (refs the renderer consumes)
@@ -24,26 +28,26 @@ export class Block {
   ry = ref(-1000)
   frame = ref(0)
   opacity = ref(0)
-  // Original sprite sheet consumed by the `sprite` component
-  get sheet(): CanvasImageSource {
-    return this.world.assets.tileBank.image
-  }
 
   // Tile position and behaviour
   active = false
   tx = 0
   ty = 0
-  type: BlockType = 'brick'
+  type: 'brick' | 'chance' = 'brick'
   used = false
   bumpTimer = 0
 
   constructor(private world: World) {}
 
-  init(tx: number, ty: number, type: BlockType) {
+  get sheet(): CanvasImageSource {
+    return this.world.assets.tileBank.image
+  }
+
+  init(def: LevelData['blocks'][number]) {
     this.active = true
-    this.tx = tx
-    this.ty = ty
-    this.type = type
+    this.tx = def.tx
+    this.ty = def.ty
+    this.type = def.type
     this.used = false
     this.bumpTimer = 0
   }
@@ -52,36 +56,67 @@ export class Block {
     this.active = false
   }
 
+  get chanceContents(): 'powerup' | 'coin' {
+    const def = this.world.level.blocks.find(
+      (b) => b.tx === this.tx && b.ty === this.ty,
+    )
+    return def?.contents === 'coin' ? 'coin' : 'powerup'
+  }
+
   update(dt: number) {
     if (!this.active) return
     if (this.bumpTimer > 0) this.bumpTimer -= dt
     this.frame.value = this.currentFrame()
   }
 
-  /** The player bumped this block from below — handle the consequence. */
-  bump() {
+  /**
+   * The player bumped this block from below.
+   * @param brickBreakable true when Mario is large (bricks shatter)
+   */
+  bump(brickBreakable: boolean) {
     if (this.bumpTimer > 0) return
     this.bumpTimer = BUMP_TIME
-    if (this.type === 'chance' && !this.used) {
-      this.used = true
-      this.world.addCoin(SCORE_BLOCK_COIN)
-      this.world.spawnCoinParticle(this.tx * TILE + 8, this.ty * TILE - 2)
-      sfx.coin()
-    } else {
+
+    if (this.type === 'chance') {
+      if (!this.used) {
+        this.used = true
+        if (this.chanceContents === 'coin') {
+          this.world.addCoin(SCORE_BLOCK_COIN)
+          // coin (16x16) sits centered on the block (same left edge) and
+          // starts just above the block top
+          this.world.spawnCoinParticle(this.tx * TILE, this.ty * TILE - 16)
+          sfx.coin()
+        } else {
+          this.world.spawnItemFromBlock(this.tx, this.ty)
+          sfx.powerupAppear()
+        }
+        return
+      }
+      // A used ? block never breaks — it just thuds
       sfx.bump()
+      return
     }
+
+    // Brick
+    if (brickBreakable) {
+      this.world.spawnShrapnel(this.tx, this.ty)
+      this.world.addScore(SCORE_BRICK)
+      this.deactivate()
+      this.world.brickBroken(this.tx, this.ty)
+      sfx.brickBreak()
+      return
+    }
+    sfx.bump()
   }
 
   private currentFrame(): number {
-    if (this.type === 'chance' && !this.used) {
-      const name = CHANCE_SEQUENCE[Math.floor(this.world.clock / 0.18) % 4]
-      return name === 'chance2'
-        ? TILE_IDX.chance2
-        : name === 'chance3'
-          ? TILE_IDX.chance3
-          : TILE_IDX.chance1
+    const F = THEME_BLOCK_FRAMES[this.world.level.theme]
+    if (this.type === 'chance') {
+      if (this.used) return F.used
+      const phase = Math.floor(this.world.clock / 0.16) % 5
+      return [F.chance1, F.chance1, F.chance2, F.chance3, F.chance2][phase]
     }
-    return this.used ? TILE_IDX.metal : TILE_IDX.bricks
+    return F.brick
   }
 
   /** Bake the camera offset into the screen-coordinate refs. */
@@ -115,7 +150,7 @@ export const BlockSprite = com((props: { block: Block }) => {
       frame={b.frame}
       frameWidth={16}
       frameHeight={16}
-      columns={16}
+      columns={SPRITE_GRID_COLUMNS}
       opacity={b.opacity}
     />
   )

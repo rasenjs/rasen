@@ -9,6 +9,8 @@
 import type { Ref } from '@rasenjs/core'
 import type { Input } from './input'
 import type { GameAssets } from './assets'
+import type { LevelData } from './level-data'
+import type { Mario } from './Mario'
 
 /** A positioned box (anything that can overlap with something else). */
 export interface Box {
@@ -31,6 +33,10 @@ export interface World {
   /** global animation clock (seconds) */
   clock: number
   camX: Ref<number>
+  /** current level data */
+  level: LevelData
+  /** the player (for items / enemies to inspect power state) */
+  mario: Mario
 
   solidAt(tx: number, ty: number): boolean
   /** Move along X and resolve against solid tiles. Returns true on wall hit. */
@@ -39,12 +45,28 @@ export interface World {
   collideY(e: Body): { tx: number; ty: number } | null
   /** Is there ground directly below ahead of this body? */
   groundAhead(e: Body): boolean
+  /** Does this box overlap any lava tile? */
+  lavaOverlap(e: Box): boolean
 
   /** Player bumped the tile at (tx, ty) from below. */
-  bumpAt(tx: number, ty: number): void
+  bumpAt(tx: number, ty: number, brickBreakable: boolean): void
+  /** A brick block at (tx, ty) was broken (clear its collision). */
+  brickBroken(tx: number, ty: number): void
   addCoin(score: number): void
+  addScore(score: number): void
+  addLife(): void
   spawnCoinParticle(x: number, y: number): void
+  spawnShrapnel(tx: number, ty: number): void
+  spawnScorePop(x: number, y: number, text: string): void
+  /** Spawn a power-up item rising out of a `?` block. */
+  spawnItemFromBlock(tx: number, ty: number): void
   killPlayer(): void
+  /** Player touched the goal of the level (exit pipe / toad). */
+  reachGoal(): void
+  /** Player slid down the pole and walked into the castle. */
+  castleEntered(): void
+  /** Flag pole tile position, if the level has one. */
+  flagPole(): { tx: number; tyTop: number; baseY: number } | null
 }
 
 /** Axis-aligned bounding box overlap. */

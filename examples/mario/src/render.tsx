@@ -2,14 +2,12 @@
  * Rasen UI — reactive DOM shell + reactive canvas-2d scene tree.
  *
  * The world is composed from self-contained pieces: `StaticLayer` (sky +
- * pre-rendered tiles), one entity per game object (each renders itself via
- * its `render()` method → a canvas-2d `image`) and `Hud`. The game loop
- * mutates entity refs and the renderer redraws automatically. Overlays
- * (title / game over / win) are DOM layers shown via `when`.
+ * pre-rendered tiles), one entity pool per game object and `Hud`. Overlays
+ * (title / world-intro card / game over / win) are DOM layers shown via
+ * `when`.
  */
 
 import { com } from '@rasenjs/core'
-import { computed } from '@rasenjs/reactive-signals'
 import { when } from '@rasenjs/dom'
 import { VIEW_H, VIEW_W } from './constants'
 import type { Game } from './game'
@@ -48,9 +46,36 @@ function TitleScreen(props: { game: Game }) {
         Press <b>SPACE</b> / <b>↑</b> or click to start
       </div>
       <div style={{ fontSize: '11px', color: '#aab', lineHeight: '1.8' }}>
-        ← → move&nbsp;&nbsp;·&nbsp;&nbsp;SPACE / ↑ jump
+        ← → move · SHIFT/X run · ↓ crouch · SPACE / ↑ jump
         <br />
-        Stomp goombas · Grab coins · Reach the flag pole!
+        Worlds 1-1 → 1-4 · Stomp enemies · Grow with mushrooms!
+      </div>
+    </div>
+  )
+}
+
+/** Classic black world-intro card: WORLD 1-1, mario × lives. */
+function IntroCard(props: { game: Game }) {
+  const g = props.game
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: '0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '16px',
+        background: '#000',
+      }}
+    >
+      <div style={{ fontSize: '24px', color: '#fff', fontWeight: 'bold', letterSpacing: '2px' }}>
+        {() => `WORLD ${g.worldLabel.value}`}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span style={{ fontSize: '20px' }}>🍄</span>
+        <span style={{ fontSize: '20px', color: '#fff' }}>{() => `×  ${g.lives.value}`}</span>
       </div>
     </div>
   )
@@ -67,10 +92,10 @@ function GameOverScreen(props: { game: Game }) {
         alignItems: 'center',
         justifyContent: 'center',
         gap: '12px',
-        background: 'rgba(32, 36, 44, 0.65)',
+        background: 'rgba(32, 36, 44, 0.85)',
         cursor: 'pointer',
       }}
-      onClick={() => props.game.restart()}
+      onClick={() => props.game.startGame()}
     >
       <div style={{ fontSize: '34px', fontWeight: 'bold', color: '#e33', textShadow: '3px 3px 0 #7a1f1f' }}>
         GAME OVER
@@ -81,7 +106,7 @@ function GameOverScreen(props: { game: Game }) {
 }
 
 function WinScreen(props: { game: Game }) {
-  const finalScore = computed(() => String(props.game.score.value))
+  const g = props.game
   return (
     <div
       style={{
@@ -92,17 +117,17 @@ function WinScreen(props: { game: Game }) {
         alignItems: 'center',
         justifyContent: 'center',
         gap: '12px',
-        background: 'rgba(20, 60, 20, 0.6)',
+        background: 'rgba(20, 60, 20, 0.75)',
         cursor: 'pointer',
       }}
-      onClick={() => props.game.restart()}
+      onClick={() => g.startGame()}
     >
       <div style={{ fontSize: '34px', fontWeight: 'bold', color: '#5f5', textShadow: '3px 3px 0 #164' }}>
-        YOU WIN!
+        THANK YOU MARIO!
       </div>
-      <div style={{ fontSize: '16px', color: '#ffd75e' }}>Thanks for playing!</div>
+      <div style={{ fontSize: '16px', color: '#ffd75e' }}>Your quest is complete.</div>
       <div style={{ fontSize: '13px', color: '#fff' }}>
-        Final score: <b>{finalScore}</b>
+        Final score: <b>{() => String(g.score.value)}</b>
       </div>
       <div style={{ fontSize: '12px', color: '#aab' }}>Press SPACE or click to play again</div>
     </div>
@@ -113,34 +138,40 @@ function WinScreen(props: { game: Game }) {
 
 function TouchControls(props: { input: Input }) {
   const { input } = props
-  const hold = (action: 'left' | 'right' | 'jump') => ({
+  const hold = (action: 'left' | 'right' | 'jump' | 'run' | 'down') => ({
     onPointerDown: (e: { preventDefault: () => void }) => {
       e.preventDefault()
       if (action === 'left') input.pressLeft()
       else if (action === 'right') input.pressRight()
+      else if (action === 'run') input.pressRun()
+      else if (action === 'down') input.pressDown()
       else input.pressJump()
     },
     onPointerUp: () => {
       if (action === 'left') input.releaseLeft()
       else if (action === 'right') input.releaseRight()
+      else if (action === 'run') input.releaseRun()
+      else if (action === 'down') input.releaseDown()
       else input.releaseJump()
     },
     onPointerLeave: () => {
       if (action === 'left') input.releaseLeft()
       else if (action === 'right') input.releaseRight()
+      else if (action === 'run') input.releaseRun()
+      else if (action === 'down') input.releaseDown()
       else input.releaseJump()
     },
   })
   const btn: Record<string, string | number> = {
     position: 'absolute',
     bottom: '10px',
-    width: '64px',
-    height: '64px',
+    width: '56px',
+    height: '56px',
     borderRadius: '50%',
     border: '2px solid rgba(255,255,255,0.35)',
     background: 'rgba(255,255,255,0.12)',
     color: '#fff',
-    fontSize: '22px',
+    fontSize: '20px',
     userSelect: 'none',
     touchAction: 'none',
     display: 'flex',
@@ -152,8 +183,14 @@ function TouchControls(props: { input: Input }) {
       <span {...hold('left')} style={{ ...btn, left: '10px' }}>
         ◀
       </span>
-      <span {...hold('right')} style={{ ...btn, left: '84px' }}>
+      <span {...hold('right')} style={{ ...btn, left: '76px' }}>
         ▶
+      </span>
+      <span {...hold('down')} style={{ ...btn, left: '142px' }}>
+        ▼
+      </span>
+      <span {...hold('run')} style={{ ...btn, right: '84px' }}>
+        B
       </span>
       <span {...hold('jump')} style={{ ...btn, right: '10px' }}>
         A
@@ -171,10 +208,6 @@ let game!: Game
 let input!: Input
 
 const App = com(() => {
-  const isTitle = computed(() => game.phase.value === 'title')
-  const isGameOver = computed(() => game.phase.value === 'gameover')
-  const isWin = computed(() => game.phase.value === 'win')
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '20px' }}>
       <div
@@ -188,13 +221,14 @@ const App = com(() => {
           boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
         }}
       >
-        {/* ── Reactive 2D scene — same Game logic, canvas-2d view ── */}
+        {/* ── Reactive 2D scene ── */}
         <View2D game={game} />
 
         {/* ── DOM overlays ── */}
-        {when({ condition: isTitle, then: () => <TitleScreen game={game} /> })}
-        {when({ condition: isGameOver, then: () => <GameOverScreen game={game} /> })}
-        {when({ condition: isWin, then: () => <WinScreen game={game} /> })}
+        {when({ condition: () => game.phase.value === 'title', then: () => <TitleScreen game={game} /> })}
+        {when({ condition: () => game.phase.value === 'intro', then: () => <IntroCard game={game} /> })}
+        {when({ condition: () => game.phase.value === 'gameover', then: () => <GameOverScreen game={game} /> })}
+        {when({ condition: () => game.phase.value === 'win', then: () => <WinScreen game={game} /> })}
 
         {/* Mute button */}
         <span
@@ -210,7 +244,14 @@ const App = com(() => {
             cursor: 'pointer',
             userSelect: 'none',
           }}
-          onClick={() => sfx.toggleMute()}
+          onClick={() => {
+            const muted = sfx.toggleMute()
+            const bgmMuted = game.bgm.toggleMute()
+            // keep both in sync; if unmuting, restart the current theme
+            if (!muted && !bgmMuted && game.phase.value === 'playing') {
+              game.bgm.playTheme(game.level.theme, game.hurry.value)
+            }
+          }}
         >
           🔊
         </span>
@@ -221,10 +262,10 @@ const App = com(() => {
 
       {/* Footer hint */}
       <div style={{ fontSize: '12px', color: '#889', textAlign: 'center', lineHeight: '1.7' }}>
-        ← → / A D move · SPACE / ↑ / W jump · click to restart
+        ← → / A D move · SHIFT / X run · ↓ / S crouch · SPACE / ↑ / W jump
         <br />
-        Built with <b>Rasen</b> — reactive canvas-2d renderer · sprites from the
-        Meth Meth Method Super Mario tutorial
+        Built with <b>Rasen</b> — reactive canvas-2d renderer · levels &amp;
+        sprites from the Meth Meth Method Super Mario data
       </div>
     </div>
   )

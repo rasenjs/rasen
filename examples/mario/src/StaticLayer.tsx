@@ -6,20 +6,25 @@
  */
 
 import { com } from '@rasenjs/core'
-import { computed } from '@rasenjs/reactive-signals'
 import { VIEW_H, VIEW_W } from './constants'
 import type { Game } from './game'
-
-const SKY = '#5c94fc'
+import { THEME_SKY } from './themes'
 
 export const StaticLayer = com((props: { game: Game }) => {
-  const camOffset = computed(() => -props.game.camX.value)
+  const game = props.game
   return (
     <group>
       {/* Sky */}
-      <rect x={0} y={0} width={VIEW_W} height={VIEW_H} fill={SKY} />
-      {/* Pre-rendered static level layer (camera-offset) */}
-      <image image={props.game.assets.staticLayer} x={camOffset} y={0} />
+      <rect
+        x={0}
+        y={0}
+        width={VIEW_W}
+        height={VIEW_H}
+        fill={() => THEME_SKY[game.level.theme]}
+      />
+      {/* Pre-rendered level layer — pass the refs directly; the JSX prop
+          system unrefs them itself */}
+      <image image={game.staticLayer} x={game.camRenderX} y={0} />
     </group>
   )
 })
