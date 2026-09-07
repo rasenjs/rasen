@@ -99,6 +99,15 @@ export const text: Component2D<TextProps> = (
       const textDecoration = props.textDecoration
         ? unref(props.textDecoration)
         : undefined
+      const opacity = props.opacity !== undefined
+        ? (unref(props.opacity) as number)
+        : 1
+
+      // text 不像 rect/image 那样走 withDrawProps 的 save/restore ——
+      // 若在这里改 globalAlpha 而不恢复，本次绘制后 ctx 的 alpha 被永久污染，
+      // 之后所有未显式传 opacity 的节点（如静态层）都会以污染后的 alpha 绘制。
+      const prevAlpha = ctx.globalAlpha
+      if (opacity < 1) ctx.globalAlpha = prevAlpha * opacity
 
       ctx.fillStyle = fill
       ctx.font = font
@@ -192,6 +201,8 @@ export const text: Component2D<TextProps> = (
           ctx.restore()
         }
       }
+
+      if (opacity < 1) ctx.globalAlpha = prevAlpha
     },
 
     on: pointerHandlersFrom(props),
@@ -205,7 +216,8 @@ export const text: Component2D<TextProps> = (
       props.textAlign ? unref(props.textAlign) : undefined,
       props.textBaseline ? unref(props.textBaseline) : undefined,
       props.letterSpacing ? unref(props.letterSpacing) : undefined,
-      props.textDecoration ? unref(props.textDecoration) : undefined
+      props.textDecoration ? unref(props.textDecoration) : undefined,
+      props.opacity ? unref(props.opacity) : undefined
     ]
     })
     return () => n.remove()

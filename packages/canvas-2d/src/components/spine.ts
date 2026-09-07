@@ -57,6 +57,13 @@ export interface SpineProps {
   skeleton: PropValue<Skeleton | null>
   atlas: PropValue<SpineAtlas | null>
   atlasImg: PropValue<HTMLImageElement | null>
+  /**
+   * Multi-page atlas images: page file name (as written in the .atlas, e.g.
+   * `c103_00_2.png`) → loaded image. Regions on page 2+ must sample from
+   * their own page's image — drawing them from the primary page paints the
+   * wrong texels (faces vanishing on c103/c094 multi-page characters).
+   */
+  atlasImgs?: PropValue<Map<string, HTMLImageElement> | null>
   state: PropValue<AnimationState | null>
   /** Animation name to play. Switches when the value changes. */
   animation?: PropValue<string>
@@ -344,6 +351,19 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
         //
         // Use drawOrder (not slots) to respect the draworder timeline which
         // reorders slots for correct layering (e.g. inner skirt behind outer).
+        // Multi-page atlas: page file name → image. Regions reference their
+        // page by name; sampling a page-2 region from the primary image paints
+        // wrong texels (faces vanish on c103/c094).
+        const pageImgs = unref(props.atlasImgs) as Map<string, HTMLImageElement> | null
+        const imgForRegion = (regionName: string): HTMLImageElement | ImageBitmap => {
+          if (pageImgs) {
+            const region = (at as SpineAtlas).regions[regionName]
+            const pageImg = region ? pageImgs.get(region.page) : undefined
+            if (pageImg) return pageImg
+          }
+          return img
+        }
+
         for (const slot of sk.drawOrder) {
           const attName = slot.attachment
           if (!attName) continue
@@ -374,7 +394,9 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
             ctx.globalCompositeOperation = 'screen'
           }
 
-          drawTexturedTriangles(ctx, geo.world, geo.uvs, geo.triangles, img, expandWorld)
+          // Pick the image for THIS attachment's atlas page (multi-page).
+          const regionName = (att as { path?: string; name?: string }).path ?? (att as { name?: string }).name ?? attName
+          drawTexturedTriangles(ctx, geo.world, geo.uvs, geo.triangles, imgForRegion(regionName), expandWorld)
 
           ctx.globalCompositeOperation = prevBlend
           ctx.globalAlpha = prevAlpha
