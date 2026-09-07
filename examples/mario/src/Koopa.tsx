@@ -25,6 +25,7 @@ export class Koopa {
   ry = ref(-1000)
   frame = ref<HTMLCanvasElement>(blankFrame)
   opacity = ref(0)
+  scaleX = ref<number>(1)
   scaleY = ref<number>(1)
 
   // World position, velocity and behaviour
@@ -144,6 +145,10 @@ export class Koopa {
     this.grounded = false
     this.world.collideY(this)
     if (this.wy > VIEW_H + 100) this.active = false
+
+    // Face the movement direction (art faces right natively, like MMM:
+    // flip when moving left). Idle shells keep their last facing.
+    if (this.vx !== 0) this.dir = this.vx < 0 ? -1 : 1
   }
 
   /** Stomp: walk→shell, moving shell→stopped. */
@@ -238,6 +243,7 @@ export class Koopa {
       this.ry.value = Math.round(this.wy + this.h - canvas.height)
       this.scaleY.value = 1
     }
+    this.scaleX.value = this.dir
     this.opacity.value = 1
     this.frame.value = canvas
   }
@@ -253,6 +259,7 @@ export const KoopaSprite = com((props: { koopa: Koopa }) => {
       image={k.frame}
       x={k.rx}
       y={k.ry}
+      scaleX={k.scaleX}
       scaleY={k.scaleY}
       opacity={k.opacity}
     />
