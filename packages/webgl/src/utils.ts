@@ -254,8 +254,27 @@ export function createTexture(
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, options?.wrapS ?? gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, options?.wrapT ?? gl.CLAMP_TO_EDGE)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, options?.minFilter ?? gl.NEAREST)
+  const minFilter = options?.minFilter ?? gl.NEAREST
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, options?.magFilter ?? gl.NEAREST)
+  // A mipmap min filter requires a complete mip chain — without generateMipmap
+  // the texture is INCOMPLETE and WebGL samples it as opaque black.
+  const wantsMips =
+    minFilter === gl.LINEAR_MIPMAP_LINEAR ||
+    minFilter === gl.LINEAR_MIPMAP_NEAREST ||
+    minFilter === gl.NEAREST_MIPMAP_LINEAR ||
+    minFilter === gl.NEAREST_MIPMAP_NEAREST
+  if (wantsMips && (source instanceof HTMLImageElement || source instanceof ImageBitmap || source instanceof HTMLCanvasElement)) {
+    // POT guarantee check happens implicitly: generateMipmap throws/errs on NPOT.
+    gl.generateMipmap(gl.TEXTURE_2D)
+    // Anisotropic filtering keeps minified textures sharp (fixes both the
+    // aliasing of plain LINEAR and the mushy look of trilinear-only mips).
+    const aniso = gl.getExtension('EXT_texture_filter_anisotropic')
+    if (aniso) {
+      const max = gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT) as number
+      gl.texParameterf(gl.TEXTURE_2D, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, max))
+    }
+  }
   gl.bindTexture(gl.TEXTURE_2D, null)
 
   byOptions.set(optionKey, texture)

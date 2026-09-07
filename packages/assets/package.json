@@ -21,7 +21,8 @@
     "dev": "../../node_modules/.bin/tsup --watch",
     "test": "../../node_modules/.bin/vitest --run",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "golden:generate": "node src/spine/runtime/golden/generate-golden.mjs"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

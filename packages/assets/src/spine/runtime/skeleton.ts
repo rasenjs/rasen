@@ -94,7 +94,7 @@ export interface Slot {
    * renderer adds these offsets to the local (non-weighted) or world
    * (weighted) vertex positions.
    */
-  deform: number[] | null
+  deform: number[] | Float64Array | null
   /**
    * Current sequence (animated texture frame) index, or -1 to use the
    * attachment's setupIndex. Driven by sequence timelines.
@@ -963,7 +963,13 @@ export class Skeleton {
   x = 0
   y = 0
   /** Ordered list of bones + IK constraints to update (Spine update cache). */
-  private _updateCache: Array<{ update: () => void }> = []
+  /**
+   * Flattened update cache. Entries are tag-dispatched (NOT closures) —
+   * closures cost megamorphic calls and an object allocation per entry.
+   * kind: 0 = bone update, 1 = IK constraint, 2 = transform constraint,
+   *       3 = path constraint
+   */
+  private _updateCache: Array<{ kind: 0 | 1 | 2 | 3; bone?: Bone; ik?: IkConstraintRuntime; tc?: TransformConstraintRuntime; pc?: PathConstraintRuntime }> = []
   /**
    * When true, `updateAppliedTransform` uses the Spine 4.1 behaviour: it
    * always decomposes the world matrix without the `transformMode` switch
@@ -1161,12 +1167,26 @@ export class Skeleton {
       bone.ashearY = bone.shearY
     }
     const updateCache = this._updateCache
-    for (let i = 0, n = updateCache.length; i < n; i++) updateCache[i].update()
+    for (let i = 0, n = updateCache.length; i < n; i++) {
+      const e = updateCache[i]
+      switch (e.kind) {
+        case 0: boneUpdate(e.bone!); break
+        case 1: applyIkConstraint(e.ik!); break
+        case 2: applyTransformConstraint(e.tc!); break
+        case 3: applyPathConstraint(e.pc!); break
+      }
+    }
   }
 
   /** Build the update cache (bones + constraints in topological order). */
   updateCache(): void {
-    const updateCache: Array<{ update: () => void }> = []
+    const updateCache: Array<{
+      kind: 0 | 1 | 2 | 3
+      bone?: Bone
+      ik?: IkConstraintRuntime
+      tc?: TransformConstraintRuntime
+      pc?: PathConstraintRuntime
+    }> = []
     this._updateCache = updateCache
     const bones = this.bones
     for (const bone of bones) {
@@ -1203,7 +1223,7 @@ export class Skeleton {
     } else {
       for (let i = 0; i < boneCount; i++) this.sortBone(constrained[i])
     }
-    this._updateCache.push({ update: () => applyTransformConstraint(constraint) })
+    this._updateCache.push({ kind: 2, tc: constraint })
     for (let i = 0; i < boneCount; i++) this.sortReset(constrained[i].children)
     for (let i = 0; i < boneCount; i++) constrained[i].sorted = true
   }
@@ -1214,7 +1234,7 @@ export class Skeleton {
     const constrained = constraint.bones
     const boneCount = constrained.length
     for (let i = 0; i < boneCount; i++) this.sortBone(constrained[i])
-    this._updateCache.push({ update: () => applyPathConstraint(constraint) })
+    this._updateCache.push({ kind: 3, pc: constraint })
     for (let i = 0; i < boneCount; i++) this.sortReset(constrained[i].children)
     for (let i = 0; i < boneCount; i++) constrained[i].sorted = true
   }
@@ -1227,12 +1247,12 @@ export class Skeleton {
     const parent = constrained[0]
     this.sortBone(parent)
     if (constrained.length === 1) {
-      this._updateCache.push({ update: () => applyIkConstraint(constraint) })
+      this._updateCache.push({ kind: 1, ik: constraint })
       this.sortReset(parent.children)
     } else {
       const child = constrained[constrained.length - 1]
       this.sortBone(child)
-      this._updateCache.push({ update: () => applyIkConstraint(constraint) })
+      this._updateCache.push({ kind: 1, ik: constraint })
       this.sortReset(parent.children)
       child.sorted = true
     }
@@ -1243,7 +1263,7 @@ export class Skeleton {
     const parent = bone.parent
     if (parent) this.sortBone(parent)
     bone.sorted = true
-    this._updateCache.push({ update: () => boneUpdate(bone) })
+    this._updateCache.push({ kind: 0, bone })
   }
 
   private sortReset(bones: Bone[]): void {

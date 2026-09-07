@@ -22,7 +22,7 @@ interface BoneRef {
 interface SlotRef {
   bone: BoneRef
   data: { name: string }
-  deform: number[] | null
+  deform: number[] | Float64Array | null
   sequenceIndex: number
 }
 interface SkeletonRef {

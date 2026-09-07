@@ -301,6 +301,8 @@ export interface AnimationData {
   sequence?: Record<string, Record<string, Record<string, Array<{ time: number; mode: number; index: number; delay: number }>>>>
   events?: Array<{ time: number; name: string; int?: number; float?: number; string?: string; volume?: number; balance?: number }>
   draworder?: Array<{ time: number; offsets?: Array<{ slot: string; offset: number }> }>
+  /** Cached duration in seconds (computed once by getAnimationDuration). */
+  duration?: number
 }
 
 /** Normalized skeleton data — the single IR both formats lower into. */

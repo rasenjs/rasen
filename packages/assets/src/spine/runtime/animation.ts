@@ -55,18 +55,7 @@ function evalCurve1D(
 }
 
 /** Evaluate the Y-axis of a 2D curve (Spine stores X handles first, then Y). */
-function evalCurve2DY(
-  curve: unknown, f: number, v0: number, v1: number, t0: number, t1: number
-): number {
-  if (curve === undefined) return v0 + (v1 - v0) * f
-  if (curve === 'stepped') return v0
-  const c = curve as number[]
-  if (c.length < 8) return v0 + (v1 - v0) * f
-  const span = t1 - t0 || 1
-  const ncx1 = (c[4] - t0) / span, ncx2 = (c[6] - t0) / span
-  const s = solveCubicBezierX(f, ncx1, ncx2)
-  return bezierY(s, v0, v1, c[5], c[7])
-}
+
 
 // ---------------------------------------------------------------------------
 // Scalar / value sampling across keyframes
@@ -102,47 +91,8 @@ function sampleScalar(
  * keyframe array. Each axis uses its OWN bezier handles from the left keyframe's
  * `curve` array: X uses indices [0..3], Y uses indices [4..7].
  */
-function sample2D(
-  keyframes: RawKeyframe[],
-  time: number,
-  getX: (kf: RawKeyframe) => number,
-  getY: (kf: RawKeyframe) => number
-): [number, number] {
-  if (keyframes.length === 0) return [0, 0]
-  // Merged X/Y-split timelines (Spine's TranslateXTimeline/TranslateYTimeline,
-  // ScaleX/ScaleY, ShearX/ShearY) interleave X-only and Y-only keyframes. Each
-  // axis must be interpolated using ONLY its own keyframes — using the merged
-  // array for both axes picks the wrong neighbours (e.g. X sampled between an
-  // X keyframe and a Y keyframe) and produces wrong bone positions.
-  const hasAxis = keyframes.some((k) => (k as RawKeyframe).axis !== undefined)
-  if (hasAxis) {
-    const xs = keyframes.filter((k) => (k as RawKeyframe).axis === 'x')
-    const ys = keyframes.filter((k) => (k as RawKeyframe).axis === 'y')
-    const x = xs.length ? sampleScalar(xs, time, (k) => numOr((k as RawKeyframe).x, 0)) : 0
-    const y = ys.length ? sampleScalar(ys, time, (k) => numOr((k as RawKeyframe).y, 0)) : 0
-    return [x, y]
-  }
-  if (keyframes.length === 1) return [getX(keyframes[0]), getY(keyframes[0])]
-  const t0 = kfTime(keyframes[0])
-  if (time <= t0) return [getX(keyframes[0]), getY(keyframes[0])]
-  const tN = kfTime(keyframes[keyframes.length - 1])
-  if (time >= tN) return [getX(keyframes[keyframes.length - 1]), getY(keyframes[keyframes.length - 1])]
-  let i = 0
-  while (i < keyframes.length - 1 && kfTime(keyframes[i + 1]) <= time) i++
-  const a = keyframes[i]
-  const b = keyframes[i + 1]
-  const ta = kfTime(a)
-  const tb = kfTime(b)
-  const span = tb - ta
-  const f = span <= EPSILON ? 0 : (time - ta) / span
-  const vax = getX(a)
-  const vbx = getX(b)
-  const vay = getY(a)
-  const vby = getY(b)
-  const x = evalCurve1D(a.curve, f, vax, vbx, ta, tb)
-  const y = evalCurve2DY(a.curve, f, vay, vby, ta, tb)
-  return [x, y]
-}
+// Per-timeline cache for the X/Y-split keyframes (see sample2D). Merged
+
 
 /** Step (no interpolation) to the last keyframe with time <= t. */
 /** Step function — returns the value of the latest keyframe at or before `time`.
@@ -171,76 +121,460 @@ function parseHexColor(hex: string): [number, number, number, number] {
  *  keyframes, with optional bezier curves on the alpha channel. Without this
  *  the color jumps instantly (step function) → shadows appear/disappear
  *  abruptly instead of fading smoothly. */
-function sampleColor(
-  keyframes: Array<RawKeyframe & { color?: string; curve?: number[] }>,
-  time: number,
-  fallback: string
-): string {
-  if (!keyframes.length) return fallback
-  // Before first keyframe → setup value.
-  if (time < kfTime(keyframes[0])) return fallback
-  // Find surrounding keyframes.
-  let i = 0
-  while (i < keyframes.length - 1 && kfTime(keyframes[i + 1]) <= time) i++
-  const kf0 = keyframes[i]
-  const kf1 = keyframes[i + 1]
-  if (!kf1 || !kf0.color) return kf0.color ?? fallback
-  const c0 = parseHexColor(kf0.color)
-  const c1 = parseHexColor(kf1.color)
-  const t0 = kfTime(kf0), t1 = kfTime(kf1)
-  const span = t1 - t0
-  let pct = span > 0 ? (time - t0) / span : 0
-  if (kf0.curve) pct = evalCurve1D(kf0.curve, pct, 0, 1, t0, t1)
-  const r = Math.round(c0[0] + (c1[0] - c0[0]) * pct)
-  const g = Math.round(c0[1] + (c1[1] - c0[1]) * pct)
-  const b = Math.round(c0[2] + (c1[2] - c0[2]) * pct)
-  const a = Math.round(c0[3] + (c1[3] - c0[3]) * pct)
-  return (
-    r.toString(16).padStart(2, '0') +
-    g.toString(16).padStart(2, '0') +
-    b.toString(16).padStart(2, '0') +
-    a.toString(16).padStart(2, '0')
-  ).toUpperCase()
-}
+
 
 // ---------------------------------------------------------------------------
 // Timeline application
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Compiled animation cache
+// ---------------------------------------------------------------------------
+// applyAnimation runs EVERY frame per instance. The raw AnimationData shape
+// (loosely typed keyframe objects, Object.keys walks, Map lookups, per-sample
+// closures, per-call bezier normalization) costs ~100x the official runtime.
+// The compile step below flattens each timeline ONCE per (animation, skeleton)
+// into numeric arrays with pre-normalized bezier control points; the per-frame
+// path then only touches packed numbers. See opt-plan.md.
+
+interface Compiled1D {
+  times: Float64Array
+  v: Float64Array
+  /** per-segment type: 0 = linear, 1 = stepped, 2 = bezier */
+  types: Uint8Array
+  /** per bezier segment 4 numbers: [ncx1, cy1, ncx2, cy2] (normalized to f) */
+  curves: Float64Array | null
+  /** Segment-lookup cache: last sampled time and its bracketing segment. */
+  lastTime: number
+  lastSeg: number
+}
+
+interface Compiled2D {
+  /** gate time: before it the whole group keeps setup pose */
+  gate: number
+  /** same times array shared by both axes (non-axis-split timelines) */
+  shared: boolean
+  tx: Compiled1D
+  ty: Compiled1D
+}
+
+interface CompiledSlot {
+  slot: any
+  /** attachment step timeline: {gate, times, names} | undefined */
+  att?: { gate: number; times: Float64Array; names: (string | undefined)[] }
+  /** color timeline compiled to numeric channels | undefined */
+  color?: {
+    gate: number
+    times: Float64Array
+    r: Float64Array
+    g: Float64Array
+    b: Float64Array
+    a: Float64Array
+    types: Uint8Array
+    curves: Float64Array | null
+  }
+}
+
+interface CompiledBone {
+  bone: any
+  rotate?: { gate: number; ch: Compiled1D; setup: number }
+  translate?: { gate: number; ch: Compiled2D; setupX: number; setupY: number }
+  scale?: { gate: number; ch: Compiled2D; setupX: number; setupY: number }
+  shear?: { gate: number; ch: Compiled2D; setupX: number; setupY: number }
+}
+
+interface CompiledDeform {
+  slotName: string
+  /** attName -> compiled deform (geometry is static per skin) */
+  byAttachment: Map<string, {
+    deformLength: number
+    times: Float64Array
+    /** per keyframe vertex offsets (padded to deformLength) */
+    verts: Float64Array[]
+    types: Uint8Array
+    curves: Float64Array | null
+    /** reused output buffer — renderer consumes it synchronously each frame */
+    out: Float64Array
+  }>
+}
+
+interface CompiledAnim {
+  bones: CompiledBone[]
+  slots: CompiledSlot[]
+  deform: CompiledDeform[]
+  /** skin key used at compile time; rebuild if the skeleton's skin changes */
+  skin: string
+}
+
+const compileCache = new WeakMap<AnimationData, Map<any, CompiledAnim>>()
+
+function compile1D(kfs: RawKeyframe[], getVal: (kf: RawKeyframe) => number): Compiled1D {
+  const n = kfs.length
+  const times = new Float64Array(n)
+  const v = new Float64Array(n)
+  for (let i = 0; i < n; i++) {
+    times[i] = kfTime(kfs[i])
+    v[i] = getVal(kfs[i])
+  }
+  const segCount = Math.max(0, n - 1)
+  const types = new Uint8Array(segCount)
+  let hasBezier = false
+  let curves: Float64Array | null = null
+  for (let i = 0; i < segCount; i++) {
+    const curve = kfs[i].curve
+    if (curve === 'stepped') {
+      types[i] = 1
+    } else if (Array.isArray(curve) && curve.length >= 4) {
+      types[i] = 2
+      hasBezier = true
+    }
+  }
+  if (hasBezier) {
+    curves = new Float64Array(segCount * 4)
+    for (let i = 0; i < segCount; i++) {
+      if (types[i] !== 2) continue
+      const c = kfs[i].curve as number[]
+      const span = (times[i + 1] - times[i]) || 1
+      curves[i * 4] = (c[0] - times[i]) / span
+      curves[i * 4 + 1] = c[1]
+      curves[i * 4 + 2] = (c[2] - times[i]) / span
+      curves[i * 4 + 3] = c[3]
+    }
+  }
+  return { times, v, types, curves, lastTime: -1, lastSeg: -1 }
+}
+
+function compile2D(kfs: RawKeyframe[], fallback = 0): Compiled2D {
+  const gate = kfTime(kfs[0])
+  // X/Y-split timelines (Spine TranslateXTimeline/Y, ScaleX/Y, ShearX/Y)
+  // interleave axis-tagged keyframes; each axis samples ONLY its own kfs.
+  let hasAxis = false
+  for (const k of kfs) { if (k.axis !== undefined) { hasAxis = true; break } }
+  if (hasAxis) {
+    const xk: RawKeyframe[] = []
+    const yk: RawKeyframe[] = []
+    for (const k of kfs) {
+      if (k.axis === 'x') xk.push(k)
+      else if (k.axis === 'y') yk.push(k)
+    }
+    return {
+      gate,
+      shared: false,
+      tx: compile1D(xk, (k) => numOr(k.x, fallback)),
+      ty: compile1D(yk, (k) => numOr(k.y, fallback))
+    }
+  }
+  const n = kfs.length
+  const times = new Float64Array(n)
+  const vx = new Float64Array(n)
+  const vy = new Float64Array(n)
+  for (let i = 0; i < n; i++) {
+    times[i] = kfTime(kfs[i])
+    vx[i] = numOr(kfs[i].x, fallback)
+    vy[i] = numOr(kfs[i].y, fallback)
+  }
+  const segCount = Math.max(0, n - 1)
+  const txTypes = new Uint8Array(segCount)
+  const tyTypes = new Uint8Array(segCount)
+  let hasBezier = false
+  let txCurves: Float64Array | null = null
+  let tyCurves: Float64Array | null = null
+  for (let i = 0; i < segCount; i++) {
+    const curve = kfs[i].curve
+    if (curve === 'stepped') {
+      txTypes[i] = 1; tyTypes[i] = 1
+    } else if (Array.isArray(curve) && curve.length >= 8) {
+      // Spine 2D curve: [xcx1, xcy1, xcx2, xcy2, ycx1, ycy1, ycx2, ycy2]
+      // in ABSOLUTE time/value space, like evalCurve1D/evalCurve2DY.
+      // X axis: evalCurve1D over c[0..3]; Y axis: evalCurve2DY over c[4..7].
+      // Mirror the legacy quirk exactly: X requires len >= 4 (true here),
+      // Y requires len >= 8 (true here). Note c[0..3] are the X handles.
+      txTypes[i] = 2; tyTypes[i] = 2
+      hasBezier = true
+    } else if (Array.isArray(curve) && curve.length >= 4) {
+      // legacy quirk: evalCurve1D treats len>=4 as bezier for X,
+      // evalCurve2DY treats len<8 as LINEAR for Y.
+      txTypes[i] = 2
+      hasBezier = true
+    }
+  }
+  if (hasBezier) {
+    txCurves = new Float64Array(segCount * 4)
+    for (let i = 0; i < segCount; i++) {
+      if (txTypes[i] !== 2) continue
+      const c = kfs[i].curve as number[]
+      const span = (times[i + 1] - times[i]) || 1
+      txCurves[i * 4] = (c[0] - times[i]) / span
+      txCurves[i * 4 + 1] = c[1]
+      txCurves[i * 4 + 2] = (c[2] - times[i]) / span
+      txCurves[i * 4 + 3] = c[3]
+    }
+    tyCurves = new Float64Array(segCount * 4)
+    for (let i = 0; i < segCount; i++) {
+      if (tyTypes[i] !== 2) continue
+      const c = kfs[i].curve as number[]
+      const span = (times[i + 1] - times[i]) || 1
+      tyCurves[i * 4] = (c[4] - times[i]) / span
+      tyCurves[i * 4 + 1] = c[5]
+      tyCurves[i * 4 + 2] = (c[6] - times[i]) / span
+      tyCurves[i * 4 + 3] = c[7]
+    }
+  }
+  return {
+    gate,
+    shared: true,
+    tx: { times, v: vx, types: txTypes, curves: txCurves, lastTime: -1, lastSeg: -1 },
+    ty: { times, v: vy, types: tyTypes, curves: tyCurves, lastTime: -1, lastSeg: -1 }
+  }
+}
+
+function sample1D(ch: Compiled1D, time: number): number {
+  const n = ch.times.length
+  if (n === 0) return 0
+  if (n === 1) return ch.v[0]
+  if (time <= ch.times[0]) return ch.v[0]
+  const last = n - 1
+  if (time >= ch.times[last]) return ch.v[last]
+  // binary search: largest i with times[i] <= time (times sorted ascending)
+  // NOTE: a monotonic-lookup cache (lastSeg/lastTime) was benchmarked here and
+  // was SLOWER than the plain binary search — timelines have so few keyframes
+  // that the search loop is cheaper than the cache bookkeeping.
+  let lo = 0
+  let hi = last - 1
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1
+    if (ch.times[mid] <= time) lo = mid
+    else hi = mid - 1
+  }
+  const ta = ch.times[lo]
+  const tb = ch.times[lo + 1]
+  const span = tb - ta
+  const f = span <= EPSILON ? 0 : (time - ta) / span
+  const type = ch.types[lo]
+  if (type === 1) return ch.v[lo]
+  if (type === 2 && ch.curves) {
+    const c = lo * 4
+    const s = solveCubicBezierX(f, ch.curves[c], ch.curves[c + 2])
+    return bezierY(s, ch.v[lo], ch.v[lo + 1], ch.curves[c + 1], ch.curves[c + 3])
+  }
+  return ch.v[lo] + (ch.v[lo + 1] - ch.v[lo]) * f
+}
+
+
+
+function getCompiled(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
+  let perSkeleton = compileCache.get(anim)
+  if (!perSkeleton) {
+    perSkeleton = new Map()
+    compileCache.set(anim, perSkeleton)
+  }
+  let compiled = perSkeleton.get(skeleton)
+  if (compiled && compiled.skin === skeleton.skin) return compiled
+  compiled = compileAnim(skeleton, anim)
+  perSkeleton.set(skeleton, compiled)
+  return compiled
+}
+
+function compileAnim(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
+  const out: CompiledAnim = { bones: [], slots: [], deform: [], skin: skeleton.skin }
+
+  if (anim.bones) {
+    for (const name of Object.keys(anim.bones)) {
+      const bone = skeleton.boneMap.get(name)
+      if (!bone) continue
+      const tl = anim.bones[name]
+      const e: CompiledBone = { bone }
+      if (tl.rotate && tl.rotate.length) {
+        e.rotate = {
+          gate: kfTime(tl.rotate[0]),
+          ch: compile1D(tl.rotate, (kf) => {
+            const v = kf.value
+            return typeof v === 'number' ? v : (typeof kf.angle === 'number' ? kf.angle : 0)
+          }),
+          setup: bone.data.rotation ?? 0
+        }
+      }
+      if (tl.translate && tl.translate.length) {
+        e.translate = {
+          gate: kfTime(tl.translate[0]),
+          ch: compile2D(tl.translate),
+          setupX: bone.data.x ?? 0,
+          setupY: bone.data.y ?? 0
+        }
+      }
+      if (tl.scale && tl.scale.length) {
+        e.scale = {
+          gate: kfTime(tl.scale[0]),
+          ch: compile2D(tl.scale, 1),
+          setupX: bone.data.scaleX ?? 1,
+          setupY: bone.data.scaleY ?? 1
+        }
+      }
+      if (tl.shear && tl.shear.length) {
+        e.shear = {
+          gate: kfTime(tl.shear[0]),
+          ch: compile2D(tl.shear),
+          setupX: bone.data.shearX ?? 0,
+          setupY: bone.data.shearY ?? 0
+        }
+      }
+      out.bones.push(e)
+    }
+  }
+
+  if (anim.slots) {
+    for (const name of Object.keys(anim.slots)) {
+      const slot = skeleton.slotMap.get(name)
+      if (!slot) continue
+      const tl = anim.slots[name]
+      const e: CompiledSlot = { slot }
+      if (tl.attachment && tl.attachment.length) {
+        const times = new Float64Array(tl.attachment.length)
+        const names: (string | undefined)[] = []
+        for (let i = 0; i < tl.attachment.length; i++) {
+          times[i] = kfTime(tl.attachment[i])
+          names.push(tl.attachment[i].name)
+        }
+        e.att = { gate: times[0], times, names }
+      }
+      if (tl.color && tl.color.length) {
+        const kfs = tl.color as Array<RawKeyframe & { color?: string; curve?: number[] }>
+        const n = kfs.length
+        const times = new Float64Array(n)
+        const r = new Float64Array(n)
+        const g = new Float64Array(n)
+        const b = new Float64Array(n)
+        const a = new Float64Array(n)
+        for (let i = 0; i < n; i++) {
+          times[i] = kfTime(kfs[i])
+          const c = parseHexColor(kfs[i].color ?? 'FFFFFFFF')
+          r[i] = c[0]; g[i] = c[1]; b[i] = c[2]; a[i] = c[3]
+        }
+        const segCount = Math.max(0, n - 1)
+        const types = new Uint8Array(segCount)
+        let hasBezier = false
+        let curves: Float64Array | null = null
+        for (let i = 0; i < segCount; i++) {
+          const curve = kfs[i].curve
+          if (curve === 'stepped') types[i] = 1
+          else if (Array.isArray(curve) && curve.length >= 4) { types[i] = 2; hasBezier = true }
+        }
+        if (hasBezier) {
+          curves = new Float64Array(segCount * 4)
+          for (let i = 0; i < segCount; i++) {
+            if (types[i] !== 2) continue
+            const c = kfs[i].curve as number[]
+            const span = (times[i + 1] - times[i]) || 1
+            curves[i * 4] = (c[0] - times[i]) / span
+            curves[i * 4 + 1] = c[1]
+            curves[i * 4 + 2] = (c[2] - times[i]) / span
+            curves[i * 4 + 3] = c[3]
+          }
+        }
+        e.color = { gate: times[0], times, r, g, b, a, types, curves }
+      }
+      out.slots.push(e)
+    }
+  }
+
+  const skinDeform = anim.deform?.[skeleton.skin] ?? anim.deform?.['default']
+  if (skinDeform) {
+    for (const slotName of Object.keys(skinDeform)) {
+      const perAtt = skinDeform[slotName]
+      const entry: CompiledDeform = { slotName, byAttachment: new Map() }
+      for (const attName of Object.keys(perAtt)) {
+        const kfs = perAtt[attName]
+        if (!kfs || kfs.length === 0) continue
+        // resolve attachment ONCE — geometry is static per skin
+        const att = skeleton.findAttachment(slotName, attName) as any
+        const attVerts = att?.vertices
+        let deformLength = 0
+        if (attVerts) {
+          if (att.type === 'path') {
+            const attBones = att.bones
+            const vCount = att.vertexCount ?? 0
+            deformLength = attBones ? vCount * 2 : attVerts.length
+          } else {
+            const attUvs = att.uvs
+            if (attUvs) {
+              const vertexCount = attUvs.length / 2
+              const weighted = attVerts.length !== vertexCount * 2
+              deformLength = weighted
+                ? ((attVerts.length - vertexCount) / 4) * 2
+                : attVerts.length
+            }
+          }
+        }
+        if (deformLength === 0) continue
+        const n = kfs.length
+        const times = new Float64Array(n)
+        const verts: Float64Array[] = []
+        for (let i = 0; i < n; i++) {
+          times[i] = kfs[i].time
+          const src: any = kfs[i].vertices
+          const padded = new Float64Array(deformLength)
+          // keyframe vertices may be SHORTER than deformLength (missing tail =
+          // 0) or even sparse (holes) — the legacy path used `?? 0` per index.
+          if (src) for (let v = 0; v < deformLength; v++) padded[v] = src[v] ?? 0
+          verts.push(padded)
+        }
+        const segCount = Math.max(0, n - 1)
+        const types = new Uint8Array(segCount)
+        let hasBezier = false
+        let curves: Float64Array | null = null
+        for (let i = 0; i < segCount; i++) {
+          const curve = kfs[i].curve
+          if (curve === 'stepped') types[i] = 1
+          else if (Array.isArray(curve) && curve.length >= 4) { types[i] = 2; hasBezier = true }
+        }
+        if (hasBezier) {
+          curves = new Float64Array(segCount * 4)
+          for (let i = 0; i < segCount; i++) {
+            if (types[i] !== 2) continue
+            const c = kfs[i].curve as number[]
+            const span = (times[i + 1] - times[i]) || 1
+            curves[i * 4] = (c[0] - times[i]) / span
+            curves[i * 4 + 1] = c[1]
+            curves[i * 4 + 2] = (c[2] - times[i]) / span
+            curves[i * 4 + 3] = c[3]
+          }
+        }
+        entry.byAttachment.set(attName, {
+          deformLength, times, verts, types, curves,
+          out: new Float64Array(deformLength)
+        })
+      }
+      if (entry.byAttachment.size) out.deform.push(entry)
+    }
+  }
+
+  return out
+}
+
 function applyBoneTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
-  const bones = anim.bones
-  if (!bones) return
-  for (const name of Object.keys(bones)) {
-    const bone = skeleton.boneMap.get(name)
-    if (!bone) continue
-    const tl = bones[name]
-    // Spine timelines store values RELATIVE to the setup pose. The runtime
-    // adds (translate/rotate/shear) or multiplies (scale) the animated delta
-    // onto the setup value, rather than replacing it absolutely. Setup values
-    // may be undefined when absent, so default them (0, or 1 for scale).
-    //
-    // Before the first keyframe the bone stays at its setup pose (delta = 0).
-    // Applying the first keyframe value here would cause bones to jump.
-    if (tl.rotate && tl.rotate.length && time >= kfTime(tl.rotate[0])) {
-      bone.rotation = (bone.data.rotation ?? 0) + sampleScalar(tl.rotate, time, (kf) => {
-        const v = (kf as RawKeyframe).value
-        return typeof v === 'number' ? v : (typeof (kf as RawKeyframe).angle === 'number' ? (kf as RawKeyframe).angle as number : 0)
-      })
+  const compiled = getCompiled(skeleton, anim)
+  const bones = compiled.bones
+  for (let i = 0, n = bones.length; i < n; i++) {
+    const e = bones[i]
+    const b = e.bone
+    const rot = e.rotate
+    if (rot && time >= rot.gate) {
+      b.rotation = rot.setup + sample1D(rot.ch, time)
     }
-    if (tl.translate && tl.translate.length && time >= kfTime(tl.translate[0])) {
-      const [x, y] = sample2D(tl.translate, time, (kf) => numOr((kf as RawKeyframe).x, 0), (kf) => numOr((kf as RawKeyframe).y, 0))
-      bone.x = (bone.data.x ?? 0) + x
-      bone.y = (bone.data.y ?? 0) + y
+    const tr = e.translate
+    if (tr && time >= tr.gate) {
+      b.x = tr.setupX + sample1D(tr.ch.tx, time)
+      b.y = tr.setupY + sample1D(tr.ch.ty, time)
     }
-    if (tl.scale && tl.scale.length && time >= kfTime(tl.scale[0])) {
-      const [x, y] = sample2D(tl.scale, time, (kf) => numOr((kf as RawKeyframe).x, 1), (kf) => numOr((kf as RawKeyframe).y, 1))
-      bone.scaleX = (bone.data.scaleX ?? 1) * x
-      bone.scaleY = (bone.data.scaleY ?? 1) * y
+    const sc = e.scale
+    if (sc && time >= sc.gate) {
+      b.scaleX = sc.setupX * sample1D(sc.ch.tx, time)
+      b.scaleY = sc.setupY * sample1D(sc.ch.ty, time)
     }
-    if (tl.shear && tl.shear.length && time >= kfTime(tl.shear[0])) {
-      const [x, y] = sample2D(tl.shear, time, (kf) => numOr((kf as RawKeyframe).x, 0), (kf) => numOr((kf as RawKeyframe).y, 0))
-      bone.shearX = (bone.data.shearX ?? 0) + x
-      bone.shearY = (bone.data.shearY ?? 0) + y
+    const sh = e.shear
+    if (sh && time >= sh.gate) {
+      b.shearX = sh.setupX + sample1D(sh.ch.tx, time)
+      b.shearY = sh.setupY + sample1D(sh.ch.ty, time)
     }
   }
 }
@@ -250,26 +584,80 @@ function numOr(v: unknown, fallback: number): number {
 }
 
 function applySlotTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
-  const slots = anim.slots
-  if (!slots) return
-  for (const name of Object.keys(slots)) {
-    const slot = skeleton.slotMap.get(name)
-    if (!slot) continue
-    const tl = slots[name]
-    if (tl.attachment && tl.attachment.length) {
-      // Spine steps the attachment to the setup pose (already applied by
-      // setToSetupPose) for any time BEFORE the first keyframe. Returning the
-      // first keyframe's value here would wrongly show/hide the slot from t=0.
-      if (time >= kfTime(tl.attachment[0])) {
-        slot.attachment = sampleStep(tl.attachment, time, (kf) => (kf as RawKeyframe).name as string | undefined)
+  const compiled = getCompiled(skeleton, anim)
+  const slots = compiled.slots
+  for (let i = 0, n = slots.length; i < n; i++) {
+    const e = slots[i]
+    const slot = e.slot
+    if (e.att && time >= e.att.gate) {
+      // step: last keyframe with time <= time
+      const times = e.att.times
+      let lo = 0
+      let hi = times.length - 1
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >>> 1
+        if (times[mid] <= time) lo = mid
+        else hi = mid - 1
       }
+      slot.attachment = e.att.names[lo]
     }
-    if (tl.color && tl.color.length) {
-      if (time >= kfTime(tl.color[0])) {
-        slot.color = sampleColor(tl.color as Array<RawKeyframe & { color?: string; curve?: number[] }>, time, slot.color)
-      }
+    const color = e.color
+    if (color && time >= color.gate) {
+      slot.color = sampleCompiledColor(color, time)
     }
   }
+}
+
+function sampleCompiledColor(
+  color: NonNullable<CompiledSlot['color']>,
+  time: number
+): string {
+  const times = color.times
+  const n = times.length
+  if (n === 1) return toHexColor(color.r[0], color.g[0], color.b[0], color.a[0])
+  // binary search: largest i with times[i] <= time
+  let lo = 0
+  let hi = n - 2
+  if (time >= times[n - 1]) lo = n - 2
+  else {
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >>> 1
+      if (times[mid] <= time) lo = mid
+      else hi = mid - 1
+    }
+  }
+  const kf0 = lo
+  // Mirror sampleColor exactly: if there is no NEXT keyframe or the left
+  // keyframe has no color, hold the left keyframe's color.
+  const t0 = times[kf0]
+  const t1 = times[kf0 + 1]
+  const span = t1 - t0
+  let pct = span > 0 ? (time - t0) / span : 0
+  const type = color.types[kf0]
+  if (type === 1) {
+    pct = 0
+  } else if (type === 2 && color.curves) {
+    // Original: pct = evalCurve1D(kf0.curve, pct, 0, 1, t0, t1) — bezier in
+    // unit value space with Y handles cy1 = curves[c+1], cy2 = curves[c+3].
+    const c = kf0 * 4
+    const s = solveCubicBezierX(pct, color.curves[c], color.curves[c + 2])
+    const oms = 1 - s
+    pct = 3 * oms * oms * s * color.curves[c + 1] + 3 * oms * s * s * color.curves[c + 3] + s * s * s
+  }
+  const r = Math.round(color.r[kf0] + (color.r[kf0 + 1] - color.r[kf0]) * pct)
+  const g = Math.round(color.g[kf0] + (color.g[kf0 + 1] - color.g[kf0]) * pct)
+  const b = Math.round(color.b[kf0] + (color.b[kf0 + 1] - color.b[kf0]) * pct)
+  const a = Math.round(color.a[kf0] + (color.a[kf0 + 1] - color.a[kf0]) * pct)
+  return toHexColor(r, g, b, a)
+}
+
+function toHexColor(r: number, g: number, b: number, a: number): string {
+  return (
+    r.toString(16).padStart(2, '0') +
+    g.toString(16).padStart(2, '0') +
+    b.toString(16).padStart(2, '0') +
+    a.toString(16).padStart(2, '0')
+  ).toUpperCase()
 }
 
 /**
@@ -414,86 +802,60 @@ function applyPathTimelines(skeleton: Skeleton, anim: AnimationData, time: numbe
  * timeline (or before the first keyframe) get `null` → setup pose.
  */
 function applyDeformTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
-  const skinDeform = anim.deform?.[skeleton.skin] ?? anim.deform?.['default']
-  if (!skinDeform) {
-    for (const slot of skeleton.slots) slot.deform = null
-    return
-  }
-  for (const slot of skeleton.slots) {
+  // NOTE: setToSetupPose() (called by applyAnimation just before this) already
+  // resets EVERY slot.deform to null — the original loop's per-slot null
+  // writes for timeline-less slots are therefore redundant here.
+  const compiled = getCompiled(skeleton, anim)
+  const entries = compiled.deform
+  if (!entries.length) return
+  for (const entry of entries) {
+    const slot = skeleton.slotMap.get(entry.slotName)
+    if (!slot) continue
     const attName = slot.attachment
-    const kfs = attName ? skinDeform[slot.data.name]?.[attName] : undefined
-    if (!kfs || kfs.length === 0) {
+    const compiled2 = attName ? entry.byAttachment.get(attName) : undefined
+    if (!compiled2) {
       slot.deform = null
       continue
     }
-    // Deform output length = the attachment's vertex count (Spine sets
-    // `deform.length = vertexCount` regardless of which keyframes have data;
-    // keyframes with `end==0` mean "setup pose" = all-zero offsets).
-    // Deform output length = attachment's totalInfluences * 2 (for weighted)
-    // or vertexCount * 2 (= uvs.length, for non-weighted). Matches official:
-    // `deformLength = weighted ? vertices.length / 3 * 2 : vertices.length`.
-    // For our interleaved format: totalInfluences = (verts.length - uvs.length/2) / 4.
-    const att = slot.attachment ? skeleton.findAttachment(slot.data.name, slot.attachment) : undefined
-    const attVerts = att && (att as unknown as { vertices?: number[] }).vertices
-    const attType = att && (att as unknown as { type?: string }).type
-    let deformLength = 0
-    if (attVerts) {
-      if (attType === 'path') {
-        // Path attachments: deform length = vertexCount * 2 (one xy pair per vertex)
-        // Path attachment has bones + vertices in interleaved format.
-        const attBones = (att as unknown as { bones?: number[] }).bones
-        const vCount = (att as unknown as { vertexCount?: number }).vertexCount ?? 0
-        if (attBones) {
-          // Weighted: deform has vertexCount * 2 entries (official applies per vertex)
-          deformLength = vCount * 2
-        } else {
-          deformLength = attVerts.length // flat xy pairs
-        }
-      } else {
-        const attUvs = (att as unknown as { uvs?: number[] }).uvs
-        if (attUvs) {
-          const vertexCount = attUvs.length / 2
-          const weighted = attVerts.length !== vertexCount * 2
-          deformLength = weighted
-            ? ((attVerts.length - vertexCount) / 4) * 2  // totalInfluences * 2
-            : attVerts.length  // = uvs.length = vertexCount * 2
-        }
-      }
-    }
-    if (deformLength === 0) {
+    const times = compiled2.times
+    const n = times.length
+    // Before first keyframe → setup (no deform).
+    if (time < times[0]) {
       slot.deform = null
       continue
     }
-    // Before the first keyframe → setup pose (no deform).
-    if (time < kfs[0].time) {
-      slot.deform = null
-      continue
-    }
+    const out = compiled2.out
     // After the last keyframe → hold the final deform.
-    const last = kfs[kfs.length - 1]
-    if (time >= last.time) {
-      const out = new Array<number>(deformLength)
-      for (let v = 0; v < deformLength; v++) out[v] = last.vertices?.[v] ?? 0
+    if (time >= times[n - 1]) {
+      const lastVerts = compiled2.verts[n - 1]
+      for (let v = 0; v < compiled2.deformLength; v++) out[v] = lastVerts[v]
       slot.deform = out
       continue
     }
-    // Find the surrounding keyframes.
-    let i = 0
-    while (i < kfs.length - 1 && kfs[i + 1].time <= time) i++
-    const kf0 = kfs[i]
-    const kf1 = kfs[i + 1]
-    const t0 = kf0.time
-    const t1 = kf1.time
+    // binary search: largest i with times[i] <= time (times sorted ascending)
+    let lo = 0
+    let hi = n - 2
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >>> 1
+      if (times[mid] <= time) lo = mid
+      else hi = mid - 1
+    }
+    const t0 = times[lo]
+    const t1 = times[lo + 1]
     const span = t1 - t0
     let percent = span > 0 ? (time - t0) / span : 0
-    if (kf0.curve) percent = evalCurve1D(kf0.curve, percent, 0, 1, t0, t1)
-    const v0 = kf0.vertices
-    const v1 = kf1.vertices
-    const out = new Array<number>(deformLength)
-    for (let v = 0; v < deformLength; v++) {
-      const a = v0?.[v] ?? 0
-      const b = v1?.[v] ?? 0
-      out[v] = a + (b - a) * percent
+    const type = compiled2.types[lo]
+    if (type === 1) percent = 0
+    else if (type === 2 && compiled2.curves) {
+      const c = lo * 4
+      const s = solveCubicBezierX(percent, compiled2.curves[c], compiled2.curves[c + 2])
+      const oms = 1 - s
+      percent = oms * oms * oms * 0 + 3 * oms * oms * s * compiled2.curves[c + 1] + 3 * oms * s * s * compiled2.curves[c + 3] + s * s * s
+    }
+    const v0 = compiled2.verts[lo]
+    const v1 = compiled2.verts[lo + 1]
+    for (let v = 0; v < compiled2.deformLength; v++) {
+      out[v] = v0[v] + (v1[v] - v0[v]) * percent
     }
     slot.deform = out
   }
@@ -579,6 +941,9 @@ function applySequenceTimelines(skeleton: Skeleton, anim: AnimationData, time: n
 
 /** Compute the duration (seconds) of an animation from its timelines. */
 export function getAnimationDuration(anim: AnimationData): number {
+  // Cached: this used to be called EVERY apply() frame and the full
+  // timeline scan alone accounted for ~22% of total pose-solve time.
+  if (typeof anim.duration === 'number') return anim.duration
   let max = 0
   const scan = (arr?: RawKeyframe[]): void => {
     if (!arr) return
@@ -603,6 +968,7 @@ export function getAnimationDuration(anim: AnimationData): number {
   if (anim.path) for (const sub of Object.values(anim.path)) for (const kfs of Object.values(sub)) scan(kfs)
   if (anim.events) for (const e of anim.events) max = Math.max(max, typeof e.time === 'number' ? e.time : 0)
   if (anim.draworder) for (const d of anim.draworder) max = Math.max(max, typeof d.time === 'number' ? d.time : 0)
+  anim.duration = max
   return max
 }
 
