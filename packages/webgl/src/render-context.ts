@@ -520,17 +520,19 @@ export class RenderContext {
     _batchKey: string,
     vertices: Float32Array,
     color: { r: number; g: number; b: number; a: number },
-    transform: {
-      tx: number
-      ty: number
-      tz?: number
-      rotationX?: number
-      rotationY?: number
-      rotationZ?: number
-      scaleX?: number
-      scaleY?: number
-      scaleZ?: number
-    },
+    transform:
+      | Mat4x4f
+      | {
+          tx: number
+          ty: number
+          tz?: number
+          rotationX?: number
+          rotationY?: number
+          rotationZ?: number
+          scaleX?: number
+          scaleY?: number
+          scaleZ?: number
+        },
     uv?: Float32Array,
     texture?: WebGLTexture | null,
     vertexColors?: Float32Array,
@@ -541,18 +543,24 @@ export class RenderContext {
     premultiplied?: boolean,
     blendMode?: import('./renderer/batch').BlendMode,
   ) {
-    const matrix = this.createTransformMatrix(
-      transform.tx,
-      transform.ty,
-      transform.tz ?? 0,
-      transform.rotationX ?? 0,
-      transform.rotationY ?? 0,
-      transform.rotationZ ?? 0,
-      transform.scaleX ?? 1,
-      transform.scaleY ?? 1,
-      transform.scaleZ ?? 1
-    )
-    
+    // Mat4x4f passthrough skips createTransformMatrix (which allocates ~11
+    // matrices per call). Components drawing many shapes per frame (spine:
+    // one shape per slot, 30k+ shapes/frame at 200 instances) pass a shared
+    // prebuilt matrix instead of the per-shape object form.
+    const matrix = transform instanceof Mat4x4f
+      ? transform
+      : this.createTransformMatrix(
+          transform.tx,
+          transform.ty,
+          transform.tz ?? 0,
+          transform.rotationX ?? 0,
+          transform.rotationY ?? 0,
+          transform.rotationZ ?? 0,
+          transform.scaleX ?? 1,
+          transform.scaleY ?? 1,
+          transform.scaleZ ?? 1
+        )
+
     if (this.batchRenderer) {
       this.batchRenderer.addShape(vertices, color, matrix, uv, texture, vertexColors, depthWrite, normals, layer, skipTonemap, premultiplied, blendMode)
     }

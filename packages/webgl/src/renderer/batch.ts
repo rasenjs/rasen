@@ -154,15 +154,19 @@ export class BatchRenderer {
       : mat4x4f(transform instanceof Float32Array ? Array.from(transform) : transform)
 
     this.batchItems.push({ vertices, color, transform: transformMatrix, uv, texture, vertexColors, depthWrite, normals, layer: layer ?? 0, skipTonemap, premultiplied, blendMode })
+    this._pendingVertexCount += vertices.length / 3
 
-    if (this.getTotalVertices() >= this.maxBatchSize) {
+    if (this._pendingVertexCount >= this.maxBatchSize) {
       this.flush()
     }
   }
 
-  private getTotalVertices(): number {
-    return this.batchItems.reduce((sum, item) => sum + item.vertices.length / 3, 0)
-  }
+  /** O(1) pending-vertex counter (getTotalVertices used to be an O(n) reduce
+   * called on EVERY addShape — O(n^2) per frame with many shapes, e.g. a
+   * 200-instance spine skeleton stage submits 30k+ shapes per frame). */
+  private _pendingVertexCount = 0
+
+
 
   /**
    * Flush buffered items. Pass a `filterLayer` to flush only that layer's
@@ -198,8 +202,12 @@ export class BatchRenderer {
     // Remove flushed items, keep other layers queued for later passes.
     if (filterLayer === undefined) {
       this.batchItems = []
+      this._pendingVertexCount = 0
     } else {
-      this.batchItems = this.batchItems.filter((it) => it.layer !== filterLayer)
+      const kept = this.batchItems.filter((it) => it.layer !== filterLayer)
+      this.batchItems = kept
+      this._pendingVertexCount = 0
+      for (const it of kept) this._pendingVertexCount += it.vertices.length / 3
     }
   }
 

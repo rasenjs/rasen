@@ -16,6 +16,7 @@
 import { com, toValue, type Mountable, type HostHooks } from '@rasenjs/core'
 import type { PropValue } from '@rasenjs/core'
 import { element } from './element'
+import { Mat4x4f } from '@rasenjs/math'
 import { createTexture } from '../utils'
 import { getRenderContext } from '../render-context'
 import type { GlNode } from '../node'
@@ -60,14 +61,20 @@ function isPremultipliedAtlas(at: SpineAtlas | null): boolean {
  * the tint's RGB must be premultiplied by its own alpha so the blended fragment
  * stays premultiplied (otherwise alpha-faded parts render too bright / wrong).
  */
+const slotColorCache = new Map<string, { r: number; g: number; b: number; a: number }>()
+
 function slotColorToRgba(hex: string | undefined, premultiplied: boolean): { r: number; g: number; b: number; a: number } {
   const h = (hex ?? 'FFFFFFFF').padStart(8, '0')
+  const key = (premultiplied ? 'p' : 's') + h
+  const cached = slotColorCache.get(key)
+  if (cached) return cached
   const r = parseInt(h.slice(0, 2), 16) / 255
   const g = parseInt(h.slice(2, 4), 16) / 255
   const b = parseInt(h.slice(4, 6), 16) / 255
   const a = parseInt(h.slice(6, 8), 16) / 255
-  if (premultiplied) return { r: r * a, g: g * a, b: b * a, a }
-  return { r, g, b, a }
+  const out = premultiplied ? { r: r * a, g: g * a, b: b * a, a } : { r, g, b, a }
+  slotColorCache.set(key, out)
+  return out
 }
 
 export interface SpineWebglProps {
@@ -209,7 +216,10 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
     // mouth, chest) render as dark fringes.
     const premultiplied = isPremultipliedAtlas(at)
     const skip = toValue(props.skipTonemap) === true
-    const transform = { tx: 0, ty: 0, tz: 0, scaleX: 1, scaleY: 1, scaleZ: 1 }
+    // Identity transform as a Mat4x4f created ONCE — passing the plain object
+    // form would make batch.addShape allocate a new 16-float matrix for every
+    // shape (30k+ allocations per frame at 200 instances).
+    const transform = new Mat4x4f()
 
     let total = 0
     // Iterate drawOrder (not slots): the `draworder` timeline reorders it, and
@@ -282,32 +292,26 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         const wy2 = worldBuf[2 * i2 + 1]
         const ecx = (wx0 + wx1 + wx2) / 3
         const ecy = (wy0 + wy1 + wy2) / 3
+        // Centroid expansion WITHOUT per-triangle allocations: the previous
+        // version allocated a closure + 2 tuple arrays + an object array per
+        // triangle (~7 allocations x ~900k triangles/frame at 200 instances).
+        // hypot is also 3-4x slower than sqrt; expand offset formula identical.
         const EXPAND = 0.6
-        const expand = (x: number, y: number): [number, number] => {
-          const lx = x - ecx
-          const ly = y - ecy
-          const len = Math.hypot(lx, ly) || 1
-          return [x + (lx / len) * EXPAND, y + (ly / len) * EXPAND]
-        }
-        const [ex0, ey0] = expand(wx0, wy0)
-        const [ex1, ey1] = expand(wx1, wy1)
-        const [ex2, ey2] = expand(wx2, wy2)
-        const triVerts: Array<{ i: number; x: number; y: number }> = [
-          { i: i0, x: ex0, y: ey0 },
-          { i: i1, x: ex1, y: ey1 },
-          { i: i2, x: ex2, y: ey2 }
-        ]
-        for (const v of triVerts) {
-          // Submit in world space — the RenderContext projection matrix handles
-          // pan/zoom/flip. No manual screen-space transform needed.
-          vertexBuf[vi++] = v.x
-          vertexBuf[vi++] = v.y
+        for (let k = 0; k < 3; k++) {
+          const idx = k === 0 ? i0 : k === 1 ? i1 : i2
+          const px = worldBuf[2 * idx]
+          const py = worldBuf[2 * idx + 1]
+          const lx = px - ecx
+          const ly = py - ecy
+          const len = Math.sqrt(lx * lx + ly * ly) || 1
+          vertexBuf[vi++] = px + (lx / len) * EXPAND
+          vertexBuf[vi++] = py + (ly / len) * EXPAND
           vertexBuf[vi++] = 0
           // Atlas UVs (image-space, top-left origin) are used directly — verified
           // against the official spine-canvas renderer that no V flip is needed
           // (the WebGL texture upload already matches the atlas orientation).
-          uvBuf[ui++] = layout.uvs[2 * v.i]
-          uvBuf[ui++] = layout.uvs[2 * v.i + 1]
+          uvBuf[ui++] = layout.uvs[2 * idx]
+          uvBuf[ui++] = layout.uvs[2 * idx + 1]
         }
       }
       if (vi === 0) continue
