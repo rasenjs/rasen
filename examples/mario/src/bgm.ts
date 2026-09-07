@@ -9,21 +9,27 @@
 
 import type { Theme } from './themes'
 
+/** Preferred audio extension for this browser (ogg is unsupported in Safari). */
+const AUDIO_EXT: 'ogg' | 'm4a' = (() => {
+  const probe = document.createElement('audio')
+  return probe.canPlayType('audio/ogg') ? 'ogg' : 'm4a'
+})()
+
 const THEME_TRACKS: Record<Theme, string> = {
-  overworld: '/audio/music/overworld.ogg',
-  underworld: '/audio/music/underworld.ogg',
-  castle: '/audio/music/castle.ogg',
+  overworld: `/audio/music/overworld.${AUDIO_EXT}`,
+  underworld: `/audio/music/underworld.${AUDIO_EXT}`,
+  castle: `/audio/music/castle.${AUDIO_EXT}`,
 }
 
 /** Speed-up factor for the hurry phase (classic SMB plays the theme faster). */
 const HURRY_RATE = 1.35
 
 const ONESHOT_TRACKS: Record<string, string> = {
-  die: '/audio/music/die.ogg',
-  gameover: '/audio/music/game-over.ogg',
-  clear: '/audio/music/level-clear.ogg',
+  die: `/audio/music/die.${AUDIO_EXT}`,
+  gameover: `/audio/music/game-over.${AUDIO_EXT}`,
+  clear: `/audio/music/level-clear.${AUDIO_EXT}`,
   /** short "hurry up!" jingle, played once before the fast theme kicks in */
-  hurry: '/audio/music/hurry.ogg',
+  hurry: `/audio/music/hurry.${AUDIO_EXT}`,
 }
 
 export class Bgm {
@@ -66,7 +72,9 @@ export class Bgm {
     const audio = this.themeAudio(theme)
     audio.playbackRate = hurry ? HURRY_RATE : 1
     audio.currentTime = 0
-    void audio.play().catch(() => {})
+    void audio.play().catch((err: unknown) => {
+      console.warn(`[bgm] playTheme(${theme}) failed:`, err)
+    })
     this.current = audio
   }
 
@@ -79,8 +87,9 @@ export class Bgm {
       if (!this.muted) this.playTheme(theme, true)
     }
     jingle.currentTime = 0
-    void jingle.play().catch(() => {
+    void jingle.play().catch((err: unknown) => {
       // autoplay refused — fall straight through to the fast theme
+      console.warn('[bgm] hurry jingle failed:', err)
       this.playTheme(theme, true)
     })
   }
@@ -97,7 +106,9 @@ export class Bgm {
       if (resume) this.playTheme(resume.theme, resume.hurry)
     }
     audio.currentTime = 0
-    void audio.play().catch(() => {})
+    void audio.play().catch((err: unknown) => {
+      console.warn(`[bgm] playOnce(${name}) failed:`, err)
+    })
   }
 
   stop() {
