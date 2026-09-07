@@ -615,24 +615,38 @@ function sampleCompiledColor(
   const times = color.times
   const n = times.length
   if (n === 1) return toHexColor(color.r[0], color.g[0], color.b[0], color.a[0])
-  // binary search: largest i with times[i] <= time
-  let lo = 0
-  let hi = n - 2
-  if (time >= times[n - 1]) lo = n - 2
-  else {
+  // CRITICAL: clamp/short-circuit at endpoints.
+  //
+  // Binary search below returns the largest i with times[i] <= time. For
+  // time < times[0] the search still returns lo = 0, which would give a
+  // NEGATIVE pct and overflow lerp() past 0xFF into multi-character hex
+  // (e.g. `FFFFFF9F6` — reproduced on c412 arm_l1 at t < first kf 0.867s).
+  // For time > times[n-1] the search returns kf0 = n-2 with pct > 1 and
+  // the same overflow. The official Spine ColorTimeline guards with an
+  // early-return; here we mimic that with explicit endpoint handling so any
+  // future regression (shifted gates, off-by-one) can never produce
+  // garbage colors.
+  let kf0: number
+  if (time <= times[0]) {
+    kf0 = 0
+  } else if (time >= times[n - 1]) {
+    kf0 = n - 2
+  } else {
+    let lo = 0
+    let hi = n - 2
     while (lo < hi) {
       const mid = (lo + hi + 1) >>> 1
       if (times[mid] <= time) lo = mid
       else hi = mid - 1
     }
+    kf0 = lo
   }
-  const kf0 = lo
-  // Mirror sampleColor exactly: if there is no NEXT keyframe or the left
-  // keyframe has no color, hold the left keyframe's color.
   const t0 = times[kf0]
   const t1 = times[kf0 + 1]
   const span = t1 - t0
   let pct = span > 0 ? (time - t0) / span : 0
+  if (pct < 0) pct = 0
+  else if (pct > 1) pct = 1
   const type = color.types[kf0]
   if (type === 1) {
     pct = 0
