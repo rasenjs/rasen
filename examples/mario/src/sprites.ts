@@ -50,12 +50,12 @@ export const SPRITE_FRAMES = {
   koopaBlueWalk2: { x: 240, y: 48, w: 16, h: 24 },
   koopaBlueShell: { x: 240, y: 168, w: 16, h: 24 },
   koopaBlueShellLegs: { x: 240, y: 192, w: 16, h: 24 },
-  // Items (16x16, grid-aligned) — verified against the sheet:
-  //   mushroom (80,0) red cap; oneUp (80,16) green variant
-  //   flower (0,64) orange petals + green stem
-  mushroom: { x: 80, y: 0, w: 16, h: 16 },
-  oneUp: { x: 80, y: 16, w: 16, h: 16 },
-  flower: { x: 0, y: 64, w: 16, h: 16 },
+  // Items (16x16) — verified against the sheet (8px-aligned rows):
+  //   mushroom (0,152) red cap; oneUp (16,152) green variant
+  //   flower (0,168) white/orange petals; palette variants at (16..48,168)
+  mushroom: { x: 0, y: 152, w: 16, h: 16 },
+  oneUp: { x: 16, y: 152, w: 16, h: 16 },
+  flower: { x: 0, y: 168, w: 16, h: 16 },
 } as const satisfies Record<string, FrameRect>
 
 export type SpriteKey = keyof typeof SPRITE_FRAMES

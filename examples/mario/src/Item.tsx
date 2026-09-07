@@ -8,9 +8,9 @@
 
 import { com } from '@rasenjs/core'
 import { ref } from '@rasenjs/reactive-signals'
-import { GRAVITY, ITEM_SPEED, MAX_FALL, SPRITE_GRID_COLUMNS } from './constants'
+import { GRAVITY, ITEM_SPEED, MAX_FALL } from './constants'
 import { SPRITE_FRAMES } from './sprites'
-import { overlap, type World } from './world'
+import { blankFrame, overlap, type World } from './world'
 import type { Mario } from './Mario'
 
 export type ItemKind = 'mushroom' | 'flower'
@@ -18,10 +18,10 @@ export type ItemKind = 'mushroom' | 'flower'
 const EMERGE_TIME = 0.6 // seconds to rise out of the block
 
 export class Item {
-  // Screen coordinates & sprite frame index (refs the renderer consumes)
+  // Screen coordinates & sprite frame canvas (refs the renderer consumes)
   rx = ref(-1000)
   ry = ref(-1000)
-  frame = ref(0)
+  frame = ref<HTMLCanvasElement>(blankFrame)
   opacity = ref(0)
 
   // World position and behaviour
@@ -40,9 +40,21 @@ export class Item {
 
   constructor(private world: World) {}
 
-  get sheet(): CanvasImageSource {
-    // items live in sprites.png (charBank) — NOT tiles.png
-    return this.world.assets.charBank.image
+  /** Bake the sprite frame for this kind into a standalone canvas. */
+  private frames(): { main: HTMLCanvasElement; palette: HTMLCanvasElement[] } {
+    const cb = this.world.assets.charBank
+    const f = SPRITE_FRAMES
+    if (this.kind === 'flower') {
+      // fire flower cycles its petal palette: 4 variants side by side
+      const palette = [0, 1, 2, 3].map((i) =>
+        cb.frame(f.flower.x + i * 16, f.flower.y, 16, 16, `flower-${i}`),
+      )
+      return { main: palette[0], palette }
+    }
+    return {
+      main: cb.frame(f.mushroom.x, f.mushroom.y, 16, 16, 'mushroom'),
+      palette: [],
+    }
   }
 
   /** Start rising out of the block at (tx, ty). */
@@ -61,15 +73,11 @@ export class Item {
     this.active = false
   }
 
-  private frameIndex(): number {
-    const f = SPRITE_FRAMES
-    return this.kind === 'mushroom'
-      ? (f.mushroom.y / 16) * SPRITE_GRID_COLUMNS + f.mushroom.x / 16
-      : (f.flower.y / 16) * SPRITE_GRID_COLUMNS + f.flower.x / 16
-  }
+  private animTime = 0
 
   update(dt: number) {
     if (!this.active) return
+    this.animTime += dt
 
     if (this.emerging) {
       this.wy -= 16 * (dt / EMERGE_TIME) * 2 // 32px rise in EMERGE_TIME
@@ -104,7 +112,11 @@ export class Item {
     }
     this.rx.value = Math.round(this.wx - cam)
     this.ry.value = Math.round(this.wy)
-    this.frame.value = this.frameIndex()
+    const { main, palette } = this.frames()
+    this.frame.value =
+      this.kind === 'flower' && palette.length > 0
+        ? palette[Math.floor(this.animTime / 0.12) % palette.length]
+        : main
     this.opacity.value = 1
   }
 }
@@ -115,14 +127,10 @@ export class Item {
 export const ItemSprite = com((props: { item: Item }) => {
   const i = props.item
   return (
-    <sprite
-      image={i.sheet}
+    <image
+      image={i.frame}
       x={i.rx}
       y={i.ry}
-      frame={i.frame}
-      frameWidth={16}
-      frameHeight={16}
-      columns={SPRITE_GRID_COLUMNS}
       opacity={i.opacity}
     />
   )
