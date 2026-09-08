@@ -77,6 +77,13 @@ export interface SpineProps {
   width: PropValue<number>
   height: PropValue<number>
   /**
+   * World-space position offset (spine-local origin → world). Applied after
+   * the canvas-level camera transform, so the offset is in world units.
+   * Defaults to 0 — same convention as the other components.
+   */
+  x?: PropValue<number>
+  y?: PropValue<number>
+  /**
    * Opaque backdrop painted before the skeleton. The canvas itself is
    * transparent, so without this the page background shows through the
    * character's semi-transparent edges and the whole picture looks washed-out
@@ -271,7 +278,10 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
       const sk = unref(props.skeleton) as Skeleton | null
       const at = unref(props.atlas) as SpineAtlas | null
       if (!sk || !at) return null
-      const hit = hitTestSpine(sk, at, worldX, worldY)
+      // Hit-test in spine-local space: undo the component's world offset.
+      const px = unref(props.x) ?? 0
+      const py = unref(props.y) ?? 0
+      const hit = hitTestSpine(sk, at, worldX - px, worldY - py)
       return hit ? { ...hit, x, y, worldX, worldY } : null
     }
 
@@ -338,6 +348,9 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
         // Spine is Y-up; canvas is Y-down.
         ctx.scale(Z, -Z)
         ctx.translate(-CX, -CY)
+        // Component world offset (x, y) — applied inside the camera transform
+        // so it moves the skeleton in world units.
+        ctx.translate(unref(props.x) ?? 0, unref(props.y) ?? 0)
 
         // Overdraw (screen px) meant to hide the anti-aliased clip seam between
         // adjacent triangles. Measured: 0 is best.
@@ -441,7 +454,9 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
         unref(props.showBones),
         unref(props.frame),
         unref(props.width),
-        unref(props.height)
+        unref(props.height),
+        unref(props.x),
+        unref(props.y)
       ]    })
     return () => node.remove()
   }

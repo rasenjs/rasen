@@ -95,6 +95,14 @@ export interface SpineWebglProps {
   frame: PropValue<number>
   width: PropValue<number>
   height: PropValue<number>
+  /**
+   * World-space position offset (spine-local origin → world). Defaults to 0 —
+   * same convention as the other components. Under a 2D ortho camera only
+   * x/y matter; under a 3D camera z places the skeleton in depth.
+   */
+  x?: PropValue<number>
+  y?: PropValue<number>
+  z?: PropValue<number>
   /** Skip the renderer's ACES tonemap (match flat reference renderers). */
   skipTonemap?: PropValue<boolean>
   /** Fired for each Spine event-timeline entry as playback passes it. */
@@ -141,6 +149,10 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
   let vertexBuf = new Float32Array(0)
   let uvBuf = new Float32Array(0)
   let worldBuf = new Float32Array(0)
+  // Model matrix for the (x, y, z) position props + the key it was built for.
+  // Identity until a non-zero position is set (see buildGeometry).
+  let posTransform = new Mat4x4f()
+  let lastPosKey = '0|0|0'
   let layoutCache: WeakMap<object, Map<string, { uvs: Float32Array; triangles: number[] }>> = new WeakMap()
   // slot → { attachmentName, attachment } — avoids findAttachment every frame.
   const slotAttCache = new Map<object, { name: string; att: unknown }>()
@@ -216,10 +228,24 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
     // mouth, chest) render as dark fringes.
     const premultiplied = isPremultipliedAtlas(at)
     const skip = toValue(props.skipTonemap) === true
-    // Identity transform as a Mat4x4f created ONCE — passing the plain object
-    // form would make batch.addShape allocate a new 16-float matrix for every
-    // shape (30k+ allocations per frame at 200 instances).
-    const transform = new Mat4x4f()
+    // Model transform: world offset (x, y, z). addShape stores the matrix
+    // REFERENCE and reads it at flush time, so a changed position builds a
+    // fresh instance instead of mutating the batched one. The default (0,0,0)
+    // reuses one identity instance — zero allocations in the common path
+    // (30k+ addShape calls per frame at 200 instances).
+    const px = toValue(props.x) ?? 0
+    const py = toValue(props.y) ?? 0
+    const pz = toValue(props.z) ?? 0
+    const posKey = px + '|' + py + '|' + pz
+    if (posKey !== lastPosKey) {
+      const m = new Mat4x4f()
+      m.source[12] = px
+      m.source[13] = py
+      m.source[14] = pz
+      posTransform = m
+      lastPosKey = posKey
+    }
+    const transform = posTransform
 
     let total = 0
     // Iterate drawOrder (not slots): the `draworder` timeline reorders it, and
@@ -368,7 +394,10 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       const sk = toValue(props.skeleton) as Skeleton | null
       const at = toValue(props.atlas) as SpineAtlas | null
       if (!sk || !at) return null
-      const hit = hitTestSpine(sk, at, worldX, worldY)
+      // Hit-test in spine-local space: undo the component's world offset.
+      const px = toValue(props.x) ?? 0
+      const py = toValue(props.y) ?? 0
+      const hit = hitTestSpine(sk, at, worldX - px, worldY - py)
       return hit ? { ...hit, x: sx, y: sy, worldX, worldY } : null
     }
     unregisterPick = rc.addPointerHandler((type, x, y) => {
@@ -403,7 +432,10 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       toValue(props.atlasImg),
       toValue(props.atlasImgs),
       toValue(props.animation),
-      toValue(props.skin)
+      toValue(props.skin),
+      toValue(props.x),
+      toValue(props.y),
+      toValue(props.z)
     ]
   })
 
