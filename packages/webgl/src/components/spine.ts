@@ -77,6 +77,11 @@ function slotColorToRgba(hex: string | undefined, premultiplied: boolean): { r: 
   return out
 }
 
+/** Bone overlay color — matches the canvas-2d renderer's
+ * `rgba(120, 170, 255, 0.35)` stroke. Straight alpha (submitted with
+ * `premultiplied: false` + normal blend ≡ canvas source-over). */
+const BONE_COLOR = { r: 120 / 255, g: 170 / 255, b: 255 / 255, a: 0.35 }
+
 export interface SpineWebglProps {
   skeleton: PropValue<Skeleton | null>
   atlas: PropValue<SpineAtlas | null>
@@ -149,6 +154,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
   let vertexBuf = new Float32Array(0)
   let uvBuf = new Float32Array(0)
   let worldBuf = new Float32Array(0)
+  let boneBuf = new Float32Array(0)
   // Model matrix for the (x, y, z) position props + the key it was built for.
   // Identity until a non-zero position is set (see buildGeometry).
   let posTransform = new Mat4x4f()
@@ -367,6 +373,58 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         blendMode
       )
       total += vi / 3
+    }
+
+    // Bone debug overlay (showBones) — same contract as the canvas-2d
+    // renderer: one segment per bone from its world origin along its rotated
+    // length (the a/c matrix columns), 1 spine-local unit wide (so screen
+    // width tracks camera zoom, like the canvas stroke's lineWidth=1 in the
+    // scaled space), rgba(120,170,255,0.35). Submitted AFTER the mesh so it
+    // draws on top (painter order under the 2D ortho camera). Zero-length
+    // leaf bones draw nothing, exactly like a canvas stroke would.
+    if (toValue(props.showBones) === true) {
+      const HALF_W = 0.5
+      if (boneBuf.length < sk.bones.length * 18) {
+        boneBuf = new Float32Array(sk.bones.length * 18)
+      }
+      let bi = 0
+      for (const bone of sk.bones) {
+        const len = bone.data.length ?? 0
+        const dx = bone.a * len
+        const dy = bone.c * len
+        const d = Math.sqrt(dx * dx + dy * dy)
+        if (d < 1e-6) continue
+        const x0 = bone.worldX
+        const y0 = bone.worldY
+        const x1 = x0 + dx
+        const y1 = y0 + dy
+        const hx = (-dy / d) * HALF_W
+        const hy = (dx / d) * HALF_W
+        boneBuf[bi++] = x0 - hx; boneBuf[bi++] = y0 - hy; boneBuf[bi++] = 0
+        boneBuf[bi++] = x1 - hx; boneBuf[bi++] = y1 - hy; boneBuf[bi++] = 0
+        boneBuf[bi++] = x1 + hx; boneBuf[bi++] = y1 + hy; boneBuf[bi++] = 0
+        boneBuf[bi++] = x0 - hx; boneBuf[bi++] = y0 - hy; boneBuf[bi++] = 0
+        boneBuf[bi++] = x1 + hx; boneBuf[bi++] = y1 + hy; boneBuf[bi++] = 0
+        boneBuf[bi++] = x0 + hx; boneBuf[bi++] = y0 + hy; boneBuf[bi++] = 0
+      }
+      if (bi > 0) {
+        renderContext.addShape(
+          'spine-bones',
+          boneBuf.slice(0, bi),
+          BONE_COLOR,
+          transform,
+          undefined, // uv — solid color path (u_useTexture = 0)
+          undefined, // texture
+          undefined, // vertexColors
+          undefined, // depthWrite
+          undefined, // normals
+          undefined, // layer
+          skip ? true : undefined,
+          false, // straight-alpha color + normal blend ≡ canvas source-over @ 0.35
+          'normal'
+        )
+        total += bi / 3
+      }
     }
     return total
   }
