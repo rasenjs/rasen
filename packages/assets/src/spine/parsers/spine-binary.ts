@@ -103,11 +103,16 @@ export function parseSpineBinary(bytes: Uint8Array, scale = 1): SkeletonData {
     const slotName = input.readString()
     if (!slotName) throw new Error('Slot name must not be null')
     const boneName = skeletonData.bones[input.readInt(true)]?.name
+    // Binary layout (Spine 4.x): color int32 first, then darkColor int32
+    // (-1 = none). Reading darkColor first turned every slot whose darkColor
+    // is absent into color=-1 → "FFFFFFFF" (opaque white), making setup-
+    // transparent effect slots (gun smoke, lights) render as solid white.
+    const color = input.readInt32()
     const dark = input.readInt32()
     const data: SlotData = {
       name: slotName,
       bone: boneName ?? '',
-      color: rgbaToHex(input.readInt32()),
+      color: rgbaToHex(color),
       dark: dark !== -1 ? rgbaToHex(dark) : undefined,
       attachment: input.readStringRef() ?? undefined,
       blend: BLEND_MODES[input.readInt(true)] ?? 'normal'

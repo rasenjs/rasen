@@ -38,7 +38,7 @@ function extractPose(sk, atlas) {
     slots[slot.data.name] = {
       attachment: attName,
       color: slot.color,
-      deform: slot.deform ? slot.deform.map(r5) : null
+      deform: slot.deform ? Array.from(slot.deform).map(r5) : null
     }
     if (!attName) continue
     const att = sk.findAttachment(slot.data.name, attName)

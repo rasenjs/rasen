@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>cover compare — official vs rasen</title>
+    <style>
+      body { margin: 0; background: #202028; display: flex; gap: 8px; }
+      canvas { display: block; }
+      .label { color: #ccc; font: 12px monospace; padding: 4px; }
+    </style>
+  </head>
+  <body>
+    <div>
+      <div class="label">OFFICIAL spine-ts 4.1</div>
+      <canvas id="official" width="1024" height="1024"></canvas>
+    </div>
+    <div id="rasen-host">
+      <div class="label">RASEN runtime</div>
+    </div>
+    <script type="module" src="/src/cover-compare.tsx"></script>
+  </body>
+</html>
