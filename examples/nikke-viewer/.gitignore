@@ -2,4 +2,5 @@
 .env*
 
 # UI icons (small, must ship with the app)
-!public/*.png
+!public/c016.png
+!public/nikke-logo.png

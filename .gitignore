@@ -111,3 +111,4 @@ examples/react-native/*.jsbundle
 
 # Synced from real react-native — run yarn sync-bench-rn to update
 packages/vue-rn/src/__bench__/__mocks__/rn-local-pkg/react-native/Libraries/Renderer/implementations/
+.env*
