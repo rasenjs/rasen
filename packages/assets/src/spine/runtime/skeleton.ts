@@ -957,6 +957,14 @@ export class Skeleton {
   readonly pathConstraints: PathConstraintRuntime[]
   /** Active skin name (default skin is "default"). */
   skin: string
+  /**
+   * Additional skins layered on top of `skin` (official Spine `addSkin`
+   * semantics). NIKKE models keep accessory parts (e.g. c810's wingman pod)
+   * in a separate skin that must be combined with the default one. Lookup
+   * order: `skin`, then `extraSkins` in order, then the "default" skin.
+   * Assign once — the animation compile cache compares by reference.
+   */
+  extraSkins: string[] = []
   /** Skeleton-level transform (Spine defaults: scale 1, position 0). */
   scaleX = 1
   scaleY = 1
@@ -1274,11 +1282,16 @@ export class Skeleton {
     }
   }
 
-  /** Find an attachment for a slot under the active skin (falls back to default). */
+  /** Find an attachment for a slot under the active skins (falls back to default). */
   findAttachment(slotName: string, attachmentName: string): import('../types').AttachmentData | undefined {
-    const skin = this.data.skins.find((s) => s.name === this.skin)
     const def = this.data.skins.find((s) => s.name === 'default')
-    const lookup = (s?: typeof skin) => s?.attachments[slotName]?.[attachmentName]
-    return lookup(skin) ?? lookup(def)
+    const lookup = (s?: import('../types').SkinData) => s?.attachments[slotName]?.[attachmentName]
+    const found = lookup(this.data.skins.find((s) => s.name === this.skin))
+    if (found) return found
+    for (const name of this.extraSkins) {
+      const att = lookup(this.data.skins.find((s) => s.name === name))
+      if (att) return att
+    }
+    return lookup(def)
   }
 }

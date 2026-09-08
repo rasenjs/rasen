@@ -4,7 +4,7 @@ export * from './types'
 // --- Parsers ---
 export { parseSpineJson, parseSpineJsonString } from './parsers/spine-json'
 export { parseSpineBinary } from './parsers/spine-binary'
-export { parseSpineAtlas, computeRegionLocal, computeAttachmentWorld, computeAttachmentWorldVertices, getSequenceRegionName, resolveRegionName } from './parsers/atlas'
+export { parseSpineAtlas, computeRegionLocal, computeAttachmentWorld, computeAttachmentWorldVertices, computeClippingWorld, getSequenceRegionName, resolveRegionName } from './parsers/atlas'
 export { parseDragonBonesJson, parseDragonBonesJsonString, parseDragonBonesAtlas } from './parsers/dragonbones'
 
 // --- Atlas types ---

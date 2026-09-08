@@ -27,8 +27,37 @@ interface SlotRef {
 }
 interface SkeletonRef {
   skin: string
+  /** Combined skins (official addSkin) — see Skeleton.extraSkins. */
+  extraSkins?: string[]
   data: { skins: SkinData[] }
   bones: BoneRef[]
+}
+
+/**
+ * Find an attachment by slot+name across the skeleton's active skin chain —
+ * `preferredSkin` (linkedmesh skin hint) first, then `skin`, then
+ * `extraSkins`, then the "default" skin. Mirrors the runtime's
+ * `Skeleton.findAttachment` so linkedmesh/sequence resolution sees combined
+ * skins too.
+ */
+function findAttachmentInSkins(
+  skeleton: SkeletonRef,
+  slotName: string,
+  attachmentName: string,
+  preferredSkin?: string
+): AttachmentData | undefined {
+  const lookup = (skin?: SkinData) => skin?.attachments[slotName]?.[attachmentName]
+  if (preferredSkin) {
+    const att = lookup(skeleton.data.skins.find((s) => s.name === preferredSkin))
+    if (att) return att
+  }
+  const found = lookup(skeleton.data.skins.find((s) => s.name === skeleton.skin))
+  if (found) return found
+  for (const name of skeleton.extraSkins ?? []) {
+    const att = lookup(skeleton.data.skins.find((s) => s.name === name))
+    if (att) return att
+  }
+  return lookup(skeleton.data.skins.find((s) => s.name === 'default'))
 }
 
 const DEG2RAD = Math.PI / 180
@@ -321,9 +350,7 @@ export function getSequenceRegionName(att: AttachmentData, index: number): strin
 export function resolveRegionName(att: AttachmentData, slot: SlotRef, skeleton: SkeletonRef): string {
   let target = att
   if (att.type === 'linkedmesh' && att.parent) {
-    const skinName = att.skin ?? skeleton.skin
-    const skin = skeleton.data.skins.find((s) => s.name === skinName) ?? skeleton.data.skins.find((s) => s.name === 'default')
-    const parent = skin?.attachments[slot.data.name]?.[att.parent ?? '']
+    const parent = findAttachmentInSkins(skeleton, slot.data.name, att.parent ?? '', att.skin)
     if (parent && (parent.type === 'mesh' || parent.type === 'linkedmesh')) target = parent
   }
   if (target.sequence) return getSequenceRegionName(target, slot.sequenceIndex)
@@ -370,12 +397,7 @@ export function computeAttachmentWorld(
   // Mesh / linkedmesh: resolve source mesh data.
   let mesh = att
   if (type === 'linkedmesh') {
-    const parentName = att.parent
-    const skinName = att.skin ?? skeleton.skin
-    const skin =
-      skeleton.data.skins.find((s) => s.name === skinName) ??
-      skeleton.data.skins.find((s) => s.name === 'default')
-    const parentAtt = skin?.attachments[slot.data.name]?.[parentName ?? '']
+    const parentAtt = findAttachmentInSkins(skeleton, slot.data.name, att.parent ?? '', att.skin)
     if (parentAtt && (parentAtt.type === 'mesh' || parentAtt.type === 'linkedmesh')) {
       mesh = parentAtt
     } else {
@@ -529,12 +551,7 @@ export function computeAttachmentWorldVertices(
   // Mesh / linkedmesh: resolve source mesh data.
   let mesh = att
   if (type === 'linkedmesh') {
-    const parentName = att.parent
-    const skinName = att.skin ?? skeleton.skin
-    const skin =
-      skeleton.data.skins.find((s) => s.name === skinName) ??
-      skeleton.data.skins.find((s) => s.name === 'default')
-    const parentAtt = skin?.attachments[slot.data.name]?.[parentName ?? '']
+    const parentAtt = findAttachmentInSkins(skeleton, slot.data.name, att.parent ?? '', att.skin)
     if (parentAtt && (parentAtt.type === 'mesh' || parentAtt.type === 'linkedmesh')) {
       mesh = parentAtt
     } else {
@@ -582,4 +599,64 @@ export function computeAttachmentWorldVertices(
   }
 
   return vCount
+}
+
+/**
+ * Compute the world-space clipping polygon for a `clipping` attachment.
+ *
+ * Spine clipping: the attachment's polygon (defined in the owning slot's bone
+ * space, optionally weighted across several bones) clips every subsequent
+ * drawable slot in draw order until the end slot is reached. Callers implement
+ * the start/end bookkeeping (see the canvas-2d spine component); this function
+ * only evaluates the polygon for the current pose.
+ *
+ * @returns flat `[x0, y0, x1, y1, ...]` world-space polygon, or null if the
+ * attachment is not a clipping attachment or has no vertices.
+ */
+export function computeClippingWorld(
+  att: AttachmentData,
+  slot: SlotRef,
+  skeleton: SkeletonRef
+): number[] | null {
+  if (att.type !== 'clipping') return null
+  const verts = att.vertices
+  const count = att.vertexCount ?? (verts ? verts.length / 2 : 0)
+  if (!verts || !count) return null
+
+  const bone = slot.bone
+  const out = new Array<number>(count * 2)
+  const weighted = verts.length !== count * 2
+
+  if (!weighted) {
+    for (let v = 0; v < count; v++) {
+      const lx = verts[2 * v]
+      const ly = verts[2 * v + 1]
+      out[2 * v] = lx * bone.a + ly * bone.b + bone.worldX
+      out[2 * v + 1] = lx * bone.c + ly * bone.d + bone.worldY
+    }
+  } else {
+    // Weighted polygon: same layout as weighted meshes —
+    //   [boneCount, (boneIdx, x, y, weight)*, boneCount, ...]
+    // Clipping attachments carry no deform timeline.
+    let ptr = 0
+    for (let v = 0; v < count; v++) {
+      const boneCount = verts[ptr++]
+      let wx = 0
+      let wy = 0
+      for (let b = 0; b < boneCount; b++) {
+        const boneIndex = verts[ptr++]
+        const vx = verts[ptr++]
+        const vy = verts[ptr++]
+        const weight = verts[ptr++]
+        const bb = skeleton.bones[boneIndex]
+        if (!bb) continue
+        wx += (vx * bb.a + vy * bb.b + bb.worldX) * weight
+        wy += (vx * bb.c + vy * bb.d + bb.worldY) * weight
+      }
+      out[2 * v] = wx
+      out[2 * v + 1] = wy
+    }
+  }
+
+  return out
 }

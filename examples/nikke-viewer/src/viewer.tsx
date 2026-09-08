@@ -627,7 +627,12 @@ async function loadCharacter(char: string, pose: PoseKind = 'fb'): Promise<boole
     }
     const img = pageImgs.values().next().value as HTMLImageElement
 
-    skeleton.value = new Skeleton(data)
+    // NIKKE models keep accessory parts (wingman pods etc.) in separate skins
+    // that must be combined with the default one (official addSkin). Single-
+    // skin models are unaffected (no extras).
+    const sk = new Skeleton(data)
+    sk.extraSkins = data.skins.filter((s) => s.name !== 'default').map((s) => s.name)
+    skeleton.value = sk
     atlas.value = parsedAtlas
     atlasImg.value = img
     atlasImgs.value = pageImgs

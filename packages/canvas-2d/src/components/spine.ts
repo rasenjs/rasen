@@ -19,6 +19,7 @@ import { unref } from '../utils/ref'
 import type { CanvasEventHandlers } from '../events'
 import {
   computeAttachmentWorld,
+  computeClippingWorld,
   hitTestSpine,
   type Skeleton,
   type SpineAtlas,
@@ -352,59 +353,84 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
           return img
         }
 
+        // Spine clipping (official SkeletonClipping semantics): a `clipping`
+        // attachment starts a clip that cuts every subsequent drawable slot in
+        // draw order until the end slot has been drawn — the end slot itself
+        // IS still clipped (official runtimes call clipEndWithSlot AFTER
+        // drawing it). Only one clip may be active; a nested clip is ignored
+        // (clipStart returns early when a clip is already active). Slots
+        // without a drawable attachment still participate in end detection.
+        let clipPolygon: number[] | null = null
+        let clipEndSlotName: string | null = null
+
         for (const slot of sk.drawOrder) {
           const attName = slot.attachment
-          if (!attName) continue
-          const att = sk.findAttachment(slot.data.name, attName)
-          if (!att) continue
-          const geo = computeAttachmentWorld(att, slot, sk, at, attName)
-          if (!geo) continue
+          const att = attName ? sk.findAttachment(slot.data.name, attName) : null
 
-          // Apply slot color/alpha from the color timeline. Spine stores
-          // colors as "RRGGBBAA" hex. The alpha controls slot visibility;
-          // without this, shadows and fades jump instantly (step function)
-          // instead of transitioning smoothly.
-          const sc = slot.color || 'FFFFFFFF'
-          const slotAlpha = parseInt(sc.slice(6, 8), 16) / 255
-          const prevAlpha = ctx.globalAlpha
-          ctx.globalAlpha = slotAlpha
-
-          // Spine blend modes: additive (lighter), multiply, screen.
-          // Without this, smoke/aura/glow effects that use additive blending
-          // render as opaque layers that compound alpha → visible banding.
-          const blendMode = slot.data.blend ?? 'normal'
-          const prevBlend = ctx.globalCompositeOperation
-          if (blendMode === 'additive') {
-            ctx.globalCompositeOperation = 'lighter'
-          } else if (blendMode === 'multiply') {
-            ctx.globalCompositeOperation = 'multiply'
-          } else if (blendMode === 'screen') {
-            ctx.globalCompositeOperation = 'screen'
+          if (att && att.type === 'clipping') {
+            if (!clipPolygon) {
+              clipPolygon = computeClippingWorld(att, slot, sk)
+              clipEndSlotName = clipPolygon ? att.end ?? null : null
+            }
+            continue
           }
 
-          // Pick the image for THIS attachment's atlas page (multi-page).
-          const regionName = (att as { path?: string; name?: string }).path ?? (att as { name?: string }).name ?? attName
-          drawTexturedTriangles(ctx, geo.world, geo.uvs, geo.triangles, imgForRegion(regionName), expandWorld)
+          // clipEndWithSlot: evaluated for every non-clip slot, drawable or not.
+          const endClip = clipPolygon !== null && slot.data.name === clipEndSlotName
 
-          ctx.globalCompositeOperation = prevBlend
-          ctx.globalAlpha = prevAlpha
-        }
+          if (attName && att) {
+            const geo = computeAttachmentWorld(att, slot, sk, at, attName)
+            if (geo) {
+              const clipping = clipPolygon !== null
+              if (clipping) {
+                ctx.save()
+                ctx.beginPath()
+                ctx.moveTo(clipPolygon![0], clipPolygon![1])
+                for (let i = 2; i < clipPolygon!.length; i += 2) {
+                  ctx.lineTo(clipPolygon![i], clipPolygon![i + 1])
+                }
+                ctx.closePath()
+                ctx.clip()
+              }
 
-        if (unref(props.showBones)) {
-          // Bones are 1px in spine-local units — the component's scale maps
-          // them to screen, so zooming in draws thicker bone lines (the
-          // expected world-space scaling semantics).
-          ctx.lineWidth = 1
-          ctx.strokeStyle = 'rgba(120, 170, 255, 0.35)'
-          ctx.beginPath()
-          for (const bone of sk.bones) {
-            const len = bone.data.length ?? 0
-            ctx.moveTo(bone.worldX, bone.worldY)
-            ctx.lineTo(bone.a * len + bone.worldX, bone.c * len + bone.worldY)
+              // Apply slot color/alpha from the color timeline. Spine stores
+              // colors as "RRGGBBAA" hex. The alpha controls slot visibility;
+              // without this, shadows and fades jump instantly (step function)
+              // instead of transitioning smoothly.
+              const sc = slot.color || 'FFFFFFFF'
+              const slotAlpha = parseInt(sc.slice(6, 8), 16) / 255
+              const prevAlpha = ctx.globalAlpha
+              ctx.globalAlpha = slotAlpha
+
+              // Spine blend modes: additive (lighter), multiply, screen.
+              // Without this, smoke/aura/glow effects that use additive blending
+              // render as opaque layers that compound alpha → visible banding.
+              const blendMode = slot.data.blend ?? 'normal'
+              const prevBlend = ctx.globalCompositeOperation
+              if (blendMode === 'additive') {
+                ctx.globalCompositeOperation = 'lighter'
+              } else if (blendMode === 'multiply') {
+                ctx.globalCompositeOperation = 'multiply'
+              } else if (blendMode === 'screen') {
+                ctx.globalCompositeOperation = 'screen'
+              }
+
+              // Pick the image for THIS attachment's atlas page (multi-page).
+              const regionName = (att as { path?: string; name?: string }).path ?? (att as { name?: string }).name ?? attName
+              drawTexturedTriangles(ctx, geo.world, geo.uvs, geo.triangles, imgForRegion(regionName), expandWorld)
+
+              ctx.globalCompositeOperation = prevBlend
+              ctx.globalAlpha = prevAlpha
+
+              if (clipping) ctx.restore()
+            }
           }
-          ctx.stroke()
-        }
 
+          if (endClip) {
+            clipPolygon = null
+            clipEndSlotName = null
+          }
+        }
         ctx.restore()
       },
       // Always the hit target across the whole canvas so pointer events reach

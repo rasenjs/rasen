@@ -204,6 +204,8 @@ interface CompiledAnim {
   deform: CompiledDeform[]
   /** skin key used at compile time; rebuild if the skeleton's skin changes */
   skin: string
+  /** combined skins at compile time; compared by reference (assigned once) */
+  extraSkins: string[]
 }
 
 const compileCache = new WeakMap<AnimationData, Map<any, CompiledAnim>>()
@@ -369,14 +371,14 @@ function getCompiled(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
     compileCache.set(anim, perSkeleton)
   }
   let compiled = perSkeleton.get(skeleton)
-  if (compiled && compiled.skin === skeleton.skin) return compiled
+  if (compiled && compiled.skin === skeleton.skin && compiled.extraSkins === skeleton.extraSkins) return compiled
   compiled = compileAnim(skeleton, anim)
   perSkeleton.set(skeleton, compiled)
   return compiled
 }
 
 function compileAnim(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
-  const out: CompiledAnim = { bones: [], slots: [], deform: [], skin: skeleton.skin }
+  const out: CompiledAnim = { bones: [], slots: [], deform: [], skin: skeleton.skin, extraSkins: skeleton.extraSkins }
 
   if (anim.bones) {
     for (const name of Object.keys(anim.bones)) {
@@ -477,12 +479,25 @@ function compileAnim(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
     }
   }
 
-  const skinDeform = anim.deform?.[skeleton.skin] ?? anim.deform?.['default']
-  if (skinDeform) {
+  // Merge deform timelines across the active skin chain (combined skins:
+  // each skin's deform entries apply to its own attachments — e.g. c810's
+  // wingman pod deforms live under the "acc" skin key). One CompiledDeform
+  // per slot so entries from different skins don't clobber each other at
+  // apply time (applyDeformTimelines writes slot.deform per entry).
+  const deformEntries = new Map<string, CompiledDeform>()
+  const deformChain = [skeleton.skin, ...skeleton.extraSkins, 'default']
+  for (const skinName of deformChain) {
+    const skinDeform = anim.deform?.[skinName]
+    if (!skinDeform) continue
     for (const slotName of Object.keys(skinDeform)) {
       const perAtt = skinDeform[slotName]
-      const entry: CompiledDeform = { slotName, byAttachment: new Map() }
+      let entry = deformEntries.get(slotName)
+      if (!entry) {
+        entry = { slotName, byAttachment: new Map() }
+        deformEntries.set(slotName, entry)
+      }
       for (const attName of Object.keys(perAtt)) {
+        if (entry.byAttachment.has(attName)) continue
         const kfs = perAtt[attName]
         if (!kfs || kfs.length === 0) continue
         // resolve attachment ONCE — geometry is static per skin
@@ -544,8 +559,10 @@ function compileAnim(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
           out: new Float64Array(deformLength)
         })
       }
-      if (entry.byAttachment.size) out.deform.push(entry)
     }
+  }
+  for (const entry of deformEntries.values()) {
+    if (entry.byAttachment.size) out.deform.push(entry)
   }
 
   return out

@@ -16,6 +16,7 @@
 import { com, toValue, type Mountable, type HostHooks } from '@rasenjs/core'
 import type { PropValue } from '@rasenjs/core'
 import { element } from './element'
+import { clipTriangleToPolygon, makePolygonClockwise } from './spine-clip'
 import { Mat4x4f } from '@rasenjs/math'
 import { createTexture } from '../utils'
 import { getRenderContext } from '../render-context'
@@ -24,6 +25,7 @@ import type { GlContext } from '../node'
 import {
   computeAttachmentWorld,
   computeAttachmentWorldVertices,
+  computeClippingWorld,
   resolveRegionName,
   hitTestSpine,
   type Skeleton,
@@ -81,6 +83,12 @@ function slotColorToRgba(hex: string | undefined, premultiplied: boolean): { r: 
  * `rgba(120, 170, 255, 0.35)` stroke. Straight alpha (submitted with
  * `premultiplied: false` + normal blend ≡ canvas source-over). */
 const BONE_COLOR = { r: 120 / 255, g: 170 / 255, b: 255 / 255, a: 0.35 }
+
+// Scratch buffers for the clipped path — module-level so the per-frame hot
+// loop allocates nothing (usage is synchronous).
+const clipTriV = new Float64Array(6)
+const clipTriU = new Float64Array(6)
+const clipOut: number[] = []
 
 export interface SpineWebglProps {
   skeleton: PropValue<Skeleton | null>
@@ -254,23 +262,52 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
     const transform = posTransform
 
     let total = 0
+    // Spine clipping (official SkeletonClipping semantics) — same contract as
+    // the canvas-2d renderer: a `clipping` attachment starts a clip that cuts
+    // every subsequent drawable slot in draw order until the end slot has been
+    // drawn (the end slot itself IS clipped — the reset happens after it
+    // draws). Only one clip may be active; a nested clip is ignored.
+    let clipPoly: number[] | null = null
+    let clipEndSlotName: string | null = null
     // Iterate drawOrder (not slots): the `draworder` timeline reorders it, and
     // ignoring it paints back parts on top → ghosting / duplicated parts.
-    for (const slot of sk.drawOrder) {      const attName = slot.attachment
-      if (!attName) continue
+    for (const slot of sk.drawOrder) {
+      const attName = slot.attachment
       // Resolve the attachment object once per (slot, name) — it is static
       // unless an animation swaps the slot's attachment.
       const cachedSlot = slotAttCache.get(slot)
-      let att: unknown
-      if (cachedSlot && cachedSlot.name === attName) {
-        att = cachedSlot.att
-      } else {
-        att = sk.findAttachment(slot.data.name, attName)
-        slotAttCache.set(slot, { name: attName, att })
+      let att: unknown = null
+      if (attName) {
+        if (cachedSlot && cachedSlot.name === attName) {
+          att = cachedSlot.att
+        } else {
+          att = sk.findAttachment(slot.data.name, attName)
+          slotAttCache.set(slot, { name: attName, att })
+        }
       }
-      if (!att) continue
+      const attData = att as AttachmentData | null
 
-      const attData = att as AttachmentData
+      if (attData && attData.type === 'clipping') {
+        // Official clipStart: ignore a nested clip while one is active.
+        if (!clipPoly) {
+          clipPoly = computeClippingWorld(attData, slot, sk)
+          if (clipPoly) makePolygonClockwise(clipPoly)
+          clipEndSlotName = clipPoly ? attData.end ?? null : null
+        }
+        continue
+      }
+
+      // clipEndWithSlot: evaluated for every non-clip slot, drawable or not.
+      const endClip = clipPoly !== null && slot.data.name === clipEndSlotName
+
+      if (!attName || !attData) {
+        if (endClip) {
+          clipPoly = null
+          clipEndSlotName = null
+        }
+        continue
+      }
+
       // Cached static layout (atlas-space UVs + triangles) for this attachment.
       // Two-level key: attachment object identity (unique per slot) → region
       // name (for sequence animations that swap regions per frame). This
@@ -285,9 +322,17 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       let layout = attLayouts.get(regionKey)
       if (!layout) {
         const geo = computeAttachmentWorld(attData, slot, sk, at, attName)
-        if (!geo) continue
-        layout = { uvs: new Float32Array(geo.uvs), triangles: geo.triangles }
-        attLayouts.set(regionKey, layout)
+        if (geo) {
+          layout = { uvs: new Float32Array(geo.uvs), triangles: geo.triangles }
+          attLayouts.set(regionKey, layout)
+        }
+      }
+      if (!layout) {
+        if (endClip) {
+          clipPoly = null
+          clipEndSlotName = null
+        }
+        continue
       }
 
       // Recompute only the world vertices for the current pose.
@@ -295,7 +340,13 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         worldBuf = new Float32Array(Math.max(layout.uvs.length, worldBuf.length * 2))
       }
       const vCount = computeAttachmentWorldVertices(attData, slot, sk, at, attName, worldBuf)
-      if (!vCount) continue
+      if (!vCount) {
+        if (endClip) {
+          clipPoly = null
+          clipEndSlotName = null
+        }
+        continue
+      }
 
       let vi = 0
       let ui = 0
@@ -329,24 +380,80 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         // triangle (~7 allocations x ~900k triangles/frame at 200 instances).
         // hypot is also 3-4x slower than sqrt; expand offset formula identical.
         const EXPAND = 0.6
-        for (let k = 0; k < 3; k++) {
-          const idx = k === 0 ? i0 : k === 1 ? i1 : i2
-          const px = worldBuf[2 * idx]
-          const py = worldBuf[2 * idx + 1]
-          const lx = px - ecx
-          const ly = py - ecy
-          const len = Math.sqrt(lx * lx + ly * ly) || 1
-          vertexBuf[vi++] = px + (lx / len) * EXPAND
-          vertexBuf[vi++] = py + (ly / len) * EXPAND
-          vertexBuf[vi++] = 0
-          // Atlas UVs (image-space, top-left origin) are used directly — verified
-          // against the official spine-canvas renderer that no V flip is needed
-          // (the WebGL texture upload already matches the atlas orientation).
-          uvBuf[ui++] = layout.uvs[2 * idx]
-          uvBuf[ui++] = layout.uvs[2 * idx + 1]
+        if (clipPoly === null) {
+          for (let k = 0; k < 3; k++) {
+            const idx = k === 0 ? i0 : k === 1 ? i1 : i2
+            const px = worldBuf[2 * idx]
+            const py = worldBuf[2 * idx + 1]
+            const lx = px - ecx
+            const ly = py - ecy
+            const len = Math.sqrt(lx * lx + ly * ly) || 1
+            vertexBuf[vi++] = px + (lx / len) * EXPAND
+            vertexBuf[vi++] = py + (ly / len) * EXPAND
+            vertexBuf[vi++] = 0
+            // Atlas UVs (image-space, top-left origin) are used directly — verified
+            // against the official spine-canvas renderer that no V flip is needed
+            // (the WebGL texture upload already matches the atlas orientation).
+            uvBuf[ui++] = layout.uvs[2 * idx]
+            uvBuf[ui++] = layout.uvs[2 * idx + 1]
+          }
+        } else {
+          // Clipped path: expand the corners the same way, then clip the
+          // triangle against the active clip polygon (Sutherland–Hodgman) and
+          // emit the resulting polygon as a triangle fan. The clip bounds the
+          // output, so the seam-hiding expansion is harmless here.
+          for (let k = 0; k < 3; k++) {
+            const idx = k === 0 ? i0 : k === 1 ? i1 : i2
+            const px = worldBuf[2 * idx]
+            const py = worldBuf[2 * idx + 1]
+            const lx = px - ecx
+            const ly = py - ecy
+            const len = Math.sqrt(lx * lx + ly * ly) || 1
+            clipTriV[k * 2] = px + (lx / len) * EXPAND
+            clipTriV[k * 2 + 1] = py + (ly / len) * EXPAND
+            clipTriU[k * 2] = layout.uvs[2 * idx]
+            clipTriU[k * 2 + 1] = layout.uvs[2 * idx + 1]
+          }
+          clipTriangleToPolygon(
+            clipPoly,
+            clipTriV[0], clipTriV[1], clipTriU[0], clipTriU[1],
+            clipTriV[2], clipTriV[3], clipTriU[2], clipTriU[3],
+            clipTriV[4], clipTriV[5], clipTriU[4], clipTriU[5],
+            clipOut
+          )
+          const corners = clipOut.length >> 2
+          for (let f = 1; f + 1 < corners; f++) {
+            // Grow the output buffers as needed — clipping can add vertices.
+            if (vertexBuf.length < vi + 9) {
+              const cap = Math.max(vi + 9, vertexBuf.length * 2)
+              const nb = new Float32Array(cap)
+              nb.set(vertexBuf.subarray(0, vi))
+              vertexBuf = nb
+            }
+            if (uvBuf.length < ui + 6) {
+              const cap = Math.max(ui + 6, uvBuf.length * 2)
+              const nb = new Float32Array(cap)
+              nb.set(uvBuf.subarray(0, ui))
+              uvBuf = nb
+            }
+            for (let k = 0; k < 3; k++) {
+              const ci = k === 0 ? 0 : k === 1 ? f : f + 1
+              vertexBuf[vi++] = clipOut[4 * ci]
+              vertexBuf[vi++] = clipOut[4 * ci + 1]
+              vertexBuf[vi++] = 0
+              uvBuf[ui++] = clipOut[4 * ci + 2]
+              uvBuf[ui++] = clipOut[4 * ci + 3]
+            }
+          }
         }
       }
-      if (vi === 0) continue
+      if (vi === 0) {
+        if (endClip) {
+          clipPoly = null
+          clipEndSlotName = null
+        }
+        continue
+      }
       // Per-slot tint/alpha (animated by `color` timelines). For a PMA atlas
       // the straight-alpha slot color must be premultiplied so the blended
       // result stays premultiplied (otherwise faded parts render too bright).
@@ -373,6 +480,11 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         blendMode
       )
       total += vi / 3
+
+      if (endClip) {
+        clipPoly = null
+        clipEndSlotName = null
+      }
     }
 
     // Bone debug overlay (showBones) — same contract as the canvas-2d
