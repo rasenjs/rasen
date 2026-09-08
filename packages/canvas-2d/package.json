@@ -42,8 +42,8 @@
   "author": "Rasen Contributors",
   "license": "MIT",
   "dependencies": {
-    "@rasenjs/core": "workspace:^",
-    "@rasenjs/assets": "workspace:*"
+    "@rasenjs/assets": "workspace:*",
+    "@rasenjs/core": "workspace:^"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.83",

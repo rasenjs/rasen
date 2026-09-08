@@ -83,13 +83,14 @@ const card = div({
     canvas({
       width: 700,
       height: 700,
-      // Camera is canvas-level (matches the WebGL examples).
-      camera: { x: 0, y: pageH / 2 - 160, zoom: 1 },
       children: [
         Spine({
           skeleton, atlas, atlasImg,
           state, frame,
           width: 700, height: 700,
+          // Skeleton origin at canvas center, shifted down the same amount
+          // the old default-camera pan (y = pageH/2 - 160) produced.
+          x: 350, y: 350 + pageH / 2 - 160,
           showBones: true
         })
       ]

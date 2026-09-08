@@ -37,8 +37,7 @@ type HTMLIntrinsicElements = {
            * window.devicePixelRatio. */
           dpr?: number
           renderOptions?: import('@rasenjs/canvas-2d').RenderContextOptions
-          /** Camera configuration for 2D rendering */
-          camera?: PropValue<{ x?: number; y?: number; zoom?: number }>
+
           children?:
             | Mountable<import('@rasenjs/canvas-2d').CanvasNode>
             | Array<Mountable<import('@rasenjs/canvas-2d').CanvasNode>>

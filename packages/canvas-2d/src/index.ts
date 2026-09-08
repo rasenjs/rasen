@@ -44,9 +44,6 @@ export * from './utils'
 // 导出path相关类型
 export type { PathPoint } from './components/path'
 
-// Canvas 2D Camera Config
-export type { CanvasCameraConfig } from './types'
-
 // 组件 props 类型（供 JSX 增强、组合等场景引用实际组件属性）
 export type { RectProps } from './components/rect'
 export type { TextProps } from './components/text'

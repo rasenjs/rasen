@@ -11,7 +11,7 @@
  * renderer itself lives in the host package — no per-demo copy).
  */
 
-import { spine as Spine, type CanvasCameraConfig } from '@rasenjs/canvas-2d'
+import { spine as Spine } from '@rasenjs/canvas-2d'
 import {
   parseSpineBinary,
   parseSpineAtlas,
@@ -189,17 +189,17 @@ const controls = div({
   ]
 })
 
-// Fit camera: pan to the skeleton's bounding-box center; zoom = the scale that
-// fits the skeleton into the 720px stage (Spine is Y-up; the camera config is
-// the same translate/scale composition the host renderer applies).
+// Fit the skeleton's bounding box into the 720px stage: uniform scale +
+// position so the bbox center lands at the stage center. Spine is Y-up; the
+// Y flip to the canvas' Y-down space happens inside the spine component.
 const STAGE = 720
-function fitCamera(): CanvasCameraConfig {
+function fitView(): { scale: number; x: number; y: number } {
   const w = (skeleton?.data.width ?? 1) || 1
   const h = (skeleton?.data.height ?? 1) || 1
   const cx = (skeleton?.data.x ?? 0) + w / 2
   const cy = (skeleton?.data.y ?? 0) + h / 2
-  const zoom = Math.min(STAGE / w, STAGE / h) * 0.92
-  return { x: cx, y: cy, zoom }
+  const scale = Math.min(STAGE / w, STAGE / h) * 0.92
+  return { scale, x: STAGE / 2 - scale * cx, y: STAGE / 2 + scale * cy }
 }
 
 const stage = div({
@@ -208,15 +208,16 @@ const stage = div({
     canvas({
       width: STAGE,
       height: STAGE,
-      // Camera is canvas-level; a getter keeps the fit reactive to the
-      // currently loaded character.
-      camera: () => fitCamera(),
       children: [
         Spine({
           get skeleton() { return skeleton },
           get atlas() { return atlas },
           get atlasImg() { return atlasImg },
           get state() { return state },
+          // Getters keep the fit reactive to the currently loaded character.
+          get scale() { return fitView().scale },
+          get x() { return fitView().x },
+          get y() { return fitView().y },
           frame,
           width: STAGE,
           height: STAGE,

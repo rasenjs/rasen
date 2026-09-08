@@ -11,11 +11,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@rasenjs/assets": "workspace:*",
     "@rasenjs/canvas-2d": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*",
-    "@rasenjs/assets": "workspace:*",
     "@vue/reactivity": "^3.5.25"
   },
   "devDependencies": {

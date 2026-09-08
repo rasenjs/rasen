@@ -7,21 +7,15 @@
  * `<spine skeleton={...} atlas={...} ... />` inside a `<canvas>`.
  *
  * Usage:
- *   <canvas contextType="2d" width={VIEW} height={VIEW} camera={{ x, y, zoom }}>
- *     <spine
- *       skeleton={skeleton} atlas={atlas} atlasImg={atlasImg} state={state}
- *       bg={bg} showBones={showBones}
- *       frame={frame} width={VIEW} height={VIEW}
- *     />
+ *   <canvas contextType="2d" width={VIEW} height={VIEW}>
+ *     <spine x={VIEW/2} y={VIEW/2} scale={fitScale} ... />
  *   </canvas>
  */
 
 import { com, type Mountable } from '@rasenjs/core'
 import type { PropValue } from '@rasenjs/core'
 import { createNode, type CanvasNode, type Context2D } from '../node'
-import { getRenderContext } from '../render-context'
 import { unref } from '../utils/ref'
-import type { CanvasCameraConfig } from '../types'
 import type { CanvasEventHandlers } from '../events'
 import {
   computeAttachmentWorld,
@@ -47,10 +41,10 @@ export interface SpinePickEvent {
   x: number
   /** Pointer Y in canvas CSS pixels (matches drawing coordinates). */
   y: number
-  /** World-space X (camera-inverted). */
-  worldX: number
-  /** World-space Y (camera-inverted, Y-up). */
-  worldY: number
+  /** Skeleton-local X (spine units, Y-up — the space animation code uses). */
+  localX: number
+  /** Skeleton-local Y (spine units, Y-up). */
+  localY: number
 }
 
 export interface SpineProps {
@@ -77,12 +71,19 @@ export interface SpineProps {
   width: PropValue<number>
   height: PropValue<number>
   /**
-   * World-space position offset (spine-local origin → world). Applied after
-   * the canvas-level camera transform, so the offset is in world units.
-   * Defaults to 0 — same convention as the other components.
+   * Position of the skeleton origin in canvas CSS pixels (top-left origin,
+   * Y-down — the same coordinate space as every other component). The
+   * skeleton's spine-local space is Y-up; the flip is applied internally.
+   * Defaults to 0.
    */
   x?: PropValue<number>
   y?: PropValue<number>
+  /**
+   * Uniform scale from spine units to canvas pixels. Defaults to 1.
+   * Fit-to-canvas: scale = min(W/skelW, H/skelH), positioned so the
+   * skeleton's bbox center lands where you want it (see the viewers).
+   */
+  scale?: PropValue<number>
   /**
    * Opaque backdrop painted before the skeleton. The canvas itself is
    * transparent, so without this the page background shows through the
@@ -254,35 +255,19 @@ function drawTexturedTriangles(
 
 export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
   return (parent: CanvasNode) => {
-    // Camera is canvas-level (RenderContext), never a component prop. The
-    // latest config is read from the parent's RenderContext so pointer
-    // handlers can invert screen→world.
-    const resolveCamera = (): CanvasCameraConfig | undefined => {
-      try {
-        return getRenderContext(parent.ctx).camera
-      } catch {
-        return undefined
-      }
-    }
-
     const pickAt = (x: number, y: number): SpinePickEvent | null => {
-      const cam = resolveCamera()
-      const W = unref(props.width) as number
-      const H = unref(props.height) as number
-      const Z = cam?.zoom ?? 1
-      const CX = cam?.x ?? 0
-      const CY = cam?.y ?? 0
-      // Inverse of: screen = translate(W/2,H/2) ∘ scale(Z,-Z) ∘ translate(-cx,-cy)
-      const worldX = (x - W / 2) / Z + CX
-      const worldY = -(y - H / 2) / Z + CY
+      // Inverse of the draw transform:
+      //   screen = translate(x,y) ∘ scale(scale,-scale) → skeleton-local
+      const s = (unref(props.scale) as number | undefined) ?? 1
+      const px = (unref(props.x) as number | undefined) ?? 0
+      const py = (unref(props.y) as number | undefined) ?? 0
+      const localX = (x - px) / s
+      const localY = -(y - py) / s
       const sk = unref(props.skeleton) as Skeleton | null
       const at = unref(props.atlas) as SpineAtlas | null
       if (!sk || !at) return null
-      // Hit-test in spine-local space: undo the component's world offset.
-      const px = unref(props.x) ?? 0
-      const py = unref(props.y) ?? 0
-      const hit = hitTestSpine(sk, at, worldX - px, worldY - py)
-      return hit ? { ...hit, x, y, worldX, worldY } : null
+      const hit = hitTestSpine(sk, at, localX, localY)
+      return hit ? { ...hit, x, y, localX, localY } : null
     }
 
     const node = createNode(parent, {
@@ -320,17 +305,12 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
         const width = unref(props.width) as number
         const height = unref(props.height) as number
 
-        // The canvas-level camera (RenderContext.camera) applies plain
-        // pan/zoom — no axis flip (that is the drawn content's business).
-        // Spine is a Y-up world against a Y-down canvas, so the component
-        // applies its own flip here, exactly like the WebGL projection does:
-        //   screen = translate(W/2,H/2) ∘ scale(Z,-Z) ∘ translate(-cx,-cy)
-        // with cx/cy = camera pan (world point at the screen center). The
-        // backdrop is painted BEFORE the flip in plain screen coordinates.
-        const cam = resolveCamera()
-        const Z = cam?.zoom ?? 1
-        const CX = cam?.x ?? 0
-        const CY = cam?.y ?? 0
+        // Spine is Y-up while the canvas is Y-down: the component owns the
+        // conversion (same approach as pixi-spine) —
+        //   screen = translate(x,y) ∘ scale(scale,-scale)
+        // so the rest of the scene sees ordinary canvas coordinates. The
+        // backdrop is painted BEFORE the transform, in plain screen space.
+        const s = (unref(props.scale) as number | undefined) ?? 1
 
         const bg = unref(props.bg) as string | null | undefined
         if (bg) {
@@ -338,19 +318,14 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
           ctx.fillRect(0, 0, width, height)
         }
 
-        // Save BEFORE the camera transform — the matching restore at the end
-        // of this draw must reset the transform, otherwise the pan/zoom/flip
-        // leaks and ACCUMULATES across frames (visual: repeated flipped
-        // half-scale copies marching to the right).
+        // Save BEFORE the transform — the matching restore at the end of
+        // this draw must reset the transform, otherwise the scale/flip
+        // leaks and ACCUMULATES across frames.
         ctx.save()
 
-        ctx.translate(width / 2, height / 2)
-        // Spine is Y-up; canvas is Y-down.
-        ctx.scale(Z, -Z)
-        ctx.translate(-CX, -CY)
-        // Component world offset (x, y) — applied inside the camera transform
-        // so it moves the skeleton in world units.
-        ctx.translate(unref(props.x) ?? 0, unref(props.y) ?? 0)
+        ctx.translate((unref(props.x) as number | undefined) ?? 0, (unref(props.y) as number | undefined) ?? 0)
+        // Spine is Y-up; canvas is Y-down → internal flip.
+        ctx.scale(s, -s)
 
         // Overdraw (screen px) meant to hide the anti-aliased clip seam between
         // adjacent triangles. Measured: 0 is best.
@@ -416,8 +391,9 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
         }
 
         if (unref(props.showBones)) {
-          // Bones are 1px in world units (the camera's zoom scales them on
-          // screen, since the canvas-level camera is applied outside).
+          // Bones are 1px in spine-local units — the component's scale maps
+          // them to screen, so zooming in draws thicker bone lines (the
+          // expected world-space scaling semantics).
           ctx.lineWidth = 1
           ctx.strokeStyle = 'rgba(120, 170, 255, 0.35)'
           ctx.beginPath()
@@ -456,7 +432,8 @@ export const spine = com((props: SpineProps): Mountable<CanvasNode> => {
         unref(props.width),
         unref(props.height),
         unref(props.x),
-        unref(props.y)
+        unref(props.y),
+        unref(props.scale)
       ]    })
     return () => node.remove()
   }

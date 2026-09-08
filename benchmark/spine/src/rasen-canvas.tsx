@@ -54,7 +54,11 @@ const skeletonData = shallowRef<SkeletonData | null>(null)
 const atlas = shallowRef<SpineAtlas | null>(null)
 const atlasImg = shallowRef<HTMLImageElement | null>(null)
 const frame = ref(0)
-const camera = ref({ x: 0, y: 0, zoom: 1 })
+// Canvas-2d spine owns its transform (no renderer camera): the shared fit is
+// solved into scale/x/y so the instance-grid bbox centers on the canvas.
+const scale = ref(1)
+const posX = ref(0)
+const posY = ref(0)
 
 // Reactive instance list — drives `each()` below.
 const instances = shallowRef<Instance[]>([])
@@ -69,7 +73,9 @@ function updateCameraFor(n: number): void {
   } else {
     fit = fitCamera({ x: d.x ?? 0, y: d.y ?? 0, width: d.width, height: d.height }, n)
   }
-  camera.value = { x: fit.cx, y: fit.cy, zoom: fit.zoom }
+  scale.value = fit.zoom
+  posX.value = CANVAS_W / 2 - fit.zoom * fit.cx
+  posY.value = CANVAS_H / 2 + fit.zoom * fit.cy
 }
 
 async function loadAssets(): Promise<void> {
@@ -126,9 +132,6 @@ function tickInstances(delta: number): void {
 const Stage = com(() => (
   <canvas
     width={CANVAS_W}
-    height={CANVAS_H}
-    contextType="2d"
-    camera={camera}
   >
     {each(instances, (inst: Instance) => (
       <SpineCanvas
@@ -138,6 +141,11 @@ const Stage = com(() => (
         state={shallowRef(inst.st) as never}
         animation={animName}
         frame={frame}
+        width={VIEW}
+        height={VIEW}
+        x={posX}
+        y={posY}
+        scale={scale}
         width={VIEW}
         height={VIEW}
         skipTonemap={true}

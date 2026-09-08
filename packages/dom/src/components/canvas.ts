@@ -5,7 +5,7 @@ import type {
   RenderContextOptions as Canvas2DRenderOptions
 } from '@rasenjs/canvas-2d'
 import type { GlNode, GlContext, CameraConfig } from '@rasenjs/webgl'
-import { createRoot as createCanvas2DRoot, getRenderContext as getCanvas2DRenderContext } from '@rasenjs/canvas-2d'
+import { createRoot as createCanvas2DRoot } from '@rasenjs/canvas-2d'
 import { createRoot as createGlRoot, getRenderContext } from '@rasenjs/webgl'
 
 /**
@@ -31,19 +31,17 @@ export interface CanvasProps<T extends keyof HostTypes = '2d'> {
   /** 渲染器配置（clearColor/continuousRender 等），强类型，直通 createRoot */
   renderOptions?: HostTypes[T]['rc']
   /**
-   * Camera configuration — intrinsic to the canvas, not a child component.
+   * Camera configuration (WebGL family only — the 2D renderer has no
+   * renderer-level camera; pan/zoom there is a `group` in the scene tree).
    * Accepts any PropValue form (plain object, reactive ref, or getter).
    *
-   * - 2D (default): `{ x?, y?, zoom? }` or omit entirely
    * - 3D perspective: `{ x, y, z, target, fov, ... }`
    * - 3D orthographic: `{ x, y, z, target }` (no fov)
    *
    * Merged into `renderOptions.camera` (top-level prop wins) and pushed
-   * into the RenderContext reactively for both renderer families.
+   * into the WebGL RenderContext reactively.
    */
-  camera?: PropValue<
-    import('@rasenjs/webgl').CameraConfig | import('@rasenjs/canvas-2d').CanvasCameraConfig
-  >
+  camera?: T extends '2d' ? never : PropValue<CameraConfig>
   dpr?: number
   className?: PropValue<string>
   style?: PropValue<Record<string, string | number>>
@@ -156,17 +154,15 @@ export function canvas<T extends keyof HostTypes = '2d'>(
       ...(props.renderOptions ?? {}),
       // camera prop merges into renderOptions.camera (top-level prop wins)
       // Resolve reactive ref to plain object before passing to RenderContext
-      camera: toValue(props.camera) ?? (props.renderOptions as any)?.camera,
+      camera:
+        toValue(props.camera) ??
+        (props.renderOptions as import('@rasenjs/webgl').RenderContextOptions | undefined)?.camera,
     }
     const root =
       contextType === '2d'
         ? createCanvas2DRoot(ctx as Parameters<typeof createCanvas2DRoot>[0], {
             schedule,
-            // camera prop merges into renderOptions.camera (top-level prop wins)
-            camera:
-              toValue(props.camera) ??
-              (props.renderOptions as Canvas2DRenderOptions | undefined)?.camera,
-          } as Canvas2DRenderOptions)
+          })
         : createGlRoot(ctx as GlContext, glOptions)
     // 两个渲染包的 createRoot 都返回带 requestRedraw 的根节点
     const requestRedraw = root.requestRedraw.bind(root)
@@ -209,7 +205,8 @@ export function canvas<T extends keyof HostTypes = '2d'>(
       (child as Mountable<unknown>)(root, undefined)
     )
 
-    // Watch for camera prop changes and push them into the RenderContext.
+    // Watch for camera prop changes and push them into the WebGL
+    // RenderContext (the 2D renderer has no renderer-level camera).
     // The getter re-evaluates the camera ref; a new config object each change
     // defeats Object.is equality → setCamera fires → projection recomputed.
     let stopCameraWatch: (() => void) | null = null
@@ -218,14 +215,6 @@ export function canvas<T extends keyof HostTypes = '2d'>(
         () => toValue(props.camera),
         (cam) => {
           if (cam) glRc.setCamera(cam as CameraConfig)
-        },
-      )
-    } else if (contextType === '2d') {
-      const rc2d = getCanvas2DRenderContext(ctx as Parameters<typeof getCanvas2DRenderContext>[0])
-      stopCameraWatch = runtime.subscribe(
-        () => toValue(props.camera),
-        (cam) => {
-          if (cam) rc2d.setCamera(cam as import('@rasenjs/canvas-2d').CanvasCameraConfig)
         },
       )
     }

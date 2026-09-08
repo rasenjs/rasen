@@ -8,7 +8,6 @@
 import type { Context2D } from './node'
 import type { CanvasNode } from './node'
 import type { CanvasPointerEventType } from './events'
-import type { CanvasCameraConfig } from './types'
 
 export interface Bounds {
   x: number
@@ -32,15 +31,13 @@ export interface RenderContextOptions {
    */
   resolution?: number
   /**
-   * Camera configuration — intrinsic to the canvas, not a child component
-   * (same model as the WebGL RenderContext). 2D is the degenerate form:
-   * x/y = the world point that lands at the screen center, zoom = ortho
-   * scale. Omitting the camera entirely defaults to `{ x:0, y:0, zoom:1 }`.
-   *
-   * Screen mapping: translate(W/2,H/2) ∘ scale(zoom,-zoom) ∘ translate(-x,-y)
-   * — Y flips because the canvas is Y-down while the world is Y-up.
+   * Coordinate convention: top-left origin, Y-down, CSS pixel units — the
+   * scene tree is the single source of truth for transforms. Pan/zoom is a
+   * `group` component; the renderer only maps surface units (see `resolution`).
+   * There is deliberately NO camera concept here: a renderer-level transform
+   * channel outside the tree splits the transform authority and forces every
+   * consumer (draw, hit-test, special components) to reinvent it.
    */
-  camera?: CanvasCameraConfig
 }
 
 const contextMap = new WeakMap<Context2D, RenderContext>()
@@ -65,15 +62,12 @@ export class RenderContext {
   private readonly resolution: number
   /** 解析后的帧调度器（构造期确定，不依赖全局探测时序） */
   private readonly scheduleFrame: (cb: () => void) => () => void
-  /** 画布级相机配置（构造期给定，setCamera 可更新） */
-  private cameraConfig: CanvasCameraConfig | undefined
 
   constructor(
     private ctx: Context2D,
     options: RenderContextOptions = {}
   ) {
     this.resolution = options.resolution ?? 1
-    this.cameraConfig = options.camera
     // 帧调度：注入优先；缺省 rAF，环境缺失（测试/SSR）退化 queueMicrotask
     this.scheduleFrame =
       options.schedule ??
@@ -119,17 +113,6 @@ export class RenderContext {
     }
     for (const r of this.roots) walk(r)
     return n
-  }
-
-  /** Update the camera from a config object (marks dirty for the next frame). */
-  setCamera(config: CanvasCameraConfig): void {
-    this.cameraConfig = config
-    this.markDirty()
-  }
-
-  /** Get the current camera configuration (undefined if default). */
-  get camera(): CanvasCameraConfig | undefined {
-    return this.cameraConfig
   }
 
   /** 标脏：v1 一律全画布重绘 */
@@ -188,13 +171,9 @@ export class RenderContext {
     }
     this.ctx.clearRect(0, 0, canvas.width / res, canvas.height / res)
 
-    // Canvas-level camera config is stored on the RenderContext but NOT
-    // applied here globally: regular 2D shapes draw in screen coordinates
-    // (pan/zoom would break every existing component), while Y-up world-space
-    // content (Spine) reads the config and applies the full mapping itself —
-    // mirroring how the WebGL camera feeds the projection matrix. This keeps
-    // the config surface identical across renderers without changing the
-    // meaning of existing 2D scenes.
+    // Coordinate convention: components draw in canvas CSS pixel space
+    // (top-left origin, Y-down). Pan/zoom lives in the scene tree (`group`),
+    // NOT here — the renderer owns only the device-resolution base transform.
     for (const root of this.roots) {
       root.draw(this.ctx)
     }
@@ -211,9 +190,9 @@ export class RenderContext {
    * are already computed in world coordinates).
    */
   hitTest(x: number, y: number): CanvasNode | null {
-    // Coordinates are in the scene's world space (camera pan/zoom are baked
-    // into node bounds by the same transform the draw path applies — the
-    // camera here uses plain pan/zoom without any axis flip, matching draw).
+    // Coordinates are canvas CSS pixels — the same space components record
+    // bounds in. Pan/zoom lives in the scene tree (group), never here: the
+    // tree is the single transform authority, so no extra mapping applies.
     for (let i = this.roots.length - 1; i >= 0; i--) {
       const found = this.hitTestNode(this.roots[i], x, y)
       if (found) return found
