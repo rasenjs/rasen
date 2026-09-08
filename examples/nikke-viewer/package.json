@@ -8,16 +8,19 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy": "vite build && npx vercel deploy dist --prod --project nikke-viewer --archive=tgz"
   },
   "dependencies": {
+    "@rasenjs/assets": "workspace:*",
     "@rasenjs/canvas-2d": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*",
-    "@rasenjs/assets": "workspace:*",
+    "@rasenjs/router-dom": "workspace:*",
     "@rasenjs/webgl": "workspace:*",
-    "@vue/reactivity": "^3.5.25"
+    "@vue/reactivity": "^3.5.25",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

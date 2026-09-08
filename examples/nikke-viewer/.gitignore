@@ -1,0 +1,5 @@
+.vercel
+.env*
+
+# UI icons (small, must ship with the app)
+!public/*.png

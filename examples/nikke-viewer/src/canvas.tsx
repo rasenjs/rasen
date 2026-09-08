@@ -74,7 +74,6 @@ const Stage = com(() => (
     width={VIEW}
     height={VIEW}
     contextType="2d"
-    camera={{ x: 0, y: 0, zoom: 1 }}
   >
     <Spine
       skeleton={skeleton}
@@ -85,6 +84,8 @@ const Stage = com(() => (
       frame={frame}
       width={VIEW}
       height={VIEW}
+      x={VIEW / 2}
+      y={VIEW / 2}
       bg={'#0a0a0a'}
     />
   </canvas>

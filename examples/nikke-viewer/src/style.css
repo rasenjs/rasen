@@ -1,3 +1,15 @@
+/* Minimal element reset: the project does not ship @unocss/reset, so
+   browser default margins on text elements would break the UI spacing. */
+h1, h2, h3, p {
+  margin: 0;
+}
+
+ul, ol, li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 :root {
   color-scheme: dark;
 }
@@ -6,6 +18,25 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* Form controls: strip UA chrome (default 2px outset button borders, native
+   backgrounds, mismatched fonts) so Uno utility classes style from a clean
+   slate. Class selectors override this baseline where needed. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+button {
+  cursor: pointer;
 }
 
 html,

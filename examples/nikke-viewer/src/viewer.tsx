@@ -25,11 +25,14 @@ import { com, each, type Mountable } from '@rasenjs/core'
 import { text, when } from '@rasenjs/dom'
 import { ref, useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { watch } from '@vue/reactivity'
+import { template, createRouter, createBrowserHistory } from '@rasenjs/router-dom'
+import { z } from 'zod'
 import {
   parseSpineBinary,
   parseSpineAtlas,
   Skeleton,
   AnimationState,
+  getAnimationDuration,
   type SkeletonData,
   type SpineAtlas
 } from '@rasenjs/assets'
@@ -103,6 +106,88 @@ const panY = ref(0)
 const zoom = ref(1)
 const showBones = ref(false)
 const renderMode = ref<'webgl' | 'canvas'>('canvas')
+const showTechInfo = ref(false)
+
+// ---------------------------------------------------------------------------
+// UI settings persistence (localStorage) — background / renderer / show bones.
+// These are view preferences, deliberately kept out of the URL (selection
+// state lives in the router instead).
+// ---------------------------------------------------------------------------
+
+const SETTINGS_KEY = 'nikke-viewer:settings'
+
+type StoredSettings = { bg?: string; renderMode?: 'webgl' | 'canvas'; showBones?: boolean }
+
+function loadStoredSettings(): StoredSettings {
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as StoredSettings
+  } catch {
+    return {}
+  }
+}
+
+const stored = loadStoredSettings()
+if (stored.bg) bg.value = stored.bg
+if (stored.renderMode) renderMode.value = stored.renderMode
+if (stored.showBones !== undefined) showBones.value = stored.showBones
+
+watch([bg, renderMode, showBones], () => {
+  try {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ bg: bg.value, renderMode: renderMode.value, showBones: showBones.value })
+    )
+  } catch {
+    /* persistence is best-effort (private mode / quota) */
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Router — character / pose / animation selection is URL-driven so any view
+// can be shared or reloaded (SPA fallback rewrite configured on Vercel).
+// ---------------------------------------------------------------------------
+
+const router = createRouter(
+  {
+    home: { path: '/' },
+    char: template`/char/${{ id: z.string() }}`,
+    charPose: template`/char/${{ id: z.string() }}/pose/${{
+      pose: z.enum(['fb', 'cover', 'aim'])
+    }}`,
+    charPoseAnim: template`/char/${{ id: z.string() }}/pose/${{
+      pose: z.enum(['fb', 'cover', 'aim'])
+    }}/anim/${{ anim: z.string() }}`
+  },
+  { history: createBrowserHistory() }
+)
+
+type SelectionRoute = typeof router.routes.char
+
+/** Encode a path param (anim names may contain spaces etc.). */
+function encParam(value: string): string {
+  return encodeURIComponent(value)
+}
+
+/** Decode a matched param; returns raw value if malformed. */
+function decParam(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+/** Read char/pose/anim from a route match (missing segments fall back). */
+function readSelection(match: { params: Record<string, unknown> } | null): {
+  id: string
+  pose: PoseKind
+  anim: string
+} {
+  const params = match?.params ?? {}
+  const pose = params.pose === 'cover' || params.pose === 'aim' ? params.pose : 'fb'
+  return { id: decParam(params.id), pose, anim: decParam(params.anim) }
+}
 
 const frame = ref(0)
 
@@ -114,39 +199,239 @@ const atlasImgs = ref<Map<string, HTMLImageElement> | null>(null)
 const state = ref<AnimationState | null>(null)
 
 /**
- * Canvas-level camera config. The spine component knows nothing about the
- * camera — it submits raw world-space vertices, and this config (consumed by
- * the WebGL projection matrix / Canvas2D ctx transform) does ALL the mapping:
+ * WebGL-branch camera config (the WebGL family keeps a renderer-level camera;
+ * the canvas-2d renderer has none). The canvas-2d spine component owns its
+ * transform, so the same fit is solved a second time into scale/x/y props:
  *
- *   screenX = zoom*(worldX - cam.x) + W/2
- *   screenY = H/2 - zoom*(worldY - cam.y)
+ *   screenX = fitX + fitScale * localX
+ *   screenY = fitY - fitScale * localY
  *
- * Solving against the spine fit convention
+ * Matching the spine fit convention
  *   screenX = (worldX - cx)*fit*zoomUser + W/2 + panUser
- * gives: zoom = fit*zoomUser, x = cx - panUser/zoom, y = cy + panUser/zoom.
+ * gives: fitScale = fit*zoomUser, fitX = W/2 + panX - fitScale*cx,
+ *        fitY = H/2 + panY + fitScale*cy.
  */
+/**
+ * Measure the rendered content bbox from canvas pixels and re-fit ONCE.
+ * Runs ~2 frames after load, when the first frame with the new skeleton is
+ * guaranteed to be on screen. Works for every model type: pixels reflect
+ * meshes that extend beyond bones, scene backgrounds, and camera-style
+ * animations alike.
+ */
+function refineFitFromPixels(): void {
+  const cv = getCanvas()
+  if (!cv || !fitBounds.value) return
+  const rect = cv.getBoundingClientRect()
+  const dpr = cv.width / rect.width || 1
+  const BW = cv.width
+  const BH = cv.height
+  let minX = BW, minY = BH, maxX = -1, maxY = -1
+
+  if (renderMode.value === 'webgl') {
+    const gl = cv.getContext('webgl') as WebGLRenderingContext | null
+    if (!gl) return
+    const px = new Uint8Array(BW * BH * 4)
+    gl.readPixels(0, 0, BW, BH, gl.RGBA, gl.UNSIGNED_BYTE, px)
+    // WebGL origin is bottom-left — collect bbox then flip y once.
+    let mnY = BH, mxY = -1
+    for (let y = 0; y < BH; y += 2) {
+      for (let x = 0; x < BW; x += 2) {
+        const i = (y * BW + x) * 4
+        if (px[i + 3] > 10) {
+          if (x < minX) minX = x
+          if (x > maxX) maxX = x
+          if (y < mnY) mnY = y
+          if (y > mxY) mxY = y
+        }
+      }
+    }
+    if (maxX < 0) return
+    minY = BH - 1 - mxY
+    maxY = BH - 1 - mnY
+  } else {
+    const ctx = cv.getContext('2d') as CanvasRenderingContext2D | null
+    if (!ctx) return
+    const img = ctx.getImageData(0, 0, BW, BH).data
+    const hex = bg.value.replace('#', '')
+    const bgR = parseInt(hex.slice(0, 2), 16)
+    const bgG = parseInt(hex.slice(2, 4), 16)
+    const bgB = parseInt(hex.slice(4, 6), 16)
+    for (let y = 0; y < BH; y += 2) {
+      for (let x = 0; x < BW; x += 2) {
+        const i = (y * BW + x) * 4
+        const d =
+          Math.abs(img[i] - bgR) + Math.abs(img[i + 1] - bgG) + Math.abs(img[i + 2] - bgB)
+        if (d > 30) {
+          if (x < minX) minX = x
+          if (x > maxX) maxX = x
+          if (y < minY) minY = y
+          if (y > maxY) maxY = y
+        }
+      }
+    }
+  }
+  if (maxX < 0) return
+
+  // Pixel bbox (physical) → logical px → world coords via the current fit.
+  const lx0 = minX / dpr
+  const lx1 = maxX / dpr
+  const ly0 = minY / dpr
+  const ly1 = maxY / dpr
+  let wx0: number, wx1: number, wy0: number, wy1: number
+  if (renderMode.value === 'webgl') {
+    const cam = camera.value
+    wx0 = cam.x + (lx0 - stageW.value / 2) / cam.zoom
+    wx1 = cam.x + (lx1 - stageW.value / 2) / cam.zoom
+    wy1 = cam.y + (stageH.value / 2 - ly0) / cam.zoom
+    wy0 = cam.y + (stageH.value / 2 - ly1) / cam.zoom
+  } else {
+    const s = fitScale.value || 1
+    wx0 = (lx0 - fitX.value) / s
+    wx1 = (lx1 - fitX.value) / s
+    wy0 = (fitY.value - ly1) / s
+    wy1 = (fitY.value - ly0) / s
+  }
+  const pad = 1.04
+  fitBounds.value = {
+    cx: (wx0 + wx1) / 2,
+    cy: (wy0 + wy1) / 2,
+    w: Math.max(1e-6, (wx1 - wx0) * pad),
+    h: Math.max(1e-6, (wy1 - wy0) * pad)
+  }
+  // updateCamera re-runs via the fitBounds watcher.
+}
+
 function updateCamera(): void {
-  const sk = skeleton.value
-  if (!sk || !sk.data.width) {
+  const W = stageW.value
+  const H = stageH.value
+  const box = fitBounds.value
+  if (!box) {
     camera.value = { x: 0, y: 0, zoom: 1 }
+    fitScale.value = 1
+    fitX.value = W / 2
+    fitY.value = H / 2
     return
   }
-  const cx = (sk.data.x ?? 0) + (sk.data.width ?? 0) / 2
-  const cy = (sk.data.y ?? 0) + (sk.data.height ?? 0) / 2
-  const base = Math.min(VIEW / (sk.data.width ?? 1), VIEW / (sk.data.height ?? 1))
+  // NOTE: the fit center/scale come from the captured pose box — many Nikke
+  // models ship skel headers whose x/y/width/height are far away from where
+  // the animation actually poses the character.
+  const cx = box.cx
+  const cy = box.cy
+  const base = Math.min(W / box.w, H / box.h)
   const Z = base * 0.92 * zoom.value
   camera.value = {
     zoom: Z,
     x: cx - panX.value / Z,
     y: cy + panY.value / Z,
   }
+  fitScale.value = Z
+  fitX.value = W / 2 + panX.value - Z * cx
+  fitY.value = H / 2 + panY.value + Z * cy
 }
 const camera = ref({ x: 0, y: 0, zoom: 1 })
-watch([skeleton, panX, panY, zoom], updateCamera)
-updateCamera()
+// Canvas-2D spine transform (no renderer camera — the component owns it).
+const fitScale = ref(1)
+const fitX = ref(0)
+const fitY = ref(0)
+
 
 // Element ref for the stage (screenshot / fullscreen / pan-zoom host).
 const stageRef = ref<HTMLElement | null>(null)
+
+// The fit reference: bone bbox of the pose captured ONCE at load /
+// animation-switch time (deterministic — the same animation always yields
+// the same box). Stage resizes re-project against this stored box instead
+// of re-measuring, so the framing never visibly shifts or wobbles.
+const fitBounds = ref<{ cx: number; cy: number; w: number; h: number } | null>(null)
+
+// One-shot pixel fit: after the model's first frame is actually drawn,
+// measure the rendered content bbox from canvas pixels and re-fit once.
+// Pixels are ground truth — they are immune to garbage skel headers, bone
+// endpoints not bounding meshes, and camera-style animations that travel.
+let pendingPixelFit = false
+let framesSinceFitRequest = 0
+
+/**
+ * Measure the bone bbox UNION over the whole animation loop, by sampling the
+ * timeline synchronously. The t=0 pose of many Nikke models is not
+ * representative of the loop (the model drifts), so fitting a single frame
+ * left the content off-center / wrongly scaled for most of the playback.
+ * The union box is deterministic (same animation → same box) and keeps the
+ * model centered and fully visible for the entire loop. One pass at load /
+ * animation-switch — never per-frame, so the framing never visibly moves.
+ */
+function captureFitBounds(): void {
+  const sk = skeleton.value
+  const st = state.value
+  if (!sk || !st || !sk.bones.length || !st.currentAnimation) {
+    fitBounds.value = null
+    return
+  }
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  const acc = (b: (typeof sk.bones)[number]): void => {
+    const len = b.data.length ?? 0
+    const x2 = b.worldX + b.a * len
+    const y2 = b.worldY + b.c * len
+    if (b.worldX < minX) minX = b.worldX
+    if (b.worldX > maxX) maxX = b.worldX
+    if (x2 < minX) minX = x2
+    if (x2 > maxX) maxX = x2
+    if (b.worldY < minY) minY = b.worldY
+    if (b.worldY > maxY) maxY = b.worldY
+    if (y2 < minY) minY = y2
+    if (y2 > maxY) maxY = y2
+  }
+  const anim = sk.data.animations[st.currentAnimation]
+  const dur = Math.max(0.05, getAnimationDuration(anim))
+  const SAMPLES = 48
+  const step = dur / SAMPLES
+  // t=0 (pose applied by the caller), then the rest of the loop.
+  for (const b of sk.bones) acc(b)
+  for (let i = 0; i < SAMPLES; i++) {
+    st.update(step)
+    st.apply()
+    for (const b of sk.bones) acc(b)
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+    fitBounds.value = null
+    return
+  }
+  // Small padding: mesh vertices can extend slightly past bone endpoints.
+  fitBounds.value = {
+    cx: (minX + maxX) / 2,
+    cy: (minY + maxY) / 2,
+    w: Math.max(1, (maxX - minX) * 1.1),
+    h: Math.max(1, (maxY - minY) * 1.1)
+  }
+  // Rewind to t=0 so playback starts from the beginning.
+  st.setAnimation(st.currentAnimation, true)
+  st.apply()
+}
+
+// Live stage box (CSS px). The canvas logical size tracks it so the drawing
+// buffer always matches the element aspect — no letterboxing, full bleed.
+const stageW = ref(VIEW)
+const stageH = ref(VIEW)
+let stageObserver: ResizeObserver | null = null
+watch(stageRef, (el) => {
+  stageObserver?.disconnect()
+  stageObserver = null
+  if (!el) return
+  stageObserver = new ResizeObserver((entries) => {
+    const r = entries[0].contentRect
+    if (r.width > 1 && r.height > 1) {
+      stageW.value = Math.round(r.width)
+      stageH.value = Math.round(r.height)
+    }
+  })
+  stageObserver.observe(el)
+})
+
+watch([fitBounds, panX, panY, zoom, stageW, stageH], updateCamera)
+updateCamera()
 
 /** Resolve the <canvas> element rendered inside the stage. */
 function getCanvas(): HTMLCanvasElement | null {
@@ -297,8 +582,8 @@ async function probePose(id: string, pose: Exclude<PoseKind, 'fb'>): Promise<boo
   return false
 }
 
-async function loadCharacter(char: string, pose: PoseKind = 'fb'): Promise<void> {
-  if (!char) return
+async function loadCharacter(char: string, pose: PoseKind = 'fb'): Promise<boolean> {
+  if (!char) return false
   status.value = `Loading ${char}…`
   loaded.value = false
   try {
@@ -351,11 +636,20 @@ async function loadCharacter(char: string, pose: PoseKind = 'fb'): Promise<void>
     if (names.length) {
       state.value.setAnimation(names[0], true)
       currentAnim.value = names[0]
+      // Capture a rough fit from the animation timeline (see above), then
+      // refine it from the actual first painted frame (pixel fit).
+      captureFitBounds()
+      pendingPixelFit = true
+      framesSinceFitRequest = 0
     } else {
       currentAnim.value = ''
     }
     selectedChar.value = char
     currentPose.value = pose
+    // Refresh restores the URL, so the sidebar tab must follow the loaded
+    // model's category (e.g. /char/777 → Scenes) or the highlight looks wrong.
+    activeTab.value = classify(char)
+    if (/^c\d+_\d+$/.test(char)) expandedId.value = char.replace(/_\d+$/, '')
     const entry = entries.value.find((e) => e.id === char)
     currentName.value = entry ? entry.name : fallbackName(char)
     status.value = ''
@@ -372,11 +666,58 @@ async function loadCharacter(char: string, pose: PoseKind = 'fb'): Promise<void>
       if (selectedChar.value === char)
         poseAvailability.value = { ...poseAvailability.value, aim: ok }
     })
+    return true
   } catch (err) {
     status.value = `Failed to load "${char}" (${pose}): ${(err as Error).message}`
     loaded.value = false
+    return false
   }
 }
+
+// ---------------------------------------------------------------------------
+// Router ↔ state sync
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply a route match to the viewer state. Loading only happens when the
+ * character/pose actually changes; a same-page anim change just switches the
+ * animation on the live AnimationState.
+ */
+async function applySelection(match: { params: Record<string, unknown> } | null): Promise<void> {
+  const { id, pose, anim } = readSelection(match)
+  if (!id) return
+
+  // Mobile flow: picking a character closes the list drawer.
+  mobileListOpen.value = false
+
+  if (id !== selectedChar.value || pose !== currentPose.value) {
+    const ok = await loadCharacter(id, pose)
+    if (!ok && pose !== 'fb') {
+      // Requested pose skeleton doesn't exist for this model — fall back to
+      // FB and rewrite the URL so the address bar reflects reality.
+      await router.replace(router.routes.char as SelectionRoute, {
+        params: { id: encParam(id) }
+      })
+      return
+    }
+  }
+
+  if (anim && state.value && anim !== currentAnim.value) {
+    if (state.value.animationNames.includes(anim)) {
+      state.value.setAnimation(anim, true)
+      currentAnim.value = anim
+      // Re-frame once for the new animation's full loop, then pixel-refine.
+      captureFitBounds()
+      pendingPixelFit = true
+      framesSinceFitRequest = 0
+    }
+    // Unknown anim in the URL (e.g. stale link): keep the default animation.
+  }
+}
+
+router.afterEach((to) => {
+  void applySelection(to)
+})
 
 // ---------------------------------------------------------------------------
 // Components — each stateful piece is wrapped in com() so its reactive
@@ -387,6 +728,15 @@ async function loadCharacter(char: string, pose: PoseKind = 'fb'): Promise<void>
 let dragging = false
 let lastX = 0
 let lastY = 0
+
+// Mobile drawers: character list (left) and control panel (right).
+const mobileListOpen = ref(false)
+const mobilePanelOpen = ref(false)
+
+// Multi-pointer tracking for pinch-to-zoom on touch devices.
+const activePointers = new Map<number, { x: number; y: number }>()
+let pinchStartDist = 0
+let pinchStartZoom = 1
 
 function hideImgOnError(e: Event): void {
   ;(e.target as HTMLElement).style.display = 'none'
@@ -406,13 +756,41 @@ function Avatar(props: { src: string; name: string }): Mountable<HTMLElement> {
 }
 
 const Sidebar = com(() => (
-  <div class="w-72 shrink-0 bg-neutral-900/80 border-r border-white/5 flex flex-col h-full">
-    <div class="flex items-center gap-3 px-5 py-5 border-b border-white/5">
-      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-400 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-brand-500/30">
-        R
-      </div>
+  <div>
+    {/* Mobile backdrop — closes the drawer on tap. */}
+    {when({
+      condition: () => mobileListOpen.value,
+      then: () => (
+        <div
+          class="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={() => (mobileListOpen.value = false)}
+        />
+      ),
+      else: () => <span class="hidden" />
+    })}
+    <div
+      class={() =>
+        'fixed md:static md:h-full inset-y-0 left-0 z-40 w-72 max-w-[85vw] shrink-0 bg-neutral-900 border-r border-white/5 flex flex-col transition-transform duration-200 ' +
+        (mobileListOpen.value ? 'translate-x-0' : '-translate-x-full md:translate-x-0')
+      }
+    >
+    <div class="flex items-center gap-3 px-4 py-3 md:px-5 md:py-5 border-b border-white/5">
+      <img
+        src="/nikke-logo.png"
+        alt="NIKKE"
+        class="w-9 h-9 rounded-xl object-cover shadow-lg shadow-black/40"
+      />
       <div class="leading-tight">
-        <div class="text-white font-semibold text-[15px]">Rasen</div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-white font-semibold text-[15px]">Rasen</span>
+          <button
+            title="About the tech stack"
+            class="w-4 h-4 rounded-full border border-neutral-600 text-[10px] leading-none text-neutral-400 hover:text-white hover:border-brand-400 hover:bg-white/10 transition flex items-center justify-center"
+            onClick={() => (showTechInfo.value = true)}
+          >
+            ?
+          </button>
+        </div>
         <div class="text-neutral-400 text-xs">NIKKE Viewer</div>
       </div>
     </div>
@@ -451,13 +829,10 @@ const Sidebar = com(() => (
                 : 'text-neutral-300 hover:bg-white/5')
             }
             onClick={() => {
-              if (row.kind === 'entry') {
-                loadCharacter(row.entry.id)
-                return
-              }
-              // Level-1 character row: selecting it loads the base skin.
-              // Expansion is handled exclusively by the chevron button.
-              loadCharacter(row.id)
+              const id = row.kind === 'entry' ? row.entry.id : row.id
+              void router.push(router.routes.char as SelectionRoute, {
+                params: { id: encParam(id) }
+              })
             }}
           >
             {Avatar({ src: row.thumb, name: row.name })}
@@ -502,7 +877,9 @@ const Sidebar = com(() => (
             then: () => (
               <div class="ml-6 pl-3 border-l border-white/10 space-y-1 my-1">
                 {each(
-                  row.variants.filter((v) => v.id !== row.id),
+                  row.kind === 'group'
+                    ? row.variants.filter((v: L2dEntry) => v.id !== row.id)
+                    : [],
                   (v: L2dEntry) => (
                     <div
                       class={() =>
@@ -511,7 +888,11 @@ const Sidebar = com(() => (
                           ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/30'
                           : 'text-neutral-300 hover:bg-white/5')
                       }
-                      onClick={() => loadCharacter(v.id)}
+                      onClick={() =>
+                        void router.push(router.routes.char as SelectionRoute, {
+                          params: { id: encParam(v.id) }
+                        })
+                      }
                     >
                       {Avatar({ src: spriteUrl(v.id), name: v.name })}
                       <span class="flex-1 min-w-0">
@@ -529,31 +910,48 @@ const Sidebar = com(() => (
         </div>
       ))}
     </div>
+    </div>
   </div>
 ))
 
 const TopBar = com(() => (
-  <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
-    <div class="leading-tight">
-      <h1 class="text-white font-semibold text-lg">Character Viewer</h1>
-      <p class="text-neutral-400 text-xs mt-0.5">
-        {text({ content: () => currentName.value || 'No character selected' })}
-      </p>
+  <div class="flex items-center justify-between px-3 py-2.5 md:px-6 md:py-4 border-b border-white/5">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <button
+        title="Characters"
+        class="md:hidden w-9 h-9 shrink-0 rounded-lg bg-white/5 text-neutral-200 hover:bg-white/10 transition flex items-center justify-center"
+        onClick={() => (mobileListOpen.value = true)}
+      >
+        {iconMenu()}
+      </button>
+      <div class="leading-tight min-w-0">
+        <h1 class="text-white font-semibold text-sm md:text-lg leading-tight">Character Viewer</h1>
+        <p class="text-neutral-400 text-[11px] md:text-xs leading-tight mt-0 md:mt-0.5 truncate">
+          {text({ content: () => currentName.value || 'No character selected' })}
+        </p>
+      </div>
     </div>
     <div class="flex items-center gap-2">
       <button
-        class="px-3 py-2 rounded-lg text-sm bg-white/5 text-neutral-200 hover:bg-white/10 transition flex items-center gap-2"
+        title="Controls"
+        class="md:hidden w-9 h-9 shrink-0 rounded-lg bg-white/5 text-neutral-200 hover:bg-white/10 transition flex items-center justify-center"
+        onClick={() => (mobilePanelOpen.value = true)}
+      >
+        {iconSliders()}
+      </button>
+      <button
+        class="h-9 px-2.5 md:h-auto md:px-3 md:py-2 rounded-lg text-sm bg-white/5 text-neutral-200 hover:bg-white/10 transition flex items-center gap-2"
         onClick={() => saveScreenshot()}
       >
         {iconCamera()}
-        <span>Screenshot</span>
+        <span class="hidden md:inline">Screenshot</span>
       </button>
       <button
-        class="px-3 py-2 rounded-lg text-sm bg-white/5 text-neutral-200 hover:bg-white/10 transition flex items-center gap-2"
+        class="h-9 px-2.5 md:h-auto md:px-3 md:py-2 rounded-lg text-sm bg-white/5 text-neutral-200 hover:bg-white/10 transition flex items-center gap-2"
         onClick={() => stageRef.value?.requestFullscreen()}
       >
         {iconExpand()}
-        <span>Fullscreen</span>
+        <span class="hidden md:inline">Fullscreen</span>
       </button>
     </div>
   </div>
@@ -565,26 +963,64 @@ const Stage = com(() => (
     class="relative flex-1 flex items-center justify-center overflow-hidden bg-neutral-950"
     style={() => ({ background: bg.value })}
     onPointerDown={(e: PointerEvent) => {
-      dragging = true
-      lastX = e.clientX
-      lastY = e.clientY
-      ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+      ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (activePointers.size === 1) {
+        dragging = true
+        lastX = e.clientX
+        lastY = e.clientY
+      } else if (activePointers.size === 2) {
+        // Begin pinch: remember the starting distance & zoom.
+        dragging = false
+        const [a, b] = [...activePointers.values()]
+        pinchStartDist = Math.hypot(a.x - b.x, a.y - b.y)
+        pinchStartZoom = zoom.value
+      }
     }}
     onPointerMove={(e: PointerEvent) => {
+      if (!activePointers.has(e.pointerId)) return
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
       const cv = getCanvas()
-      if (!dragging || !cv) return
+      if (!cv) return
       const rect = cv.getBoundingClientRect()
-      const scale = Math.min(rect.width, rect.height) / VIEW || 1
+      const scale =
+        Math.min(rect.width / (stageW.value || VIEW), rect.height / (stageH.value || VIEW)) || 1
+      if (activePointers.size >= 2) {
+        const [a, b] = [...activePointers.values()]
+        const dist = Math.hypot(a.x - b.x, a.y - b.y)
+        if (pinchStartDist > 0) {
+          zoom.value = Math.min(5, Math.max(0.3, pinchStartZoom * (dist / pinchStartDist)))
+        }
+        return
+      }
+      if (!dragging) return
       panX.value = panX.value + (e.clientX - lastX) / scale
       panY.value = panY.value + (e.clientY - lastY) / scale
       lastX = e.clientX
       lastY = e.clientY
     }}
-    onPointerUp={() => {
-      dragging = false
+    onPointerUp={(e: PointerEvent) => {
+      activePointers.delete(e.pointerId)
+      if (activePointers.size === 1) {
+        // Pinch ended with one finger remaining — resume panning.
+        const [p] = activePointers.values()
+        dragging = true
+        lastX = p.x
+        lastY = p.y
+        pinchStartDist = 0
+      } else if (activePointers.size === 0) {
+        dragging = false
+        pinchStartDist = 0
+      }
     }}
-    onPointerLeave={() => {
+    onPointerCancel={(e: PointerEvent) => {
+      activePointers.delete(e.pointerId)
       dragging = false
+      pinchStartDist = 0
+    }}
+    onPointerLeave={(e: PointerEvent) => {
+      activePointers.delete(e.pointerId)
+      if (activePointers.size === 0) dragging = false
     }}
     onWheel={(e: WheelEvent) => {
       e.preventDefault()
@@ -596,9 +1032,15 @@ const Stage = com(() => (
       condition: () => renderMode.value === 'webgl',
       then: () => (
         <canvas
-          className="max-w-full max-h-full select-none touch-none"
-          width={VIEW}
-          height={VIEW}
+          style={{
+            width: '100%',
+            height: '100%',
+            'object-fit': 'contain',
+            'touch-action': 'none',
+            'user-select': 'none',
+          }}
+          width={stageW}
+          height={stageH}
           contextType="webgl"
           contextOptions={{ alpha: true, preserveDrawingBuffer: true }}
           renderOptions={{ clearColor: 'rgba(0,0,0,0)', continuousRender: true }}
@@ -613,19 +1055,24 @@ const Stage = com(() => (
             animation={currentAnim}
             showBones={showBones}
             frame={frame}
-            width={VIEW}
-            height={VIEW}
+            width={stageW}
+            height={stageH}
             skipTonemap={true}
           />
         </canvas>
       ),
       else: () => (
         <canvas
-          className="max-w-full max-h-full select-none touch-none"
-          width={VIEW}
-          height={VIEW}
+          style={{
+            width: '100%',
+            height: '100%',
+            'object-fit': 'contain',
+            'touch-action': 'none',
+            'user-select': 'none',
+          }}
+          width={stageW}
+          height={stageH}
           contextType="2d"
-          camera={camera}
         >
           <SpineCanvas
             skeleton={skeleton}
@@ -636,8 +1083,11 @@ const Stage = com(() => (
             animation={currentAnim}
             showBones={showBones}
             frame={frame}
-            width={VIEW}
-            height={VIEW}
+            width={stageW}
+            height={stageH}
+            x={fitX}
+            y={fitY}
+            scale={fitScale}
             bg={bg}
           />
         </canvas>
@@ -668,9 +1118,26 @@ const POSE_BUTTONS: Array<{ pose: PoseKind; label: string; title: string }> = [
 ]
 
 const ControlPanel = com(() => (
-  <div class="w-72 shrink-0 bg-neutral-900/80 border-l border-white/5 flex flex-col gap-6 p-5 overflow-y-auto">
+  <div>
+    {/* Mobile backdrop — closes the drawer on tap. */}
+    {when({
+      condition: () => mobilePanelOpen.value,
+      then: () => (
+        <div
+          class="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={() => (mobilePanelOpen.value = false)}
+        />
+      ),
+      else: () => <span class="hidden" />
+    })}
+    <div
+      class={() =>
+        'fixed md:static md:h-full inset-y-0 right-0 z-40 w-72 max-w-[85vw] shrink-0 bg-neutral-900 border-l border-white/5 flex flex-col gap-6 p-5 overflow-y-auto transition-transform duration-200 ' +
+        (mobilePanelOpen.value ? 'translate-x-0' : 'translate-x-full md:translate-x-0')
+      }
+    >
     <div class="space-y-3">
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Pose</h2>
+      <h2 class="text-[11px] md:text-xs font-semibold uppercase tracking-wider text-neutral-500">Pose</h2>
       <div class="flex gap-2">
         {each(
           POSE_BUTTONS,
@@ -691,7 +1158,9 @@ const ControlPanel = com(() => (
               }}
               onClick={() => {
                 if (pose === 'fb' || poseAvailability.value[pose]) {
-                  loadCharacter(selectedChar.value, pose)
+                  void router.push(router.routes.charPose as typeof router.routes.charPose, {
+                    params: { id: encParam(selectedChar.value), pose }
+                  })
                 }
               }}
             >
@@ -710,7 +1179,7 @@ const ControlPanel = com(() => (
       </p>
     </div>
     <div class="space-y-3">
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Animation</h2>
+      <h2 class="text-[11px] md:text-xs font-semibold uppercase tracking-wider text-neutral-500">Animation</h2>
       <div class="flex flex-wrap gap-2">
         {each(animItems, (item: AnimItem) => (
           <button
@@ -721,8 +1190,14 @@ const ControlPanel = com(() => (
                 : 'bg-white/5 border-white/10 text-neutral-300 hover:bg-white/10')
             }
             onClick={() => {
-              state.value?.setAnimation(item.name, true)
-              currentAnim.value = item.name
+              if (!selectedChar.value) return
+              void router.push(router.routes.charPoseAnim as typeof router.routes.charPoseAnim, {
+                params: {
+                  id: encParam(selectedChar.value),
+                  pose: currentPose.value,
+                  anim: encParam(item.name)
+                }
+              })
             }}
           >
             {item.name}
@@ -731,13 +1206,15 @@ const ControlPanel = com(() => (
       </div>
     </div>
     <div class="space-y-3">
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Background</h2>
+      <h2 class="text-[11px] md:text-xs font-semibold uppercase tracking-wider text-neutral-500">Background</h2>
       <div class="flex flex-wrap gap-2 items-center">
         {each(BG_PRESETS, (p: { name: string; color: string }) => (
           <button
-            class={
+            class={() =>
               'w-8 h-8 rounded-lg border-2 transition hover:scale-105 ' +
-              (bg.value.toLowerCase() === p.color.toLowerCase() ? 'border-brand-400' : 'border-white/10')
+              (bg.value.toLowerCase() === p.color.toLowerCase()
+                ? 'border-brand-400'
+                : 'border-white/10')
             }
             style={() => ({ background: p.color })}
             title={p.name}
@@ -754,7 +1231,7 @@ const ControlPanel = com(() => (
       </div>
     </div>
     <div class="space-y-3">
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Renderer</h2>
+      <h2 class="text-[11px] md:text-xs font-semibold uppercase tracking-wider text-neutral-500">Renderer</h2>
       <div class="flex rounded-lg overflow-hidden border border-white/10">
         <button
           class={() => 'flex-1 px-3 py-1.5 text-xs transition ' + (renderMode.value === 'webgl' ? 'bg-brand-600 text-white' : 'bg-white/5 text-neutral-400 hover:bg-white/10')}
@@ -767,7 +1244,7 @@ const ControlPanel = com(() => (
       </div>
     </div>
     <div class="space-y-3">
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-500">View</h2>
+      <h2 class="text-[11px] md:text-xs font-semibold uppercase tracking-wider text-neutral-500">View</h2>
       <button
         class="w-full px-3 py-2 rounded-lg text-sm bg-white/5 text-neutral-200 hover:bg-white/10 transition"
         onClick={() => {
@@ -779,24 +1256,82 @@ const ControlPanel = com(() => (
         Reset pan &amp; zoom
       </button>
       <button
-        class="w-full px-3 py-2 rounded-lg text-sm bg-white/5 text-neutral-200 hover:bg-white/10 transition flex items-center gap-2"
+        class={() =>
+          'w-full px-3 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2 ' +
+          (showBones.value
+            ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/30'
+            : 'bg-white/5 text-neutral-200 hover:bg-white/10')
+        }
         onClick={() => (showBones.value = !showBones.value)}
       >
         <span>{text({ content: () => (showBones.value ? 'Hide' : 'Show') })}</span>
         <span>bones</span>
       </button>
     </div>
+    </div>
   </div>
 ))
 
+const TECH_STACK: Array<{ name: string; desc: string }> = [
+  { name: '@rasenjs/core', desc: 'Reactive core — components, effect scopes, pluggable reactivity runtime' },
+  { name: '@rasenjs/dom', desc: 'DOM renderer with JSX runtime and reactive prop/class/text bindings' },
+  { name: '@rasenjs/canvas-2d', desc: 'Canvas 2D renderer — drives the Spine skeletal animation here' },
+  { name: '@rasenjs/webgl', desc: 'WebGL renderer — the alternative high-performance backend (toggle in Renderer)' },
+  { name: '@rasenjs/reactive-vue', desc: 'Vue reactivity adapter: ref / watch / computed via @vue/reactivity' },
+  { name: '@rasenjs/router', desc: 'Typed, reactive routing — char/pose/anim selection in this viewer is URL-driven' },
+  { name: '@rasenjs/assets', desc: 'Spine .skel/.atlas binary parsing and skeleton model' },
+  { name: 'UnoCSS', desc: 'Utility-first CSS engine' }
+]
+
+const TechInfoModal = com(() =>
+  when({
+    condition: () => showTechInfo.value,
+    then: () => (
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+        onClick={() => (showTechInfo.value = false)}
+      >
+        <div
+          class="w-full max-w-[calc(100vw-2rem)] md:max-w-md max-h-[82vh] overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 p-4 md:p-6 shadow-2xl shadow-black/60"
+          onClick={(e: Event) => e.stopPropagation()}
+        >
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h2 class="text-white font-semibold text-lg">Built with Rasen</h2>
+              <p class="text-neutral-500 text-xs mt-0.5">One reactive core, multiple render targets.</p>
+            </div>
+            <button
+              class="w-7 h-7 shrink-0 rounded-lg bg-white/5 text-neutral-400 hover:text-white hover:bg-white/10 transition flex items-center justify-center text-sm"
+              onClick={() => (showTechInfo.value = false)}
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <ul class="space-y-3">
+            {each(TECH_STACK, (lib: { name: string; desc: string }) => (
+              <li class="rounded-lg bg-white/[0.03] border border-white/5 px-3.5 py-2.5">
+                <div class="text-brand-400 font-mono text-xs font-semibold">{lib.name}</div>
+                <div class="text-neutral-400 text-xs mt-0.5 leading-relaxed">{lib.desc}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    ),
+    else: () => <span class="hidden" />
+  })
+)
+
 const App = com(() => (
-  <div class="h-screen w-screen flex bg-neutral-950 text-neutral-200 font-sans overflow-hidden">
+  <div class="h-screen h-[100dvh] w-screen flex bg-neutral-950 text-neutral-200 font-sans overflow-hidden">
     <Sidebar />
     <div class="flex-1 flex flex-col min-w-0">
       <TopBar />
       <Stage />
     </div>
     <ControlPanel />
+    {TechInfoModal()}
   </div>
 ))
 
@@ -812,6 +1347,31 @@ function svgMount(svg: SVGElement): Mountable<HTMLElement> {
     host.appendChild(svg)
     return () => svg.remove()
   }
+}
+
+function iconMenu(): Mountable<HTMLElement> {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  s.setAttribute('width', '18')
+  s.setAttribute('height', '18')
+  s.setAttribute('viewBox', '0 0 24 24')
+  s.setAttribute('fill', 'none')
+  s.setAttribute('stroke', 'currentColor')
+  s.setAttribute('stroke-width', '2')
+  s.innerHTML = '<path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/>'
+  return svgMount(s)
+}
+
+function iconSliders(): Mountable<HTMLElement> {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  s.setAttribute('width', '18')
+  s.setAttribute('height', '18')
+  s.setAttribute('viewBox', '0 0 24 24')
+  s.setAttribute('fill', 'none')
+  s.setAttribute('stroke', 'currentColor')
+  s.setAttribute('stroke-width', '2')
+  s.innerHTML =
+    '<path stroke-linecap="round" d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'
+  return svgMount(s)
 }
 
 function iconChevron(): Mountable<HTMLElement> {
@@ -878,7 +1438,7 @@ function saveScreenshot(): void {
 async function loadNames(): Promise<Map<string, string>> {
   const map = new Map<string, string>()
   try {
-    const resp = await fetch(L2D_NAMES_URL)
+    const resp = await fetch(L2D_NAMES_URL, { signal: AbortSignal.timeout(6000) })
     if (!resp.ok) return map
     const list = (await resp.json()) as Array<{ id: string; name: string }>
     for (const item of list) if (item.id && item.name) map.set(item.id, item.name)
@@ -888,25 +1448,117 @@ async function loadNames(): Promise<Map<string, string>> {
   return map
 }
 
-async function boot(): Promise<void> {
-  let dirs: string[] = []
-  try {
-    const resp = await fetch(GITHUB_API)
-    if (!resp.ok) throw new Error(`GitHub API ${resp.status}`)
-    const list = (await resp.json()) as Array<{ name: string; type: string }>
-    dirs = list.filter((e) => e.type === 'dir').map((e) => e.name)
-  } catch {
-    dirs = FALLBACK_CHARS
+/**
+ * Resolve the model catalogue from the most reliable source available:
+ *   1. GitHub API — freshest, but blocked / rate-limited on some networks
+ *   2. localStorage from the last successful fetch on this device
+ *   3. Built-in minimal fallback
+ */
+async function fetchCatalogue(): Promise<{
+  dirs: string[]
+  names: Map<string, string>
+  offline: boolean
+}> {
+  const ENTRIES_CACHE_KEY = 'nikke-viewer:entries'
+
+  const readCache = (): { dirs: string[]; names: Map<string, string> } | null => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(ENTRIES_CACHE_KEY) ?? 'null') as {
+        dirs?: string[]
+        names?: Record<string, string>
+      } | null
+      if (cached?.dirs?.length) {
+        return { dirs: cached.dirs, names: new Map(Object.entries(cached.names ?? {})) }
+      }
+    } catch {
+      /* corrupted cache — ignore */
+    }
+    return null
   }
-  const names = await loadNames()
+
+  const writeCache = (dirs: string[], names: Map<string, string>): void => {
+    try {
+      localStorage.setItem(
+        ENTRIES_CACHE_KEY,
+        JSON.stringify({ dirs, names: Object.fromEntries(names) })
+      )
+    } catch {
+      /* cache is best-effort */
+    }
+  }
+
+  // 1+2. GitHub directory listing — direct first, then the same-origin
+  // pass-through proxy (/gh/l2d is a Vercel rewrite to the same GitHub URL).
+  // The proxy exists for networks where api.github.com itself is unreachable;
+  // nothing is stored or served by us — it is a live pass-through.
+  for (const url of [GITHUB_API, '/gh/l2d']) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(8000) })
+      if (!resp.ok) continue
+      const list = (await resp.json()) as Array<{ name: string; type: string }>
+      const dirs = list.filter((e) => e.type === 'dir').map((e) => e.name)
+      if (dirs.length) {
+        const names = await loadNames()
+        writeCache(dirs, names)
+        return { dirs, names, offline: false }
+      }
+    } catch {
+      /* try the next source */
+    }
+  }
+
+  // 3. nikke-db's l2d.json (CORS-friendly, usually reachable when GitHub is
+  // not) — its ids double as the catalogue; names come for free.
+  try {
+    const resp = await fetch(L2D_NAMES_URL, { signal: AbortSignal.timeout(6000) })
+    if (resp.ok) {
+      const list = (await resp.json()) as Array<{ id?: string; name?: string }>
+      const ids = list.map((x) => x.id).filter((id): id is string => !!id)
+      if (ids.length) {
+        const names = new Map(
+          list.filter((x) => x.id && x.name).map((x) => [x.id as string, x.name as string])
+        )
+        writeCache(ids, names)
+        return { dirs: ids, names, offline: false }
+      }
+    }
+  } catch {
+    /* fall through to the device cache */
+  }
+
+  // 4. Last successful fetch on this device (fully offline case)
+  const cached = readCache()
+  if (cached) return { ...cached, offline: true }
+
+  // 5. Built-in minimal fallback
+  return { dirs: FALLBACK_CHARS, names: new Map(), offline: true }
+}
+
+async function boot(): Promise<void> {
+  const { dirs, names, offline } = await fetchCatalogue()
+  if (offline) status.value = 'Offline — showing cached model list'
   entries.value = dirs.map((id) => ({ id, name: names.get(id) ?? fallbackName(id) }))
   if (!entries.value.length) entries.value = FALLBACK_CHARS.map((id) => ({ id, name: id }))
 
-  // Support ?char=xxx URL parameter to load a specific character.
-  const params = new URLSearchParams(location.search)
-  const charParam = params.get('char')
-  const targetChar = charParam && dirs.includes(charParam) ? charParam : findDefaultChar()
-  await loadCharacter(targetChar)
+  // Legacy deep links (?char=xxx) are redirected to the canonical route.
+  const legacy = new URLSearchParams(location.search).get('char')
+  if (legacy && dirs.includes(legacy)) {
+    await router.replace(router.routes.char as SelectionRoute, {
+      params: { id: encParam(legacy) }
+    })
+    return
+  }
+
+  // Restore selection from the current URL, or seed the default character.
+  const current = router.current
+  const fromUrl = readSelection(current)
+  if (fromUrl.id && dirs.includes(fromUrl.id)) {
+    await applySelection(current)
+  } else {
+    await router.replace(router.routes.char as SelectionRoute, {
+      params: { id: encParam(findDefaultChar()) }
+    })
+  }
 }
 
 /** First loadable entry, preferring an actual character over scenes. */
@@ -924,6 +1576,12 @@ function tick(now: number): void {
   if (state.value) {
     state.value.update(dt)
     state.value.apply()
+  }
+  if (pendingPixelFit && ++framesSinceFitRequest >= 2) {
+    // Wait 2 frames so the first real draw with the new skeleton happened.
+    pendingPixelFit = false
+    framesSinceFitRequest = 0
+    refineFitFromPixels()
   }
   frame.value = frame.value + 1
   requestAnimationFrame(tick)
