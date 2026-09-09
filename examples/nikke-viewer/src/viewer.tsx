@@ -36,7 +36,7 @@ import {
   type SkeletonData,
   type SpineAtlas
 } from '@rasenjs/assets'
-import { spine as SpineWebgl } from '@rasenjs/webgl'
+import { spine as SpineWebgl } from '@rasenjs/gfx'
 import { spine as SpineCanvas } from '@rasenjs/canvas-2d'
 
 // ---------------------------------------------------------------------------
@@ -1283,7 +1283,7 @@ const TECH_STACK: Array<{ name: string; desc: string }> = [
   { name: '@rasenjs/core', desc: 'Reactive core — components, effect scopes, pluggable reactivity runtime' },
   { name: '@rasenjs/dom', desc: 'DOM renderer with JSX runtime and reactive prop/class/text bindings' },
   { name: '@rasenjs/canvas-2d', desc: 'Canvas 2D renderer — drives the Spine skeletal animation here' },
-  { name: '@rasenjs/webgl', desc: 'WebGL renderer — the alternative high-performance backend (toggle in Renderer)' },
+  { name: '@rasenjs/gfx', desc: 'WebGL renderer — the alternative high-performance backend (toggle in Renderer)' },
   { name: '@rasenjs/reactive-vue', desc: 'Vue reactivity adapter: ref / watch / computed via @vue/reactivity' },
   { name: '@rasenjs/router', desc: 'Typed, reactive routing — char/pose/anim selection in this viewer is URL-driven' },
   { name: '@rasenjs/assets', desc: 'Spine .skel/.atlas binary parsing and skeleton model' },

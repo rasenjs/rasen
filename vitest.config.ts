@@ -22,7 +22,7 @@ export default defineConfig({
         __dirname,
         'packages/reactive-signals/src/index.ts'
       ),
-      '@rasenjs/webgl': path.resolve(__dirname, 'packages/webgl/src/index.ts'),
+      '@rasenjs/gfx': path.resolve(__dirname, 'packages/gfx/src/index.ts'),
       '@rasenjs/rota/components': path.resolve(
         __dirname,
         'packages/rota/src/components'

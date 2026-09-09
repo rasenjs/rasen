@@ -10,7 +10,7 @@ protocol, canvas-vs-canvas and webgl-vs-webgl.
 |---|---|---|---|
 | WebGL | Official spine-ts 4.1 | `official-webgl.html` | `SceneRenderer` begin/drawSkeleton/end (official examples) |
 | WebGL | pixi-spine 4.0.6 | `pixi.html` | `Application` + `Spine` display objects (community standard) |
-| WebGL | Rasen | `rasen-webgl.html` | `@rasenjs/dom` canvas + `@rasenjs/webgl` spine component |
+| WebGL | Rasen | `rasen-webgl.html` | `@rasenjs/dom` canvas + `@rasenjs/gfx` spine component |
 | Canvas2D | Official spine-ts 4.1 | `official-canvas.html` | `SkeletonRenderer` (triangleRendering for mesh rigs) |
 | Canvas2D | Rasen | `rasen-canvas.html` | `@rasenjs/dom` canvas(2d) + `@rasenjs/canvas-2d` spine component |
 

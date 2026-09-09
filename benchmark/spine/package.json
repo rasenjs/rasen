@@ -21,8 +21,8 @@
     "@rasenjs/canvas-2d": "file:../../packages/canvas-2d",
     "@rasenjs/core": "file:../../packages/core",
     "@rasenjs/dom": "file:../../packages/dom",
+    "@rasenjs/gfx": "file:../../packages/gfx",
     "@rasenjs/reactive-vue": "file:../../packages/reactive-vue",
-    "@rasenjs/webgl": "file:../../packages/webgl",
     "pixi-spine": "^4.0.6",
     "pixi.js": "^7.4.3"
   },

@@ -1,5 +1,5 @@
 /**
- * Rasen WebGL entry — @rasenjs/dom canvas + @rasenjs/webgl spine component.
+ * Rasen WebGL entry — @rasenjs/dom canvas + @rasenjs/gfx spine component.
  *
  * Idiomatic usage exactly as in examples/nikke-viewer: refs drive the spine
  * component; each animation tick bumps `frame` which rebuilds the mesh.
@@ -20,7 +20,7 @@ import {
   type SkeletonData,
   type SpineAtlas
 } from '@rasenjs/assets'
-import { spine as SpineWebgl } from '@rasenjs/webgl'
+import { spine as SpineWebgl } from '@rasenjs/gfx'
 import {
   installStage,
   timed,

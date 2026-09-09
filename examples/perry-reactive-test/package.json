@@ -1,0 +1,21 @@
+{
+  "name": "@rasenjs/example-perry-reactive-test",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Perry AOT compile + run smoke test for Rasen core + math reactive primitives",
+  "scripts": {
+    "check": "perry check src/test.ts",
+    "run": "perry run src/test.ts"
+  },
+  "perry": {
+    "compilePackages": ["@rasenjs/core", "@rasenjs/math"],
+    "allow": {
+      "compilePackages": ["@rasenjs/core", "@rasenjs/math"]
+    }
+  },
+  "dependencies": {
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/math": "workspace:*"
+  }
+}

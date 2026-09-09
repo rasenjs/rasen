@@ -40,7 +40,7 @@ plus the reactive DOM layer for UI — all in **one JSX syntax**:
   `<perspectiveCamera>`, registered via `configureTags` and typed through
   `src/jsx.d.ts`).
 - **3D scene from GLB assets** — track pieces, decorations and AI trucks are
-  loaded from Kenney's `.glb` models via `@rasenjs/webgl`'s `loadGLB` and
+  loaded from Kenney's `.glb` models via `@rasenjs/gfx`'s `loadGLB` and
   rendered as `<mesh>` with per-pixel directional lighting + shadow mapping.
 - **Split-model player truck** — the player truck is loaded as **separate
   parts** (body, underside, 4 wheels) so the wheels can spin and steer

@@ -6,7 +6,7 @@ Performance-optimization safety net for `@rasenjs/assets` spine runtime.
 
 The ONLY stable contracts across the optimization work are:
 
-1. **The data face that renderers consume.** `@rasenjs/webgl` and
+1. **The data face that renderers consume.** `@rasenjs/gfx` and
    `@rasenjs/canvas-2d` spine components read, per posed frame:
    - `skeleton.drawOrder` (slot sequence)
    - `slot.attachment` / `slot.color` / `slot.deform`

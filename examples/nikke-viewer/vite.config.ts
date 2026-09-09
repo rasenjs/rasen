@@ -21,7 +21,7 @@ export default defineConfig({
       '@rasenjs/canvas-2d': resolve(__dirname, '../../packages/canvas-2d/src'),
       '@rasenjs/reactive-vue': resolve(__dirname, '../../packages/reactive-vue/src'),
       '@rasenjs/assets': resolve(__dirname, '../../packages/assets/src'),
-      '@rasenjs/webgl': resolve(__dirname, '../../packages/webgl/src')
+      '@rasenjs/gfx': resolve(__dirname, '../../packages/gfx/src')
     }
   }
 })

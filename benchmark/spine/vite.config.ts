@@ -13,7 +13,7 @@ export default defineConfig({
   base: './',
   build: {
     outDir: 'dist',
-    minify: 'terser',
+    minify: false, // DEBUG: was 'terser'
     terserOptions: {
       compress: { drop_console: true, drop_debugger: true }
     },
@@ -32,13 +32,21 @@ export default defineConfig({
   preview: { port: 5177, strictPort: true },
   resolve: {
     alias: [
+      // Pin @vue/reactivity to the ROOT copy (3.5.25, the version
+      // @rasenjs/reactive-vue uses). Without this, the direct
+      // `import { shallowRef } from '@vue/reactivity'` in the bench pages
+      // resolves to benchmark/node_modules (3.6.0-rc.5, hoisted from the
+      // vapor benchmark's vue@3.6.0-rc.5) — a SECOND reactivity copy whose
+      // refs the runtime's effects cannot track (each/spine silently never
+      // mounts). Keep this alias in sync if the root version changes.
+      { find: '@vue/reactivity', replacement: resolve(__dirname, '../../node_modules/@vue/reactivity') },
       { find: '@rasenjs/dom/jsx-runtime', replacement: resolve(__dirname, '../../packages/dom/dist/jsx-runtime.js') },
       { find: '@rasenjs/dom/jsx-dev-runtime', replacement: resolve(__dirname, '../../packages/dom/dist/jsx-runtime.js') },
       { find: '@rasenjs/core', replacement: resolve(__dirname, '../../packages/core/dist') },
       { find: '@rasenjs/reactive-vue', replacement: resolve(__dirname, '../../packages/reactive-vue/dist') },
       { find: '@rasenjs/assets', replacement: resolve(__dirname, '../../packages/assets/dist') },
       { find: '@rasenjs/canvas-2d', replacement: resolve(__dirname, '../../packages/canvas-2d/dist') },
-      { find: '@rasenjs/webgl', replacement: resolve(__dirname, '../../packages/webgl/dist') },
+      { find: '@rasenjs/gfx', replacement: resolve(__dirname, '../../packages/gfx/dist') },
       { find: '@rasenjs/dom', replacement: resolve(__dirname, '../../packages/dom/dist') }
     ]
   }

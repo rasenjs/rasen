@@ -2,7 +2,7 @@
  * GLTF 2.0 / GLB loader — parses the binary container and extracts
  * mesh geometry + texture references, ready for rasen's `mesh` component.
  *
- * Adapted from `@rasenjs/webgl/utils/gltf.ts` — decoupled from rendering
+ * Adapted from `@rasenjs/gfx/utils/gltf.ts` — decoupled from rendering
  * by outputting generic `GLTFMesh` instead of webgl-specific types.
  */
 

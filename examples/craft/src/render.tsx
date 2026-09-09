@@ -14,7 +14,7 @@ import { createAtlas } from './blocks'
 import type { MouseControls } from './input'
 import type { Player } from './player'
 import type { VoxelChunk, World } from './world'
-import type { CameraConfig } from '@rasenjs/webgl'
+import type { CameraConfig } from '@rasenjs/gfx'
 import { forwardVector } from '@rasenjs/math'
 
 // Texture atlas is static — build once.

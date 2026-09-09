@@ -6,8 +6,8 @@
  * (no gimbal issues from fixed rotation order).
  */
 
-import type { LoadedGLTF } from '@rasenjs/webgl'
-import { createTexture, getRenderContext, element, unref } from '@rasenjs/webgl'
+import type { LoadedGLTF } from '@rasenjs/gfx'
+import { createTexture, getRenderContext, element, unref } from '@rasenjs/gfx'
 import { Mat4x4f } from '@rasenjs/math'
 import type { Player } from './player'
 

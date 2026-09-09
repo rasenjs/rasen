@@ -6,7 +6,7 @@
  * Sounds are loaded as HTMLAudioElement (OGG format).
  */
 
-import { loadGLB, type LoadedGLTF } from '@rasenjs/webgl'
+import { loadGLB, type LoadedGLTF } from '@rasenjs/gfx'
 
 export interface FPSAssets {
   models: Map<string, LoadedGLTF>

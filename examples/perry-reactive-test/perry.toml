@@ -1,0 +1,15 @@
+# Perry config for the Rasen reactive smoke test
+# - Host project: perry-reactivity-test
+# - Entry: src/test.ts
+# - Pure TS, no perry/ui (we want to test the LLVM pipeline on Rasen-shaped code)
+
+[project]
+name = "rasen-perry-smoke"
+entry = "src/test.ts"
+
+[perry]
+# Tell Perry to compile these packages from source (instead of treating them
+# as opaque native libs). This is the path that lets user TS be linked into
+# the same binary as the entry, without converting each package into a
+# perry.nativeLibrary Rust crate.
+compilePackages = ["@rasenjs/core", "@rasenjs/math"]

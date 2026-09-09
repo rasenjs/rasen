@@ -13,7 +13,7 @@
 import { ref } from '@rasenjs/reactive-signals'
 import type { Ref } from '@rasenjs/core'
 import { SimplexNoise, fbm2 } from '@rasenjs/math'
-import { buildVoxelMesh, type MeshGeometry } from '@rasenjs/webgl'
+import { buildVoxelMesh, type MeshGeometry } from '@rasenjs/gfx'
 import { ATLAS_COLS, ATLAS_ROWS, BLOCK_TILES, Blocks } from './blocks'
 
 export const CHUNK_SIZE = 16

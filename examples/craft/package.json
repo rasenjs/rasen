@@ -13,10 +13,10 @@
   "dependencies": {
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
+    "@rasenjs/gfx": "workspace:*",
     "@rasenjs/math": "workspace:*",
     "@rasenjs/reactive-signals": "workspace:*",
-    "@rasenjs/vite-plugin-rasen": "workspace:*",
-    "@rasenjs/webgl": "workspace:*"
+    "@rasenjs/vite-plugin-rasen": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

@@ -57,7 +57,7 @@ src/
 
 ## Rasen features exercised / extended
 
-- `@rasenjs/webgl` — `FirstPersonCamera`, `buildVoxelMesh`, `voxelRaycast`,
+- `@rasenjs/gfx` — `FirstPersonCamera`, `buildVoxelMesh`, `voxelRaycast`,
   `clearColor` context option.
 - `@rasenjs/math` — `SimplexNoise` (2D/3D) + `fbm2`.
 - `@rasenjs/dom` — canvas JSX `contextType`/`contextOptions` support.

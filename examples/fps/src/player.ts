@@ -8,7 +8,7 @@
 import { computed, ref } from '@rasenjs/reactive-signals'
 import type { Ref } from '@rasenjs/core'
 import { aabb, overlapsAabb, type Aabb } from '@rasenjs/math'
-import { forwardVector, rightVector } from '@rasenjs/webgl'
+import { forwardVector, rightVector } from '@rasenjs/gfx'
 import type { Wall } from './level'
 
 const HALF_WIDTH = 0.3

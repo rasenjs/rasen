@@ -49,12 +49,12 @@ type HTMLIntrinsicElements = {
            * window.devicePixelRatio. */
           dpr?: number
           contextOptions?: WebGLContextAttributes
-          renderOptions?: import('@rasenjs/webgl').RenderContextOptions
+          renderOptions?: import('@rasenjs/gfx').RenderContextOptions
           /** Camera configuration for WebGL rendering */
-          camera?: PropValue<import('@rasenjs/webgl').CameraConfig>
+          camera?: PropValue<import('@rasenjs/gfx').CameraConfig>
           children?:
-            | Mountable<import('@rasenjs/webgl').GlNode>
-            | Array<Mountable<import('@rasenjs/webgl').GlNode>>
+            | Mountable<import('@rasenjs/gfx').GlNode>
+            | Array<Mountable<import('@rasenjs/gfx').GlNode>>
         }
     )
 }

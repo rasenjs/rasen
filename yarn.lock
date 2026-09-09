@@ -4048,8 +4048,8 @@ __metadata:
 
 "@rasenjs/assets@file:../../packages/assets::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=6239ed&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
-  checksum: 10c0/ade4500addc4f12d3d7fc6b1d7da5f28d3dda089b4492391eab9f5f133e17a03fa71e57ed30156e4da288d89c8d7dafdc1b41d34b836f5d0d51170d6ac2fd392
+  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=4830f3&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  checksum: 10c0/11c9f771b768e911c8b3efd4fb1dc3a05102242072608c23c923dba9c289102c0bfc9d9368c6f99717fb345d61dd4f10bbdd66bf7d0a3363a4304bf50fea1e45
   languageName: node
   linkType: hard
 
@@ -4065,11 +4065,11 @@ __metadata:
 
 "@rasenjs/canvas-2d@file:../../packages/canvas-2d::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.1
-  resolution: "@rasenjs/canvas-2d@file:../../packages/canvas-2d#../../packages/canvas-2d::hash=b7ecb7&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/canvas-2d@file:../../packages/canvas-2d#../../packages/canvas-2d::hash=ecbf0f&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
-  checksum: 10c0/4f727829bcff9fda7cebcf70964dda9c27bc2533ed45b3e59737dd37eb83f037bbb52d15d24c4cfcca92477bf8a9d73831b83359682a2640b33d500e418fa8be
+  checksum: 10c0/c1678fdfb480681ee36bcfe981c7da259e69673afdbac601f4f9859ef398b542194d0d43e05b2a9d8e925b3567e6492f6a33726e78d806e2c9cc41c7cc8cd1a0
   languageName: node
   linkType: hard
 
@@ -4101,6 +4101,18 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@rasenjs/core@file:../../packages/core::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
+  version: 0.1.8
+  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=bf78ed&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  peerDependencies:
+    zod: ^3.0.0
+  peerDependenciesMeta:
+    zod:
+      optional: true
+  checksum: 10c0/47db84510d8be24177f0b28b8f9a179a25b2a23914fa4a0a936240d83d533d9fa1085d93ed2d647b070bf906041380ac4b85af63d7b2f0074c36de30337b0c03
+  languageName: node
+  linkType: hard
+
 "@rasenjs/core@file:../../packages/core::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
   resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=bf78ed&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
@@ -4126,13 +4138,13 @@ __metadata:
 
 "@rasenjs/dom@file:../../packages/dom::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=205b0b&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=bf9c2c&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:^"
-    "@rasenjs/webgl": "workspace:*"
-  checksum: 10c0/bad4348e8d5ed2e78bcb5698f7d73fcdea477c6111e631e1c8bf0f2034bc7ea89e039afa74545ff3e36c06cd8a55d17d4e8aca728436800be44367f73934b0df
+    "@rasenjs/gfx": "workspace:*"
+  checksum: 10c0/f1a1bb47beca33f82d79cc62f30fdba590fce31ef1cd7157980624a29808ea4c2f81489114fdcb314c87107e73583596473406c405b59860246cb56cf30d8561
   languageName: node
   linkType: hard
 
@@ -4143,9 +4155,18 @@ __metadata:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:^"
+    "@rasenjs/gfx": "workspace:*"
     "@rasenjs/reactive-vue": "workspace:*"
-    "@rasenjs/webgl": "workspace:*"
     "@vue/reactivity": "npm:^3.5.25"
+  languageName: unknown
+  linkType: soft
+
+"@rasenjs/example-perry-reactive-test@workspace:examples/perry-reactive-test":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/example-perry-reactive-test@workspace:examples/perry-reactive-test"
+  dependencies:
+    "@rasenjs/core": "workspace:*"
+    "@rasenjs/math": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -4186,10 +4207,10 @@ __metadata:
   dependencies:
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
+    "@rasenjs/gfx": "workspace:*"
     "@rasenjs/math": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
     "@rasenjs/vite-plugin-rasen": "workspace:*"
-    "@rasenjs/webgl": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
   languageName: unknown
@@ -4201,12 +4222,24 @@ __metadata:
   dependencies:
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
+    "@rasenjs/gfx": "workspace:*"
     "@rasenjs/math": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
     "@rasenjs/vite-plugin-rasen": "workspace:*"
-    "@rasenjs/webgl": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
+  languageName: unknown
+  linkType: soft
+
+"@rasenjs/examples-gfx@workspace:examples/gfx":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/examples-gfx@workspace:examples/gfx"
+  dependencies:
+    "@rasenjs/core": "workspace:*"
+    "@rasenjs/gfx": "workspace:*"
+    "@rasenjs/reactive-vue": "workspace:*"
+    "@vue/reactivity": "npm:^3.5.25"
+    vite: "npm:^6.0.3"
   languageName: unknown
   linkType: soft
 
@@ -4232,9 +4265,9 @@ __metadata:
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
+    "@rasenjs/gfx": "workspace:*"
     "@rasenjs/reactive-vue": "workspace:*"
     "@rasenjs/router-dom": "workspace:*"
-    "@rasenjs/webgl": "workspace:*"
     "@vue/reactivity": "npm:^3.5.25"
     typescript: "npm:^5.3.3"
     unocss: "npm:^66.0.0"
@@ -4249,10 +4282,10 @@ __metadata:
   dependencies:
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
+    "@rasenjs/gfx": "workspace:*"
     "@rasenjs/math": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
     "@rasenjs/vite-plugin-rasen": "workspace:*"
-    "@rasenjs/webgl": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
   languageName: unknown
@@ -4299,15 +4332,38 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/examples-webgl@workspace:examples/webgl":
-  version: 0.0.0-use.local
-  resolution: "@rasenjs/examples-webgl@workspace:examples/webgl"
+"@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
+  version: 0.1.0-alpha
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=51d92f&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   dependencies:
-    "@rasenjs/core": "workspace:*"
-    "@rasenjs/reactive-vue": "workspace:*"
-    "@rasenjs/webgl": "workspace:*"
-    "@vue/reactivity": "npm:^3.5.25"
-    vite: "npm:^6.0.3"
+    "@rasenjs/assets": "workspace:*"
+    "@rasenjs/core": "workspace:^"
+    "@rasenjs/math": "workspace:^"
+  checksum: 10c0/2b7581aa200818b1b900b2351820097e51db0bf277dc68792c7875d80e6d81df2874e810f8995f82be29125382d1ab1063e3cb507d0df5b46224263b41c83381
+  languageName: node
+  linkType: hard
+
+"@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
+  version: 0.1.0-alpha
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=51d92f&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  dependencies:
+    "@rasenjs/assets": "workspace:*"
+    "@rasenjs/core": "workspace:^"
+    "@rasenjs/math": "workspace:^"
+  checksum: 10c0/2b7581aa200818b1b900b2351820097e51db0bf277dc68792c7875d80e6d81df2874e810f8995f82be29125382d1ab1063e3cb507d0df5b46224263b41c83381
+  languageName: node
+  linkType: hard
+
+"@rasenjs/gfx@workspace:*, @rasenjs/gfx@workspace:packages/gfx":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/gfx@workspace:packages/gfx"
+  dependencies:
+    "@rasenjs/assets": "workspace:*"
+    "@rasenjs/core": "workspace:^"
+    "@rasenjs/math": "workspace:^"
+    "@types/node": "npm:^22.10.2"
+    typescript: "npm:^5.7.2"
+    vitest: "npm:^2.1.8"
   languageName: unknown
   linkType: soft
 
@@ -4465,6 +4521,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@rasenjs/reactive-vue@file:../../packages/reactive-vue::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
+  version: 0.1.4-alpha
+  resolution: "@rasenjs/reactive-vue@file:../../packages/reactive-vue#../../packages/reactive-vue::hash=808850&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  dependencies:
+    "@rasenjs/core": "workspace:^"
+    "@vue/reactivity": "npm:^3.5.25"
+  checksum: 10c0/f69e99303b2ae5eee2b5ee9b6e4d354d4d573ef1b35b2dc48465438166c5ba510678eef45406b49a891d575f3d73ea8adb4eaf041344b4ff992e5f5608acd626
+  languageName: node
+  linkType: hard
+
 "@rasenjs/reactive-vue@file:../../packages/reactive-vue::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.4-alpha
   resolution: "@rasenjs/reactive-vue@file:../../packages/reactive-vue#../../packages/reactive-vue::hash=808850&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
@@ -4603,30 +4669,6 @@ __metadata:
     "@rasenjs/router-html": "workspace:*"
     tsup: "npm:^8.0.1"
     typescript: "npm:^5.3.3"
-  languageName: unknown
-  linkType: soft
-
-"@rasenjs/webgl@file:../../packages/webgl::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
-  version: 0.1.0-alpha
-  resolution: "@rasenjs/webgl@file:../../packages/webgl#../../packages/webgl::hash=2e11e6&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
-  dependencies:
-    "@rasenjs/assets": "workspace:*"
-    "@rasenjs/core": "workspace:^"
-    "@rasenjs/math": "workspace:^"
-  checksum: 10c0/035844a630af975eea6e0bae690ec2c4b87d8da0029af4b8f97e2327cb7f393e02d97c38a4faca455c1051e0c26d6ae0b3938e27f95c49117e4c45c8489a68ee
-  languageName: node
-  linkType: hard
-
-"@rasenjs/webgl@workspace:*, @rasenjs/webgl@workspace:packages/webgl":
-  version: 0.0.0-use.local
-  resolution: "@rasenjs/webgl@workspace:packages/webgl"
-  dependencies:
-    "@rasenjs/assets": "workspace:*"
-    "@rasenjs/core": "workspace:^"
-    "@rasenjs/math": "workspace:^"
-    "@types/node": "npm:^22.10.2"
-    typescript: "npm:^5.7.2"
-    vitest: "npm:^2.1.8"
   languageName: unknown
   linkType: soft
 
@@ -7723,6 +7765,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"benchmark-gfx@workspace:benchmark/gfx":
+  version: 0.0.0-use.local
+  resolution: "benchmark-gfx@workspace:benchmark/gfx"
+  dependencies:
+    "@rasenjs/core": "file:../../packages/core"
+    "@rasenjs/gfx": "file:../../packages/gfx"
+    "@rasenjs/reactive-vue": "file:../../packages/reactive-vue"
+    pixelmatch: "npm:^7.0.0"
+    pngjs: "npm:^7.0.0"
+    puppeteer: "npm:^24.32.0"
+    typescript: "npm:^5.3.0"
+    vite: "npm:^5.0.0"
+  languageName: unknown
+  linkType: soft
+
 "benchmark-rasen-alien@workspace:benchmark/rasen-alien":
   version: 0.0.0-use.local
   resolution: "benchmark-rasen-alien@workspace:benchmark/rasen-alien"
@@ -7761,8 +7818,8 @@ __metadata:
     "@rasenjs/canvas-2d": "file:../../packages/canvas-2d"
     "@rasenjs/core": "file:../../packages/core"
     "@rasenjs/dom": "file:../../packages/dom"
+    "@rasenjs/gfx": "file:../../packages/gfx"
     "@rasenjs/reactive-vue": "file:../../packages/reactive-vue"
-    "@rasenjs/webgl": "file:../../packages/webgl"
     pixelmatch: "npm:^7.0.0"
     pixi-spine: "npm:^4.0.6"
     pixi.js: "npm:^7.4.3"

@@ -7,7 +7,7 @@ import type {
   BoxProps,
   GroupProps,
   MeshProps,
-} from '@rasenjs/webgl'
+} from '@rasenjs/gfx'
 
 declare module '@rasenjs/dom/jsx-runtime' {
   namespace JSX {

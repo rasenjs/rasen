@@ -66,7 +66,7 @@
     "@rasenjs/assets": "workspace:*",
     "@rasenjs/canvas-2d": "workspace:*",
     "@rasenjs/core": "workspace:^",
-    "@rasenjs/webgl": "workspace:*"
+    "@rasenjs/gfx": "workspace:*"
   },
   "devDependencies": {
     "@rasenjs/reactive-vue": "workspace:*",

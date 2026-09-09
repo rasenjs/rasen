@@ -1,5 +1,5 @@
 /**
- * Comparison harness — renders 777 with @rasenjs/webgl + @rasenjs/assets at the
+ * Comparison harness — renders 777 with @rasenjs/gfx + @rasenjs/assets at the
  * SAME canvas size / camera / pose as the official spine-webgl reference, so the
  * two can be pixel-compared.
  *
@@ -21,7 +21,7 @@ import {
   type SkeletonData,
   type SpineAtlas
 } from '@rasenjs/assets'
-import { spine as SpineWebgl } from '@rasenjs/webgl'
+import { spine as SpineWebgl } from '@rasenjs/gfx'
 
 const VIEW = 2048
 

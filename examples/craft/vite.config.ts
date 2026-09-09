@@ -7,7 +7,7 @@ export default defineConfig({
     dedupe: ['@rasenjs/core']
   },
   optimizeDeps: {
-    exclude: ['@rasenjs/core', '@rasenjs/dom', '@rasenjs/webgl', '@rasenjs/math']
+    exclude: ['@rasenjs/core', '@rasenjs/dom', '@rasenjs/gfx', '@rasenjs/math']
   },
   server: {
     port: 3011,

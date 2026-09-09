@@ -16,9 +16,9 @@
     "@rasenjs/canvas-2d": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
+    "@rasenjs/gfx": "workspace:*",
     "@rasenjs/reactive-vue": "workspace:*",
     "@rasenjs/router-dom": "workspace:*",
-    "@rasenjs/webgl": "workspace:*",
     "@vue/reactivity": "^3.5.25",
     "zod": "^3.25.76"
   },

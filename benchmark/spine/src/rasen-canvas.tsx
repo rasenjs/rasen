@@ -132,6 +132,7 @@ function tickInstances(delta: number): void {
 const Stage = com(() => (
   <canvas
     width={CANVAS_W}
+    height={CANVAS_H}
   >
     {each(instances, (inst: Instance) => (
       <SpineCanvas

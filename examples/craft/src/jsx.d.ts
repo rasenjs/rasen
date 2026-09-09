@@ -12,7 +12,7 @@ import type {
   GroupProps,
   MeshProps,
   RectProps,
-} from '@rasenjs/webgl'
+} from '@rasenjs/gfx'
 
 declare module '@rasenjs/dom/jsx-runtime' {
   namespace JSX {

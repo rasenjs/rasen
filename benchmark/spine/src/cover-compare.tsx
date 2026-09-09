@@ -19,7 +19,7 @@ import {
   type SkeletonData,
   type SpineAtlas
 } from '@rasenjs/assets'
-import { spine as SpineWebgl } from '@rasenjs/webgl'
+import { spine as SpineWebgl } from '@rasenjs/gfx'
 import {
   SceneRenderer,
   ManagedWebGLRenderingContext

@@ -7,7 +7,7 @@
  * the Godot vehicle.gd effects.
  */
 
-import { loadGLB, type LoadedGLTF } from '@rasenjs/webgl'
+import { loadGLB, type LoadedGLTF } from '@rasenjs/gfx'
 import { Mat4x4f } from '@rasenjs/math'
 
 export interface RacingAssets {

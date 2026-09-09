@@ -4,9 +4,9 @@ import type {
   CanvasNode,
   RenderContextOptions as Canvas2DRenderOptions
 } from '@rasenjs/canvas-2d'
-import type { GlNode, GlContext, CameraConfig } from '@rasenjs/webgl'
+import type { GlNode, GlContext, CameraConfig } from '@rasenjs/gfx'
 import { createRoot as createCanvas2DRoot } from '@rasenjs/canvas-2d'
-import { createRoot as createGlRoot, getRenderContext } from '@rasenjs/webgl'
+import { createRoot as createGlRoot, getRenderContext } from '@rasenjs/gfx'
 
 /**
  * contextType → 渲染器节点与配置的类型映射。
@@ -17,8 +17,8 @@ import { createRoot as createGlRoot, getRenderContext } from '@rasenjs/webgl'
  */
 interface HostTypes {
   '2d': { node: CanvasNode; rc: Canvas2DRenderOptions }
-  webgl: { node: GlNode; rc: import('@rasenjs/webgl').RenderContextOptions }
-  webgl2: { node: GlNode; rc: import('@rasenjs/webgl').RenderContextOptions }
+  webgl: { node: GlNode; rc: import('@rasenjs/gfx').RenderContextOptions }
+  webgl2: { node: GlNode; rc: import('@rasenjs/gfx').RenderContextOptions }
 }
 
 export interface CanvasProps<T extends keyof HostTypes = '2d'> {
@@ -58,7 +58,7 @@ export interface CanvasProps<T extends keyof HostTypes = '2d'> {
  * ```typescript
  * import { canvas } from '@rasenjs/dom'
  * import { rect } from '@rasenjs/canvas-2d'
- * import { mesh } from '@rasenjs/webgl'
+ * import { mesh } from '@rasenjs/gfx'
  *
  * // 2D（缺省）
  * canvas({ width: 400, height: 400, children: [rect({ ... })] })
@@ -121,10 +121,14 @@ export function canvas<T extends keyof HostTypes = '2d'>(
     if (contextType === '2d') {
       ctx = canvasEl.getContext('2d')
     } else {
-      ctx = canvasEl.getContext(
-        contextType,
-        props.contextOptions as WebGLContextAttributes | undefined
-      )
+      // WebGL2-first policy: 'webgl' means "the GL family" — prefer a WebGL2
+      // context and fall back to WebGL1 only when WebGL2 is unavailable
+      // (WebGL1 is frozen: no new features). 'webgl2' stays explicit and
+      // never downgrades.
+      const attrs = props.contextOptions as WebGLContextAttributes | undefined
+      ctx = contextType === 'webgl'
+        ? (canvasEl.getContext('webgl2', attrs) ?? canvasEl.getContext('webgl', attrs))
+        : canvasEl.getContext(contextType, attrs)
     }
 
     if (!ctx) {
@@ -156,7 +160,7 @@ export function canvas<T extends keyof HostTypes = '2d'>(
       // Resolve reactive ref to plain object before passing to RenderContext
       camera:
         toValue(props.camera) ??
-        (props.renderOptions as import('@rasenjs/webgl').RenderContextOptions | undefined)?.camera,
+        (props.renderOptions as import('@rasenjs/gfx').RenderContextOptions | undefined)?.camera,
     }
     const root =
       contextType === '2d'

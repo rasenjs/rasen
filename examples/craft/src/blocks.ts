@@ -6,7 +6,7 @@
  * layout `buildVoxelMesh` expects.
  */
 
-import type { VoxelFaces } from '@rasenjs/webgl'
+import type { VoxelFaces } from '@rasenjs/gfx'
 
 // ---- block ids -------------------------------------------------------------
 

@@ -56,7 +56,7 @@
 | [@rasenjs/router](./packages/router)                     | Framework-agnostic router core               | 🧪 Alpha |
 | [@rasenjs/router-dom](./packages/router-dom)             | DOM-specific router components               | 🧪 Alpha |
 | [@rasenjs/canvas-2d](./packages/canvas-2d)               | Canvas 2D rendering components               | 🧪 Alpha |
-| [@rasenjs/webgl](./packages/webgl)                       | WebGL rendering components                   | 🏗️ Under Construction |
+| [@rasenjs/gfx](./packages/gfx)                       | WebGL rendering components                   | 🏗️ Under Construction |
 | [@rasenjs/react-native](./packages/react-native)         | React Native Fabric renderer                 | 🏗️ Under Construction |
 | [@rasenjs/gpui](./packages/gpui)                         | GPU-accelerated native desktop (Zed's GPUI)  | 🏗️ Under Construction |
 | [@rasenjs/lvgl](./packages/lvgl)                         | Embedded UI for ESP32/STM32 (LVGL + QuickJS) | 🏗️ Under Construction |

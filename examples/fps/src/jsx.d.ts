@@ -10,7 +10,7 @@ import type {
   MeshProps,
   RectProps,
   SkyboxProps,
-} from '@rasenjs/webgl'
+} from '@rasenjs/gfx'
 import type { WeaponProps } from './weapon'
 
 declare module '@rasenjs/dom/jsx-runtime' {

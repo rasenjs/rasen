@@ -14,7 +14,7 @@ import {
   mesh,
   rect,
   voxelRaycast,
-} from '@rasenjs/webgl'
+} from '@rasenjs/gfx'
 import { forwardVector } from '@rasenjs/math'
 import { Blocks } from './blocks'
 import { bindLookControls, setupKeyboard } from './input'

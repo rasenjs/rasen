@@ -5,7 +5,7 @@
  * Destructive-change gate for the spine performance optimization work.
  *
  * Contract philosophy (see golden/README.md):
- *   - The renderer components (@rasenjs/webgl, @rasenjs/canvas-2d) consume a
+ *   - The renderer components (@rasenjs/gfx, @rasenjs/canvas-2d) consume a
  *     specific DATA FACE per posed frame: drawOrder, slot attachment/color/
  *     deform, bone world matrices, attachment world geometry.
  *   - Internal APIs (Bone/Slot shapes, _updateCache, timeline structures,
@@ -244,8 +244,8 @@ describe('golden gate — update/apply separation', () => {
 // ---------------------------------------------------------------------------
 
 describe('golden gate — renderer component public API shape', () => {
-  it('@rasenjs/webgl exports a spine component factory', async () => {
-    const mod = await import('@rasenjs/webgl')
+  it('@rasenjs/gfx exports a spine component factory', async () => {
+    const mod = await import('@rasenjs/gfx')
     expect(typeof mod.spine).toBe('function')
   })
 
