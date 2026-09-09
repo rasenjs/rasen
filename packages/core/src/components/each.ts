@@ -97,7 +97,7 @@ export function each<T extends object, N = unknown>(
   }
 
   return com(
-    <T extends object, N = unknown>(
+    (
       config: EachConfig<T, N>
     ): Mountable<N> => {
       return (node: N, hooks: HostHooks<N> | undefined) => {

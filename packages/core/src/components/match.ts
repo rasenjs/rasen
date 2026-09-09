@@ -71,10 +71,11 @@ export interface MatchConfig<
  *   default: () => NotFound()
  * })
  */
-export const match = com(
-  <K extends string = string, N = unknown>(
-    config: MatchConfig<K, N>
-  ): Mountable<N> => {
+// Perry AOT note: generic arrow functions in call-argument position are not
+// supported by Perry's SWC parser — use a function declaration instead.
+function matchComponent<K extends string = string, N = unknown>(
+  config: MatchConfig<K, N>
+): Mountable<N> {
     return (node: N, mountHooks?: HostHooks<N>) => {
       const hooks = mountHooks ?? config.hooks
       const runtime = getReactiveRuntime()
@@ -177,8 +178,9 @@ export const match = com(
         }
       }
     }
-  }
-)
+}
+
+export const match = com(matchComponent)
 
 // Deprecated alias for backwards compatibility
 /** @deprecated Use `match` instead */

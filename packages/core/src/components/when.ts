@@ -35,10 +35,11 @@ export interface WhenConfig<N = unknown> {
  *   then: () => DetailsPanel()
  * })
  */
-export const when = com(
-  <N = unknown>(
-    config: WhenConfig<N>
-  ): Mountable<N> => {
+// Perry AOT note: generic arrow functions in call-argument position are not
+// supported by Perry's SWC parser — use a function declaration instead.
+function whenComponent<N = unknown>(
+  config: WhenConfig<N>
+): Mountable<N> {
     return (node: N, mountHooks?: HostHooks<N>) => {
       const hooks = mountHooks ?? config.hooks
       const runtime = getReactiveRuntime()
@@ -115,5 +116,7 @@ export const when = com(
         }
       }
     }
-  }
-)
+}
+
+export const when = com(whenComponent)
+
