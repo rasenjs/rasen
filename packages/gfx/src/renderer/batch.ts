@@ -40,6 +40,10 @@ interface BatchItem {
    * meshes). WebGL2 only; on WebGL1 (frozen) and in mixed groups, indexed
    * items are expanded through the index list inside the transform loop. */
   indices?: Uint16Array | number[]
+  /** Hint that `transform` is a pure translation matrix (only source[12..14]
+   * non-zero, all other diagonal=1 off-diagonal=0). The transform pass then
+   * skips 9 multiplies per vertex and adds source[12..14] directly. */
+  translationOnly?: boolean
 }
 
 /** Max textures merged into one draw call (sampler array size in the ES 3.00
@@ -229,12 +233,20 @@ export class BatchRenderer {
     premultiplied?: boolean,
     blendMode?: BlendMode,
     indices?: Uint16Array | number[],
+    translationOnly?: boolean,
   ) {
     const transformMatrix = transform instanceof Mat4x4f
       ? transform
       : mat4x4f(transform instanceof Float32Array ? Array.from(transform) : transform)
+    let effectiveTranslationOnly = !!translationOnly
+    if (!effectiveTranslationOnly) {
+      const s = transformMatrix.source
+      if (s[0] === 1 && s[5] === 1 && s[10] === 1 && s[1] === 0 && s[2] === 0 && s[4] === 0 && s[6] === 0 && s[8] === 0 && s[9] === 0) {
+        effectiveTranslationOnly = true
+      }
+    }
 
-    this.batchItems.push({ vertices, color, transform: transformMatrix, uv, texture, vertexColors, depthWrite, normals, layer: layer ?? 0, skipTonemap, premultiplied, blendMode, indices })
+    this.batchItems.push({ vertices, color, transform: transformMatrix, uv, texture, vertexColors, depthWrite, normals, layer: layer ?? 0, skipTonemap, premultiplied, blendMode, indices, translationOnly: effectiveTranslationOnly })
     this._pendingVertexCount += vertices.length / 3
 
     if (this._pendingVertexCount >= this.maxBatchSize) {
@@ -420,6 +432,10 @@ export class BatchRenderer {
       const itemUv = item.uv
       const itemNormals = item.normals
       const texSlot = (item.texture ? slotOf.get(item.texture) : undefined) ?? 0
+      const transOnly = !!item.translationOnly
+      const tx = m[12]
+      const ty = m[13]
+      const tz = m[14]
 
       for (let i = 0; i < outCount; i++) {
         const s = idx ? idx[i] : i
@@ -427,23 +443,34 @@ export class BatchRenderer {
         const y = item.vertices[s * 3 + 1]
         const z = item.vertices[s * 3 + 2] || 0
 
-        const transformedX = m[0] * x + m[4] * y + m[8] * z + m[12]
-        const transformedY = m[1] * x + m[5] * y + m[9] * z + m[13]
-        const transformedZ = m[2] * x + m[6] * y + m[10] * z + m[14]
-
-        positions[posOffset++] = transformedX
-        positions[posOffset++] = transformedY
-        positions[posOffset++] = transformedZ
+        if (transOnly) {
+          positions[posOffset++] = x + tx
+          positions[posOffset++] = y + ty
+          positions[posOffset++] = z + tz
+        } else {
+          const transformedX = m[0] * x + m[4] * y + m[8] * z + m[12]
+          const transformedY = m[1] * x + m[5] * y + m[9] * z + m[13]
+          const transformedZ = m[2] * x + m[6] * y + m[10] * z + m[14]
+          positions[posOffset++] = transformedX
+          positions[posOffset++] = transformedY
+          positions[posOffset++] = transformedZ
+        }
 
         // Transform normals by the model matrix's 3x3 (rotation+scale) part,
         // then normalize in the shader. Good enough for uniform-ish scales.
         if (itemNormals) {
-          const nx = itemNormals[s * 3]
-          const ny = itemNormals[s * 3 + 1]
-          const nz = itemNormals[s * 3 + 2]
-          normals[normOffset++] = m[0] * nx + m[4] * ny + m[8] * nz
-          normals[normOffset++] = m[1] * nx + m[5] * ny + m[9] * nz
-          normals[normOffset++] = m[2] * nx + m[6] * ny + m[10] * nz
+          if (transOnly) {
+            normals[normOffset++] = itemNormals[s * 3]
+            normals[normOffset++] = itemNormals[s * 3 + 1]
+            normals[normOffset++] = itemNormals[s * 3 + 2]
+          } else {
+            const nx = itemNormals[s * 3]
+            const ny = itemNormals[s * 3 + 1]
+            const nz = itemNormals[s * 3 + 2]
+            normals[normOffset++] = m[0] * nx + m[4] * ny + m[8] * nz
+            normals[normOffset++] = m[1] * nx + m[5] * ny + m[9] * nz
+            normals[normOffset++] = m[2] * nx + m[6] * ny + m[10] * nz
+          }
         } else {
           normals[normOffset++] = 0
           normals[normOffset++] = 0

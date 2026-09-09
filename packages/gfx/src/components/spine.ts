@@ -398,7 +398,8 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
           skip ? true : undefined,
           premultiplied,
           blendMode,
-          layout.triangles
+          layout.triangles,
+          true // translationOnly — spine's model matrix is always translation
         )
         total += nVerts
 

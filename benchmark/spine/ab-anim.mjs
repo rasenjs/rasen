@@ -17,6 +17,7 @@ import fs from 'node:fs'
 const N = Number(process.argv[2] || 200)
 const RUNS = Number(process.argv[3] || 2)
 const HWGL = !!process.env.HWGL
+const PORT = Number(process.env.PORT || 5179)
 
 function launchBrowser(forceGL1) {
   const args = ['--headless=new', '--window-size=1360,1360', '--js-flags=--expose-gc']
@@ -44,7 +45,7 @@ async function main() {
       const browser = await launchBrowser(t.gl1)
       try {
         const page = await browser.newPage()
-        await page.goto(`http://localhost:5179/${t.page}?bench=1`, { waitUntil: 'networkidle0', timeout: 60000 })
+        await page.goto(`http://localhost:${PORT}/${t.page}?bench=1`, { waitUntil: 'networkidle0', timeout: 60000 })
         await page.waitForFunction(() => !!window.__bench, { timeout: 20000 })
         await page.evaluate(() => window.__bench.load())
         await page.evaluate((n) => window.__bench.createInstances(n), N)
