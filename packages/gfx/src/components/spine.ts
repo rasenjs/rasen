@@ -16,7 +16,6 @@
 import { com, toValue, type Mountable, type HostHooks } from '@rasenjs/core'
 import type { PropValue } from '@rasenjs/core'
 import { element } from './element'
-import { clipTriangleToPolygon, makePolygonClockwise } from './spine-clip'
 import { Mat4x4f } from '@rasenjs/math'
 import { createTexture } from '../utils'
 import { getRenderContext } from '../render-context'
@@ -28,6 +27,8 @@ import {
   computeClippingWorld,
   resolveRegionName,
   hitTestSpine,
+  clipTriangleToPolygon,
+  makePolygonClockwise,
   type Skeleton,
   type SpineAtlas,
   type AnimationState,
@@ -514,10 +515,10 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       const blendMode = slot.data.blend ?? 'normal'
       renderContext.addShape(
         'spine',
-        vertexBuf.slice(0, vi),
+        vertexBuf.subarray(0, vi),
         color,
         transform,
-        uvBuf.slice(0, ui),
+        uvBuf.subarray(0, ui),
         slotTexture,
         undefined,
         undefined,
@@ -570,7 +571,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       if (bi > 0) {
         renderContext.addShape(
           'spine-bones',
-          boneBuf.slice(0, bi),
+          boneBuf.subarray(0, bi),
           BONE_COLOR,
           transform,
           undefined, // uv — solid color path (u_useTexture = 0)

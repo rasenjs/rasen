@@ -16,3 +16,7 @@ export type { AtlasPage, AtlasRegion, SpineAtlas, AttachmentGeometry } from './p
 export { Skeleton, type Bone, type Slot, type IkConstraintRuntime, type PathConstraintRuntime } from './runtime/skeleton'
 export { AnimationState, applyAnimation, getAnimationDuration, type SpineEvent } from './runtime/animation'
 export { hitTestSpine, type SpineHit } from './runtime/hit-test'
+// Sutherland–Hodgman triangle clipping against a convex clip polygon — the
+// geometric equivalent of the official SkeletonClipping.clipTriangles. Pure
+// math (no GL), shared by the WebGL and canvas-2d spine renderers.
+export { clipTriangleToPolygon, makePolygonClockwise } from './runtime/spine-clip'

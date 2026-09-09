@@ -30,7 +30,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve, dirname, join } from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath } from 'node:url'
 import {
   parseSpineJson,
   parseSpineBinary,
