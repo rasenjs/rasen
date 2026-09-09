@@ -213,14 +213,15 @@ const state = ref<AnimationState | null>(null)
  */
 /**
  * Measure the rendered content bbox from canvas pixels and re-fit ONCE.
- * Runs ~2 frames after load, when the first frame with the new skeleton is
- * guaranteed to be on screen. Works for every model type: pixels reflect
- * meshes that extend beyond bones, scene backgrounds, and camera-style
- * animations alike.
+ * Returns true when the fit was applied, false when there was nothing to
+ * measure yet (the first draw may land a frame or two later on slow devices
+ * — the caller retries) or when the readback failed (tainted canvas, lost
+ * context). Works for every model type: pixels reflect meshes that extend
+ * beyond bones, scene backgrounds, and camera-style animations alike.
  */
-function refineFitFromPixels(): void {
+function refineFitFromPixels(): boolean {
   const cv = getCanvas()
-  if (!cv || !fitBounds.value) return
+  if (!cv || !fitBounds.value) return false
   const rect = cv.getBoundingClientRect()
   const dpr = cv.width / rect.width || 1
   const BW = cv.width
@@ -229,7 +230,7 @@ function refineFitFromPixels(): void {
 
   if (renderMode.value === 'webgl') {
     const gl = cv.getContext('webgl') as WebGLRenderingContext | null
-    if (!gl) return
+    if (!gl) return false
     const px = new Uint8Array(BW * BH * 4)
     gl.readPixels(0, 0, BW, BH, gl.RGBA, gl.UNSIGNED_BYTE, px)
     // WebGL origin is bottom-left — collect bbox then flip y once.
@@ -245,12 +246,12 @@ function refineFitFromPixels(): void {
         }
       }
     }
-    if (maxX < 0) return
+    if (maxX < 0) return false
     minY = BH - 1 - mxY
     maxY = BH - 1 - mnY
   } else {
     const ctx = cv.getContext('2d') as CanvasRenderingContext2D | null
-    if (!ctx) return
+    if (!ctx) return false
     const img = ctx.getImageData(0, 0, BW, BH).data
     const hex = bg.value.replace('#', '')
     const bgR = parseInt(hex.slice(0, 2), 16)
@@ -270,7 +271,7 @@ function refineFitFromPixels(): void {
       }
     }
   }
-  if (maxX < 0) return
+  if (maxX < 0) return false
 
   // Pixel bbox (physical) → logical px → world coords via the current fit.
   const lx0 = minX / dpr
@@ -299,6 +300,7 @@ function refineFitFromPixels(): void {
     h: Math.max(1e-6, (wy1 - wy0) * pad)
   }
   // updateCamera re-runs via the fitBounds watcher.
+  return true
 }
 
 function updateCamera(): void {
@@ -1329,7 +1331,11 @@ const TechInfoModal = com(() =>
 )
 
 const App = com(() => (
-  <div class="h-screen h-[100dvh] w-screen flex bg-neutral-950 text-neutral-200 font-sans overflow-hidden">
+  // Height comes from .app-shell in style.css (100vh fallback + 100dvh) —
+  // Tailwind's h-screen would win over h-[100dvh] in the emitted stylesheet
+  // and reintroduce the mobile URL-bar scrollbar. w-full instead of w-screen
+  // so a classic scrollbar never causes horizontal overflow.
+  <div class="app-shell w-full flex bg-neutral-950 text-neutral-200 font-sans overflow-hidden">
     <Sidebar />
     <div class="flex-1 flex flex-col min-w-0">
       <TopBar />
@@ -1583,10 +1589,21 @@ function tick(now: number): void {
     state.value.apply()
   }
   if (pendingPixelFit && ++framesSinceFitRequest >= 2) {
-    // Wait 2 frames so the first real draw with the new skeleton happened.
-    pendingPixelFit = false
-    framesSinceFitRequest = 0
-    refineFitFromPixels()
+    // Wait 2 frames so the first real draw with the new skeleton happened,
+    // then measure. On slow devices the first draw can land later (texture
+    // upload jank, rAF throttling) or the readback can fail (tainted canvas,
+    // lost context) — retry until pixels are actually measurable, bounded to
+    // ~1.5s so a genuinely empty model cannot loop forever.
+    let applied = false
+    try {
+      applied = refineFitFromPixels()
+    } catch {
+      applied = false
+    }
+    if (applied || framesSinceFitRequest >= 90) {
+      pendingPixelFit = false
+      framesSinceFitRequest = 0
+    }
   }
   frame.value = frame.value + 1
   requestAnimationFrame(tick)

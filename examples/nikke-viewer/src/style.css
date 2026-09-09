@@ -44,6 +44,9 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
+  /* The app shell owns all scrolling (side panels); a page-level scrollbar
+     shifts the stage center away from the visual center on mobile. */
+  overflow: hidden;
   font-family:
     system-ui,
     -apple-system,
@@ -55,6 +58,19 @@ body {
 
 #app {
   height: 100%;
+}
+
+/* Full-viewport app shell. 100dvh tracks the mobile URL bar so the stage
+   center stays at the visual center; 100vh is the fallback for browsers
+   without dvh. (Declared here because Tailwind emits h-screen AFTER
+   h-[100dvh], which would let 100vh win and reintroduce the scrollbar.) */
+.app-shell {
+  height: 100vh;
+}
+@supports (height: 100dvh) {
+  .app-shell {
+    height: 100dvh;
+  }
 }
 
 /* Slim scrollbars for the side panels */
