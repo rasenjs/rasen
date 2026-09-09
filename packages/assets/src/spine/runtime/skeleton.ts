@@ -173,7 +173,7 @@ function boneUpdate(bone: Bone): void {
  * transform. The applied transform is set to the specified local transform.
  * Child bones are not updated. Mirrors Spine's `Bone.updateWorldTransformWith`.
  */
-function boneUpdateWorldTransformWith(
+export function boneUpdateWorldTransformWith(
   bone: Bone,
   x: number,
   y: number,
@@ -1109,16 +1109,21 @@ export class Skeleton {
    * animation can be applied cleanly on top.
    */
   setToSetupPose(): void {
-    for (const bone of this.bones) {
-      bone.x = bone.data.x ?? 0
-      bone.y = bone.data.y ?? 0
-      bone.rotation = bone.data.rotation ?? 0
-      bone.scaleX = bone.data.scaleX ?? 1
-      bone.scaleY = bone.data.scaleY ?? 1
-      bone.shearX = bone.data.shearX ?? 0
-      bone.shearY = bone.data.shearY ?? 0
+    const bones = this.bones
+    for (let i = 0, n = bones.length; i < n; i++) {
+      const bone = bones[i]
+      const d = bone.data
+      bone.x = d.x ?? 0
+      bone.y = d.y ?? 0
+      bone.rotation = d.rotation ?? 0
+      bone.scaleX = d.scaleX ?? 1
+      bone.scaleY = d.scaleY ?? 1
+      bone.shearX = d.shearX ?? 0
+      bone.shearY = d.shearY ?? 0
     }
-    for (const slot of this.slots) {
+    const slots = this.slots
+    for (let i = 0, n = slots.length; i < n; i++) {
+      const slot = slots[i]
       slot.attachment = slot.data.attachment
       slot.color = slot.data.color ?? 'FFFFFFFF'
       slot.deform = null
@@ -1126,28 +1131,37 @@ export class Skeleton {
     }
     // Restore the setup draw order; the `draworder` timeline reorders it.
     this.drawOrder = this.slots.slice()
-    for (const ik of this.ikConstraints) {
-      ik.mix = ik.data.mix ?? 1
-      ik.softness = ik.data.softness ?? 0
-      ik.bendPositive = ik.data.bendPositive ?? true
-      ik.bendDirection = ik.data.bendDirection ?? 0
-      ik.compress = ik.data.compress ?? false
-      ik.stretch = ik.data.stretch ?? false
+    const iks = this.ikConstraints
+    for (let i = 0, n = iks.length; i < n; i++) {
+      const ik = iks[i]
+      const d = ik.data
+      ik.mix = d.mix ?? 1
+      ik.softness = d.softness ?? 0
+      ik.bendPositive = d.bendPositive ?? true
+      ik.bendDirection = d.bendDirection ?? 0
+      ik.compress = d.compress ?? false
+      ik.stretch = d.stretch ?? false
     }
-    for (const tc of this.transformConstraints) {
-      tc.mixRotate = tc.data.mixRotate ?? 0
-      tc.mixX = tc.data.mixX ?? 0
-      tc.mixY = tc.data.mixY ?? 0
-      tc.mixScaleX = tc.data.mixScaleX ?? 0
-      tc.mixScaleY = tc.data.mixScaleY ?? 0
-      tc.mixShearY = tc.data.mixShearY ?? 0
+    const tcs = this.transformConstraints
+    for (let i = 0, n = tcs.length; i < n; i++) {
+      const tc = tcs[i]
+      const d = tc.data
+      tc.mixRotate = d.mixRotate ?? 0
+      tc.mixX = d.mixX ?? 0
+      tc.mixY = d.mixY ?? 0
+      tc.mixScaleX = d.mixScaleX ?? 0
+      tc.mixScaleY = d.mixScaleY ?? 0
+      tc.mixShearY = d.mixShearY ?? 0
     }
-    for (const pc of this.pathConstraints) {
-      pc.position = pc.data.position ?? 0
-      pc.spacing = pc.data.spacing ?? 0
-      pc.mixRotate = pc.data.mixRotate ?? pc.data.rotateMix ?? 0
-      pc.mixX = pc.data.mixX ?? pc.data.translateMix ?? 0
-      pc.mixY = pc.data.mixY ?? pc.data.translateMix ?? 0
+    const pcs = this.pathConstraints
+    for (let i = 0, n = pcs.length; i < n; i++) {
+      const pc = pcs[i]
+      const d = pc.data
+      pc.position = d.position ?? 0
+      pc.spacing = d.spacing ?? 0
+      pc.mixRotate = d.mixRotate ?? d.rotateMix ?? 0
+      pc.mixX = d.mixX ?? d.translateMix ?? 0
+      pc.mixY = d.mixY ?? d.translateMix ?? 0
     }
   }
 
@@ -1164,8 +1178,17 @@ export class Skeleton {
    * `boneLocalToWorld` / `RegionAttachment.computeWorldVertices` rely on.
    */
   updateWorldTransform(): void {
+    // Prepass: copy bone.x/y/rotation/... into the applied fields (ax, ay,
+    // …). boneUpdate reads these via boneUpdateWorldTransformWith; the IK /
+    // transform / path constraint passes also rely on bone.ax as the
+    // "unconstrained target" they subtract from to compute the IK offset.
+    // Without this prepass, after `new Skeleton()` bone.ax would still be
+    // its makeBone default (0) and every bone's worldX would collapse to 0
+    // (test: integration > builds a skeleton and evaluates a finite world
+    // transform for every bone).
     const bones = this.bones
-    for (const bone of bones) {
+    for (let i = 0, n = bones.length; i < n; i++) {
+      const bone = bones[i]
       bone.ax = bone.x
       bone.ay = bone.y
       bone.arotation = bone.rotation

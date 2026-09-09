@@ -539,11 +539,12 @@ export function computeAttachmentWorldVertices(
     const region = atlas.regions[regionName]
     if (!region) return 0
     const { offset } = computeRegionLocal(att as RegionAttachmentData, region)
+    const ba = bone.a, bb = bone.b, bc = bone.c, bd = bone.d, bx = bone.worldX, by = bone.worldY
     for (let v = 0; v < 4; v++) {
       const lx = offset[2 * v]
       const ly = offset[2 * v + 1]
-      out[2 * v] = lx * bone.a + ly * bone.b + bone.worldX
-      out[2 * v + 1] = lx * bone.c + ly * bone.d + bone.worldY
+      out[2 * v] = lx * ba + ly * bb + bx
+      out[2 * v + 1] = lx * bc + ly * bd + by
     }
     return 4
   }
@@ -567,11 +568,26 @@ export function computeAttachmentWorldVertices(
   const deform = slot.deform
 
   if (!weighted) {
-    for (let v = 0; v < vCount; v++) {
-      const lx = verts[2 * v] + (deform ? deform[2 * v] ?? 0 : 0)
-      const ly = verts[2 * v + 1] + (deform ? deform[2 * v + 1] ?? 0 : 0)
-      out[2 * v] = lx * bone.a + ly * bone.b + bone.worldX
-      out[2 * v + 1] = lx * bone.c + ly * bone.d + bone.worldY
+    // Hot loop: per-vertex affine transform by the bone's 2x2 [a b; c d]
+    // matrix. Pull the deform branch out so the loop body is straight-line
+    // arithmetic — deform is almost always null in practice (most slots
+    // don't carry FFD deformations every frame).
+    if (deform) {
+      const ba = bone.a, bb = bone.b, bc = bone.c, bd = bone.d, bx = bone.worldX, by = bone.worldY
+      for (let v = 0; v < vCount; v++) {
+        const lx = verts[2 * v] + deform[2 * v]
+        const ly = verts[2 * v + 1] + deform[2 * v + 1]
+        out[2 * v] = lx * ba + ly * bb + bx
+        out[2 * v + 1] = lx * bc + ly * bd + by
+      }
+    } else {
+      const ba = bone.a, bb = bone.b, bc = bone.c, bd = bone.d, bx = bone.worldX, by = bone.worldY
+      for (let v = 0; v < vCount; v++) {
+        const lx = verts[2 * v]
+        const ly = verts[2 * v + 1]
+        out[2 * v] = lx * ba + ly * bb + bx
+        out[2 * v + 1] = lx * bc + ly * bd + by
+      }
     }
   } else {
     // Weighted mesh: deform index is per bone influence (official
@@ -582,10 +598,12 @@ export function computeAttachmentWorldVertices(
       const boneCount = verts[ptr++]
       let wx = 0
       let wy = 0
+      const dvx0 = deform ? deform[f] : 0
+      const dvy0 = deform ? deform[f + 1] : 0
       for (let b = 0; b < boneCount; b++) {
         const boneIndex = verts[ptr++]
-        const vx = verts[ptr++] + (deform ? deform[f] ?? 0 : 0)
-        const vy = verts[ptr++] + (deform ? deform[f + 1] ?? 0 : 0)
+        const vx = verts[ptr++] + dvx0
+        const vy = verts[ptr++] + dvy0
         const weight = verts[ptr++]
         const bb = skeleton.bones[boneIndex]
         if (!bb) continue
