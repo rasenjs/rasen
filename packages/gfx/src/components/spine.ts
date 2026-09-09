@@ -399,7 +399,8 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
           premultiplied,
           blendMode,
           layout.triangles,
-          true // translationOnly — spine's model matrix is always translation
+          true, // translationOnly — spine's model matrix is always translation
+          color // packedColor: opt-in RGBA8 upload path; batch renderer expands
         )
         total += nVerts
 

@@ -44,6 +44,15 @@ interface BatchItem {
    * non-zero, all other diagonal=1 off-diagonal=0). The transform pass then
    * skips 9 multiplies per vertex and adds source[12..14] directly. */
   translationOnly?: boolean
+  /** Opt-in RGBA8 packed color. Two forms accepted:
+   *  - `Uint8Array` of length 4 * vertexCount (per-vertex RGBA8 stream)
+   *  - a `{ r, g, b, a }` uniform color object — the batch renderer
+   *    expands it once into the group's packed stream (avoids caller-side
+   *    per-frame allocation for simple single-color-per-shape cases like
+   *    spine slots).
+   * Mutually exclusive with `vertexColors`. When set, the group is uploaded
+   * via UNSIGNED_BYTE + normalized=true (shader still sees vec4 [0,1]). */
+  packedColor?: Uint8Array | Color
 }
 
 /** Max textures merged into one draw call (sampler array size in the ES 3.00
@@ -69,6 +78,11 @@ export class BatchRenderer {
 
   private positionsArray: Float32Array | null = null
   private colorsArray: Float32Array | null = null
+  /** Packed RGBA8 per-vertex color stream (opt-in via BatchItem.packedColor).
+   * Used when caller knows colors are already 8-bit-quantized (e.g. spine slot
+   * hex palette) and wants to skip the 16-byte float upload. Shader still sees
+   * vec4 [0,1] via UNSIGNED_BYTE + normalized=true. */
+  private packedColorsArray: Uint8Array | null = null
   private uvsArray: Float32Array | null = null
   private normalsArray: Float32Array | null = null
   private currentCapacity = 0
@@ -106,10 +120,10 @@ export class BatchRenderer {
   private readonly isWebGL2: boolean
   /** WebGL2-only entry point; null on WebGL1 (all uses are isWebGL2-gated). */
   private readonly gl2: Gl2Context | null
-  /** VAOs with attrib pointers baked in, one per (normals × uv) enable
-   * combination — the legacy path toggles those attribs per group. Indexed
-   * [hasNormals ? 2 : 0] | [hasTexture ? 1 : 0]. */
-  private vaos: (WebGLVertexArrayObject | null)[] = [null, null, null, null]
+  /** VAOs with attrib pointers baked in, one per (normals × uv × packedColor)
+   * enable combination — the legacy path toggles those attribs per group.
+   * Indexed [hasNormals ? 4 : 0] | [hasTexture ? 2 : 0] | [packedColor ? 1 : 0]. */
+  private vaos: (WebGLVertexArrayObject | null)[] = [null, null, null, null, null, null, null, null]
   /** GL-side buffer capacity in vertices; grown via bufferData (orphaning),
    * then filled per group via bufferSubData. 0 = nothing allocated yet. */
   private bufferCapacity = 0
@@ -234,6 +248,7 @@ export class BatchRenderer {
     blendMode?: BlendMode,
     indices?: Uint16Array | number[],
     translationOnly?: boolean,
+    packedColor?: Uint8Array | Color,
   ) {
     const transformMatrix = transform instanceof Mat4x4f
       ? transform
@@ -246,7 +261,7 @@ export class BatchRenderer {
       }
     }
 
-    this.batchItems.push({ vertices, color, transform: transformMatrix, uv, texture, vertexColors, depthWrite, normals, layer: layer ?? 0, skipTonemap, premultiplied, blendMode, indices, translationOnly: effectiveTranslationOnly })
+    this.batchItems.push({ vertices, color, transform: transformMatrix, uv, texture, vertexColors, depthWrite, normals, layer: layer ?? 0, skipTonemap, premultiplied, blendMode, indices, translationOnly: effectiveTranslationOnly, packedColor })
     this._pendingVertexCount += vertices.length / 3
 
     if (this._pendingVertexCount >= this.maxBatchSize) {
@@ -393,6 +408,7 @@ export class BatchRenderer {
       this.currentCapacity = Math.max(totalVertices, Math.ceil(this.currentCapacity * 1.5))
       this.positionsArray = new Float32Array(this.currentCapacity * 3)
       this.colorsArray = new Float32Array(this.currentCapacity * 4)
+      this.packedColorsArray = new Uint8Array(this.currentCapacity * 4)
       this.uvsArray = new Float32Array(this.currentCapacity * 2)
       this.normalsArray = new Float32Array(this.currentCapacity * 3)
       this.texIndicesArray = new Float32Array(this.currentCapacity)
@@ -400,13 +416,19 @@ export class BatchRenderer {
 
     const positions = this.positionsArray
     const colors = this.colorsArray
+    const packedColors = this.packedColorsArray
     const uvs = this.uvsArray
     const normals = this.normalsArray
     const texIndices = this.texIndicesArray
-    if (!positions || !colors || !uvs || !normals || !texIndices) return
+    if (!positions || !colors || !packedColors || !uvs || !normals || !texIndices) return
 
     // Does any item carry normals? (enables per-pixel lighting for the group)
     const hasNormals = items.some((item) => item.normals && item.normals.length > 0)
+    // Every item opting into the packed-color stream means the group can use
+    // the UNSIGNED_BYTE + normalized=true path. Mixed groups fall back to
+    // the float-color path (vertexColors take precedence for the few non-
+    // packed items, the rest pay the float upload).
+    const allPackedColor = items.length > 0 && items.every((item) => item.packedColor !== undefined)
 
     // texture → slot within this group (multi-texture merge, A/B E4)
     const slotOf = new Map<WebGLTexture, number>()
@@ -417,6 +439,7 @@ export class BatchRenderer {
 
     let posOffset = 0
     let colorOffset = 0
+    let packedColorOffset = 0
     let uvOffset = 0
     let normOffset = 0
     let texIdxOffset = 0
@@ -477,17 +500,39 @@ export class BatchRenderer {
           normals[normOffset++] = 0
         }
 
-        // Per-vertex color: use vertexColors if available, else uniform color
-        if (item.vertexColors) {
+        // Per-vertex color: prefer the optional packedColor stream (opt-in, 4
+// bytes/vertex), then vertexColors (per-vertex float, 16 bytes), then
+// uniform color (4 floats). PackedColor writes into packedColors (Uint8Array);
+// non-packed writes into colors (Float32Array). Each item picks one stream.
+        if (item.packedColor !== undefined) {
+          if (item.packedColor instanceof Uint8Array) {
+            const pc = item.packedColor
+            packedColors[packedColorOffset++] = pc[s * 4]
+            packedColors[packedColorOffset++] = pc[s * 4 + 1]
+            packedColors[packedColorOffset++] = pc[s * 4 + 2]
+            packedColors[packedColorOffset++] = pc[s * 4 + 3]
+          } else {
+            // Uniform Color form: expand once per output vertex. The caller
+            // saves a per-slot Uint8Array allocation; the batch renderer
+            // pays 4 small writes per vertex (the same cost as the float
+            // path, minus the float upload).
+            const c = item.packedColor
+            packedColors[packedColorOffset++] = (c.r * 255) | 0
+            packedColors[packedColorOffset++] = (c.g * 255) | 0
+            packedColors[packedColorOffset++] = (c.b * 255) | 0
+            packedColors[packedColorOffset++] = (c.a * 255) | 0
+          }
+        } else if (item.vertexColors) {
           colors[colorOffset++] = item.vertexColors[s * 3]
           colors[colorOffset++] = item.vertexColors[s * 3 + 1]
           colors[colorOffset++] = item.vertexColors[s * 3 + 2]
+          colors[colorOffset++] = item.color.a
         } else {
           colors[colorOffset++] = item.color.r
           colors[colorOffset++] = item.color.g
           colors[colorOffset++] = item.color.b
+          colors[colorOffset++] = item.color.a
         }
-        colors[colorOffset++] = item.color.a
 
         if (itemUv) {
           uvs[uvOffset++] = itemUv[s * 2]
@@ -550,7 +595,7 @@ export class BatchRenderer {
       // (configured once), buffers are allocated once at capacity and filled
       // per group with bufferSubData — no per-group reallocation or pointer
       // setup. Validated by benchmark/gfx A/B E1+E2.
-      const vao = this.getVao(hasNormals, hasTexture)
+      const vao = this.getVao(hasNormals, hasTexture, allPackedColor)
       this.gl2!.bindVertexArray(vao)
       this.ensureBufferCapacity(totalVertices)
 
@@ -564,8 +609,14 @@ export class BatchRenderer {
 
       gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions.subarray(0, totalVertices * 3))
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, colors.subarray(0, totalVertices * 4))
+      if (allPackedColor) {
+        // 4 bytes/vertex RGBA8 (vs 16 bytes for float) — 75% upload cut.
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, packedColors!.subarray(0, packedColorOffset))
+      } else {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, colors!.subarray(0, colorOffset))
+      }
       if (hasNormals) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer)
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, normals.subarray(0, totalVertices * 3))
@@ -576,8 +627,13 @@ export class BatchRenderer {
       if (hasTexture) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer)
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, uvs.subarray(0, totalVertices * 2))
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.texIndexBuffer)
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, texIndices.subarray(0, totalVertices))
+        // Single-texture groups always sample u_tex[0] → a_texIndex can stay
+        // at whatever stale values are in the buffer. Skip the upload.
+        // Multi-texture merged draws (textures.length > 1) need it.
+        if (textures.length > 1) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, this.texIndexBuffer)
+          gl.bufferSubData(gl.ARRAY_BUFFER, 0, texIndices.subarray(0, totalVertices))
+        }
       }
     } else {
       // Legacy WebGL1 path (frozen): per-group reallocation + pointer setup.
@@ -587,9 +643,13 @@ export class BatchRenderer {
       gl.vertexAttribPointer(this.positionLoc, 3, gl.FLOAT, false, 0, 0)
 
       gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
-      gl.bufferData(gl.ARRAY_BUFFER, colors.subarray(0, totalVertices * 4), gl.DYNAMIC_DRAW)
+      if (allPackedColor) {
+        gl.bufferData(gl.ARRAY_BUFFER, packedColors!.subarray(0, packedColorOffset), gl.DYNAMIC_DRAW)
+      } else {
+        gl.bufferData(gl.ARRAY_BUFFER, colors!.subarray(0, colorOffset), gl.DYNAMIC_DRAW)
+      }
       gl.enableVertexAttribArray(this.colorLoc)
-      gl.vertexAttribPointer(this.colorLoc, 4, gl.FLOAT, false, 0, 0)
+      gl.vertexAttribPointer(this.colorLoc, 4, gl.UNSIGNED_BYTE, true, 0, 0)
 
       // Normals (world space) — enables per-pixel directional lighting
       if (hasNormals) {
@@ -669,11 +729,11 @@ export class BatchRenderer {
     }
   }
 
-  /** VAO for the (normals, uv) enable combination — configured lazily, once.
-   * Buffer growth does NOT invalidate the VAO: pointers reference the buffer
-   * objects, and bufferData orphaning keeps the bindings. */
-  private getVao(hasNormals: boolean, hasTexture: boolean): WebGLVertexArrayObject {
-    const index = (hasNormals ? 2 : 0) | (hasTexture ? 1 : 0)
+  /** VAO for the (normals, uv, packedColor) enable combination — configured
+   * lazily, once. Buffer growth does NOT invalidate the VAO: pointers
+   * reference the buffer objects, and bufferData orphaning keeps the bindings. */
+  private getVao(hasNormals: boolean, hasTexture: boolean, packedColor: boolean): WebGLVertexArrayObject {
+    const index = (hasNormals ? 4 : 0) | (hasTexture ? 2 : 0) | (packedColor ? 1 : 0)
     const gl2 = this.gl2!
     let vao = this.vaos[index]
     if (vao) return vao
@@ -691,7 +751,8 @@ export class BatchRenderer {
     gl2.vertexAttribPointer(this.positionLoc, 3, gl2.FLOAT, false, 0, 0)
     gl2.bindBuffer(gl2.ARRAY_BUFFER, this.colorBuffer)
     gl2.enableVertexAttribArray(this.colorLoc)
-    gl2.vertexAttribPointer(this.colorLoc, 4, gl2.FLOAT, false, 0, 0)
+    // Packed RGBA8 (4 bytes/vertex, normalized → [0,1] in shader).
+    gl2.vertexAttribPointer(this.colorLoc, 4, gl2.UNSIGNED_BYTE, true, 0, 0)
     if (hasNormals) {
       gl2.bindBuffer(gl2.ARRAY_BUFFER, this.normalBuffer)
       gl2.enableVertexAttribArray(this.normalLoc)
@@ -727,7 +788,8 @@ export class BatchRenderer {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, next * 3 * 4, gl.DYNAMIC_DRAW)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, next * 4 * 4, gl.DYNAMIC_DRAW)
+    // color is packed RGBA8 (1 byte per component, 4 components per vertex)
+    gl.bufferData(gl.ARRAY_BUFFER, next * 4, gl.DYNAMIC_DRAW)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, next * 2 * 4, gl.DYNAMIC_DRAW)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer)

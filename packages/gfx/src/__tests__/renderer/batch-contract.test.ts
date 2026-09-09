@@ -99,15 +99,17 @@ describe('BatchRenderer contract (WebGL2 perf-refactor safety net)', () => {
   /** Every uploaded Float32Array (bufferData + bufferSubData if present).
    * Picks the Float32Array argument regardless of call signature
    * (bufferData(target, data, usage) vs bufferSubData(target, offset, data)). */
-  function uploads(): Float32Array[] {
+  function uploads(): ArrayBufferView[] {
     const sub = (gl as unknown as { bufferSubData?: ReturnType<typeof vi.fn> }).bufferSubData
     const calls = [
       ...(gl.bufferData as unknown as ReturnType<typeof vi.fn>).mock.calls,
       ...(sub?.mock.calls ?? [])
     ]
+    // Some attributes upload as Uint8Array (packed RGBA8 color) instead of
+    // Float32Array. Accept either typed-array flavor.
     return calls
-      .map((c) => c.find((a) => a instanceof Float32Array) as unknown)
-      .filter((d): d is Float32Array => d instanceof Float32Array)
+      .map((c) => c.find((a) => a instanceof Float32Array || a instanceof Uint8Array) as unknown)
+      .filter((d): d is ArrayBufferView => d instanceof Float32Array || d instanceof Uint8Array)
   }
 
   /** Last blend call's (srcRGB, dstRGB) — blendFuncSeparate preferred, blendFunc fallback. */

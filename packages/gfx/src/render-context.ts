@@ -557,6 +557,7 @@ export class RenderContext {
     blendMode?: import('./renderer/batch').BlendMode,
     indices?: Uint16Array | number[],
     translationOnly?: boolean,
+    packedColor?: Uint8Array | { r: number; g: number; b: number; a: number },
   ) {
     // Mat4x4f passthrough skips createTransformMatrix (which allocates ~11
     // matrices per call). Components drawing many shapes per frame (spine:
@@ -577,7 +578,7 @@ export class RenderContext {
         )
 
     if (this.batchRenderer) {
-      this.batchRenderer.addShape(vertices, color, matrix, uv, texture, vertexColors, depthWrite, normals, layer, skipTonemap, premultiplied, blendMode, indices, translationOnly)
+      this.batchRenderer.addShape(vertices, color, matrix, uv, texture, vertexColors, depthWrite, normals, layer, skipTonemap, premultiplied, blendMode, indices, translationOnly, packedColor)
     }
   }
 
