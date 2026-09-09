@@ -139,18 +139,27 @@ async function capture(browser, serverUrl, pageFile, outDir, stem) {
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text())
   })
-  await page.goto(`${serverUrl}/${pageFile}?bench=1`, { waitUntil: 'networkidle0', timeout: 60000 })
-  // Load the character (t=0 state).
-  const loadMs = await page.evaluate(() => window.__bench.load())
-  const canvasEl = await page.$('#app canvas')
-  const f0 = path.join(outDir, `${stem}-t0.png`)
-  await canvasEl.screenshot({ path: f0 })
-  // 90 deterministic steps (1.5 s of animation).
-  await page.evaluate((s) => window.__bench.debugStep(s), ANIM_STEPS)
-  const f1 = path.join(outDir, `${stem}-anim.png`)
-  await canvasEl.screenshot({ path: f1 })
-  await page.close()
-  return { t0: f0, anim: f1, loadMs, errors }
+  // Total budget per page = 90s (server up to 60s + 30s for the page work).
+  // Without this, a hung GL2 path under perf work can stall the verify loop
+  // (silent — the outer catch swallows it and the script just prints FAILED).
+  const EVAL_TIMEOUT_MS = 30000
+  page.setDefaultTimeout(EVAL_TIMEOUT_MS)
+  page.setDefaultNavigationTimeout(60000)
+  try {
+    await page.goto(`${serverUrl}/${pageFile}?bench=1`, { waitUntil: 'networkidle0', timeout: 60000 })
+    // Load the character (t=0 state).
+    const loadMs = await page.evaluate(() => window.__bench.load(), { timeout: EVAL_TIMEOUT_MS })
+    const canvasEl = await page.$('#app canvas')
+    const f0 = path.join(outDir, `${stem}-t0.png`)
+    await canvasEl.screenshot({ path: f0 })
+    // 90 deterministic steps (1.5 s of animation).
+    await page.evaluate((s) => window.__bench.debugStep(s), ANIM_STEPS, { timeout: EVAL_TIMEOUT_MS })
+    const f1 = path.join(outDir, `${stem}-anim.png`)
+    await canvasEl.screenshot({ path: f1 })
+    return { t0: f0, anim: f1, loadMs, errors }
+  } finally {
+    try { await page.close() } catch {}
+  }
 }
 
 // --- main ----------------------------------------------------------------------
@@ -169,10 +178,15 @@ async function main() {
     for (const group of GROUPS) {
       for (const target of group.targets) {
         console.log(`▶ ${target.name}`)
+        const t0 = Date.now()
         try {
           shots[target.name] = await capture(browser, serverUrl, target.page, outDir, target.name)
+          console.log(`  done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
         } catch (e) {
-          console.log(`  FAILED: ${e.message}`)
+          // Print name + first line of stack so failures are diagnosable
+          // (the outer "FAILED: <message>" used to swallow the trace).
+          const head = (e.stack || e.message || String(e)).split('\n').slice(0, 3).join('\n    ')
+          console.log(`  FAILED after ${((Date.now() - t0) / 1000).toFixed(1)}s: ${head}`)
           shots[target.name] = null
         }
       }
