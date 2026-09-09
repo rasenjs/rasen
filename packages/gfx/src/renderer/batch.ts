@@ -12,6 +12,23 @@ import { Mat4x4f, mat4x4f } from '@rasenjs/math'
  *  and 2D-style meshes that emulate an additive/multiply/screen draw. */
 export type BlendMode = 'normal' | 'additive' | 'multiply' | 'screen'
 
+/**
+ * A sealed fast-lane mesh group (see beginMesh/endMesh). The component
+ * writes world-space positions / packed colors / uvs / indices directly into
+ * the shared staging arrays at [vBase..] / [iBase..]; the group is drawn
+ * with straight bufferSubData of those ranges — no per-vertex copy pass.
+ */
+export interface SealedMesh {
+  vBase: number
+  vCount: number
+  iBase: number
+  iCount: number
+  textures: (WebGLTexture | null)[]
+  blendMode: BlendMode
+  premultiplied: boolean
+  skipTonemap: boolean
+}
+
 interface BatchItem {
   vertices: Float32Array
   color: Color
@@ -54,6 +71,10 @@ interface BatchItem {
    * Mutually exclusive with `vertexColors`. When set, the group is uploaded
    * via UNSIGNED_BYTE + normalized=true (shader still sees vec4 [0,1]). */
   packedColor?: Uint8Array | Color
+  /** Fast-lane sealed mesh (beginMesh/endMesh). When present, the item is a
+   * group marker: drawGroup uploads the staging ranges directly and draws
+   * via drawElements — no per-vertex transform/copy pass. */
+  sealed?: SealedMesh
 }
 
 /** Max textures merged into one draw call (sampler array size in the ES 3.00
@@ -74,6 +95,7 @@ function mergedGroupKey(it: BatchItem): number {
     | (it.skipTonemap === true ? 16 : 0)
     | (it.depthWrite === false ? 32 : 0)
     | (it.normals && it.normals.length > 0 ? 64 : 0)
+    | (it.sealed ? 128 : 0)
 }
 
 export class BatchRenderer {
@@ -305,6 +327,11 @@ export class BatchRenderer {
   /** Recycled BatchItem objects (see addShape / flush). */
   private itemPool: BatchItem[] = []
 
+  /** O(1) pending-vertex counter (getTotalVertices used to be an O(n) reduce
+   * called on EVERY addShape — O(n^2) per frame with high-volume shape
+   * scenes). */
+  private _pendingVertexCount = 0
+
   /** Return drawn items to the pool, dropping references to caller-owned
    * buffers (vertices/uv/indices/packedColor may be reused component arrays —
    * retaining them across frames would pin them). */
@@ -320,16 +347,120 @@ export class BatchRenderer {
       it.normals = undefined
       it.indices = undefined
       it.packedColor = undefined
+      it.sealed = undefined
       this.itemPool.push(it)
     }
   }
 
-  /** O(1) pending-vertex counter (getTotalVertices used to be an O(n) reduce
-   * called on EVERY addShape — O(n^2) per frame with high-volume shape
-   * scenes). */
-  private _pendingVertexCount = 0
+  // --- Fast lane: direct staging write (beginMesh / endMesh) -----------------
+  // High-throughput geometry producers (skeletal renderers, particle systems)
+  // write world-space vertices straight into the shared staging arrays at a
+  // reserved base, then seal the range as a group. This eliminates the
+  // intermediate component buffer + the per-vertex re-copy in drawGroup —
+  // the staging write the component performs IS the final content.
 
+  /** Reusable span view handed out by beginMesh (one per batch, mutated). */
+  private meshSpan: {
+    vBase: number; iBase: number; vCap: number; iCap: number
+    pos: Float32Array; col: Uint8Array; uv: Float32Array; idx: Uint32Array
+  } | null = null
+  /** Staging vertices reserved this frame (legacy addShape items and fast
+   * lane reservations share one watermark so ranges never overlap). Reset
+   * to 0 by flush. */
+  private vertexWatermark = 0
+  private indexWatermark = 0
 
+  /**
+   * Reserve staging space for a fast-lane mesh and return write views.
+   *
+   * The caller writes world-space positions into `pos` at
+   * `[vBase*3 .. vBase*3 + n*3)`, packed RGBA8 colors into `col` at
+   * `[vBase*4 ..]`, uvs into `uv` at `[vBase*2 ..]`, and (optionally
+   * vBase-offseted) triangle indices into `idx` at `[iBase ..]`, then calls
+   * {@link endMesh} with the actual counts. All views are live slices of the
+   * shared staging arrays — writes land directly where the upload reads.
+   */
+  beginMesh(vertexCap: number, indexCap: number): {
+    vBase: number; iBase: number
+    pos: Float32Array; col: Uint8Array; uv: Float32Array; idx: Uint32Array
+  } {
+    this.ensureStaging(this.vertexWatermark + vertexCap)
+    if (this.indexCapacity < this.indexWatermark + indexCap) {
+      const gl = this.gl
+      const next = Math.max(this.indexWatermark + indexCap, Math.ceil(this.indexCapacity * 1.5))
+      this.indexCapacity = next
+      this.indicesArray = new Uint32Array(next)
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, next * 4, gl.DYNAMIC_DRAW)
+    }
+    const vBase = this.vertexWatermark
+    const iBase = this.indexWatermark
+    this.vertexWatermark += vertexCap
+    this.indexWatermark += indexCap
+
+    let span = this.meshSpan
+    if (!span) {
+      span = this.meshSpan = {
+        vBase: 0, iBase: 0, vCap: 0, iCap: 0,
+        pos: this.positionsArray!, col: this.packedColorsArray!,
+        uv: this.uvsArray!, idx: this.indicesArray!
+      }
+    }
+    span.vBase = vBase
+    span.iBase = iBase
+    span.vCap = vertexCap
+    span.iCap = indexCap
+    span.pos = this.positionsArray!
+    span.col = this.packedColorsArray!
+    span.uv = this.uvsArray!
+    span.idx = this.indicesArray!
+    return span
+  }
+
+  /**
+   * Seal a fast-lane mesh range previously reserved by {@link beginMesh}.
+   * The staged content becomes a drawable group; consecutive seals with the
+   * same key (texture/blend/flags) merge into one draw at flush time.
+   * Indices in `idx` must already be offset by the span's vBase.
+   */
+  endMesh(
+    span: { vBase: number; iBase: number },
+    vertexCount: number,
+    indexCount: number,
+    texture: WebGLTexture | null,
+    blendMode: BlendMode,
+    premultiplied: boolean,
+    skipTonemap: boolean,
+  ): void {
+    const item = this.itemPool.pop() ?? ({} as BatchItem)
+    // Fast-lane markers only read these fields in drawSealedRun; the legacy
+    // per-vertex fields stay undefined.
+    item.vertices = undefined as never
+    item.color = undefined as never
+    item.transform = undefined as never
+    item.sealed = {
+      vBase: span.vBase, vCount: vertexCount,
+      iBase: span.iBase, iCount: indexCount,
+      textures: [texture],
+      blendMode, premultiplied, skipTonemap,
+    }
+    this.batchItems.push(item)
+  }
+
+  /** Grow the shared staging arrays to cover `needVerts` vertices. Same
+   * orphaning contract as ensureBufferCapacity (GL bufferData sizes in
+   * bytes). */
+  private ensureStaging(needVerts: number): void {
+    if (this.positionsArray && this.currentCapacity >= needVerts) return
+    this.currentCapacity = Math.max(needVerts, Math.ceil(this.currentCapacity * 1.5))
+    this.positionsArray = new Float32Array(this.currentCapacity * 3)
+    this.colorsArray = new Float32Array(this.currentCapacity * 4)
+    this.packedColorsArray = new Uint8Array(this.currentCapacity * 4)
+    this.uvsArray = new Float32Array(this.currentCapacity * 2)
+    this.normalsArray = new Float32Array(this.currentCapacity * 3)
+    this.texIndicesArray = new Float32Array(this.currentCapacity)
+    this.ensureBufferCapacity(this.currentCapacity)
+  }
 
   /**
    * Flush buffered items. Pass a `filterLayer` to flush only that layer's
@@ -395,9 +526,26 @@ export class BatchRenderer {
       const textures: WebGLTexture[] = []
       const slots = new Map<WebGLTexture, number>()
       let i = start
+      let sawSealed = false
+      let sealedFirst = -1
+      let sealedLast = -1
       while (i < toDraw.length) {
         const it = toDraw[i]
         if (mergedGroupKey(it) !== key) break
+        if (it.sealed) {
+          // Fast-lane markers share one texture by construction (endMesh
+          // splits groups on key change) — merge consecutive markers into
+          // one sealed run: their staging ranges are contiguous.
+          if (!sawSealed) { sawSealed = true; sealedFirst = i }
+          sealedLast = i
+          i++
+          continue
+        }
+        // A legacy item inside a sealed run splits it (draw both parts).
+        if (sawSealed) {
+          this.drawSealedRun(toDraw, sealedFirst, sealedLast)
+          sawSealed = false
+        }
         const tex = it.texture ?? null
         if (tex && !slots.has(tex)) {
           if (textures.length >= MAX_TEXTURES_PER_DRAW) break
@@ -406,9 +554,98 @@ export class BatchRenderer {
         }
         i++
       }
+      if (sawSealed) {
+        this.drawSealedRun(toDraw, sealedFirst, sealedLast)
+        start = i
+        continue
+      }
       this.drawGroup(toDraw.slice(start, i), textures.length > 0 ? textures : [null])
       start = i
     }
+  }
+
+  /** Draw a run of consecutive fast-lane markers as one drawElements call:
+   * their staging ranges are contiguous by construction (beginMesh reserves
+   * from a monotonic watermark), so one bufferSubData per attribute covers
+   * the merged range. */
+  private drawSealedRun(items: BatchItem[], start: number, end: number): void {
+    const gl = this.gl
+    const first = items[start].sealed!
+    const last = items[end - 1].sealed!
+    const vBase = first.vBase
+    const vCount = last.vBase + last.vCount - vBase
+    const iBase = first.iBase
+    const iCount = last.iBase + last.iCount - iBase
+
+    // Blend state — the run is key-homogeneous, read from the first marker.
+    const blendMode = first.blendMode
+    const pma = first.premultiplied
+    const srcRgb = pma ? gl.ONE : gl.SRC_ALPHA
+    const blendSep = (gl as { blendFuncSeparate?: (srcRGB: number, dstRGB: number, srcAlpha: number, dstAlpha: number) => void }).blendFuncSeparate
+    const blend = (srcRgb: number, dstRgb: number, srcA: number, dstA: number): void => {
+      if (blendSep) blendSep.call(gl, srcRgb, dstRgb, srcA, dstA)
+      else gl.blendFunc(srcRgb, dstRgb)
+    }
+    switch (blendMode) {
+      case 'additive': blend(srcRgb, gl.ONE, gl.ONE, gl.ONE); break
+      case 'multiply': blend(gl.DST_COLOR, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA); break
+      case 'screen': blend(gl.ONE, gl.ONE_MINUS_SRC_COLOR, gl.ONE, gl.ONE_MINUS_SRC_COLOR); break
+      default: blend(srcRgb, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    }
+
+    this.shader.use()
+    this.uploadFrameUniforms()
+
+    // Shadow map: fast-lane items are opaque world geometry by default;
+    // honor the same depthWrite rule as legacy (skip for depthWrite=false).
+    const shadowActive = this.activeShadow && !first.skipTonemap
+    if (shadowActive && this.useShadowLoc) {
+      const shadowUnit = this.gl2 ? 15 : 1
+      gl.activeTexture(gl.TEXTURE0 + shadowUnit)
+      gl.bindTexture(gl.TEXTURE_2D, this.activeShadow!.map)
+      if (this.shadowMapLoc) gl.uniform1i(this.shadowMapLoc, shadowUnit)
+      if (this.shadowMatrixLoc) gl.uniformMatrix4fv(this.shadowMatrixLoc, false, this.activeShadow!.matrix.source)
+      gl.uniform1i(this.useShadowLoc, 1)
+      gl.activeTexture(gl.TEXTURE0)
+    } else if (this.useShadowLoc) {
+      gl.uniform1i(this.useShadowLoc, 0)
+    }
+    if (this.skipTonemapLoc) gl.uniform1i(this.skipTonemapLoc, first.skipTonemap ? 1 : 0)
+
+    // Fast-lane groups draw through the packedColor VAO variant (the color
+    // staging is RGBA8). Fast-lane producers don't carry normals; a future
+    // producer that does can key its own VAO lane.
+    const vao = this.getVao(false, true, true)
+    this.gl2!.bindVertexArray(vao)
+
+    const byteOff = vBase * 4
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
+    gl.bufferSubData(gl.ARRAY_BUFFER, byteOff, this.positionsArray!.subarray(vBase * 3, (vBase + vCount) * 3))
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
+    gl.bufferSubData(gl.ARRAY_BUFFER, byteOff, this.packedColorsArray!.subarray(vBase * 4, (vBase + vCount) * 4))
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer)
+    gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 8, this.uvsArray!.subarray(vBase * 2, (vBase + vCount) * 2))
+    // texIndex: fast-lane groups are single-texture (u_tex[0]) — same stale
+    // policy as the legacy single-texture path.
+    if (this.texIndexStale) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.texIndexBuffer)
+      gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 4, this.texIndicesArray!.subarray(vBase, vBase + vCount))
+      this.texIndexStale = false
+    }
+
+    // Texture: single texture per sealed group (endMesh splits on change).
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, first.textures[0]!)
+    if (this.useTextureLoc) gl.uniform1i(this.useTextureLoc, 1)
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
+    gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, iBase * 4, this.indicesArray!.subarray(iBase, iBase + iCount))
+
+    if (first.skipTonemap) gl.depthMask(false)
+    gl.drawElements(gl.TRIANGLES, iCount, gl.UNSIGNED_INT, 0)
+
+    if (this.gl2) this.gl2.bindVertexArray(null)
+    if (first.skipTonemap) gl.depthMask(true)
   }
 
   private drawGroup(items: BatchItem[], textures: (WebGLTexture | null)[]) {
