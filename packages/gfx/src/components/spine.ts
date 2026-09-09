@@ -58,25 +58,46 @@ function isPremultipliedAtlas(at: SpineAtlas | null): boolean {
 }
 
 /**
- * Convert a Spine slot color (`RRGGBBAA` hex) to a 0..1 RGBA tint.
+ * Resolve a slot's tint as 0..1 RGBA.
  *
- * Spine slot colors are straight-alpha. When the atlas is premultiplied alpha
- * the tint's RGB must be premultiplied by its own alpha so the blended fragment
- * stays premultiplied (otherwise alpha-faded parts render too bright / wrong).
+ * Reads the runtime's numeric side-channel (slot.colorN — written by
+ * setToSetupPose / color timelines, official-style numeric colors) when
+ * present; falls back to parsing the hex string. Memoized PER SLOT via
+ * WeakMap with string-identity check: static slots (the vast majority —
+ * color timelines are rare) hit with zero string work. The previous
+ * string-keyed Map allocated a fresh concat key + padStart + string hash
+ * on every one of the 30k+ calls/frame. Animated slots miss (the runtime
+ * writes a new hex string each frame) and re-resolve — same cost as
+ * before, but only for the few slots that animate their tint.
+ *
+ * Spine slot colors are straight-alpha. When the atlas is premultiplied
+ * alpha the tint's RGB must be premultiplied by its own alpha so the
+ * blended fragment stays premultiplied (otherwise alpha-faded parts render
+ * too bright / wrong).
  */
-const slotColorCache = new Map<string, { r: number; g: number; b: number; a: number }>()
+interface SlotColorSource {
+  color: string
+  colorN?: Float32Array
+}
+const slotColorMemo = new WeakMap<object, { hex: string; premul: boolean; out: { r: number; g: number; b: number; a: number } }>()
 
-function slotColorToRgba(hex: string | undefined, premultiplied: boolean): { r: number; g: number; b: number; a: number } {
-  const h = (hex ?? 'FFFFFFFF').padStart(8, '0')
-  const key = (premultiplied ? 'p' : 's') + h
-  const cached = slotColorCache.get(key)
-  if (cached) return cached
-  const r = parseInt(h.slice(0, 2), 16) / 255
-  const g = parseInt(h.slice(2, 4), 16) / 255
-  const b = parseInt(h.slice(4, 6), 16) / 255
-  const a = parseInt(h.slice(6, 8), 16) / 255
+function slotColorToRgba(slot: SlotColorSource, premultiplied: boolean): { r: number; g: number; b: number; a: number } {
+  const hex = slot.color
+  const hit = slotColorMemo.get(slot)
+  if (hit && hit.hex === hex && hit.premul === premultiplied) return hit.out
+  let r: number, g: number, b: number, a: number
+  const n = slot.colorN
+  if (n) {
+    r = n[0]; g = n[1]; b = n[2]; a = n[3]
+  } else {
+    const h = hex.length === 8 ? hex : hex.padStart(8, '0')
+    r = parseInt(h.slice(0, 2), 16) / 255
+    g = parseInt(h.slice(2, 4), 16) / 255
+    b = parseInt(h.slice(4, 6), 16) / 255
+    a = parseInt(h.slice(6, 8), 16) / 255
+  }
   const out = premultiplied ? { r: r * a, g: g * a, b: b * a, a } : { r, g, b, a }
-  slotColorCache.set(key, out)
+  slotColorMemo.set(slot, { hex, premul: premultiplied, out })
   return out
 }
 
@@ -375,7 +396,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         // Per-slot tint/alpha (animated by `color` timelines). For a PMA atlas
         // the straight-alpha slot color must be premultiplied so the blended
         // result stays premultiplied (otherwise faded parts render too bright).
-        const color = slotColorToRgba(slot.color, premultiplied)
+        const color = slotColorToRgba(slot, premultiplied)
         // Multi-page atlas: pick the texture for this attachment's region page.
         const region = at.regions[regionKey]
         const slotTexture = region ? textureForPage(region.page) : texture
@@ -506,7 +527,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       // Per-slot tint/alpha (animated by `color` timelines). For a PMA atlas
       // the straight-alpha slot color must be premultiplied so the blended
       // result stays premultiplied (otherwise faded parts render too bright).
-      const color = slotColorToRgba(slot.color, premultiplied)
+      const color = slotColorToRgba(slot, premultiplied)
       // Multi-page atlas: pick the texture for this attachment's region page.
       const region = at.regions[regionKey]
       const slotTexture = region ? textureForPage(region.page) : texture

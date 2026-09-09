@@ -688,18 +688,24 @@ function applySlotTimelines(time: number, compiled: CompiledAnim): void {
     }
     const color = e.color
     if (color && time >= color.gate) {
-      slot.color = sampleCompiledColor(color, time)
+      slot.color = sampleCompiledColor(color, time, slot)
     }
   }
 }
 
 function sampleCompiledColor(
   color: NonNullable<CompiledSlot['color']>,
-  time: number
+  time: number,
+  slot: { colorN: Float32Array }
 ): string {
   const times = color.times
   const n = times.length
-  if (n === 1) return toHexColor(color.r[0], color.g[0], color.b[0], color.a[0])
+  if (n === 1) {
+    const r = color.r[0], g = color.g[0], b = color.b[0], a = color.a[0]
+    const cn = slot.colorN
+    cn[0] = r / 255; cn[1] = g / 255; cn[2] = b / 255; cn[3] = a / 255
+    return toHexColor(r, g, b, a)
+  }
   // CRITICAL: clamp/short-circuit at endpoints.
   //
   // Binary search below returns the largest i with times[i] <= time. For
@@ -747,6 +753,8 @@ function sampleCompiledColor(
   const g = Math.round(color.g[kf0] + (color.g[kf0 + 1] - color.g[kf0]) * pct)
   const b = Math.round(color.b[kf0] + (color.b[kf0 + 1] - color.b[kf0]) * pct)
   const a = Math.round(color.a[kf0] + (color.a[kf0 + 1] - color.a[kf0]) * pct)
+  const cn = slot.colorN
+  cn[0] = r / 255; cn[1] = g / 255; cn[2] = b / 255; cn[3] = a / 255
   return toHexColor(r, g, b, a)
 }
 

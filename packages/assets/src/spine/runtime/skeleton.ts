@@ -26,6 +26,25 @@ import { applyPathConstraint } from './path-solver'
 
 /** Degrees to radians. Internal — used by bone math and the path solver. */
 export const DEG2RAD = Math.PI / 180
+
+/** Shared parse cache for setup colors. The setup hex string is stable per
+ * SlotData, so slot creation and every setToSetupPose call hit the cache —
+ * parsing happens exactly once per unique color for the lifetime of the app. */
+const setupColorCache = new Map<string, Float32Array>()
+
+export function parseSetupColor(hex: string): Float32Array {
+  let v = setupColorCache.get(hex)
+  if (!v) {
+    const h = hex.length === 8 ? hex : hex.padStart(8, '0')
+    v = new Float32Array(4)
+    v[0] = parseInt(h.slice(0, 2), 16) / 255
+    v[1] = parseInt(h.slice(2, 4), 16) / 255
+    v[2] = parseInt(h.slice(4, 6), 16) / 255
+    v[3] = parseInt(h.slice(6, 8), 16) / 255
+    setupColorCache.set(hex, v)
+  }
+  return v
+}
 /** Radians to degrees. Internal — used by the IK solver. */
 export const RAD2DEG = 180 / Math.PI
 
@@ -87,6 +106,12 @@ export interface Slot {
   data: import('../types').SlotData
   bone: Bone
   color: string
+  /** Numeric RGBA tint (straight alpha, 0..1) kept in lockstep with `color`
+   * (slot creation + setToSetupPose + color timelines). The official runtime
+   * carries colors as numbers; renderers read this instead of re-parsing the
+   * hex string every frame. `color` remains the string for canvas-2d
+   * fillStyle / golden-gate compatibility. */
+  colorN: Float32Array
   attachment: string | undefined
   /**
    * FFD deform vertex offsets (length = vertexCount*2) for the current pose,
@@ -1025,6 +1050,7 @@ export class Skeleton {
         data: sd,
         bone,
         color: sd.color ?? 'FFFFFFFF',
+        colorN: new Float32Array(parseSetupColor(sd.color ?? 'FFFFFFFF')),
         attachment: sd.attachment,
         deform: null,
         sequenceIndex: -1,
@@ -1126,6 +1152,7 @@ export class Skeleton {
       const slot = slots[i]
       slot.attachment = slot.data.attachment
       slot.color = slot.data.color ?? 'FFFFFFFF'
+      slot.colorN.set(parseSetupColor(slot.color))
       slot.deform = null
       slot.sequenceIndex = -1
     }
