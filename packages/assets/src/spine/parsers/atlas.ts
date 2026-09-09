@@ -525,7 +525,8 @@ export function computeAttachmentWorldVertices(
   skeleton: SkeletonRef,
   atlas: SpineAtlas,
   attachmentName: string | undefined,
-  out: Float32Array | number[]
+  out: Float32Array | number[],
+  outStride: number = 2
 ): number {
   const bone = slot.bone
   const type = att.type ?? 'region'
@@ -540,11 +541,22 @@ export function computeAttachmentWorldVertices(
     if (!region) return 0
     const { offset } = computeRegionLocal(att as RegionAttachmentData, region)
     const ba = bone.a, bb = bone.b, bc = bone.c, bd = bone.d, bx = bone.worldX, by = bone.worldY
-    for (let v = 0; v < 4; v++) {
-      const lx = offset[2 * v]
-      const ly = offset[2 * v + 1]
-      out[2 * v] = lx * ba + ly * bb + bx
-      out[2 * v + 1] = lx * bc + ly * bd + by
+    if (outStride === 3) {
+      for (let v = 0; v < 4; v++) {
+        const o = v * 3
+        const lx = offset[2 * v]
+        const ly = offset[2 * v + 1]
+        out[o] = lx * ba + ly * bb + bx
+        out[o + 1] = lx * bc + ly * bd + by
+        out[o + 2] = 0
+      }
+    } else {
+      for (let v = 0; v < 4; v++) {
+        const lx = offset[2 * v]
+        const ly = offset[2 * v + 1]
+        out[2 * v] = lx * ba + ly * bb + bx
+        out[2 * v + 1] = lx * bc + ly * bd + by
+      }
     }
     return 4
   }
@@ -571,14 +583,38 @@ export function computeAttachmentWorldVertices(
     // Hot loop: per-vertex affine transform by the bone's 2x2 [a b; c d]
     // matrix. Pull the deform branch out so the loop body is straight-line
     // arithmetic — deform is almost always null in practice (most slots
-    // don't carry FFD deformations every frame).
+    // don't carry FFD deformations every frame). outStride lets the caller
+    // choose between (x, y) packing for 2D layout buffers and (x, y, 0) for
+    // 3D-ready buffers; spine's WebGL path now writes straight to (x, y, 0)
+    // so buildGeometry no longer needs a follow-up copy loop.
     if (deform) {
       const ba = bone.a, bb = bone.b, bc = bone.c, bd = bone.d, bx = bone.worldX, by = bone.worldY
+      if (outStride === 3) {
+        for (let v = 0; v < vCount; v++) {
+          const o = v * 3
+          const lx = verts[2 * v] + deform[2 * v]
+          const ly = verts[2 * v + 1] + deform[2 * v + 1]
+          out[o] = lx * ba + ly * bb + bx
+          out[o + 1] = lx * bc + ly * bd + by
+          out[o + 2] = 0
+        }
+      } else {
+        for (let v = 0; v < vCount; v++) {
+          const lx = verts[2 * v] + deform[2 * v]
+          const ly = verts[2 * v + 1] + deform[2 * v + 1]
+          out[2 * v] = lx * ba + ly * bb + bx
+          out[2 * v + 1] = lx * bc + ly * bd + by
+        }
+      }
+    } else if (outStride === 3) {
+      const ba = bone.a, bb = bone.b, bc = bone.c, bd = bone.d, bx = bone.worldX, by = bone.worldY
       for (let v = 0; v < vCount; v++) {
-        const lx = verts[2 * v] + deform[2 * v]
-        const ly = verts[2 * v + 1] + deform[2 * v + 1]
-        out[2 * v] = lx * ba + ly * bb + bx
-        out[2 * v + 1] = lx * bc + ly * bd + by
+        const o = v * 3
+        const lx = verts[2 * v]
+        const ly = verts[2 * v + 1]
+        out[o] = lx * ba + ly * bb + bx
+        out[o + 1] = lx * bc + ly * bd + by
+        out[o + 2] = 0
       }
     } else {
       const ba = bone.a, bb = bone.b, bc = bone.c, bd = bone.d, bx = bone.worldX, by = bone.worldY
@@ -594,25 +630,50 @@ export function computeAttachmentWorldVertices(
     // `computeWorldVertices` increments f by 2 per bone, not per vertex).
     let ptr = 0
     let f = 0
-    for (let v = 0; v < vCount; v++) {
-      const boneCount = verts[ptr++]
-      let wx = 0
-      let wy = 0
-      const dvx0 = deform ? deform[f] : 0
-      const dvy0 = deform ? deform[f + 1] : 0
-      for (let b = 0; b < boneCount; b++) {
-        const boneIndex = verts[ptr++]
-        const vx = verts[ptr++] + dvx0
-        const vy = verts[ptr++] + dvy0
-        const weight = verts[ptr++]
-        const bb = skeleton.bones[boneIndex]
-        if (!bb) continue
-        wx += (vx * bb.a + vy * bb.b + bb.worldX) * weight
-        wy += (vx * bb.c + vy * bb.d + bb.worldY) * weight
-        f += 2
+    if (outStride === 3) {
+      for (let v = 0; v < vCount; v++) {
+        const boneCount = verts[ptr++]
+        let wx = 0
+        let wy = 0
+        const dvx0 = deform ? deform[f] : 0
+        const dvy0 = deform ? deform[f + 1] : 0
+        for (let b = 0; b < boneCount; b++) {
+          const boneIndex = verts[ptr++]
+          const vx = verts[ptr++] + dvx0
+          const vy = verts[ptr++] + dvy0
+          const weight = verts[ptr++]
+          const bb = skeleton.bones[boneIndex]
+          if (!bb) continue
+          wx += (vx * bb.a + vy * bb.b + bb.worldX) * weight
+          wy += (vx * bb.c + vy * bb.d + bb.worldY) * weight
+          f += 2
+        }
+        const o = v * 3
+        out[o] = wx
+        out[o + 1] = wy
+        out[o + 2] = 0
       }
-      out[2 * v] = wx
-      out[2 * v + 1] = wy
+    } else {
+      for (let v = 0; v < vCount; v++) {
+        const boneCount = verts[ptr++]
+        let wx = 0
+        let wy = 0
+        const dvx0 = deform ? deform[f] : 0
+        const dvy0 = deform ? deform[f + 1] : 0
+        for (let b = 0; b < boneCount; b++) {
+          const boneIndex = verts[ptr++]
+          const vx = verts[ptr++] + dvx0
+          const vy = verts[ptr++] + dvy0
+          const weight = verts[ptr++]
+          const bb = skeleton.bones[boneIndex]
+          if (!bb) continue
+          wx += (vx * bb.a + vy * bb.b + bb.worldX) * weight
+          wy += (vx * bb.c + vy * bb.d + bb.worldY) * weight
+          f += 2
+        }
+        out[2 * v] = wx
+        out[2 * v + 1] = wy
+      }
     }
   }
 

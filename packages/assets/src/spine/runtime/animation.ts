@@ -568,8 +568,7 @@ function compileAnim(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
   return out
 }
 
-function applyBoneTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
-  const compiled = getCompiled(skeleton, anim)
+function applyBoneTimelines(time: number, compiled: CompiledAnim): void {
   const bones = compiled.bones
   for (let i = 0, n = bones.length; i < n; i++) {
     const e = bones[i]
@@ -600,8 +599,7 @@ function numOr(v: unknown, fallback: number): number {
   return typeof v === 'number' ? v : fallback
 }
 
-function applySlotTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
-  const compiled = getCompiled(skeleton, anim)
+function applySlotTimelines(time: number, compiled: CompiledAnim): void {
   const slots = compiled.slots
   for (let i = 0, n = slots.length; i < n; i++) {
     const e = slots[i]
@@ -832,11 +830,10 @@ function applyPathTimelines(skeleton: Skeleton, anim: AnimationData, time: numbe
  * (non-weighted) or world (weighted) vertex positions. Slots with no matching
  * timeline (or before the first keyframe) get `null` → setup pose.
  */
-function applyDeformTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
+function applyDeformTimelines(skeleton: Skeleton, time: number, compiled: CompiledAnim): void {
   // NOTE: setToSetupPose() (called by applyAnimation just before this) already
   // resets EVERY slot.deform to null — the original loop's per-slot null
   // writes for timeline-less slots are therefore redundant here.
-  const compiled = getCompiled(skeleton, anim)
   const entries = compiled.deform
   if (!entries.length) return
   for (const entry of entries) {
@@ -1014,9 +1011,13 @@ export function applyAnimation(skeleton: Skeleton, anim: AnimationData, time: nu
   skeleton.setToSetupPose()
   const duration = getAnimationDuration(anim)
   const t = loop && duration > 0 ? time % duration : time
-  applyBoneTimelines(skeleton, anim, t)
-  applySlotTimelines(skeleton, anim, t)
-  applyDeformTimelines(skeleton, anim, t)
+  // Compile once per apply — previously bone/slot/deform timelines each
+  // called getCompiled() which did two nested Map lookups. Hoisting saves 4
+  // hashmap probes per apply at 200 instances × 60Hz = 48k/frame avoided.
+  const compiled = getCompiled(skeleton, anim)
+  applyBoneTimelines(t, compiled)
+  applySlotTimelines(t, compiled)
+  applyDeformTimelines(skeleton, t, compiled)
   applySequenceTimelines(skeleton, anim, t)
   applyIkTimelines(skeleton, anim, t)
   applyTransformTimelines(skeleton, anim, t)

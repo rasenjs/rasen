@@ -161,17 +161,16 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
   // Spine 4.1+ sequence attachments that swap atlas regions per frame.
   let vertexBuf = new Float32Array(0)
   let uvBuf = new Float32Array(0)
-  let worldBuf = new Float32Array(0)
   let boneBuf = new Float32Array(0)
   // Model matrix for the (x, y, z) position props + the key it was built for.
   // Identity until a non-zero position is set (see buildGeometry).
   let posTransform = new Mat4x4f()
   let lastPosKey = '0|0|0'
-  // verts: reusable [x, y, 0] triplet buffer for the indexed submission — one
-  // per (attachment, region) layout, refilled every frame. addShape stores the
-  // array REFERENCE and flush reads it before the next draw overwrites it
-  // (each attachment is visited once per frame), so no per-frame copy is
-  // needed. UVs and triangles are shared static arrays from the same layout.
+  // Per-layout reusable [x, y, 0] triplet buffer (3 floats/vertex). computeAttachmentWorldVertices
+  // writes straight into it with outStride=3, eliminating the per-frame copy from a 2-float
+  // staging buffer (was ~2250 vertex writes × 200 instances = 450k/frame). addShape stores the
+  // array REFERENCE and flush reads it before the next draw overwrites it (each attachment is
+  // visited once per frame). UVs and triangles are shared static arrays from the same layout.
   let layoutCache: WeakMap<object, Map<string, { uvs: Float32Array; triangles: number[]; verts: Float32Array }>> = new WeakMap()
   // slot → { attachmentName, attachment } — avoids findAttachment every frame.
   const slotAttCache = new Map<object, { name: string; att: unknown }>()
@@ -341,10 +340,20 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       }
 
       // Recompute only the world vertices for the current pose.
-      if (worldBuf.length < layout.uvs.length) {
-        worldBuf = new Float32Array(Math.max(layout.uvs.length, worldBuf.length * 2))
+      const nVerts = layout.uvs.length / 2
+      const needV = nVerts * 3
+      // nVerts is static per layout — allocate exactly once, reuse forever.
+      if (layout.verts.length !== needV) {
+        layout.verts = new Float32Array(needV)
       }
-      const vCount = computeAttachmentWorldVertices(attData, slot, sk, at, attName, worldBuf)
+      // Write the world vertices straight into layout.verts with stride 3
+      // (computeAttachmentWorldVertices now accepts outStride=3). This
+      // eliminates the 2→3 expand loop that was previously the body of the
+      // per-slot "for (let v = 0; v < nVerts; v++) verts[v*3] = ..." copy
+      // (~2250 vertex writes × 200 instances = 450k/frame). The clipped path
+      // below reads these same vertices with stride 3 (so `2 * idx` becomes
+      // `3 * idx`).
+      const vCount = computeAttachmentWorldVertices(attData, slot, sk, at, attName, layout.verts, 3)
       if (!vCount) {
         if (endClip) {
           clipPoly = null
@@ -362,18 +371,6 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       // drawElements (WebGL2); WebGL1 expands the indices back into a flat
       // triangle list inside the batch transform loop.
       if (clipPoly === null) {
-        const nVerts = layout.uvs.length / 2
-        const needV = nVerts * 3
-        // nVerts is static per layout — allocate exactly once, reuse forever.
-        if (layout.verts.length !== needV) {
-          layout.verts = new Float32Array(needV)
-        }
-        const verts = layout.verts
-        for (let v = 0; v < nVerts; v++) {
-          verts[v * 3] = worldBuf[2 * v]
-          verts[v * 3 + 1] = worldBuf[2 * v + 1]
-          verts[v * 3 + 2] = 0
-        }
         // Per-slot tint/alpha (animated by `color` timelines). For a PMA atlas
         // the straight-alpha slot color must be premultiplied so the blended
         // result stays premultiplied (otherwise faded parts render too bright).
@@ -386,7 +383,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         const blendMode = slot.data.blend ?? 'normal'
         renderContext.addShape(
           'spine',
-          verts,
+          layout.verts,
           color,
           transform,
           layout.uvs,
@@ -417,13 +414,13 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       // flat non-indexed submission.
       let vi = 0
       let ui = 0
-      const needV = layout.triangles.length * 3
-      const needU = layout.triangles.length * 2
-      if (vertexBuf.length < needV) {
-        vertexBuf = new Float32Array(Math.max(needV, vertexBuf.length * 2))
+      const triVertCap = layout.triangles.length * 3
+      const triUvCap = layout.triangles.length * 2
+      if (vertexBuf.length < triVertCap) {
+        vertexBuf = new Float32Array(Math.max(triVertCap, vertexBuf.length * 2))
       }
-      if (uvBuf.length < needU) {
-        uvBuf = new Float32Array(Math.max(needU, uvBuf.length * 2))
+      if (uvBuf.length < triUvCap) {
+        uvBuf = new Float32Array(Math.max(triUvCap, uvBuf.length * 2))
       }
       for (let t = 0; t < layout.triangles.length; t += 3) {
         const i0 = layout.triangles[t]
@@ -434,12 +431,15 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         // blush) overlap instead of leaving a gap that shows through as a
         // thin line. UVs stay tied to the original vertex index, so no foreign
         // texels are sampled — only the drawn area grows, hiding the seam.
-        const wx0 = worldBuf[2 * i0]
-        const wy0 = worldBuf[2 * i0 + 1]
-        const wx1 = worldBuf[2 * i1]
-        const wy1 = worldBuf[2 * i1 + 1]
-        const wx2 = worldBuf[2 * i2]
-        const wy2 = worldBuf[2 * i2 + 1]
+        // World vertices live in layout.verts with stride 3 (filled by
+        // computeAttachmentWorldVertices outStride=3 above) — read with the
+        // same stride here.
+        const wx0 = layout.verts[3 * i0]
+        const wy0 = layout.verts[3 * i0 + 1]
+        const wx1 = layout.verts[3 * i1]
+        const wy1 = layout.verts[3 * i1 + 1]
+        const wx2 = layout.verts[3 * i2]
+        const wy2 = layout.verts[3 * i2 + 1]
         const ecx = (wx0 + wx1 + wx2) / 3
         const ecy = (wy0 + wy1 + wy2) / 3
         // Centroid expansion WITHOUT per-triangle allocations: the previous
@@ -453,8 +453,8 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         // output, so the seam-hiding expansion is harmless here.
         for (let k = 0; k < 3; k++) {
           const idx = k === 0 ? i0 : k === 1 ? i1 : i2
-          const px = worldBuf[2 * idx]
-          const py = worldBuf[2 * idx + 1]
+          const px = layout.verts[3 * idx]
+          const py = layout.verts[3 * idx + 1]
           const lx = px - ecx
           const ly = py - ecy
           const len = Math.sqrt(lx * lx + ly * ly) || 1
