@@ -117,8 +117,7 @@ function layoutInstances(): void {
 function tickInstances(delta: number): void {
   for (const inst of instances.value) {
     inst.st.update(delta)
-    inst.st.apply()
-    inst.sk.updateWorldTransform()
+    inst.st.apply() // includes updateWorldTransform (per-frame path proven safe)
   }
   frame.value++
 }
@@ -183,8 +182,7 @@ const bench: BenchAPI = {
     for (let i = 0; i < ticks; i++) {
       for (const inst of instances.value) {
         inst.st.update(FIXED_DELTA)
-        inst.st.apply()
-        inst.sk.updateWorldTransform()
+        inst.st.apply() // includes updateWorldTransform
       }
     }
     return (performance.now() - t0) / ticks
