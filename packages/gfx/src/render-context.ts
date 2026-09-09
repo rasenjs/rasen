@@ -40,8 +40,8 @@ export interface RenderContextOptions {
    * Opt-in WebGL2 instanced-quad fast path (massive uniform quads, e.g. the
    * million-rects benchmark). NOT on by default: the draw pass treats the
    * instanced renderer and the batch renderer as MUTUALLY EXCLUSIVE paths —
-   * enabling this bypasses every addShape submission (spine/mesh/shapes/
-   * glTF). Requires WebGL2 (probed via 'drawArraysInstanced' in gl); on
+   * enabling this bypasses every addShape submission (skeletal / mesh / shape
+   * / glTF). Requires WebGL2 (probed via 'drawArraysInstanced' in gl); on
    * WebGL1 the option is silently ignored and the batch path is used.
    */
   instancing?: boolean
@@ -560,9 +560,8 @@ export class RenderContext {
     packedColor?: Uint8Array | { r: number; g: number; b: number; a: number },
   ) {
     // Mat4x4f passthrough skips createTransformMatrix (which allocates ~11
-    // matrices per call). Components drawing many shapes per frame (spine:
-    // one shape per slot, 30k+ shapes/frame at 200 instances) pass a shared
-    // prebuilt matrix instead of the per-shape object form.
+    // matrices per call). High-volume shape scenes pass a shared prebuilt
+    // matrix instead of the per-shape object form.
     const matrix = transform instanceof Mat4x4f
       ? transform
       : this.createTransformMatrix(

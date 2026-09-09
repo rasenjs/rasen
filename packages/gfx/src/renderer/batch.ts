@@ -8,7 +8,8 @@ import type { Gl2Context, GlContext } from '../node'
 import { ShaderProgram, DEFAULT_VERTEX_SHADER, DEFAULT_FRAGMENT_SHADER, DEFAULT_VERTEX_SHADER_ES3, DEFAULT_FRAGMENT_SHADER_ES3 } from './shader'
 import { Mat4x4f, mat4x4f } from '@rasenjs/math'
 
-/** Spine-style blend mode (affects the GL blend function). */
+/** 2D blend equation (affects the GL blend function). Used for both 2D shapes
+ *  and 2D-style meshes that emulate an additive/multiply/screen draw. */
 export type BlendMode = 'normal' | 'additive' | 'multiply' | 'screen'
 
 interface BatchItem {
@@ -31,14 +32,15 @@ interface BatchItem {
    *  for atlases exported with premultiplied alpha (pma:true). Default false
    *  uses straight-alpha blending (SRC_ALPHA, ONE_MINUS_SRC_ALPHA). */
   premultiplied?: boolean
-  /** Spine blend mode (normal/additive/multiply/screen). Default normal. */
+  /** 2D blend equation (normal/additive/multiply/screen). Default normal. */
   blendMode?: BlendMode
   /** Optional triangle index list into `vertices` (3 entries per triangle).
    * When EVERY item in a group carries indices, the group draws via
    * drawElements: unique vertices are transformed and uploaded once instead
-   * of once per triangle (~3× less CPU transform work and upload for spine
-   * meshes). WebGL2 only; on WebGL1 (frozen) and in mixed groups, indexed
-   * items are expanded through the index list inside the transform loop. */
+   * of once per triangle (~3× less CPU transform work and upload on
+   * shared-vertex meshes). WebGL2 only; on WebGL1 (frozen) and in mixed
+   * groups, indexed items are expanded through the index list inside the
+   * batch transform loop. */
   indices?: Uint16Array | number[]
   /** Hint that `transform` is a pure translation matrix (only source[12..14]
    * non-zero, all other diagonal=1 off-diagonal=0). The transform pass then
@@ -48,8 +50,7 @@ interface BatchItem {
    *  - `Uint8Array` of length 4 * vertexCount (per-vertex RGBA8 stream)
    *  - a `{ r, g, b, a }` uniform color object — the batch renderer
    *    expands it once into the group's packed stream (avoids caller-side
-   *    per-frame allocation for simple single-color-per-shape cases like
-   *    spine slots).
+   *    per-frame allocation for the common single-tint-per-shape case).
    * Mutually exclusive with `vertexColors`. When set, the group is uploaded
    * via UNSIGNED_BYTE + normalized=true (shader still sees vec4 [0,1]). */
   packedColor?: Uint8Array | Color
@@ -79,9 +80,9 @@ export class BatchRenderer {
   private positionsArray: Float32Array | null = null
   private colorsArray: Float32Array | null = null
   /** Packed RGBA8 per-vertex color stream (opt-in via BatchItem.packedColor).
-   * Used when caller knows colors are already 8-bit-quantized (e.g. spine slot
-   * hex palette) and wants to skip the 16-byte float upload. Shader still sees
-   * vec4 [0,1] via UNSIGNED_BYTE + normalized=true. */
+   * Used when caller knows colors are already 8-bit-quantized and wants to
+   // skip the 16-byte float upload. Shader still sees vec4 [0,1] via
+   * UNSIGNED_BYTE + normalized=true. */
   private packedColorsArray: Uint8Array | null = null
   private uvsArray: Float32Array | null = null
   private normalsArray: Float32Array | null = null
@@ -270,8 +271,8 @@ export class BatchRenderer {
   }
 
   /** O(1) pending-vertex counter (getTotalVertices used to be an O(n) reduce
-   * called on EVERY addShape — O(n^2) per frame with many shapes, e.g. a
-   * 200-instance spine skeleton stage submits 30k+ shapes per frame). */
+   * called on EVERY addShape — O(n^2) per frame with high-volume shape
+   * scenes). */
   private _pendingVertexCount = 0
 
 
@@ -328,7 +329,7 @@ export class BatchRenderer {
    * to the shared item value — per-item output is identical to the legacy
    * grouping; only same-flag different-texture neighbours merge into one
    * draw call (validated by benchmark/gfx A/B E4). Draw order is preserved
-   * (Spine drawOrder semantics). */
+   * (item order is preserved — important for painter's-order draws). */
   private flushMerged(toDraw: BatchItem[]): void {
     let start = 0
     while (start < toDraw.length) {
@@ -357,7 +358,7 @@ export class BatchRenderer {
     // Indexed path (WebGL2 only — GL1 is frozen and always takes the legacy
     // path): when EVERY item carries an index list, unique vertices are
     // transformed and uploaded ONCE and triangles reference them through a
-    // shared ELEMENT_ARRAY_BUFFER (drawElements). Spine meshes share ~2/3 of
+    // shared ELEMENT_ARRAY_BUFFER (drawElements). Shared-vertex meshes save ~2/3 of
     // their vertices across triangles, so this cuts the per-frame CPU
     // transform loop and upload by ~3×. Mixed groups fall back to the
     // non-indexed path; indexed items are then expanded through their index
@@ -374,7 +375,7 @@ export class BatchRenderer {
     // WebGL1 legacy path draws one texture per group (textures.length === 1).
     const texture = textures[0]
 
-    // Spine blend modes (matches official `PolygonBatcher.blendModesGL`).
+    // 2D blend modes (matches the standard Porter-Duff / additive / multiply / screen factors).
     // `premultiplied` swaps the src RGB factor for PMA atlases (ONE instead of
     // SRC_ALPHA). A group shares one texture + blend mode, so all its items
     // agree on the flags.
