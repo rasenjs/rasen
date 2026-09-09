@@ -144,9 +144,66 @@ interface Compiled1D {
   types: Uint8Array
   /** per bezier segment 4 numbers: [ncx1, cy1, ncx2, cy2] (normalized to f) */
   curves: Float64Array | null
+  /** Per bezier segment: precomputed y(x) lookup table (official spine-core
+   * Curve parity — 512-entry table + linear interpolation, replacing the
+   * 20-iteration bisection at sample time). Shared across segments/skeletons
+   * via curveTableCache (keyed by the normalized control-point tuple). null
+   * entries fall back to the exact solve (degenerate v0===v1 bulges). */
+  tables?: (Float32Array | null)[] | null
   /** Segment-lookup cache: last sampled time and its bracketing segment. */
   lastTime: number
   lastSeg: number
+}
+
+/** Table size — matches official spine-core CURVE_TABLE_SIZE (512). */
+const CURVE_TABLE_SIZE = 512
+/** Global cache of y(x) tables keyed by normalized control tuple. Bezier
+ * shapes repeat heavily across timelines (the editor's default ease is one
+ * tuple shared by thousands of segments), so this stays tiny. */
+const curveTableCache = new Map<string, Float32Array>()
+
+/** Build the y(x) table for a normalized cubic (endpoints (0,0)/(1,1),
+ * handles (cx1, cy1N), (cx2, cy2N)). x = i/(N-1); yN in [0,1] shape space. */
+function buildCurveTable(cx1: number, cx2: number, cy1N: number, cy2N: number): Float32Array {
+  const key = cx1 + ',' + cy1N + ',' + cx2 + ',' + cy2N
+  const hit = curveTableCache.get(key)
+  if (hit) return hit
+  const tbl = new Float32Array(CURVE_TABLE_SIZE)
+  for (let i = 0; i < CURVE_TABLE_SIZE; i++) {
+    const x = i / (CURVE_TABLE_SIZE - 1)
+    const s = solveCubicBezierX(x, cx1, cx2)
+    const oms = 1 - s
+    tbl[i] = 3 * oms * oms * s * cy1N + 3 * oms * s * s * cy2N + s * s * s
+  }
+  curveTableCache.set(key, tbl)
+  return tbl
+}
+
+/** Precompute per-segment tables for a compiled channel's bezier segments.
+ * Control points are in value space ([cx1, cy1, cx2, cy2] per segment, x
+ * handles already time-normalized); y handles are re-expressed in shape space
+ * via (cy - v0) / (v1 - v0) so tables can be shared. Returns null when no
+ * segment is bezier. */
+function buildSegmentTables(v: Float64Array, types: Uint8Array, curves: Float64Array | null): (Float32Array | null)[] | null {
+  if (!curves) return null
+  const segCount = types.length
+  let out: (Float32Array | null)[] | null = null
+  for (let i = 0; i < segCount; i++) {
+    if (types[i] !== 2) continue
+    const c = i * 4
+    const v0 = v[i]
+    const v1 = v[i + 1]
+    const span = v1 - v0
+    if (!out) out = new Array(segCount).fill(null)
+    if (Math.abs(span) < 1e-12) continue // degenerate → exact-solve fallback
+    out[i] = buildCurveTable(
+      curves[c],
+      curves[c + 2],
+      (curves[c + 1] - v0) / span,
+      (curves[c + 3] - v0) / span
+    )
+  }
+  return out
 }
 
 interface Compiled2D {
@@ -243,7 +300,7 @@ function compile1D(kfs: RawKeyframe[], getVal: (kf: RawKeyframe) => number): Com
       curves[i * 4 + 3] = c[3]
     }
   }
-  return { times, v, types, curves, lastTime: -1, lastSeg: -1 }
+  return { times, v, types, curves, tables: buildSegmentTables(v, types, curves), lastTime: -1, lastSeg: -1 }
 }
 
 function compile2D(kfs: RawKeyframe[], fallback = 0): Compiled2D {
@@ -325,8 +382,8 @@ function compile2D(kfs: RawKeyframe[], fallback = 0): Compiled2D {
   return {
     gate,
     shared: true,
-    tx: { times, v: vx, types: txTypes, curves: txCurves, lastTime: -1, lastSeg: -1 },
-    ty: { times, v: vy, types: tyTypes, curves: tyCurves, lastTime: -1, lastSeg: -1 }
+    tx: { times, v: vx, types: txTypes, curves: txCurves, tables: buildSegmentTables(vx, txTypes, txCurves), lastTime: -1, lastSeg: -1 },
+    ty: { times, v: vy, types: tyTypes, curves: tyCurves, tables: buildSegmentTables(vy, tyTypes, tyCurves), lastTime: -1, lastSeg: -1 }
   }
 }
 
@@ -355,6 +412,19 @@ function sample1D(ch: Compiled1D, time: number): number {
   const type = ch.types[lo]
   if (type === 1) return ch.v[lo]
   if (type === 2 && ch.curves) {
+    // Table path (official Curve parity): O(1) lookup + linear interpolation
+    // instead of the 20-iteration bisection. Tables are shared across
+    // segments/skeletons with identical normalized shapes (curveTableCache).
+    const tbl = ch.tables ? ch.tables[lo] : null
+    if (tbl) {
+      const t = f * (CURVE_TABLE_SIZE - 1)
+      const i = t | 0
+      const v0 = ch.v[lo]
+      if (i >= CURVE_TABLE_SIZE - 1) return v0 + (ch.v[lo + 1] - v0) * tbl[CURVE_TABLE_SIZE - 1]
+      const yn = tbl[i] + (tbl[i + 1] - tbl[i]) * (t - i)
+      return v0 + (ch.v[lo + 1] - v0) * yn
+    }
+    // Degenerate fallback (v0===v1 bulging bezier): exact solve, unchanged.
     const c = lo * 4
     const s = solveCubicBezierX(f, ch.curves[c], ch.curves[c + 2])
     return bezierY(s, ch.v[lo], ch.v[lo + 1], ch.curves[c + 1], ch.curves[c + 3])
