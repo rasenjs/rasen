@@ -134,6 +134,10 @@ export class RenderContext {
   private instancedRenderer: InstancedRenderer | null = null
   private projectionMatrix: Mat4x4f
   private viewMatrix: Mat4x4f
+  /** Last camera config — kept so a logical-size change can recompute the
+   *  projection with the same camera (the aspect must track the viewport,
+   *  otherwise a resized canvas stretches the scene). */
+  private lastCamera: CameraConfig | undefined
   private transformStack: TransformState[] = []
   /** Scene-registered pointer handlers (pure — fed by the host adapter). */
   private pointerHandlers = new Set<GlPointerHandler>()
@@ -152,6 +156,7 @@ export class RenderContext {
       logicalHeight: options.logicalHeight,
       camera: options.camera
     }
+    this.lastCamera = options.camera
 
     // 帧调度：注入优先；缺省 rAF，环境缺失（测试/SSR）退化 queueMicrotask
     this.scheduleFrame =
@@ -648,6 +653,7 @@ export class RenderContext {
    * For 3D: pass `{ x, y, z, target, fov?, ... }`.
    */
   setCamera(config: CameraConfig) {
+    this.lastCamera = config
     const w = this.options.logicalWidth ?? this.gl.canvas.width
     const h = this.options.logicalHeight ?? this.gl.canvas.height
     const { projection, view } = computeCameraMatrix(config, w, h)
@@ -659,6 +665,24 @@ export class RenderContext {
     } else {
       this.gl.disable(this.gl.DEPTH_TEST)
     }
+    this.requestRedraw()
+  }
+
+  /**
+   * Update the logical (CSS px) size the projection aspect derives from.
+   *
+   * The dom <canvas> bridge calls this when the element resizes. The logical
+   * size is captured once at mount (before the first ResizeObserver callback,
+   * so usually a placeholder); without this update the projection keeps the
+   * mount-time aspect while the viewport uses the real one — the scene is
+   * drawn stretched. Recomputes the projection with the last camera config.
+   */
+  setLogicalSize(w: number, h: number) {
+    this.options.logicalWidth = w
+    this.options.logicalHeight = h
+    const { projection, view } = computeCameraMatrix(this.lastCamera, w, h)
+    this.setProjectionMatrix(projection)
+    this.setViewMatrix(view)
     this.requestRedraw()
   }
 

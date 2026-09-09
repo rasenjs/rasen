@@ -192,6 +192,12 @@ export function canvas<T extends keyof HostTypes = '2d'>(
         if (contextType === '2d') {
           // canvas.width reset clears the transform — re-apply DPR scale.
           ;(ctx as CanvasRenderingContext2D).setTransform(dpr, 0, 0, dpr, 0, 0)
+        } else {
+          // The WebGL projection aspect derives from the logical size, which
+          // was captured at mount (before the first ResizeObserver callback —
+          // usually a placeholder). Keep it in sync with the resized viewport,
+          // otherwise the scene is drawn stretched after a resize.
+          glRc?.setLogicalSize(w, h)
         }
         // Drawing buffer was cleared by the resize — ask the renderer to
         // repaint (direct call; replaces the old 'rasen:resize' event).
