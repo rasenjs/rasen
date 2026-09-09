@@ -63,9 +63,17 @@ const MAX_TEXTURES_PER_DRAW = 4
 /** Item-level grouping key for the WebGL2 merged flush. Every component is
  * an item-level boolean so groups are flag-homogeneous — the some()/every()
  * derivations in drawGroup then reduce to the shared item value and per-item
- * output matches the legacy (texture, blend) grouping exactly. */
-function mergedGroupKey(it: BatchItem): string {
-  return `${it.blendMode ?? 'normal'}|${it.texture ? 'T' : 'S'}|${it.premultiplied === true ? 1 : 0}|${it.skipTonemap === true ? 1 : 0}|${it.depthWrite === false ? 1 : 0}|${it.normals && it.normals.length > 0 ? 1 : 0}`
+ * output matches the legacy (texture, blend) grouping exactly.
+ * Numeric bitfield (not a template string): flushMerged evaluates this per
+ * item per flush — 60k+ string allocations/frame at 200 spine instances. */
+function mergedGroupKey(it: BatchItem): number {
+  const blend = it.blendMode === 'additive' ? 1 : it.blendMode === 'multiply' ? 2 : it.blendMode === 'screen' ? 3 : 0
+  return blend
+    | (it.texture ? 4 : 0)
+    | (it.premultiplied === true ? 8 : 0)
+    | (it.skipTonemap === true ? 16 : 0)
+    | (it.depthWrite === false ? 32 : 0)
+    | (it.normals && it.normals.length > 0 ? 64 : 0)
 }
 
 export class BatchRenderer {
@@ -137,6 +145,11 @@ export class BatchRenderer {
   /** Per-vertex texture index for multi-texture merged draws (WebGL2 only,
    * A/B E4). WebGL1 keeps one texture per group and never touches this. */
   private texIndexBuffer: WebGLBuffer | null = null
+  /** True after a multi-texture upload: the buffer holds non-zero slot
+   * indices, so the next single-texture group must re-zero it once before
+   * uploads can be skipped again (stale indices would sample unbound
+   * u_tex units → wrong colors). */
+  private texIndexStale = false
   private texIndicesArray: Float32Array | null = null
   private texIndexLoc: number = -1
   /** Location of the ES 3.00 sampler array u_tex[4] (null on WebGL1). */
@@ -262,11 +275,52 @@ export class BatchRenderer {
       }
     }
 
-    this.batchItems.push({ vertices, color, transform: transformMatrix, uv, texture, vertexColors, depthWrite, normals, layer: layer ?? 0, skipTonemap, premultiplied, blendMode, indices, translationOnly: effectiveTranslationOnly, packedColor })
+    // Pooled item object — high-volume submitters (skeletal renderers) push
+    // tens of thousands of shapes per frame; recycling avoids GC churn.
+    // All fields are (re)assigned below, including undefineds.
+    const item = this.itemPool.pop() ?? ({} as BatchItem)
+    item.vertices = vertices
+    item.color = color
+    item.transform = transformMatrix
+    item.uv = uv
+    item.texture = texture
+    item.vertexColors = vertexColors
+    item.depthWrite = depthWrite
+    item.normals = normals
+    item.layer = layer ?? 0
+    item.skipTonemap = skipTonemap
+    item.premultiplied = premultiplied
+    item.blendMode = blendMode
+    item.indices = indices
+    item.translationOnly = effectiveTranslationOnly
+    item.packedColor = packedColor
+    this.batchItems.push(item)
     this._pendingVertexCount += vertices.length / 3
 
     if (this._pendingVertexCount >= this.maxBatchSize) {
       this.flush()
+    }
+  }
+
+  /** Recycled BatchItem objects (see addShape / flush). */
+  private itemPool: BatchItem[] = []
+
+  /** Return drawn items to the pool, dropping references to caller-owned
+   * buffers (vertices/uv/indices/packedColor may be reused component arrays —
+   * retaining them across frames would pin them). */
+  private releaseItems(items: BatchItem[], start: number, end: number): void {
+    for (let i = start; i < end; i++) {
+      const it = items[i]
+      it.vertices = undefined as never
+      it.color = undefined as never
+      it.transform = undefined as never
+      it.uv = undefined
+      it.texture = undefined
+      it.vertexColors = undefined
+      it.normals = undefined
+      it.indices = undefined
+      it.packedColor = undefined
+      this.itemPool.push(it)
     }
   }
 
@@ -310,11 +364,15 @@ export class BatchRenderer {
       }
     }
 
-    // Remove flushed items, keep other layers queued for later passes.
+    // Return drawn items to the pool, keep other layers queued for later
+    // passes. Full flush releases everything and reuses the items array;
+    // layer-filtered flush releases only the drawn subset.
     if (filterLayer === undefined) {
-      this.batchItems = []
+      this.releaseItems(toDraw, 0, toDraw.length)
+      this.batchItems.length = 0
       this._pendingVertexCount = 0
     } else {
+      this.releaseItems(toDraw, 0, toDraw.length)
       const kept = this.batchItems.filter((it) => it.layer !== filterLayer)
       this.batchItems = kept
       this._pendingVertexCount = 0
@@ -628,12 +686,21 @@ export class BatchRenderer {
       if (hasTexture) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer)
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, uvs.subarray(0, totalVertices * 2))
-        // Single-texture groups always sample u_tex[0] → a_texIndex can stay
-        // at whatever stale values are in the buffer. Skip the upload.
-        // Multi-texture merged draws (textures.length > 1) need it.
+        // a_texIndex is always enabled in the VAO, so the buffer must not
+        // hold stale slot indices from a previous MULTI-texture group when a
+        // SINGLE-texture group samples u_tex[0] only. Skip the upload only
+        // while the buffer is known-zero (the transform loop writes texSlot=0
+        // for single groups); after any multi upload, the next single group
+        // re-zeroes once. (Golden caught the naive skip: stale indices made
+        // single groups sample unbound units → 6% pixel drift.)
         if (textures.length > 1) {
           gl.bindBuffer(gl.ARRAY_BUFFER, this.texIndexBuffer)
           gl.bufferSubData(gl.ARRAY_BUFFER, 0, texIndices.subarray(0, totalVertices))
+          this.texIndexStale = true
+        } else if (this.texIndexStale) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, this.texIndexBuffer)
+          gl.bufferSubData(gl.ARRAY_BUFFER, 0, texIndices.subarray(0, totalVertices))
+          this.texIndexStale = false
         }
       }
     } else {
@@ -650,7 +717,11 @@ export class BatchRenderer {
         gl.bufferData(gl.ARRAY_BUFFER, colors!.subarray(0, colorOffset), gl.DYNAMIC_DRAW)
       }
       gl.enableVertexAttribArray(this.colorLoc)
-      gl.vertexAttribPointer(this.colorLoc, 4, gl.UNSIGNED_BYTE, true, 0, 0)
+      gl.vertexAttribPointer(
+        this.colorLoc, 4,
+        allPackedColor ? gl.UNSIGNED_BYTE : gl.FLOAT,
+        allPackedColor, 0, 0
+      )
 
       // Normals (world space) — enables per-pixel directional lighting
       if (hasNormals) {
@@ -752,8 +823,16 @@ export class BatchRenderer {
     gl2.vertexAttribPointer(this.positionLoc, 3, gl2.FLOAT, false, 0, 0)
     gl2.bindBuffer(gl2.ARRAY_BUFFER, this.colorBuffer)
     gl2.enableVertexAttribArray(this.colorLoc)
-    // Packed RGBA8 (4 bytes/vertex, normalized → [0,1] in shader).
-    gl2.vertexAttribPointer(this.colorLoc, 4, gl2.UNSIGNED_BYTE, true, 0, 0)
+    // Color attribute type follows the group kind: packed groups upload
+    // RGBA8 (UNSIGNED_BYTE, normalized → vec4 [0,1]); non-packed groups
+    // upload Float32Array vec4. Binding UNSIGNED_BYTE for float data (or
+    // vice versa) reinterprets the bytes → garbage colors (golden caught
+    // this: 6.2% drift on the shapes scene).
+    if (packedColor) {
+      gl2.vertexAttribPointer(this.colorLoc, 4, gl2.UNSIGNED_BYTE, true, 0, 0)
+    } else {
+      gl2.vertexAttribPointer(this.colorLoc, 4, gl2.FLOAT, false, 0, 0)
+    }
     if (hasNormals) {
       gl2.bindBuffer(gl2.ARRAY_BUFFER, this.normalBuffer)
       gl2.enableVertexAttribArray(this.normalLoc)
@@ -789,8 +868,9 @@ export class BatchRenderer {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, next * 3 * 4, gl.DYNAMIC_DRAW)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
-    // color is packed RGBA8 (1 byte per component, 4 components per vertex)
-    gl.bufferData(gl.ARRAY_BUFFER, next * 4, gl.DYNAMIC_DRAW)
+    // Sized for the FLOAT path (4 floats × 4 bytes = 16 B/vertex); the packed
+    // RGBA8 path (4 B/vertex) fits inside it.
+    gl.bufferData(gl.ARRAY_BUFFER, next * 4 * 4, gl.DYNAMIC_DRAW)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, next * 2 * 4, gl.DYNAMIC_DRAW)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer)
