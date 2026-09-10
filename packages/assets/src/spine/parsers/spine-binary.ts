@@ -270,16 +270,22 @@ function readSequence(input: BinaryInput): SequenceData | null {
   return { count, start, digits, setupIndex }
 }
 
-function readVertices(input: BinaryInput, vertexCount: number, scale: number): number[] {
+function readVertices(input: BinaryInput, vertexCount: number, scale: number): Float32Array {
   const verticesLength = vertexCount << 1
   if (!input.readBoolean()) {
-    return readFloatArray(input, verticesLength, scale)
+    // Typed on purpose: the per-frame world-transform loop reads these
+    // elements millions of times per frame at high instance counts — plain
+    // number[] reads (hole checks + boxed doubles) measurably dominate that
+    // loop. One conversion at parse time, hot reads stay monomorphic.
+    return Float32Array.from(readFloatArray(input, verticesLength, scale))
   }
   const bonesArray: number[] = []
   const weights: number[] = []
+  let totalBones = 0
   for (let i = 0; i < vertexCount; i++) {
     const boneCount = input.readInt(true)
     bonesArray.push(boneCount)
+    totalBones += boneCount
     for (let ii = 0; ii < boneCount; ii++) {
       bonesArray.push(input.readInt(true))
       weights.push(input.readFloat() * scale)
@@ -289,18 +295,22 @@ function readVertices(input: BinaryInput, vertexCount: number, scale: number): n
   }
   // Interleave into the format the runtime expects:
   // [boneCount, boneIdx, vx, vy, weight, boneCount, ...]
-  const interleaved: number[] = []
+  const interleaved = new Float32Array(vertexCount + totalBones * 4)
+  let o = 0
   let bi = 0
   let wi = 0
   for (let v = 0; v < vertexCount; v++) {
     const boneCount = bonesArray[bi++]
-    interleaved.push(boneCount)
+    interleaved[o++] = boneCount
     for (let b = 0; b < boneCount; b++) {
       const boneIndex = bonesArray[bi++]
       const vx = weights[wi++]
       const vy = weights[wi++]
       const weight = weights[wi++]
-      interleaved.push(boneIndex, vx, vy, weight)
+      interleaved[o++] = boneIndex
+      interleaved[o++] = vx
+      interleaved[o++] = vy
+      interleaved[o++] = weight
     }
   }
   return interleaved

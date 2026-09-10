@@ -172,9 +172,11 @@ export interface AttachmentData {
   height?: number
   color?: string
   // Mesh geometry (shared by mesh + DragonBones mesh display).
+  // vertices may be a Float32Array (binary parser emits typed data — the
+  // per-frame world-transform loop reads it millions of times per frame).
   uvs?: number[]
   triangles?: number[]
-  vertices?: number[]
+  vertices?: number[] | Float32Array
   /** Weighted bone indices (for path/mesh attachments). In official spine format:
    *  bones = [boneCount, boneIdx, boneIdx, ..., boneCount, ...] and
    *  vertices = [vx, vy, weight, vx, vy, weight, ...] (flat, not interleaved). */
@@ -210,7 +212,7 @@ export interface MeshAttachmentData extends AttachmentData {
   type: 'mesh' | 'linkedmesh'
   uvs: number[]
   triangles: number[]
-  vertices: number[]
+  vertices: number[] | Float32Array
   hull?: number
   edges?: number[]
   /** linkedmesh: source skin/mesh. */

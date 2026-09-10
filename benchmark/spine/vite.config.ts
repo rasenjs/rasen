@@ -24,7 +24,8 @@ export default defineConfig({
         'official-canvas': resolve(__dirname, 'official-canvas.html'),
         pixi: resolve(__dirname, 'pixi.html'),
         'rasen-webgl': resolve(__dirname, 'rasen-webgl.html'),
-        'rasen-canvas': resolve(__dirname, 'rasen-canvas.html')
+        'rasen-canvas': resolve(__dirname, 'rasen-canvas.html'),
+        c233: resolve(__dirname, 'c233.html')
       }
     }
   },

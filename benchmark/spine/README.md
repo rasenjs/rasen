@@ -4,6 +4,11 @@ Rasen vs official spine-ts 4.1 vs pixi-spine on an identical complex spine rig
 (NIKKE c310, Spine 4.1.20 binary — 204 bones / 181 slots / 146 meshes), same
 protocol, canvas-vs-canvas and webgl-vs-webgl.
 
+> **Optimisation record:** [`docs/SPINE-PERF.md`](../../docs/SPINE-PERF.md) — where
+> the runtime stands against official, the measurement methodology (and which
+> instruments to trust), the structural ideas that were measured and rejected, and
+> the probe tooling listed in §5. Read it before optimising anything here.
+
 ## Targets
 
 | Group | Target | Page | Best practice used |

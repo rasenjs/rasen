@@ -27,6 +27,7 @@ import {
   measureAnimation,
   nextPaint,
   pickAnimation,
+  pickAsset,
   type BenchAPI
 } from './bench-api'
 import {
@@ -73,14 +74,14 @@ function updateCameraFor(n: number): void {
 }
 
 async function loadAssets(): Promise<void> {
-  const [skelResp, atlasResp, img] = await Promise.all([
-    fetch(ASSET_SKEL),
-    fetch(ASSET_ATLAS),
+  let [skelResp, atlasResp, img] = await Promise.all([
+    fetch(pickAsset(ASSET_SKEL)),
+    fetch(pickAsset(ASSET_ATLAS)),
     new Promise<HTMLImageElement>((resolve, reject) => {
       const i = new Image()
       i.onload = () => resolve(i)
       i.onerror = () => reject(new Error(`image load failed: ${ASSET_PNG}`))
-      i.src = ASSET_PNG
+      i.src = pickAsset(ASSET_PNG)
     })
   ])
   const skelBuf = new Uint8Array(await skelResp.arrayBuffer())
@@ -176,6 +177,9 @@ const bench: BenchAPI = {
       instances.value = [...instances.value]
       await nextPaint()
     })
+  },
+  instanceCount() {
+    return instances.value.length
   },
   async poseOnly(ticks) {
     const t0 = performance.now()

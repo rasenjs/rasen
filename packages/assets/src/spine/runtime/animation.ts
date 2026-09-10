@@ -240,19 +240,36 @@ interface CompiledBone {
   shear?: { gate: number; ch: Compiled2D; setupX: number; setupY: number }
 }
 
+interface CompiledDeformAttachment {
+  deformLength: number
+  times: Float64Array
+  /** per keyframe vertex offsets (padded to deformLength) */
+  verts: Float64Array[]
+  types: Uint8Array
+  curves: Float64Array | null
+  /** reused output buffer — renderer consumes it synchronously each frame */
+  out: Float64Array
+}
+
 interface CompiledDeform {
-  slotName: string
+  /**
+   * Resolved slot, baked in at compile time.
+   *
+   * The compile is cached per skeleton and invalidated on skin change, so a
+   * direct reference stays valid. Storing the NAME and doing `slotMap.get()` in
+   * the applier instead cost one string-keyed Map probe per deform slot per
+   * instance per frame — c310's `action` drives 23 deform slots, so that alone
+   * was 4,600 lookups per frame at 200 instances.
+   */
+  slot: any
   /** attName -> compiled deform (geometry is static per skin) */
-  byAttachment: Map<string, {
-    deformLength: number
-    times: Float64Array
-    /** per keyframe vertex offsets (padded to deformLength) */
-    verts: Float64Array[]
-    types: Uint8Array
-    curves: Float64Array | null
-    /** reused output buffer — renderer consumes it synchronously each frame */
-    out: Float64Array
-  }>
+  byAttachment: Map<string, CompiledDeformAttachment>
+  /** One-entry memo over {@link byAttachment}: a slot's attachment only changes
+   * when an attachment timeline swaps it, so the Map probe is skipped in the
+   * steady state. Initialised to `undefined`, which correctly matches the
+   * "no attachment yet" case (the memoised value is `undefined` too). */
+  lastAtt: string | undefined
+  lastCompiled: CompiledDeformAttachment | undefined
 }
 
 interface CompiledAnim {
@@ -265,15 +282,65 @@ interface CompiledAnim {
   extraSkins: string[]
 }
 
-const compileCache = new WeakMap<AnimationData, Map<any, CompiledAnim>>()
+// Outer key is the (shared) animation data; inner key is the skeleton. The inner
+// map MUST be weak: a strong Map here pins every skeleton alive for as long as
+// the animation is reachable, and with 200 instances per page that is a leak.
+const compileCache = new WeakMap<AnimationData, WeakMap<object, CompiledAnim>>()
 
-function compile1D(kfs: RawKeyframe[], getVal: (kf: RawKeyframe) => number): Compiled1D {
+/**
+ * Channel value extractors, as a small enum instead of per-call closures.
+ *
+ * Why: the compiled channel data (times / values / types / curves / tables) is
+ * a pure function of the timeline's keyframes, NOT of the skeleton — but it used
+ * to be rebuilt inside `compileAnim`, which runs once PER SKELETON. With 200 live
+ * instances that meant 200 private copies of every channel (~15 MB of immutable
+ * data), so every sample missed cache even though the source animation data is
+ * shared. Passing an extractor closure made the result uncacheable, so the
+ * extractor is now part of the cache key.
+ */
+const CH_ROTATE = 0
+const CH_X0 = 1
+const CH_X1 = 2
+const CH_Y0 = 3
+const CH_Y1 = 4
+
+function extractChannelValue(kf: RawKeyframe, mode: number): number {
+  switch (mode) {
+    case CH_ROTATE: {
+      const v = (kf as { value?: unknown }).value
+      return typeof v === 'number' ? v : typeof kf.angle === 'number' ? kf.angle : 0
+    }
+    case CH_X0:
+      return numOr(kf.x, 0)
+    case CH_X1:
+      return numOr(kf.x, 1)
+    case CH_Y0:
+      return numOr(kf.y, 0)
+    default:
+      return numOr(kf.y, 1)
+  }
+}
+
+/** Shared 1D channels, keyed by the source keyframe array then by extractor. */
+const channel1DCache = new WeakMap<RawKeyframe[], Map<number, Compiled1D>>()
+/** Shared 2D channel groups, keyed by source keyframes then by value fallback. */
+const channel2DCache = new WeakMap<RawKeyframe[], Map<number, Compiled2D>>()
+
+function compile1D(kfs: RawKeyframe[], mode: number): Compiled1D {
+  let perKfs = channel1DCache.get(kfs)
+  if (perKfs) {
+    const hit = perKfs.get(mode)
+    if (hit) return hit
+  } else {
+    perKfs = new Map()
+    channel1DCache.set(kfs, perKfs)
+  }
   const n = kfs.length
   const times = new Float64Array(n)
   const v = new Float64Array(n)
   for (let i = 0; i < n; i++) {
     times[i] = kfTime(kfs[i])
-    v[i] = getVal(kfs[i])
+    v[i] = extractChannelValue(kfs[i], mode)
   }
   const segCount = Math.max(0, n - 1)
   const types = new Uint8Array(segCount)
@@ -300,10 +367,26 @@ function compile1D(kfs: RawKeyframe[], getVal: (kf: RawKeyframe) => number): Com
       curves[i * 4 + 3] = c[3]
     }
   }
-  return { times, v, types, curves, tables: buildSegmentTables(v, types, curves), lastTime: -1, lastSeg: -1 }
+  const out: Compiled1D = { times, v, types, curves, tables: buildSegmentTables(v, types, curves), lastTime: -1, lastSeg: -1 }
+  perKfs.set(mode, out)
+  return out
 }
 
 function compile2D(kfs: RawKeyframe[], fallback = 0): Compiled2D {
+  let perKfs = channel2DCache.get(kfs)
+  if (perKfs) {
+    const hit = perKfs.get(fallback)
+    if (hit) return hit
+  } else {
+    perKfs = new Map()
+    channel2DCache.set(kfs, perKfs)
+  }
+  const out = build2D(kfs, fallback)
+  perKfs.set(fallback, out)
+  return out
+}
+
+function build2D(kfs: RawKeyframe[], fallback: number): Compiled2D {
   const gate = kfTime(kfs[0])
   // X/Y-split timelines (Spine TranslateXTimeline/Y, ScaleX/Y, ShearX/Y)
   // interleave axis-tagged keyframes; each axis samples ONLY its own kfs.
@@ -319,8 +402,8 @@ function compile2D(kfs: RawKeyframe[], fallback = 0): Compiled2D {
     return {
       gate,
       shared: false,
-      tx: compile1D(xk, (k) => numOr(k.x, fallback)),
-      ty: compile1D(yk, (k) => numOr(k.y, fallback))
+      tx: compile1D(xk, fallback === 1 ? CH_X1 : CH_X0),
+      ty: compile1D(yk, fallback === 1 ? CH_Y1 : CH_Y0)
     }
   }
   const n = kfs.length
@@ -437,7 +520,7 @@ function sample1D(ch: Compiled1D, time: number): number {
 function getCompiled(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
   let perSkeleton = compileCache.get(anim)
   if (!perSkeleton) {
-    perSkeleton = new Map()
+    perSkeleton = new WeakMap()
     compileCache.set(anim, perSkeleton)
   }
   let compiled = perSkeleton.get(skeleton)
@@ -459,10 +542,7 @@ function compileAnim(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
       if (tl.rotate && tl.rotate.length) {
         e.rotate = {
           gate: kfTime(tl.rotate[0]),
-          ch: compile1D(tl.rotate, (kf) => {
-            const v = kf.value
-            return typeof v === 'number' ? v : (typeof kf.angle === 'number' ? kf.angle : 0)
-          }),
+          ch: compile1D(tl.rotate, CH_ROTATE),
           setup: bone.data.rotation ?? 0
         }
       }
@@ -563,7 +643,9 @@ function compileAnim(skeleton: Skeleton, anim: AnimationData): CompiledAnim {
       const perAtt = skinDeform[slotName]
       let entry = deformEntries.get(slotName)
       if (!entry) {
-        entry = { slotName, byAttachment: new Map() }
+        const slot = skeleton.slotMap.get(slotName)
+        if (!slot) continue
+        entry = { slot, byAttachment: new Map(), lastAtt: undefined, lastCompiled: undefined }
         deformEntries.set(slotName, entry)
       }
       for (const attName of Object.keys(perAtt)) {
@@ -812,13 +894,18 @@ function applyDrawOrder(skeleton: Skeleton, anim: AnimationData, time: number): 
 function applyIkTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
   const ik = anim.ik
   if (!ik) return
-  for (const name of Object.keys(ik)) {
-    const constraint = skeleton.ikConstraints.find((c) => c.data.name === name)
-    if (!constraint) continue
+  // Object.keys() allocated a fresh array here EVERY call (i.e. per instance
+  // per frame) just to iterate; `for...in` walks the same keys without
+  // allocating. Same fix in the transform/path appliers below.
+  for (const name in ik) {
     const kfs = ik[name]
     if (!kfs || kfs.length === 0) continue
-    // Skip if time is before the first keyframe — use setup pose values.
+    // Resolve the constraint only after the cheap "no keyframes / before the
+    // first keyframe" rejects — the lookup is a linear scan with a string
+    // compare, and most constraints in a given animation have no track.
     if (time < kfTime(kfs[0])) continue
+    const constraint = skeleton.ikConstraints.find((c) => c.data.name === name)
+    if (!constraint) continue
     if (kfs.some((k) => (k as RawKeyframe).mix !== undefined)) {
       constraint.mix = sampleScalar(kfs, time, (k) => numOr((k as RawKeyframe).mix, constraint.mix))
     }
@@ -838,12 +925,12 @@ function applyIkTimelines(skeleton: Skeleton, anim: AnimationData, time: number)
 function applyTransformTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
   const transform = anim.transform
   if (!transform) return
-  for (const name of Object.keys(transform)) {
-    const constraint = skeleton.transformConstraints.find((c) => c.data.name === name)
-    if (!constraint) continue
+  for (const name in transform) {
     const kfs = transform[name]
     if (!kfs || kfs.length === 0) continue
     if (time < kfTime(kfs[0])) continue
+    const constraint = skeleton.transformConstraints.find((c) => c.data.name === name)
+    if (!constraint) continue
     if (kfs.some((k) => (k as RawKeyframe).mixRotate !== undefined)) {
       constraint.mixRotate = sampleScalar(kfs, time, (k) => numOr((k as RawKeyframe).mixRotate, constraint.mixRotate))
     }
@@ -872,11 +959,11 @@ function applyTransformTimelines(skeleton: Skeleton, anim: AnimationData, time: 
 function applyPathTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
   const path = anim.path
   if (!path) return
-  for (const constraintName of Object.keys(path)) {
-    const constraint = skeleton.pathConstraints.find((c) => c.data.name === constraintName)
-    if (!constraint) continue
+  for (const constraintName in path) {
     const timelines = path[constraintName]
     if (!timelines) continue
+    const constraint = skeleton.pathConstraints.find((c) => c.data.name === constraintName)
+    if (!constraint) continue
     if (timelines.position && timelines.position.length && time >= kfTime(timelines.position[0])) {
       constraint.position = sampleScalar(timelines.position, time, (k) => numOr((k as RawKeyframe).position, constraint.position))
     }
@@ -908,17 +995,22 @@ function applyPathTimelines(skeleton: Skeleton, anim: AnimationData, time: numbe
  * (non-weighted) or world (weighted) vertex positions. Slots with no matching
  * timeline (or before the first keyframe) get `null` → setup pose.
  */
-function applyDeformTimelines(skeleton: Skeleton, time: number, compiled: CompiledAnim): void {
+function applyDeformTimelines(time: number, compiled: CompiledAnim): void {
   // NOTE: setToSetupPose() (called by applyAnimation just before this) already
   // resets EVERY slot.deform to null — the original loop's per-slot null
   // writes for timeline-less slots are therefore redundant here.
   const entries = compiled.deform
   if (!entries.length) return
   for (const entry of entries) {
-    const slot = skeleton.slotMap.get(entry.slotName)
+    const slot = entry.slot
     if (!slot) continue
     const attName = slot.attachment
-    const compiled2 = attName ? entry.byAttachment.get(attName) : undefined
+    // Memoised: the Map probe only runs when the slot's attachment changed.
+    let compiled2 = entry.lastCompiled
+    if (attName !== entry.lastAtt) {
+      entry.lastAtt = attName
+      compiled2 = entry.lastCompiled = attName ? entry.byAttachment.get(attName) : undefined
+    }
     if (!compiled2) {
       slot.deform = null
       continue
@@ -978,15 +1070,85 @@ function applyDeformTimelines(skeleton: Skeleton, time: number, compiled: Compil
  * The renderer resolves the frame's atlas region from this index. Slots with no
  * matching timeline (or before the first keyframe) get -1 → setupIndex.
  */
+/**
+ * Slots a sequence timeline can drive for one (animation, skin): the slot NAMES
+ * plus their per-attachment keyframe lists, resolved once and cached.
+ * The applier then visits only these instead of every slot in the skeleton —
+ * c310's `action` drives a single slot, yet the previous code walked all 181
+ * slots every frame (measured 0.46 ms/frame at 200 instances).
+ */
+interface SeqSlotNames {
+  names: string[]
+  bySlot: Record<string, Record<string, RawKeyframe[] | undefined> | undefined>
+}
+/** Sentinel meaning "the previous apply drove no sequences" (see Skeleton.seqDriven). */
+const NO_SEQ: object = []
+const seqSlotCache = new WeakMap<AnimationData, Map<string, SeqSlotNames>>()
+
+function getSequenceSlotNames(
+  anim: AnimationData,
+  skinName: string,
+  skinSequence: Record<string, Record<string, RawKeyframe[] | undefined>>
+): SeqSlotNames {
+  let perSkin = seqSlotCache.get(anim)
+  if (!perSkin) {
+    perSkin = new Map()
+    seqSlotCache.set(anim, perSkin)
+  }
+  let cached = perSkin.get(skinName)
+  if (!cached) {
+    const names: string[] = []
+    for (const slotName in skinSequence) names.push(slotName)
+    cached = { names, bySlot: skinSequence }
+    perSkin.set(skinName, cached)
+  }
+  return cached
+}
+
 function applySequenceTimelines(skeleton: Skeleton, anim: AnimationData, time: number): void {
-  const skinSequence = anim.sequence?.[skeleton.skin] ?? anim.sequence?.['default']
+  const slots = skeleton.slots
+  const skinName = skeleton.skin ?? 'default'
+  const skinSequence = anim.sequence?.[skinName] ?? anim.sequence?.['default']
   if (!skinSequence) {
-    for (const slot of skeleton.slots) slot.sequenceIndex = -1
+    // Nothing drives a sequence. Clear stale indices only if a previous apply
+    // set some — otherwise this is a no-op and the walk is skipped entirely.
+    if (skeleton.seqDriven !== NO_SEQ) {
+      for (const slot of slots) slot.sequenceIndex = -1
+      skeleton.seqDriven = NO_SEQ
+      skeleton.seqEntries = null
+    }
     return
   }
-  for (const slot of skeleton.slots) {
+  const driven = getSequenceSlotNames(anim, skinName, skinSequence)
+  // Switching animation or skin changes the driven set: clear every slot once
+  // (rare), re-mark, and resolve the driven slot OBJECTS once here so the
+  // per-frame loop below does no name-keyed lookups at all.
+  if (skeleton.seqDriven !== driven) {
+    for (const slot of slots) slot.sequenceIndex = -1
+    skeleton.seqDriven = driven
+    const drivenNames = driven.names
+    const resolved = new Array(drivenNames.length)
+    for (let i = 0; i < drivenNames.length; i++) {
+      resolved[i] = {
+        slot: skeleton.slotMap.get(drivenNames[i]),
+        perAtt: driven.bySlot[drivenNames[i]],
+        lastAtt: undefined,
+        seqCount: -1
+      }
+    }
+    skeleton.seqEntries = resolved
+  }
+  const entries = skeleton.seqEntries
+  if (!entries) return
+  for (let s = 0; s < entries.length; s++) {
+    const e = entries[s]
+    const slot = e.slot
+    if (!slot) continue
     const attName = slot.attachment
-    const kfs = attName ? skinSequence[slot.data.name]?.[attName] : undefined
+    // Keyed by the CURRENT attachment: an attachment timeline can swap the
+    // slot onto a different sequence, and the per-attachment map keeps that
+    // working without visiting every slot in the skeleton.
+    const kfs = attName && e.perAtt ? e.perAtt[attName] : undefined
     if (!kfs || kfs.length === 0) {
       slot.sequenceIndex = -1
       continue
@@ -1004,10 +1166,18 @@ function applySequenceTimelines(skeleton: Skeleton, anim: AnimationData, time: n
     const mode = kf.mode
     let index = kf.index
     const delay = kf.delay
-    // Frame count comes from the attachment's sequence metadata.
-    const att = slot.attachment ? skeleton.findAttachment(slot.data.name, slot.attachment) : undefined
-    const seq = att && (att as unknown as { sequence?: { count: number } }).sequence
-    const count = seq ? seq.count : index + 1
+    // Frame count comes from the attachment's sequence metadata. Memoised per
+    // slot because the attachment is static in the steady state, and this used
+    // to walk the skin chain (findAttachment) on every apply for every driven
+    // slot. -1 means "this attachment has no sequence", so the fallback below
+    // still depends on the keyframe.
+    if (attName !== e.lastAtt) {
+      e.lastAtt = attName
+      const att = attName ? skeleton.findAttachment(slot.data.name, attName) : undefined
+      const seq = att && (att as unknown as { sequence?: { count: number } }).sequence
+      e.seqCount = seq ? seq.count : -1
+    }
+    const count = e.seqCount >= 0 ? e.seqCount : index + 1
     if (mode !== 0) {
       index += Math.floor((time - before) / delay + 1e-5)
       switch (mode) {
@@ -1086,16 +1256,34 @@ export function getAnimationDuration(anim: AnimationData): number {
  * rotations) and recomputes the world transform once more.
  */
 export function applyAnimation(skeleton: Skeleton, anim: AnimationData, time: number, loop: boolean): void {
-  skeleton.setToSetupPose()
   const duration = getAnimationDuration(anim)
   const t = loop && duration > 0 ? time % duration : time
   // Compile once per apply — previously bone/slot/deform timelines each
   // called getCompiled() which did two nested Map lookups. Hoisting saves 4
   // hashmap probes per apply at 200 instances × 60Hz = 48k/frame avoided.
   const compiled = getCompiled(skeleton, anim)
+  // Reset to setup only when it is actually needed: a different animation is
+  // driving now (the new one may not cover properties the old one moved), or the
+  // clock went backwards (loop wrap / seek) so a pose carried in from a later
+  // time cannot be trusted.
+  //
+  // While one animation plays forward no reset is needed at all: its appliers
+  // rewrite every property the animation covers, unconditionally, every frame
+  // (a gate miss writes the setup value rather than skipping), and everything
+  // else still holds what the previous reset left.
+  //
+  // The pose solve is instruction-bound, not cache-bound (per-instance cost is
+  // flat from N=8 to N=200, and the official ratio is already 1.36x at N=1), so
+  // removing this work removes real time rather than shuffling it: the reset is
+  // 204 bones x 7 fields + 181 slots x several writes + a draw-order refill.
+  if (skeleton.poseCompiled !== compiled || t < skeleton.poseTime) {
+    skeleton.setToSetupPose()
+  }
+  skeleton.poseCompiled = compiled
+  skeleton.poseTime = t
   applyBoneTimelines(t, compiled)
   applySlotTimelines(t, compiled)
-  applyDeformTimelines(skeleton, t, compiled)
+  applyDeformTimelines(t, compiled)
   applySequenceTimelines(skeleton, anim, t)
   applyIkTimelines(skeleton, anim, t)
   applyTransformTimelines(skeleton, anim, t)

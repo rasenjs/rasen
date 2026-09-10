@@ -25,7 +25,9 @@ import {
   computeAttachmentWorld,
   computeAttachmentWorldVertices,
   computeClippingWorld,
+  getSequenceRegionName,
   resolveRegionName,
+  resolveRegionTarget,
   hitTestSpine,
   clipTriangleToPolygon,
   makePolygonClockwise,
@@ -99,6 +101,39 @@ function slotColorToRgba(slot: SlotColorSource, premultiplied: boolean): { r: nu
   const out = premultiplied ? { r: r * a, g: g * a, b: b * a, a } : { r, g, b, a }
   slotColorMemo.set(slot, { hex, premul: premultiplied, out })
   return out
+}
+
+// Per-slot packed RGBA8 stream memo — static slots (constant color) hit with
+// zero per-vertex expansion; animated slots (colorN) refill in place when the
+// color changes, avoiding per-frame reallocation. Used by the fast-lane
+// (beginMesh/endMesh) path to fill m.col in one Uint8Array copy.
+// `version` bumps on every content refill so callers can skip re-copying an
+// UNCHANGED stream into staging (the copy is only needed when the content or
+// the staging base moved).
+let packedStreamVersion = 0
+const packedStreamMemo = new WeakMap<object, { hex: string; premul: boolean; nVerts: number; stream: Uint8Array; version: number }>()
+function packedColorStream(slot: SlotColorSource, premul: boolean, nVerts: number): { stream: Uint8Array; version: number } {
+  const hex = slot.color
+  const hit = packedStreamMemo.get(slot)
+  if (hit && hit.hex === hex && hit.premul === premul && hit.nVerts === nVerts) return hit
+  // Reuse the existing buffer when the vertex count matches (animated slot
+  // refill) — avoids a fresh Uint8Array allocation per frame.
+  const stream = hit && hit.nVerts === nVerts ? hit.stream : new Uint8Array(nVerts * 4)
+  const c = slotColorToRgba(slot, premul)
+  const r8 = Math.round(c.r * 255)
+  const g8 = Math.round(c.g * 255)
+  const b8 = Math.round(c.b * 255)
+  const a8 = Math.round(c.a * 255)
+  for (let i = 0; i < nVerts; i++) {
+    const o = i * 4
+    stream[o] = r8
+    stream[o + 1] = g8
+    stream[o + 2] = b8
+    stream[o + 3] = a8
+  }
+  const entry = { hex, premul, nVerts, stream, version: ++packedStreamVersion }
+  packedStreamMemo.set(slot, entry)
+  return entry
 }
 
 /** Bone overlay color — matches the canvas-2d renderer's
@@ -193,12 +228,90 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
   // staging buffer (was ~2250 vertex writes × 200 instances = 450k/frame). addShape stores the
   // array REFERENCE and flush reads it before the next draw overwrites it (each attachment is
   // visited once per frame). UVs and triangles are shared static arrays from the same layout.
-  let layoutCache: WeakMap<object, Map<string, { uvs: Float32Array; triangles: number[]; verts: Float32Array }>> = new WeakMap()
+  // Cached static per-attachment draw data: atlas-space UVs + triangle list,
+  // plus the vBase-offseted Uint32 index cache (rebuilt only when the staging
+  // base moves — steady state: identical every frame → skip).
+  type AttachmentLayout = {
+    uvs: Float32Array
+    triangles: number[]
+    idxU32?: Uint32Array
+    idxLastVBase?: number
+    idxLastIBase?: number
+    /** Staging-copy markers: the uv stream and the offseted index stream are
+     * STATIC per layout — once copied into the shared staging at vBase/iBase
+     * they stay valid until the base moves or another attachment takes the
+     * range (checked against vBaseLedger). Skips ~21MB/frame of redundant
+     * TypedArray.set at 200 instances. */
+    uvStagedVBase?: number
+    idxStagedVBase?: number
+    idxStagedIBase?: number
+  }
+  // Per-attachment submission cache entry — everything STATIC about drawing
+  // one attachment (see subCache below) plus the staged-color marker.
+  type SubEntry = {
+    target: AttachmentData
+    seq: boolean
+    /** Non-seq: resolved once at first draw. Seq: re-resolved per frame. */
+    regionKey: string
+    /** Non-seq: the single layout (null = not drawable). */
+    layout: AttachmentLayout | null
+    /** Non-seq: page texture (null = fall back to the default texture). */
+    texture: WebGLTexture | null
+    resolved: boolean
+    /** Staged-color marker: the packed RGBA8 stream is static per slot —
+     * once copied into staging at colStagedVBase with colVersion it stays
+     * valid until the slot color changes (version bump) or the base moves.
+     * colHex/colPremul mirror the stream's inputs so the steady-state path
+     * skips the packedColorStream call entirely (one string compare). */
+    colStream?: Uint8Array
+    colVersion?: number
+    colStagedVBase?: number
+    colHex?: string
+    colPremul?: boolean
+    /** The staging vBase this sub's uv/index/color streams were last written
+     * at. Ownership requires this to still equal the current vBase: a clipped
+     * attachment reserves staging (advancing the watermark) without taking a
+     * submission slot, so a sub can hold the same slot index while the base
+     * shifts underneath it. */
+    stagedVBase?: number
+  }
+  let layoutCache: WeakMap<object, Map<string, AttachmentLayout>> = new WeakMap()
   // slot → { attachmentName, attachment } — avoids findAttachment every frame.
   const slotAttCache = new Map<object, { name: string; att: unknown }>()
   // page file name → WebGL texture (multi-page atlases).
   const pageTextureCache = new Map<string, WebGLTexture>()
   let lastSkeleton: Skeleton | null = null
+  // Per-attachment submission cache — everything STATIC about drawing one
+  // attachment, resolved once and reused every frame: the region-naming
+  // attachment (linkedmesh → parent skin search), its sequence flag, and for
+  // static attachments the resolved regionKey + layout + page texture. Skips
+  // per frame at high instance counts: the linkedmesh skin search, the
+  // string-keyed layout Map lookup, the atlas regions lookup, and the page
+  // texture lookup. Sequence attachments re-resolve their region per frame
+  // (their layouts stay in the two-level layoutCache so each region's
+  // geometry is still built once).
+  let subCache: WeakMap<object, SubEntry> = new WeakMap()
+  // Staging-range ownership, tracked POSITIONALLY: `prevSubs[k]` is the sub
+  // that occupied submission slot k on the previous frame. A sub owns its
+  // staged uv/index/color bytes iff it still occupies the same slot as last
+  // frame (steady state: always true → every static copy is skipped).
+  //
+  // Why not a Map<vBase, SubEntry>: the ledger is touched twice per sealed
+  // mesh per frame (181 attachments x 200 instances = 36.2k get+set per
+  // frame), and measured 1.63 ms/frame versus 0.30 ms for this positional
+  // form — a 1.3 ms/frame difference, i.e. a third of the whole render gap.
+  //
+  // Why positional identity is CORRECT where a per-sub (seq, vBase) memo is
+  // not: if attachment A is hidden for a frame, the attachments after it shift
+  // down and one of them takes A's vBase range. A's own memo would still claim
+  // that range, so A would wrongly skip re-staging on its return. Comparing
+  // the occupant of the SLOT catches it, because the slot's previous occupant
+  // was the other attachment.
+  let prevSubs: (SubEntry | undefined)[] = []
+  /** Slot index into prevSubs for the frame currently being built. */
+  let seq = 0
+  /** Number of submissions recorded last frame (tails are dropped). */
+  let prevCount = 0
 
   // Build the flattened triangle list and submit one draw call per slot so
   // each slot's tint/alpha (animated by `color` timelines) and the `draworder`
@@ -240,10 +353,18 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
     if (sk !== lastSkeleton) {
       // WeakMap has no .clear() — reassign to a fresh instance.
       layoutCache = new WeakMap()
+      subCache = new WeakMap()
+      prevSubs = []
+      seq = 0
+      prevCount = 0
       slotAttCache.clear()
       pageTextureCache.clear()
       lastSkeleton = sk
     }
+    // Drop the previous frame's tail so a removed attachment cannot leave a
+    // stale occupant behind its position, then start recording this frame.
+    prevSubs.length = prevCount
+    seq = 0
 
     // Camera is canvas-level (<canvas camera={...}>): the projection matrix in
     // the batch renderer maps world → screen. This component submits raw
@@ -334,93 +455,174 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         continue
       }
 
-      // Cached static layout (atlas-space UVs + triangles) for this attachment.
-      // Two-level key: attachment object identity (unique per slot) → region
-      // name (for sequence animations that swap regions per frame). This
-      // prevents cross-contamination when two slots share the same region
-      // name but have different mesh geometry (e.g. Hair_f_5 / Hair_f_3).
-      const regionKey = resolveRegionName(attData, slot, sk)
-      let attLayouts = layoutCache.get(attData as object)
-      if (!attLayouts) {
-        attLayouts = new Map()
-        layoutCache.set(attData as object, attLayouts)
-      }
-      let layout = attLayouts.get(regionKey)
-      if (!layout) {
-        const geo = computeAttachmentWorld(attData, slot, sk, at, attName)
-        if (geo) {
-          layout = { uvs: new Float32Array(geo.uvs), triangles: geo.triangles, verts: new Float32Array(0) }
-          attLayouts.set(regionKey, layout)
+      // Per-attachment submission cache (see subCache): resolve the static
+      // draw data once, reuse every frame. Sequence attachments re-resolve
+      // their region per frame through the two-level layoutCache.
+      let sub = subCache.get(attData as object)
+      if (!sub) {
+        sub = {
+          target: resolveRegionTarget(attData, slot, sk),
+          seq: false,
+          regionKey: resolveRegionName(attData, slot, sk),
+          layout: null,
+          texture: null,
+          resolved: false
         }
+        sub.seq = !!sub.target.sequence
+        subCache.set(attData as object, sub)
       }
-      if (!layout) {
-        if (endClip) {
-          clipPoly = null
-          clipEndSlotName = null
+      let regionKey: string
+      let layout: AttachmentLayout | null
+      let slotTexture: WebGLTexture | null
+      if (sub.seq) {
+        // Sequence-driven region swap — re-resolve per frame. Layouts stay
+        // in the two-level cache so each region's geometry is built once.
+        regionKey = getSequenceRegionName(sub.target, slot.sequenceIndex)
+        let attLayouts = layoutCache.get(attData as object)
+        if (!attLayouts) {
+          attLayouts = new Map()
+          layoutCache.set(attData as object, attLayouts)
         }
-        continue
-      }
-
-      // Recompute only the world vertices for the current pose.
-      const nVerts = layout.uvs.length / 2
-      const needV = nVerts * 3
-      // nVerts is static per layout — allocate exactly once, reuse forever.
-      if (layout.verts.length !== needV) {
-        layout.verts = new Float32Array(needV)
-      }
-      // Write the world vertices straight into layout.verts with stride 3
-      // (computeAttachmentWorldVertices now accepts outStride=3). This
-      // eliminates the 2→3 expand loop that was previously the body of the
-      // per-slot "for (let v = 0; v < nVerts; v++) verts[v*3] = ..." copy
-      // (~2250 vertex writes × 200 instances = 450k/frame). The clipped path
-      // below reads these same vertices with stride 3 (so `2 * idx` becomes
-      // `3 * idx`).
-      const vCount = computeAttachmentWorldVertices(attData, slot, sk, at, attName, layout.verts, 3)
-      if (!vCount) {
-        if (endClip) {
-          clipPoly = null
-          clipEndSlotName = null
+        layout = attLayouts.get(regionKey) ?? null
+        if (!layout) {
+          const geo = computeAttachmentWorld(attData, slot, sk, at, attName)
+          if (geo) {
+            layout = { uvs: new Float32Array(geo.uvs), triangles: geo.triangles, idxLastVBase: -1, idxLastIBase: -1 }
+            attLayouts.set(regionKey, layout)
+          }
         }
-        continue
-      }
-
-      // Unclipped path — indexed submission: unique world vertices + the
-      // cached triangle table. Adjacent triangles share edges through the
-      // index buffer, so the rasterizer's fill rule seals seams WITHOUT the
-      // per-triangle centroid expansion the old non-indexed path needed
-      // (that expansion cost a sqrt per vertex and 3× the transform/upload
-      // volume). The batch renderer joins per-item index lists and draws
-      // drawElements (WebGL2); WebGL1 expands the indices back into a flat
-      // triangle list inside the batch transform loop.
-      if (clipPoly === null) {
-        // Per-slot tint/alpha (animated by `color` timelines). For a PMA atlas
-        // the straight-alpha slot color must be premultiplied so the blended
-        // result stays premultiplied (otherwise faded parts render too bright).
-        const color = slotColorToRgba(slot, premultiplied)
-        // Multi-page atlas: pick the texture for this attachment's region page.
         const region = at.regions[regionKey]
-        const slotTexture = region ? textureForPage(region.page) : texture
+        slotTexture = region ? textureForPage(region.page) : texture
+      } else {
+        if (!sub.resolved) {
+          let attLayouts = layoutCache.get(attData as object)
+          if (!attLayouts) {
+            attLayouts = new Map()
+            layoutCache.set(attData as object, attLayouts)
+          }
+          let l = attLayouts.get(sub.regionKey) ?? null
+          if (!l) {
+            const geo = computeAttachmentWorld(attData, slot, sk, at, attName)
+            if (geo) {
+              l = { uvs: new Float32Array(geo.uvs), triangles: geo.triangles, idxLastVBase: -1, idxLastIBase: -1 }
+              attLayouts.set(sub.regionKey, l)
+            }
+          }
+          const region = at.regions[sub.regionKey]
+          sub.texture = region ? textureForPage(region.page) : texture
+          sub.layout = l
+          sub.resolved = true
+        }
+        regionKey = sub.regionKey
+        layout = sub.layout
+        slotTexture = sub.texture
+      }
+      if (!layout) {
+        if (endClip) {
+          clipPoly = null
+          clipEndSlotName = null
+        }
+        continue
+      }
+
+      // Recompute only the world vertices for the current pose — written
+      // STRAIGHT into the batch renderer's shared staging buffer (fast lane,
+      // Phase 2): beginMesh reserves a vertex/index range, the world-transform
+      // loop fills positions in in, uv/color/index are filled with one
+      // memcpy each from per-layout caches. This eliminates the intermediate
+      // layout.verts buffer AND the per-vertex re-copy pass in drawGroup.
+      const nVerts = layout.uvs.length / 2
+      const triCount = layout.triangles.length
+      const m = renderContext.beginMesh(nVerts, triCount)
+      if (!m) {
+        // No batch renderer (headless/test env) — nothing to submit.
+        if (endClip) {
+          clipPoly = null
+          clipEndSlotName = null
+        }
+        continue
+      }
+      const vCount = computeAttachmentWorldVertices(attData, slot, sk, at, attName, m.pos, 3, m.vBase * 3)
+      if (!vCount) {
+        // Release the unused reservation by simply not sealing it: the
+        // watermark has advanced, but flush() resets it — the gap is
+        // harmless because legacy/next reservations never read it.
+        if (endClip) {
+          clipPoly = null
+          clipEndSlotName = null
+        }
+        continue
+      }
+      // Staging contract: world-space positions. computeAttachmentWorldVertices
+      // emits skeleton-space vertices — add this instance's translation in
+      // place (3 adds/vertex; cheaper than the legacy full-matrix pass).
+      if (px !== 0 || py !== 0 || pz !== 0) {
+        const base = m.vBase * 3
+        for (let i = 0; i < vCount; i++) {
+          const o = base + i * 3
+          m.pos[o] += px
+          m.pos[o + 1] += py
+          m.pos[o + 2] += pz
+        }
+      }
+      // Unclipped path — fast-lane indexed submission. Adjacent triangles
+      // share edges through the index buffer, so the rasterizer's fill rule
+      // seals seams WITHOUT any centroid expansion (official parity).
+      if (clipPoly === null) {
+        // Steady state: the same attachment lands at the same vBase/iBase
+        // every frame (deterministic draw order → identical watermark
+        // assignments), and the uv/index/color streams are STATIC — the
+        // staging already holds this exact content, so the copies are
+        // skipped. Ownership needs BOTH the same submission slot as last frame
+        // (prevSubs, catches attachments appearing/disappearing) AND the same
+        // staged vBase (catches a clipped neighbour shifting the watermark).
+        // Positions are recomputed every frame (the pose changed) and always
+        // written.
+        const owned = prevSubs[seq] === sub && sub.stagedVBase === m.vBase
+        prevSubs[seq] = sub
+        seq++
+        // uv: one memcpy from the layout's static atlas-space stream.
+        if (!owned || layout.uvStagedVBase !== m.vBase) {
+          m.uv.set(layout.uvs, m.vBase * 2)
+          layout.uvStagedVBase = m.vBase
+        }
+        // indices: vBase-offseted Uint32 per layout — rewritten only when the
+        // staging base moved (steady state: identical every frame → skip).
+        if (layout.idxLastVBase !== m.vBase || layout.idxLastIBase !== m.iBase) {
+          let u32 = layout.idxU32
+          if (!u32 || u32.length !== triCount) u32 = layout.idxU32 = new Uint32Array(triCount)
+          const tris = layout.triangles
+          for (let i = 0; i < triCount; i++) u32[i] = tris[i] + m.vBase
+          layout.idxLastVBase = m.vBase
+          layout.idxLastIBase = m.iBase
+        }
+        if (!owned || layout.idxStagedVBase !== m.vBase || layout.idxStagedIBase !== m.iBase) {
+          m.idx.set(layout.idxU32!, m.iBase)
+          layout.idxStagedVBase = m.vBase
+          layout.idxStagedIBase = m.iBase
+        }
+        // color: per-slot packed RGBA8 stream. Steady state (same hex, same
+        // premul, same base, owned range): skip BOTH the packedColorStream
+        // call and the staging copy — one string compare detects any color
+        // timeline change (the same detector the stream memo uses).
+        const hex = slot.color
+        if (!owned || sub.colHex !== hex || sub.colPremul !== premultiplied || sub.colStagedVBase !== m.vBase) {
+          const packed = packedColorStream(slot, premultiplied, nVerts)
+          m.col.set(packed.stream, m.vBase * 4)
+          sub.colStream = packed.stream
+          sub.colVersion = packed.version
+          sub.colStagedVBase = m.vBase
+          sub.colHex = hex
+          sub.colPremul = premultiplied
+          // Any staging write re-stamps the base: uv/index were staged alongside.
+          sub.stagedVBase = m.vBase
+        }
+
+        // Multi-page atlas texture + blend mode resolved above (sub-cache).
         // Spine blend mode (additive/multiply/screen effects — e.g. aura, foot
         // glow, gun muzzle — must not render with normal alpha blending).
         const blendMode = slot.data.blend ?? 'normal'
-        renderContext.addShape(
-          'spine',
-          layout.verts,
-          color,
-          transform,
-          layout.uvs,
-          slotTexture,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          skip ? true : undefined,
-          premultiplied,
-          blendMode,
-          layout.triangles,
-          true, // translationOnly — spine's model matrix is always translation
-          color // packedColor: opt-in RGBA8 upload path; batch renderer expands
-        )
+        renderContext.endMesh(m, nVerts, triCount, slotTexture, blendMode, premultiplied, skip === true)
         total += nVerts
 
         if (endClip) {
@@ -453,15 +655,15 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         // blush) overlap instead of leaving a gap that shows through as a
         // thin line. UVs stay tied to the original vertex index, so no foreign
         // texels are sampled — only the drawn area grows, hiding the seam.
-        // World vertices live in layout.verts with stride 3 (filled by
-        // computeAttachmentWorldVertices outStride=3 above) — read with the
-        // same stride here.
-        const wx0 = layout.verts[3 * i0]
-        const wy0 = layout.verts[3 * i0 + 1]
-        const wx1 = layout.verts[3 * i1]
-        const wy1 = layout.verts[3 * i1 + 1]
-        const wx2 = layout.verts[3 * i2]
-        const wy2 = layout.verts[3 * i2 + 1]
+        // World vertices live in m.pos at [vBase*3 ..] (filled by
+        // computeAttachmentWorldVertices outStride=3 + outBase=vBase*3 above).
+        const wv = m.vBase * 3
+        const wx0 = m.pos[wv + 3 * i0]
+        const wy0 = m.pos[wv + 3 * i0 + 1]
+        const wx1 = m.pos[wv + 3 * i1]
+        const wy1 = m.pos[wv + 3 * i1 + 1]
+        const wx2 = m.pos[wv + 3 * i2]
+        const wy2 = m.pos[wv + 3 * i2 + 1]
         const ecx = (wx0 + wx1 + wx2) / 3
         const ecy = (wy0 + wy1 + wy2) / 3
         // Centroid expansion WITHOUT per-triangle allocations: the previous
@@ -475,8 +677,8 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         // output, so the seam-hiding expansion is harmless here.
         for (let k = 0; k < 3; k++) {
           const idx = k === 0 ? i0 : k === 1 ? i1 : i2
-          const px = layout.verts[3 * idx]
-          const py = layout.verts[3 * idx + 1]
+          const px = m.pos[wv + 3 * idx]
+          const py = m.pos[wv + 3 * idx + 1]
           const lx = px - ecx
           const ly = py - ecy
           const len = Math.sqrt(lx * lx + ly * ly) || 1
@@ -528,9 +730,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       // the straight-alpha slot color must be premultiplied so the blended
       // result stays premultiplied (otherwise faded parts render too bright).
       const color = slotColorToRgba(slot, premultiplied)
-      // Multi-page atlas: pick the texture for this attachment's region page.
-      const region = at.regions[regionKey]
-      const slotTexture = region ? textureForPage(region.page) : texture
+      // Multi-page atlas texture + blend mode resolved above (sub-cache).
       // Spine blend mode (additive/multiply/screen effects — e.g. aura, foot
       // glow, gun muzzle — must not render with normal alpha blending).
       const blendMode = slot.data.blend ?? 'normal'
@@ -556,6 +756,9 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         clipEndSlotName = null
       }
     }
+    // Record how many submissions this frame saw; the next frame truncates
+    // prevSubs to this length before it starts recording.
+    prevCount = seq
 
     // Bone debug overlay (showBones) — same contract as the canvas-2d
     // renderer: one segment per bone from its world origin along its rotated

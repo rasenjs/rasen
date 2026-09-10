@@ -28,6 +28,7 @@ import {
   measureAnimation,
   nextPaint,
   pickAnimation,
+  pickAsset,
   type BenchAPI
 } from './bench-api'
 import {
@@ -87,8 +88,8 @@ async function loadAssets(): Promise<void> {
   // prefix would produce '//c310_00.skel' — a protocol-relative URL that
   // resolves to a bogus host and never loads.
   assetManager = new AssetManager(renderer!.context as ManagedWebGLRenderingContext, '')
-  assetManager.loadBinary(ASSET_SKEL)
-  assetManager.loadTextureAtlas(ASSET_ATLAS)
+  assetManager.loadBinary(pickAsset(ASSET_SKEL))
+  assetManager.loadTextureAtlas(pickAsset(ASSET_ATLAS))
   await new Promise<void>((resolve, reject) => {
     const wait = () => {
       if (assetManager!.isLoadingComplete()) {
@@ -168,9 +169,9 @@ const bench: BenchAPI = {
     return timed(async () => {
       await loadAssets()
       // require(ATLAS) returns a fully-parsed TextureAtlas with textures bound.
-      const atlas = assetManager!.require(ASSET_ATLAS) as TextureAtlas
+      const atlas = assetManager!.require(pickAsset(ASSET_ATLAS)) as TextureAtlas
       skeletonData = new SkeletonBinary(new AtlasAttachmentLoader(atlas)).readSkeletonData(
-        assetManager!.require(ASSET_SKEL)
+        assetManager!.require(pickAsset(ASSET_SKEL))
       )
       animName = pickAnimation(skeletonData.animations.map((a: any) => a.name))
       instances.push(makeInstance())

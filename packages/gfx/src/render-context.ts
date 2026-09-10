@@ -5,6 +5,10 @@
 
 import type { Gl2Context, GlContext } from './node'
 import { BatchRenderer } from './renderer/batch'
+import type { BlendMode } from './renderer/batch'
+
+/** Live staging-span view returned by beginMesh (see BatchRenderer). */
+type MeshSpan = ReturnType<BatchRenderer['beginMesh']>
 import { InstancedRenderer } from './renderer/instanced'
 import { ShadowRenderer } from './renderer/shadow'
 import { ShaderProgram } from './renderer/shader'
@@ -582,6 +586,38 @@ export class RenderContext {
   }
 
   /**
+   * Fast-lane mesh submission: reserve a vertex/index range in the batch
+   * renderer's shared staging buffers. The caller fills positions/UVs/
+   * colors/indices in place (zero intermediate copies), then seals the span
+   * with endMesh(). Returns null when no batch renderer is available
+   * (headless/test envs) — callers must skip submission.
+   */
+  beginMesh(vertexCount: number, indexCount: number): MeshSpan | null {
+    return this.batchRenderer ? this.batchRenderer.beginMesh(vertexCount, indexCount) : null
+  }
+
+  /** Seal a fast-lane mesh span reserved by beginMesh as one batch item. */
+  endMesh(
+    span: MeshSpan,
+    vertexCount: number,
+    indexCount: number,
+    texture?: WebGLTexture | null,
+    blendMode?: BlendMode,
+    premultiplied?: boolean,
+    skipTonemap?: boolean,
+  ): void {
+    this.batchRenderer?.endMesh(
+      span,
+      vertexCount,
+      indexCount,
+      texture ?? null,
+      blendMode,
+      premultiplied,
+      skipTonemap
+    )
+  }
+
+  /**
    * Create 4x4 transform matrix (2D/3D unified)
    */
   private createTransformMatrix(
@@ -616,13 +652,9 @@ export class RenderContext {
   }
 
   setProjectionMatrix(matrix: Mat4x4f) {
-    console.log('RenderContext.setProjectionMatrix:', Array.from(matrix.source.slice(0, 4)))
     this.projectionMatrix = matrix
     if (this.batchRenderer) {
-      console.log('BatchRenderer.setProjectionMatrix:', Array.from(matrix.source.slice(0, 4)))
       this.batchRenderer.setProjectionMatrix(matrix)
-    } else {
-      console.log('BatchRenderer is null!')
     }
     if (this.instancedRenderer) {
       this.instancedRenderer.setProjectionMatrix(matrix)

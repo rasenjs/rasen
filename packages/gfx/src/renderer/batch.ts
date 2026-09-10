@@ -117,6 +117,15 @@ export class BatchRenderer {
   private uvsArray: Float32Array | null = null
   private normalsArray: Float32Array | null = null
   private currentCapacity = 0
+  /** Legacy drawGroup transform scratch — dedicated to drawGroup so a legacy
+   * transform never clobbers the shared fast-lane staging (see the
+   * allocation site in drawGroup). Grown lazily to the largest group. */
+  private groupPositions: Float32Array | null = null
+  private groupColors: Float32Array | null = null
+  private groupPackedColors: Uint8Array | null = null
+  private groupUvs: Float32Array | null = null
+  private groupNormals: Float32Array | null = null
+  private groupTexIndices: Float32Array | null = null
 
   /** CPU staging for the group's combined index list (per-item lists joined
    * with base vertex offsets). WebGL2 indexed path only. */
@@ -347,10 +356,21 @@ export class BatchRenderer {
       it.normals = undefined
       it.indices = undefined
       it.packedColor = undefined
-      it.sealed = undefined
+      // Recycle the sealed payload instead of dropping it: it is re-created
+      // for every sealed mesh otherwise (see endMesh). `sealed = undefined`
+      // is the "this item is not a sealed marker" signal that mergedGroupKey
+      // and the layer-filtered flush branch rely on, so the payload moves to
+      // its own pool rather than staying on the item.
+      if (it.sealed) {
+        this.sealedPool.push(it.sealed)
+        it.sealed = undefined
+      }
       this.itemPool.push(it)
     }
   }
+
+  /** Recycled SealedMesh payloads (see endMesh). */
+  private sealedPool: SealedMesh[] = []
 
   // --- Fast lane: direct staging write (beginMesh / endMesh) -----------------
   // High-throughput geometry producers (skeletal renderers, particle systems)
@@ -389,7 +409,13 @@ export class BatchRenderer {
       const gl = this.gl
       const next = Math.max(this.indexWatermark + indexCap, Math.ceil(this.indexCapacity * 1.5))
       this.indexCapacity = next
-      this.indicesArray = new Uint32Array(next)
+      // Grow WITH COPY (same contract as ensureStaging): without this the
+      // first frame's mid-frame growth would let drawSealedRun's
+      // indicesArray.subarray read past the old JS-array end and silently
+      // clamp, losing everything staged before the growth.
+      const nextArr = new Uint32Array(next)
+      if (this.indicesArray && this.indicesArray.length) nextArr.set(this.indicesArray)
+      this.indicesArray = nextArr
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, next * 4, gl.DYNAMIC_DRAW)
     }
@@ -427,23 +453,64 @@ export class BatchRenderer {
     span: { vBase: number; iBase: number },
     vertexCount: number,
     indexCount: number,
-    texture: WebGLTexture | null,
-    blendMode: BlendMode,
-    premultiplied: boolean,
-    skipTonemap: boolean,
+    texture?: WebGLTexture | null,
+    blendMode?: BlendMode,
+    premultiplied?: boolean,
+    skipTonemap?: boolean,
   ): void {
     const item = this.itemPool.pop() ?? ({} as BatchItem)
     // Fast-lane markers only read these fields in drawSealedRun; the legacy
-    // per-vertex fields stay undefined.
+    // per-vertex fields stay undefined. Force layer=0: pooled items may
+    // carry a stale layer from a previous life, and flush(0) filters by
+    // layer — a stale non-zero layer would drop the sealed item entirely.
     item.vertices = undefined as never
     item.color = undefined as never
     item.transform = undefined as never
-    item.sealed = {
-      vBase: span.vBase, vCount: vertexCount,
-      iBase: span.iBase, iCount: indexCount,
-      textures: [texture],
-      blendMode, premultiplied, skipTonemap,
+    item.layer = 0
+    // Reuse a recycled sealed payload when one is available (see releaseItems):
+    // high-volume producers submit one sealed mesh per attachment per frame
+    // (36k/frame on the c310 bench), so allocating a fresh payload plus its
+    // single-element texture array here was 72k short-lived allocations per
+    // frame of pure GC pressure.
+    const sealed = this.sealedPool.pop()
+    if (sealed) {
+      sealed.vBase = span.vBase
+      sealed.vCount = vertexCount
+      sealed.iBase = span.iBase
+      sealed.iCount = indexCount
+      sealed.blendMode = blendMode ?? 'normal'
+      sealed.premultiplied = premultiplied ?? false
+      sealed.skipTonemap = skipTonemap ?? false
+      sealed.textures[0] = texture ?? null
+      item.sealed = sealed
+    } else {
+      item.sealed = {
+        vBase: span.vBase, vCount: vertexCount,
+        iBase: span.iBase, iCount: indexCount,
+        textures: [texture ?? null],
+        blendMode: blendMode ?? 'normal',
+        premultiplied: premultiplied ?? false,
+        skipTonemap: skipTonemap ?? false,
+      }
     }
+    // Mirror the sealed flags onto the item-level fields mergedGroupKey
+    // reads. Pooled items carry STALE values from a previous legacy life —
+    // without this, sealed markers key by garbage: blend changes between
+    // consecutive attachments don't split runs, so an additive mesh merged
+    // into a normal run draws with the run's first blend mode (wrong
+    // blending on same-page blend transitions; multi-page atlases only
+    // masked it because the texture split happened to fire first).
+    item.blendMode = blendMode ?? 'normal'
+    item.premultiplied = premultiplied ?? false
+    item.skipTonemap = skipTonemap ?? false
+    item.texture = texture ?? null
+    item.depthWrite = undefined
+    item.normals = undefined
+    item.uv = undefined
+    item.indices = undefined
+    item.packedColor = undefined
+    item.vertexColors = undefined
+    item.translationOnly = undefined
     this.batchItems.push(item)
   }
 
@@ -452,14 +519,29 @@ export class BatchRenderer {
    * bytes). */
   private ensureStaging(needVerts: number): void {
     if (this.positionsArray && this.currentCapacity >= needVerts) return
-    this.currentCapacity = Math.max(needVerts, Math.ceil(this.currentCapacity * 1.5))
-    this.positionsArray = new Float32Array(this.currentCapacity * 3)
-    this.colorsArray = new Float32Array(this.currentCapacity * 4)
-    this.packedColorsArray = new Uint8Array(this.currentCapacity * 4)
-    this.uvsArray = new Float32Array(this.currentCapacity * 2)
-    this.normalsArray = new Float32Array(this.currentCapacity * 3)
-    this.texIndicesArray = new Float32Array(this.currentCapacity)
-    this.ensureBufferCapacity(this.currentCapacity)
+    const next = Math.max(needVerts, Math.ceil(this.currentCapacity * 1.5))
+    // Grow WITH COPY: fast-lane producers stage vertex data at submit time
+    // (before flush). Replacing arrays with fresh zeroed ones would wipe
+    // every mesh staged earlier in the same frame. (Only the per-vertex
+    // elements need reallocating — batchItems and items arrays grow on
+    // demand elsewhere.)
+    const grow = <T extends Float32Array | Uint8Array>(
+      old: T | null,
+      stride: number,
+      Ctor: new (n: number) => T
+    ): T => {
+      const nextArr = new Ctor(next * stride)
+      if (old && old.length) nextArr.set(old)
+      return nextArr
+    }
+    this.positionsArray = grow(this.positionsArray, 3, Float32Array)
+    this.colorsArray = grow(this.colorsArray, 4, Float32Array)
+    this.packedColorsArray = grow(this.packedColorsArray, 4, Uint8Array)
+    this.uvsArray = grow(this.uvsArray, 2, Float32Array)
+    this.normalsArray = grow(this.normalsArray, 3, Float32Array)
+    this.texIndicesArray = grow(this.texIndicesArray, 1, Float32Array)
+    this.currentCapacity = next
+    this.ensureBufferCapacity(next)
   }
 
   /**
@@ -498,16 +580,30 @@ export class BatchRenderer {
     // Return drawn items to the pool, keep other layers queued for later
     // passes. Full flush releases everything and reuses the items array;
     // layer-filtered flush releases only the drawn subset.
+    //
+    // Watermark reset: fast-lane producers write into staging at submit
+    // time (before flush). The watermarks MUST reset here, otherwise the
+    // very first frame's capacity grows unboundedly across subsequent
+    // frames (staging would absorb ~1.5 GB/frame at 200 spine instances).
+    // Layer-filtered flush also drops kept sealed markers — their staging
+    // ranges are invalidated by the reset — and the kept legacy items
+    // re-copy from their own buffers at draw time so they survive intact.
     if (filterLayer === undefined) {
       this.releaseItems(toDraw, 0, toDraw.length)
       this.batchItems.length = 0
       this._pendingVertexCount = 0
+      this.vertexWatermark = 0
+      this.indexWatermark = 0
     } else {
       this.releaseItems(toDraw, 0, toDraw.length)
-      const kept = this.batchItems.filter((it) => it.layer !== filterLayer)
+      const kept = this.batchItems.filter(
+        (it) => it.layer !== filterLayer && !it.sealed
+      )
       this.batchItems = kept
       this._pendingVertexCount = 0
       for (const it of kept) this._pendingVertexCount += it.vertices.length / 3
+      this.vertexWatermark = 0
+      this.indexWatermark = 0
     }
   }
 
@@ -529,23 +625,50 @@ export class BatchRenderer {
       let sawSealed = false
       let sealedFirst = -1
       let sealedLast = -1
+      // Flush the sealed run collected so far. `end` is EXCLUSIVE —
+      // drawSealedRun reads items[end - 1] for the run's last marker, and
+      // passing the inclusive sealedLast here dropped the final attachment of
+      // every run (invisible on single-texture skeletons, catastrophic on
+      // multi-texture/multi-blend ones like the NIKKE c223/c233 atlases
+      // where most meshes disappeared).
+      const flushSealed = (): void => {
+        this.drawSealedRun(toDraw, sealedFirst, sealedLast + 1)
+        sawSealed = false
+        sealedFirst = -1
+        sealedLast = -1
+      }
+      // True once ANY sealed marker in this key group has been drawn. Groups
+      // are sealed-homogeneous (mergedGroupKey carries the sealed bit), so a
+      // drawn run means the whole [start, i) span is consumed — drawGroup
+      // must not see it again.
+      let sealedDrawn = false
       while (i < toDraw.length) {
         const it = toDraw[i]
-        if (mergedGroupKey(it) !== key) break
+        if (mergedGroupKey(it) !== key) {
+          // Key change ends the run — draw a trailing sealed run before the
+          // outer loop re-keys to the next group.
+          if (sawSealed) { flushSealed(); sealedDrawn = true }
+          break
+        }
         if (it.sealed) {
-          // Fast-lane markers share one texture by construction (endMesh
-          // splits groups on key change) — merge consecutive markers into
-          // one sealed run: their staging ranges are contiguous.
+          // drawSealedRun binds ONE texture (first.textures[0]). A multi-page
+          // atlas alternates pages between consecutive attachments, so a
+          // texture change must split the run — otherwise later meshes sample
+          // the previous page (the "smoke renders clothing" class of bug on
+          // the NIKKE c223/c233 atlases). Blend/flags are already
+          // key-homogeneous; only texture identity needs an explicit split.
+          const runTex = sawSealed ? toDraw[sealedFirst].sealed!.textures[0] : null
+          if (sawSealed && it.sealed.textures[0] !== runTex) {
+            flushSealed()
+            sealedDrawn = true
+          }
           if (!sawSealed) { sawSealed = true; sealedFirst = i }
           sealedLast = i
           i++
           continue
         }
         // A legacy item inside a sealed run splits it (draw both parts).
-        if (sawSealed) {
-          this.drawSealedRun(toDraw, sealedFirst, sealedLast)
-          sawSealed = false
-        }
+        if (sawSealed) { flushSealed(); sealedDrawn = true }
         const tex = it.texture ?? null
         if (tex && !slots.has(tex)) {
           if (textures.length >= MAX_TEXTURES_PER_DRAW) break
@@ -555,13 +678,30 @@ export class BatchRenderer {
         i++
       }
       if (sawSealed) {
-        this.drawSealedRun(toDraw, sealedFirst, sealedLast)
+        flushSealed()
+        start = i
+        continue
+      }
+      if (sealedDrawn) {
+        // Sealed run ended on a key change; the remaining items belong to
+        // the next group.
         start = i
         continue
       }
       this.drawGroup(toDraw.slice(start, i), textures.length > 0 ? textures : [null])
       start = i
     }
+  }
+
+  /** Cached zero-filled texIndex scratch for drawSealedRun's re-zero upload
+   * (grown on demand; content stays zero forever). */
+  private zeroTexIndicesScratch: Float32Array = new Float32Array(0)
+
+  private zeroTexIndices(count: number): Float32Array {
+    if (this.zeroTexIndicesScratch.length < count) {
+      this.zeroTexIndicesScratch = new Float32Array(Math.max(count, Math.ceil(this.zeroTexIndicesScratch.length * 1.5)))
+    }
+    return this.zeroTexIndicesScratch.subarray(0, count)
   }
 
   /** Draw a run of consecutive fast-lane markers as one drawElements call:
@@ -618,22 +758,30 @@ export class BatchRenderer {
     const vao = this.getVao(false, true, true)
     this.gl2!.bindVertexArray(vao)
 
-    const byteOff = vBase * 4
+    // Position stride = 12 bytes (3 floats); color = 4 bytes (RGBA8);
+    // uv = 8 bytes (2 floats). The byte offsets differ per attribute.
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
-    gl.bufferSubData(gl.ARRAY_BUFFER, byteOff, this.positionsArray!.subarray(vBase * 3, (vBase + vCount) * 3))
+    gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 12, this.positionsArray!.subarray(vBase * 3, (vBase + vCount) * 3))
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
-    gl.bufferSubData(gl.ARRAY_BUFFER, byteOff, this.packedColorsArray!.subarray(vBase * 4, (vBase + vCount) * 4))
+    gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 4, this.packedColorsArray!.subarray(vBase * 4, (vBase + vCount) * 4))
     gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer)
     gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 8, this.uvsArray!.subarray(vBase * 2, (vBase + vCount) * 2))
     // texIndex: fast-lane groups are single-texture (u_tex[0]) — same stale
-    // policy as the legacy single-texture path.
+    // policy as the legacy single-texture path. The re-zero upload must write
+    // ZEROS, not the staging content: fast-lane producers never stage
+    // texIndices, so this.texIndicesArray[vBase..] holds stale values from
+    // previous legacy (multi-texture) groups — uploading them would make the
+    // group sample unbound texture units.
     if (this.texIndexStale) {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.texIndexBuffer)
-      gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 4, this.texIndicesArray!.subarray(vBase, vBase + vCount))
+      const zeros = this.zeroTexIndices(vCount)
+      gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 4, zeros)
       this.texIndexStale = false
     }
 
-    // Texture: single texture per sealed group (endMesh splits on change).
+    // Texture: single texture per sealed run (flushMerged splits runs on
+    // texture change — multi-page atlases alternate pages between
+    // consecutive attachments).
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, first.textures[0]!)
     if (this.useTextureLoc) gl.uniform1i(this.useTextureLoc, 1)
@@ -642,7 +790,13 @@ export class BatchRenderer {
     gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, iBase * 4, this.indicesArray!.subarray(iBase, iBase + iCount))
 
     if (first.skipTonemap) gl.depthMask(false)
-    gl.drawElements(gl.TRIANGLES, iCount, gl.UNSIGNED_INT, 0)
+    // Draw from the run's own element range: the indices were uploaded at
+    // byte offset iBase*4, so the draw offset must match. Offset 0 reads the
+    // START of the element buffer — the first run's (or a previous frame's
+    // legacy group's) indices — which rendered every sealed run after the
+    // first as garbage triangles (the c223/c233 multi-page "shredded
+    // character" regression; c310's single run with iBase=0 hid it entirely).
+    gl.drawElements(gl.TRIANGLES, iCount, gl.UNSIGNED_INT, iBase * 4)
 
     if (this.gl2) this.gl2.bindVertexArray(null)
     if (first.skipTonemap) gl.depthMask(true)
@@ -700,22 +854,31 @@ export class BatchRenderer {
         blend(srcRgb, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     }
 
-    if (!this.positionsArray || this.currentCapacity < totalVertices) {
-      this.currentCapacity = Math.max(totalVertices, Math.ceil(this.currentCapacity * 1.5))
-      this.positionsArray = new Float32Array(this.currentCapacity * 3)
-      this.colorsArray = new Float32Array(this.currentCapacity * 4)
-      this.packedColorsArray = new Uint8Array(this.currentCapacity * 4)
-      this.uvsArray = new Float32Array(this.currentCapacity * 2)
-      this.normalsArray = new Float32Array(this.currentCapacity * 3)
-      this.texIndicesArray = new Float32Array(this.currentCapacity)
+    // Legacy groups transform into DEDICATED scratch arrays — NOT the shared
+    // fast-lane staging. The staging arrays hold fast-lane producers' content
+    // written at submit time; a legacy transform writing [0..N) here would
+    // clobber sealed ranges that later runs in the same flush still upload
+    // (garbage positions/colors for every sealed run drawn after a legacy
+    // group — latent on any skeleton mixing clipped addShape meshes with
+    // fast-lane meshes). Scratch grows lazily to the largest group seen and
+    // is reused; legacy groups are a small fraction of a frame.
+    if (!this.groupPositions || this.groupPositions.length < totalVertices * 3) {
+      const prevCap = this.groupPositions ? this.groupPositions.length / 3 : 0
+      const cap = Math.max(totalVertices, Math.ceil(prevCap * 1.5))
+      this.groupPositions = new Float32Array(cap * 3)
+      this.groupColors = new Float32Array(cap * 4)
+      this.groupPackedColors = new Uint8Array(cap * 4)
+      this.groupUvs = new Float32Array(cap * 2)
+      this.groupNormals = new Float32Array(cap * 3)
+      this.groupTexIndices = new Float32Array(cap)
     }
 
-    const positions = this.positionsArray
-    const colors = this.colorsArray
-    const packedColors = this.packedColorsArray
-    const uvs = this.uvsArray
-    const normals = this.normalsArray
-    const texIndices = this.texIndicesArray
+    const positions = this.groupPositions
+    const colors = this.groupColors
+    const packedColors = this.groupPackedColors
+    const uvs = this.groupUvs
+    const normals = this.groupNormals
+    const texIndices = this.groupTexIndices
     if (!positions || !colors || !packedColors || !uvs || !normals || !texIndices) return
 
     // Does any item carry normals? (enables per-pixel lighting for the group)

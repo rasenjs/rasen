@@ -89,16 +89,11 @@ export interface Bone {
   /** World transform (computed each update). */
   worldX: number
   worldY: number
-  worldRotation: number
-  worldScaleX: number
-  worldScaleY: number
-  /** 2x3 world matrix [a, b, c, d, tx, ty]. */
+  /** 2x3 world matrix [a, b, c, d]; the translation lives in worldX/worldY. */
   a: number
   b: number
   c: number
   d: number
-  tx: number
-  ty: number
 }
 
 /** A live slot instance. */
@@ -112,6 +107,14 @@ export interface Slot {
    * hex string every frame. `color` remains the string for canvas-2d
    * fillStyle / golden-gate compatibility. */
   colorN: Float32Array
+  /** Pre-parsed setup tint (the `colorN` values at setup pose). The setup hex
+   * is immutable per SlotData, so this is parsed once at slot creation and
+   * `setToSetupPose` restores it with a 4-float copy instead of a string-keyed
+   * Map lookup per slot per frame (≈36k lookups/frame at 200 instances). */
+  setupColorN: Float32Array
+  /** The setup tint as the original hex string, cached so the per-frame reset
+   * does not re-read `data.color` and re-apply the default per slot. */
+  setupColor: string
   attachment: string | undefined
   /**
    * FFD deform vertex offsets (length = vertexCount*2) for the current pose,
@@ -946,15 +949,10 @@ function makeBone(data: BoneData, parent: Bone | null, skeleton: Skeleton): Bone
     active: true,
     worldX: 0,
     worldY: 0,
-    worldRotation: 0,
-    worldScaleX: 1,
-    worldScaleY: 1,
     a: 1,
     b: 0,
     c: 0,
     d: 1,
-    tx: 0,
-    ty: 0,
   }
 }
 
@@ -972,6 +970,50 @@ export class Skeleton {
    * therefore "ghosting"/duplicated parts) will be wrong.
    */
   drawOrder: Slot[]
+  /**
+   * Which sequence-driven slot set the last apply used, so the sequence
+   * applier can skip the whole-skeleton clear when nothing changed. `null`
+   * means "never applied"; the applier owns the exact sentinel values.
+   * Not part of the pose — purely an applier bookkeeping field.
+   */
+  seqDriven: unknown
+  /**
+   * Driven sequence slots resolved for the current `seqDriven` set: one entry
+   * per driven slot holding the Slot object, its per-attachment keyframe record
+   * and a one-entry memo for the attachment's sequence frame count.
+   *
+   * Resolved when the driven set changes rather than per frame: the old code did
+   * `slotMap.get(name)` AND `findAttachment(...)` for every driven slot on every
+   * apply, which on c310's `action` (21 driven slots) was ~42 string-keyed
+   * lookups plus 21 skin walks per instance per frame.
+   *
+   * Cannot live on `SeqSlotNames`, which is cached per (animation, skin) and
+   * therefore SHARED between skeletons. Purely applier bookkeeping.
+   */
+  seqEntries: Array<{
+    slot: any
+    perAtt: any
+    lastAtt: string | undefined
+    /** attachment frame count, or -1 when the attachment has no sequence */
+    seqCount: number
+  }> | null = null
+  /**
+   * The compiled animation that produced the current pose, compared by
+   * identity. Lets {@link applyAnimation} skip the per-frame setup reset while
+   * one animation keeps driving this skeleton: every property its timelines
+   * cover is rewritten unconditionally each apply, so the untouched remainder
+   * is still exactly what the last reset left there. Purely applier bookkeeping.
+   */
+  poseCompiled: unknown = null
+  /**
+   * Wrapped animation time of the previous apply. A decrease means the clock
+   * wrapped (loop) or was seeked, so the pose cannot be trusted and the next
+   * apply forces a full setup reset. Purely applier bookkeeping.
+   */
+  poseTime = 0
+  /** Flat [x, y, rotation, scaleX, scaleY, shearX, shearY] per bone holding the
+   * setup values, built once by {@link setToSetupPose} (see its comment). */
+  setupBoneValues: Float64Array | null = null
   readonly boneMap: Map<string, Bone>
   readonly slotMap: Map<string, Slot>
   /** Runtime IK constraints (animated by `ik` timelines). */
@@ -1017,6 +1059,7 @@ export class Skeleton {
     this.bones = []
     this.slots = []
     this.drawOrder = []
+    this.seqDriven = null
     this.boneMap = new Map()
     this.slotMap = new Map()
     this.ikConstraints = []
@@ -1046,11 +1089,15 @@ export class Skeleton {
     for (const sd of data.slots) {
       const bone = this.boneMap.get(sd.bone)
       if (!bone) continue
+      const setupColor = sd.color ?? 'FFFFFFFF'
+      const setupColorN = parseSetupColor(setupColor)
       const slot: Slot = {
         data: sd,
         bone,
-        color: sd.color ?? 'FFFFFFFF',
-        colorN: new Float32Array(parseSetupColor(sd.color ?? 'FFFFFFFF')),
+        color: setupColor,
+        colorN: new Float32Array(setupColorN),
+        setupColorN,
+        setupColor,
         attachment: sd.attachment,
         deform: null,
         sequenceIndex: -1,
@@ -1136,28 +1183,53 @@ export class Skeleton {
    */
   setToSetupPose(): void {
     const bones = this.bones
-    for (let i = 0, n = bones.length; i < n; i++) {
+    if (!this.setupBoneValues) {
+      // Flat [x, y, rotation, scaleX, scaleY, shearX, shearY] per bone, built
+      // once: the reset then costs 7 typed reads instead of 7 loads from
+      // `bone.data` plus 7 nullish checks, on data that never changes. The
+      // reset runs every frame per skeleton (measured 0.64 ms/tick at 200
+      // instances, 8x official spine-core).
+      const flat = (this.setupBoneValues = new Float64Array(bones.length * 7))
+      for (let i = 0, o = 0; i < bones.length; i++, o += 7) {
+        const d = bones[i].data
+        flat[o] = d.x ?? 0
+        flat[o + 1] = d.y ?? 0
+        flat[o + 2] = d.rotation ?? 0
+        flat[o + 3] = d.scaleX ?? 1
+        flat[o + 4] = d.scaleY ?? 1
+        flat[o + 5] = d.shearX ?? 0
+        flat[o + 6] = d.shearY ?? 0
+      }
+    }
+    const flat = this.setupBoneValues
+    let o = 0
+    for (let i = 0, n = bones.length; i < n; i++, o += 7) {
       const bone = bones[i]
-      const d = bone.data
-      bone.x = d.x ?? 0
-      bone.y = d.y ?? 0
-      bone.rotation = d.rotation ?? 0
-      bone.scaleX = d.scaleX ?? 1
-      bone.scaleY = d.scaleY ?? 1
-      bone.shearX = d.shearX ?? 0
-      bone.shearY = d.shearY ?? 0
+      bone.x = flat[o]
+      bone.y = flat[o + 1]
+      bone.rotation = flat[o + 2]
+      bone.scaleX = flat[o + 3]
+      bone.scaleY = flat[o + 4]
+      bone.shearX = flat[o + 5]
+      bone.shearY = flat[o + 6]
     }
     const slots = this.slots
+    // Refill drawOrder IN PLACE instead of `this.drawOrder = slots.slice()`:
+    // drawOrder is a permutation of slots, so a positional copy restores it,
+    // and the previous code allocated a fresh array every frame per skeleton
+    // (200 instances x 60fps = 12k arrays/frame of pure GC pressure). Keeps
+    // the same array identity too, so anything holding a reference to it stays
+    // valid.
+    const order = this.drawOrder
     for (let i = 0, n = slots.length; i < n; i++) {
       const slot = slots[i]
       slot.attachment = slot.data.attachment
-      slot.color = slot.data.color ?? 'FFFFFFFF'
-      slot.colorN.set(parseSetupColor(slot.color))
+      slot.color = slot.setupColor
+      slot.colorN.set(slot.setupColorN)
       slot.deform = null
       slot.sequenceIndex = -1
+      order[i] = slot
     }
-    // Restore the setup draw order; the `draworder` timeline reorders it.
-    this.drawOrder = this.slots.slice()
     const iks = this.ikConstraints
     for (let i = 0, n = iks.length; i < n; i++) {
       const ik = iks[i]

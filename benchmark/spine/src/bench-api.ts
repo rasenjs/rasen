@@ -34,6 +34,8 @@ export interface BenchAPI {
   load(): Promise<number>
   /** Create `n` additional instances (total n). Elapsed ms incl. first draw. */
   createInstances(n: number): Promise<number>
+  /** Number of live instances. Optional; used by probe diagnostics only. */
+  instanceCount?(): number
   /**
    * Run ONLY the pose solve for `ticks` ticks (update/apply/
    * updateWorldTransform), no rendering. Returns elapsed ms per tick.
@@ -128,7 +130,39 @@ export function installStage(): HTMLDivElement {
   return el
 }
 
-/** First animation name fallback helper. */
+/**
+ * Skeleton asset for every target page.
+ *
+ * `?skel=<id>` overrides the spec default so one harness can sweep RIG SIZE
+ * (c310 is 204 bones / 181 slots, c233 is 685 / 563). Bone count drives
+ * updateWorldTransform while track count drives the timeline appliers, so
+ * sweeping both isolates per-bone cost, per-track cost and the fixed per-apply
+ * overhead from each other — three different fixes that a total cannot separate.
+ */
+export function pickAsset(id: string): string {
+  if (typeof location !== 'undefined' && typeof location.search === 'string') {
+    const m = /[?&]skel=([^&]+)/.exec(location.search)
+    if (m) return `/${decodeURIComponent(m[1])}`
+  }
+  return id
+}
+
+/**
+ * Animation name for every target page.
+ *
+ * `?anim=<name>` overrides the spec default so a single harness can sweep
+ * animations of one skeleton (e.g. c310 ships 2-track and 189-track
+ * animations). Comparing pose cost across track counts is what separates
+ * PER-TRACK overhead from PER-APPLY fixed overhead — the two have completely
+ * different fixes, and the total-only number cannot tell them apart.
+ */
 export function pickAnimation(names: string[]): string {
-  return ANIM_NAME ?? names[0] ?? ''
+  let override: string | null = null
+  if (typeof location !== 'undefined' && typeof location.search === 'string') {
+    const m = /[?&]anim=([^&]+)/.exec(location.search)
+    if (m) override = decodeURIComponent(m[1])
+  }
+  const wanted = override ?? ANIM_NAME
+  if (wanted && names.includes(wanted)) return wanted
+  return names[0] ?? ''
 }
