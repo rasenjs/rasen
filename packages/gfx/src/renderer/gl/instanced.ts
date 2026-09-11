@@ -3,8 +3,8 @@
  * Supports both 2D (z=0) and 3D rendering
  */
 
-import type { Color } from '../types'
-import type { Gl2Context } from '../node'
+import type { Color } from '../../types'
+import type { Gl2Context } from '../../node'
 import { ShaderProgram, INSTANCED_VERTEX_SHADER, INSTANCED_FRAGMENT_SHADER } from './shader'
 import { Mat4x4f, mat4x4f } from '@rasenjs/math'
 

@@ -11,10 +11,9 @@
  * the 3D camera components (PerspectiveCamera / OrthographicCamera).
  */
 
-import type { Component3D } from '../../../node'
+import type { Component3D, GfxNode } from '../../../node'
 import type { MaybeRef, CommonDrawProps, TransformProps } from '../../../types'
-import { unref, parseColor, createTexture, type BitmapSource } from '../../../utils'
-import { getRenderContext } from '../../../render-context'
+import { unref, parseColor, type BitmapSource } from '../../../utils'
 import { element } from '../../element'
 
 export interface BoxProps extends CommonDrawProps, TransformProps {
@@ -97,7 +96,7 @@ export const box: Component3D<BoxProps> = (props: BoxProps) => {
   return element({
     getBounds: () => null, // 3D — always full redraw (depth/camera dependent)
 
-    draw: (gl) => {
+    draw: (node: GfxNode) => {
       const width = unref(props.width)
       const height = unref(props.height)
       const depth = unref(props.depth)
@@ -130,16 +129,14 @@ export const box: Component3D<BoxProps> = (props: BoxProps) => {
         cachedH = height
         cachedD = depth
       }
-
-      const renderContext = getRenderContext(gl)
-      const transform = renderContext.getCurrentTransform()
+      const transform = node.getCurrentTransform()
 
       // Tint (defaults to white when only a texture is provided)
       const color = fill ? parseColor(fill) : { r: 1, g: 1, b: 1, a: 1 }
       color.a *= opacity * transform.opacity
 
       // Upload (cached) WebGL texture when provided
-      const texture = textureSource ? createTexture(gl, textureSource) : null
+      const texture = textureSource ? node.createTexture(textureSource) : null
 
       // Compose with the enclosing group transform (same as rect)
       const finalTransform = {
@@ -160,7 +157,7 @@ export const box: Component3D<BoxProps> = (props: BoxProps) => {
         faceColor.r *= face.brightness
         faceColor.g *= face.brightness
         faceColor.b *= face.brightness
-        renderContext.addShape(
+        node.addShape(
           `box-${width}-${height}-${depth}-f${i}`,
           face.vertices,
           faceColor,

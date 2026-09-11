@@ -4,9 +4,9 @@
 
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
-import { getRenderContext } from '../../render-context'
+import type { GfxNode } from '../../node'
 import { element } from '../element'
-import type { Component3D, GlContext } from '../../node'
+import type { Component3D } from '../../node'
 
 export interface WedgeProps extends CommonDrawProps, Transform2DProps {
   x: MaybeRef<number>
@@ -93,7 +93,7 @@ export const wedge: Component3D<WedgeProps> = (props: WedgeProps) => {
       return cachedBounds
     },
 
-    draw: (gl: GlContext) => {
+    draw: (node: GfxNode) => {
       const x = unref(props.x)
       const y = unref(props.y)
       const z = unref(props.z) ?? 0
@@ -110,8 +110,6 @@ export const wedge: Component3D<WedgeProps> = (props: WedgeProps) => {
 
       if (!visible || opacity <= 0) return
 
-      const renderContext = getRenderContext(gl)
-
       if (fill) {
         if (!cachedGeometry || 
             cachedRadius !== radius ||
@@ -126,7 +124,7 @@ export const wedge: Component3D<WedgeProps> = (props: WedgeProps) => {
         }
         const color = parseColor(fill)
         
-        const transform = renderContext.getCurrentTransform()
+        const transform = node.getCurrentTransform()
         
         const finalOpacity = opacity * transform.opacity
         color.a *= finalOpacity
@@ -148,7 +146,7 @@ export const wedge: Component3D<WedgeProps> = (props: WedgeProps) => {
           scaleZ: transform.scaleZ
         }
         
-        renderContext.addShape(
+        node.addShape(
           `wedge-${segments}`,
           cachedGeometry,
           color,

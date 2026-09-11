@@ -7,10 +7,9 @@
  * and an optional texture. Reactive like every other shape.
  */
 
-import type { Component3D } from '../../../node'
+import type { Component3D, GfxNode } from '../../../node'
 import type { MaybeRef, CommonDrawProps, TransformProps } from '../../../types'
-import { unref, createTexture, type BitmapSource, type TextureOptions } from '../../../utils'
-import { getRenderContext } from '../../../render-context'
+import { unref, type BitmapSource, type TextureOptions } from '../../../utils'
 import { element } from '../../element'
 
 export interface MeshGeometry {
@@ -43,7 +42,7 @@ export const mesh: Component3D<MeshProps> = (props: MeshProps) => {
   return element({
     getBounds: () => null, // 3D — full redraw
 
-    draw: (gl) => {
+    draw: (node: GfxNode) => {
       const geo = unref(props.geometry)
       const textureSource = unref(props.texture)
       const textureOptions = unref(props.textureOptions)
@@ -63,12 +62,8 @@ export const mesh: Component3D<MeshProps> = (props: MeshProps) => {
 
       if (!visible || opacity <= 0 || !geo || geo.vertices.length === 0) return
 
-      const renderContext = getRenderContext(gl)
-      const batch = renderContext.getBatchRenderer()
-      if (!batch) return
-
-      const transform = renderContext.getCurrentTransform()
-      const texture = textureSource ? createTexture(gl, textureSource, textureOptions) : null
+      const transform = node.getCurrentTransform()
+      const texture = textureSource ? node.createTexture(textureSource, textureOptions) : null
 
       // Lighting is computed per-pixel in the fragment shader from world-space
       // normals (passed via `normals`). No CPU-side vertex color baking here.
@@ -84,7 +79,7 @@ export const mesh: Component3D<MeshProps> = (props: MeshProps) => {
         scaleZ: transform.scaleZ * scaleZ,
       }
 
-      renderContext.addShape(
+      node.addShape(
         `mesh-${geo.vertices.length}`,
         geo.vertices,
         { r: 1, g: 1, b: 1, a: opacity * transform.opacity },

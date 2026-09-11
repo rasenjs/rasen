@@ -26,7 +26,7 @@ type HTMLIntrinsicElements = {
   /**
    * The `canvas` JSX tag maps to the Rasen canvas component. contextType is a
    * discriminant: children/renderOptions are typed per renderer (CanvasNode
-   * for '2d', GlNode for webgl/webgl2).
+   * for '2d', GfxNode for webgl/webgl2/webgpu).
    */
   canvas: Omit<ElementProps<'canvas'>, 'tag' | 'children'> &
     (
@@ -53,8 +53,20 @@ type HTMLIntrinsicElements = {
           /** Camera configuration for WebGL rendering */
           camera?: PropValue<import('@rasenjs/gfx').CameraConfig>
           children?:
-            | Mountable<import('@rasenjs/gfx').GlNode>
-            | Array<Mountable<import('@rasenjs/gfx').GlNode>>
+            | Mountable<import('@rasenjs/gfx').GfxNode>
+            | Array<Mountable<import('@rasenjs/gfx').GfxNode>>
+        }
+      | {
+          contextType: 'webgpu'
+          /** The GPUDevice, created by the caller before mounting (see the
+           * canvas component's webgpuDevice prop). */
+          webgpuDevice?: GPUDevice
+          dpr?: number
+          renderOptions?: import('@rasenjs/gfx').WebGPURendererOptions
+          camera?: PropValue<{ x?: number; y?: number; zoom?: number }>
+          children?:
+            | Mountable<import('@rasenjs/gfx').GfxNode>
+            | Array<Mountable<import('@rasenjs/gfx').GfxNode>>
         }
     )
 }

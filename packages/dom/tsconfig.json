@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    // @webgpu/types: the WebGPU canvas branch. "node" is restored because
+    // specifying ANY `types` array disables the automatic @types/* inclusion,
+    // which dev-warnings.ts relied on for `process`.
+    "types": ["@webgpu/types", "node"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts"]

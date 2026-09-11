@@ -13,7 +13,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         scenes: resolve(__dirname, 'scenes.html'),
-        ab: resolve(__dirname, 'ab.html')
+        ab: resolve(__dirname, 'ab.html'),
+        // GPU backend equivalence: WebGL2 vs WebGPU through the same descriptors.
+        'webgpu-equivalence': resolve(__dirname, 'webgpu-equivalence.html')
       }
     }
   },

@@ -1,9 +1,15 @@
-# 🎛 GPU Backend Split — WebGL / WebGPU
+# 🎛 GPU Renderer Split — WebGL / WebGPU
 
-Goal: **one engine, two interchangeable GPU backends.** All scene, batching and
-geometry logic stays shared; everything that talks to a GPU API moves behind a
-device interface, so `@rasenjs/gfx` can run on WebGL2 today and WebGPU tomorrow
-with identical output.
+Goal: **one engine, two renderers.** The batching decisions are shared; each
+graphics API gets its own renderer that speaks that API directly.
+
+> **Revised after review.** The first cut of this document invented a neutral
+> "device" layer (`GpuDevice`, pipelines, bind groups, descriptors) that both
+> backends would implement. That layer is gone, and it should stay gone: WebGL
+> has no concept of a device — `GPUDevice` is a WebGPU type — so a shared
+> interface named "device" was a fiction that borrowed one API's vocabulary and
+> pretended the other had it. The layering that survives names only real things:
+> one renderer per API, plus the batching data they share.
 
 Companion docs: [`DESIGN.md`](./DESIGN.md) (engine philosophy),
 [`SPINE-PERF.md`](./SPINE-PERF.md) (the spine workload that must not regress).
@@ -218,7 +224,28 @@ than raw `readPixels` from inside the page.
 2. **Shader parity test**: every WGSL module has a GLSL sibling; assert the
    uniform/binding names match (see §3).
 3. **Backend parity gate**: the Stage-4 pixel-equivalence test, run on every
-   change to either backend.
+   change to either backend. It is a real gate, not a demo:
+
+   ```bash
+   cd benchmark/gfx && npm run build
+   npx vite preview --port 5178 --strictPort &
+   node verify-backend-equivalence.mjs      # 0 / 65536 pixels differ
+   ```
+
+   It runs **headless** and it really does exercise WebGPU here — verified:
+   `HeadlessChrome/152.0.0.0`, adapter `apple / metal-3`, canvas format
+   `bgra8unorm`. The runner prints that adapter line on every run so a reader can
+   see the WebGPU backend was exercised rather than skipped.
+
+   A missing WebGPU is therefore a **FAILURE by default**, not a skip: a silent
+   skip would let a backend regression pass unnoticed, which is the entire reason
+   the gate exists. Machines or CI images without WebGPU must opt out explicitly
+   with `ALLOW_MISSING_WEBGPU=1`.
+
+   The gate compares raw pixels, so it also catches the failure mode a
+   tolerance-only check would wave through — 31% of pixels differing while
+   corners and orientation matched exactly (a sampler-filtering bug).
+
 4. **No default switch** until parity is proven on the existing gates *and* the
    spine perf probes.
 
@@ -230,7 +257,7 @@ than raw `readPixels` from inside the page.
 - [~] **Stage 1 — device interface + WebGL adapter** (in progress)
   - [x] `renderer/device.ts` — the interface (no GPU API types; enforced)
   - [x] `backend/webgl.ts` — `WebGLDevice`, WebGL2 with a WebGL1 fallback
-  - [x] `backend/webgl.test.ts` — 30 tests asserting the emitted GL command
+  - [x] `backend/webgl.test.ts` — 34 tests asserting the emitted GL command
         stream (offsets, state deltas, texture units, format mapping) plus the
         WebGL1/WebGL2 version split
   - [x] `__tests__/layering.test.ts` — the guardrail from §6, with an explicit
@@ -240,9 +267,28 @@ than raw `readPixels` from inside the page.
   - [ ] wire `RenderContext` / `BatchRenderer` onto the device (the remaining
         Stage-1 work: replace the raw `GlContext` fields and the `WebGL*` handles
         in public types)
-- [ ] Stage 2 — `batch.ts` emits a draw list
-- [ ] Stage 3 — WebGPU backend
-- [ ] Stage 4 — WebGPU bench page + pixel-equivalence gate
+- [x] **Stage 3 (partial) — WebGPU backend** — `backend/webgpu.ts` +
+      `backend/webgpu-shaders.ts` exist and render, and are **pixel-identical to
+      WebGL** on the device-tier equivalence scene (see Stage 4). What is NOT done
+      is the engine-side migration that would let the batch renderer run on it.
+- [x] **Stage 4 (partial) — equivalence gate** — `benchmark/gfx/`
+      `webgpu-equivalence.html` + `src/webgpu-equivalence.ts` +
+      `verify-backend-equivalence.mjs`. Result: **0 / 65536 pixels differ,
+      max channel delta 0** — byte-identical, not merely within tolerance.
+- [ ] Stage 2 — `batch.ts` emits a draw list (the real remaining work)
+
+### The equivalence result
+
+```
+reference: webgl2
+candidate: webgpu
+differing pixels:  0 / 65536  (0.000%)
+max channel delta: 0
+```
+
+Identical on the full 256x256 frame, through the same descriptors: one
+interleaved vertex buffer (position/uv/colour), one indexed draw, one texture,
+nearest filtering, a pipeline, a bind group, and a readback.
 
 ### Finding from Stage 1 worth carrying forward
 
@@ -253,3 +299,59 @@ suite as it stood only covered the **WebGL1 fallback**; the WebGL2 path (ES3
 shaders, the `Frame` UBO, VAOs) was untested. Two mocks now exist and each test
 opts in. Any work on the WebGL backend should keep asking which of the two paths
 it is actually exercising.
+
+### WebGPU findings — the parts that cost time
+
+Each of these produced a *silent* wrong result (black frame or wrong pixels),
+not a crash, which is why the equivalence gate exists.
+
+1. **A canvas texture cannot be read back after presentation.** The copy to a
+   buffer must be recorded into the **same command buffer** as the render pass
+   and submitted with it. Doing it afterwards yields a different, never-rendered
+   texture — the first run read back 100% transparent black while every other
+   stage reported success. `readPixelsAsync` therefore closes the frame itself.
+
+2. **`COPY_SRC` must be declared on the canvas configuration.**
+   `getCurrentTexture()` otherwise returns a texture whose usage is
+   `RENDER_ATTACHMENT` only, and the copy fails with "usage does not include
+   TextureUsage::CopySrc". It must be repeated on every `configure()`.
+
+3. **The bind group layout is a single layout, not one per entry.** WebGPU
+   matches a pipeline's declared layout against the group bound at the same
+   index; creating a layout per entry produced one holding only binding 0 and the
+   device rejected the texture/sampler group.
+
+4. **Vertex locations come from layout ORDER, never a name table.** A hybrid of
+   "canonical names from a table, otherwise ordinal" is unsound: a name in the
+   table and one absent from it can resolve to the same number, and WebGPU
+   rejects the pipeline with "attribute shader location (n) is used more than
+   once". Ordering cannot collide, and it is what the WGSL `@location(n)`
+   declarations mean anyway.
+
+5. **Sampler filtering must come from the bound texture.** A backend that
+   quietly samples linearly renders nearest-filtered atlases blurred. This showed
+   up as 31% of pixels differing on a checkerboard test *while the corners and
+   the orientation matched exactly* — the kind of partial mismatch that a
+   tolerance-based comparison would have accepted.
+
+6. **`bgra8unorm` is the canvas format on most platforms, GL and the golden
+   PNGs are RGBA.** Readback must swizzle, or every red and blue channel is
+   exchanged.
+
+### Interface additions the WebGPU port forced
+
+Two fields had to be added to the interface, both because WebGPU is *more*
+explicit rather than different in naming:
+
+- `BindGroupLayoutEntry.samplerName` — GLSL addresses a texture by uniform NAME
+  and WebGPU by binding NUMBER, so the name has to travel in the descriptor for
+  the WebGL backend to bind the right unit.
+- `BindGroupDesc.pipeline` — a `GPUBindGroup` is created against a
+  pipeline-owned layout, so the dependency is real and is stated at the call site
+  instead of being hidden in an ordering rule only WebGPU enforces.
+
+A `UniformField[]` (names + offsets) is defined for the same reason but is not
+used yet: WebGL has no uniform buffers at all, so the WebGL backend will need to
+write each member through the matching `uniform*` call from a CPU shadow copy.
+That is the next interface-level piece, and it is why the equivalence scene is
+deliberately attribute-only.

@@ -50,6 +50,13 @@ const GROUPS = [
     ]
   },
   {
+    name: 'WebGPU',
+    baseline: 'official-webgl',
+    targets: [
+      { name: 'Rasen webgpu', page: 'rasen-webgpu.html' }
+    ]
+  },
+  {
     name: 'Canvas2D',
     baseline: 'official-canvas',
     targets: [
@@ -73,6 +80,8 @@ if (argv.includes('--instances')) {
   const i = argv.indexOf('--instances')
   CONFIG.instanceCounts = argv[i + 1].split(',').map(Number)
 }
+const GROUP_FILTER = argv.includes('--groups') ? argv[argv.indexOf('--groups') + 1].split(',') : null
+const TARGET_FILTER = argv.includes('--targets') ? argv[argv.indexOf('--targets') + 1].split(',') : null
 
 // --- Browser / server infra (same contract as canvas2d bench) ----------------
 function browserExecutablePath() {
@@ -269,7 +278,9 @@ async function main() {
 
   try {
     for (const group of GROUPS) {
+      if (GROUP_FILTER && !GROUP_FILTER.includes(group.name)) continue
       for (const target of group.targets) {
+        if (TARGET_FILTER && !TARGET_FILTER.includes(target.name)) continue
         const url = `${serverUrl}/${target.page}`
         console.log(`▶ ${target.name} (${group.name})`)
         const key = `${group.name}/${target.name}`
@@ -358,6 +369,7 @@ async function main() {
   console.log(`\n📄 saved: ${path.relative(process.cwd(), outFile)}`)
 
   for (const group of GROUPS) {
+    if (GROUP_FILTER && !GROUP_FILTER.includes(group.name)) continue
     console.log(`\n=== ${group.name} group (baseline: ${group.baseline}) ===`)
     const baselineTarget =
       group.targets.find((t) => t.page === group.baseline + '.html') ??

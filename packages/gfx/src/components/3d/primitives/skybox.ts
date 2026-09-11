@@ -5,10 +5,9 @@
  * so it always appears behind all other geometry.
  */
 
-import type { Component3D } from '../../../node'
+import type { Component3D, GfxNode } from '../../../node'
 import type { MaybeRef, CommonDrawProps } from '../../../types'
-import { unref, createTexture, type BitmapSource } from '../../../utils'
-import { getRenderContext } from '../../../render-context'
+import { unref, type BitmapSource } from '../../../utils'
 import { element } from '../../element'
 
 export interface SkyboxProps extends CommonDrawProps {
@@ -95,28 +94,27 @@ export const skybox: Component3D<SkyboxProps> = (props: SkyboxProps) => {
   return element({
     getBounds: () => null,
 
-    draw: (gl) => {
+    draw: (node: GfxNode) => {
       const textureSource = unref(props.texture)
       if (!textureSource) return
 
       const radius = unref(props.radius) ?? 500
       const pos = unref(props.position) ?? { x: 0, y: 0, z: 0 }
-      const renderContext = getRenderContext(gl)
-      const batch = renderContext.getBatchRenderer()
-      if (!batch) return
 
-      const texture = createTexture(gl, textureSource, {
-        wrapS: gl.REPEAT,
-        wrapT: gl.CLAMP_TO_EDGE,
-        minFilter: gl.LINEAR,
-        magFilter: gl.LINEAR,
+      // GL texture wrap/filter enums (REPEAT / CLAMP_TO_EDGE / LINEAR) —
+      // plain numbers so the submission stays backend-agnostic.
+      const texture = node.createTexture(textureSource, {
+        wrapS: 0x2901,
+        wrapT: 0x812F,
+        minFilter: 0x2601,
+        magFilter: 0x2601,
       })
       const sphere = getSphereGeometry(radius)
 
       // Skybox is positioned at the camera eye — always surrounds the viewer.
       // depthWrite=false so it renders as background and scene geometry
       // (drawn after) still passes depth test and covers it.
-      renderContext.addShape(
+      node.addShape(
         `skybox-${radius}`,
         sphere.vertices,
         { r: 1, g: 1, b: 1, a: 1 },

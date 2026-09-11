@@ -2,7 +2,7 @@
  * Shader program management
  */
 
-import type { Gl2Context, GlContext } from '../node'
+import type { Gl2Context, GlContext } from '../../node'
 
 export class ShaderProgram {
   private program: WebGLProgram | null = null

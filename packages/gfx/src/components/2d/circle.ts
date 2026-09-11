@@ -4,9 +4,9 @@
 
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
-import { getRenderContext } from '../../render-context'
+import type { GfxNode } from '../../node'
 import { element } from '../element'
-import type { Component3D, GlContext } from '../../node'
+import type { Component3D } from '../../node'
 
 /**
  * Generate circle vertices (triangle fan approximation)
@@ -93,7 +93,7 @@ export const circle: Component3D<CircleProps> = (props: CircleProps) => {
       return cachedBounds
     },
 
-    draw: (gl: GlContext) => {
+    draw: (node: GfxNode) => {
       const x = unref(props.x)
       const y = unref(props.y)
       const z = unref(props.z) ?? 0
@@ -108,8 +108,6 @@ export const circle: Component3D<CircleProps> = (props: CircleProps) => {
 
       if (!visible || opacity <= 0 || radius <= 0) return
 
-      const renderContext = getRenderContext(gl)
-
       if (fill) {
         if (cachedGeometry === null || 
             cachedRadius !== radius || 
@@ -121,7 +119,7 @@ export const circle: Component3D<CircleProps> = (props: CircleProps) => {
 
         const color = parseColor(fill)
         
-        const transform = renderContext.getCurrentTransform()
+        const transform = node.getCurrentTransform()
         
         const finalOpacity = opacity * transform.opacity
         color.a *= finalOpacity
@@ -143,7 +141,7 @@ export const circle: Component3D<CircleProps> = (props: CircleProps) => {
           scaleZ: transform.scaleZ
         }
 
-        renderContext.addShape(
+        node.addShape(
           `circle-${segments}`,
           cachedGeometry,
           color,

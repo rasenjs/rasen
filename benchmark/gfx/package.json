@@ -9,6 +9,7 @@
     "build": "vite build",
     "golden": "node golden.mjs",
     "golden:update": "node golden.mjs --update",
+    "equivalence": "node verify-backend-equivalence.mjs",
     "probe": "node probe-gl-stats.mjs",
     "probe:baseline": "node probe-gl-stats.mjs --baseline",
     "ab": "node ab.mjs"

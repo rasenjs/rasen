@@ -1,5 +1,5 @@
 /**
- * WebGL Node —— 宿主节点抽象（真实树结构）
+ * GfxNode —— 唯一的场景树节点抽象（WebGL 与 WebGPU 共用）。
  *
  * 类型策略：GL 上下文与句柄直接复用 DOM 标准类型
  * （WebGLRenderingContext / WebGL2RenderingContext / WebGLBuffer …）；
@@ -14,15 +14,24 @@
  *    （宿主是 group 节点则成为其子节点；顶层裸宿主则注册为渲染根）
  *  - 绘制顺序 = 树的前序遍历；group 节点在自身绘制中 push 变换后
  *    递归 children、pop，子树变换层级天然成立
+ *
+ * 组件面：draw 回调收到的就是这个节点。几何提交（addShape/beginMesh/
+ * endMesh/createTexture）由节点直接转发给它关联的 batch renderer，
+ * 场景状态（变换栈/相机/指针）由节点转发给所属后端——组件因此只认识
+ * GfxNode 一个类型，不需要再做任何 ctx → 引擎 的查找。
  */
 
 import { getReactiveRuntime } from '@rasenjs/core'
-import { RenderContext, hasRenderContext, getRenderContext } from './render-context'
+import { Mat4x4f } from '@rasenjs/math'
+import type { TransformState, TransformInput } from './transform-stack'
 import type { Bounds } from './types'
+import type { BlendMode, TextureHandle } from './renderer/base'
+import { Renderer, type GlPointerHandler } from './renderer/base'
+import { getRenderContext, hasRenderContext } from './renderer/gl/index'
+import { WebGLRenderer } from './renderer/gl/index'
+import type { BitmapSource, TextureOptions } from './utils'
 
-/**
- * domlike 画布表面 —— 替代 HTMLCanvasElement 的最小造型
- */
+/** domlike 画布表面 —— 替代 HTMLCanvasElement 的最小造型 */
 export interface CanvasSurface {
   readonly width: number
   readonly height: number
@@ -48,31 +57,81 @@ export type Gl2Context = Omit<WebGL2RenderingContext, 'canvas'> & {
  */
 export type GlContext = Gl1Context | Gl2Context
 
+/** Live staging-span view returned by beginMesh (see BatchRenderer). */
+export type MeshSpan = ReturnType<Renderer['beginMesh']>
+
 /**
- * WebGL 宿主/场景节点
+ * 场景树节点 —— 组件的唯一可见面。
  *
- * Mountable<GlNode> 的 node 入参；同时也是场景树的成员。
+ * Mountable<GfxNode> 的 node 入参；同时也是场景树的成员。
  */
-export interface GlNode {
-  readonly ctx: GlContext
-  /**
-   * 渲染上下文配置：由桥接方（dom <canvas>）注入，组件懒创建
-   * RenderContext 时读取。替代旧的 dataset 传递。
-   */
-  readonly rcOptions?: import('./render-context').RenderContextOptions
+export interface GfxNode {
+  /** 后端上下文句柄（GL context / WebGPU 画布）。仅供后端特化代码使用。 */
+  readonly ctx: unknown
+  /** 渲染上下文配置：由桥接方（dom <canvas>）注入，组件懒创建时读取。 */
+  readonly rcOptions?: Record<string, unknown>
+  /** 本树所有组件的渲染引擎（每棵树/每个画布一个）。 */
+  readonly renderer: Renderer
   /** 父节点；顶层（直接挂在渲染根上）为 null */
-  readonly parent: GlNode | null
+  readonly parent: GfxNode | null
   /** 子节点（按绘制顺序） */
-  readonly children: GlNode[]
+  readonly children: GfxNode[]
   /** Optional bounds provider (world coordinates); null for 3D components. */
   bounds?: () => Bounds | null
+
+  // -- 几何提交（转发到 batch） ---------------------------------------------
+
+  /** batchKey 仅为兼容保留（调试标记），batch 层忽略它。 */
+  addShape(
+    batchKey: string,
+    vertices: Float32Array,
+    color: { r: number; g: number; b: number; a: number },
+    transform: Mat4x4f | Float32Array | number[] | TransformInput,
+    uv?: Float32Array,
+    texture?: TextureHandle | null,
+    vertexColors?: Float32Array,
+    depthWrite?: boolean,
+    normals?: Float32Array,
+    layer?: number,
+    skipTonemap?: boolean,
+    premultiplied?: boolean,
+    blendMode?: BlendMode,
+    indices?: Uint16Array | number[],
+    translationOnly?: boolean,
+    packedColor?: Uint8Array | { r: number; g: number; b: number; a: number },
+  ): void
+  beginMesh(vertexCount: number, indexCount: number): MeshSpan | null
+  endMesh(
+    span: { vBase: number; iBase: number },
+    vertexCount: number,
+    indexCount: number,
+    texture?: TextureHandle | null,
+    blendMode?: BlendMode,
+    premultiplied?: boolean,
+    skipTonemap?: boolean,
+  ): void
+  createTexture(source: BitmapSource, options?: TextureOptions): TextureHandle
+  deleteTexture(texture: TextureHandle): void
+
+  // -- 场景状态（转发到所属后端） -------------------------------------------
+
+  getCurrentTransform(): TransformState
+  pushTransform(transform: Partial<TransformState>): void
+  popTransform(): void
+  getViewMatrix(): Mat4x4f
+  readonly camera?: { x?: number; y?: number; zoom?: number }
+  addPointerHandler(handler: GlPointerHandler): () => void
+
+  /** 标脏触发重绘（deps 订阅与结构性变化都走这里）。 */
+  markDirty(): void
+
   /** 绘制：叶子只画自身；容器在 push 自身变换后调用 drawChildren() 再 pop */
   draw(): void
   /** 从树上摘除并停止自身的响应式订阅 */
   remove(): void
 }
 
-export interface GlNodeOptions {
+export interface GfxNodeOptions {
   /**
    * 绘制自身。容器组件在需要绘制子树的位置调用 `drawChildren()`
    * （典型形态：pushTransform → drawChildren() → popTransform），
@@ -85,33 +144,61 @@ export interface GlNodeOptions {
   deps?: () => unknown[]
 }
 
-function ensureRenderContext(ctx: GlContext, rcOptions?: import('./render-context').RenderContextOptions): RenderContext {
-  if (!hasRenderContext(ctx)) {
-    return new RenderContext(ctx, rcOptions)
+/** addShape 的对象形式 → 矩阵（Mat4x4f 直传零开销）。 */
+function toMatrix(transform: Mat4x4f | Float32Array | number[] | TransformInput): Mat4x4f {
+  if (transform instanceof Mat4x4f) return transform
+  if (transform instanceof Float32Array || Array.isArray(transform)) {
+    return Mat4x4f.fromArray(transform)
   }
-  return getRenderContext(ctx)
+  return Mat4x4f.identity()
+    .multiply(Mat4x4f.translate(transform.tx, transform.ty, transform.tz ?? 0))
+    .multiply(Mat4x4f.rotateX(transform.rotationX ?? 0))
+    .multiply(Mat4x4f.rotateY(transform.rotationY ?? 0))
+    .multiply(Mat4x4f.rotateZ(transform.rotationZ ?? 0))
+    .multiply(Mat4x4f.scale(transform.scaleX ?? 1, transform.scaleY ?? 1, transform.scaleZ ?? 1))
 }
 
 /**
  * 共享的节点构造：挂到 parent 下（parent 为 null 时注册为渲染根）。
+ * 节点方法全部是对所属 Renderer 的转发——组件只见 GfxNode。
  */
 function attachNode(
-  rc: RenderContext,
-  ctx: GlContext,
-  rcOptions: import('./render-context').RenderContextOptions | undefined,
-  parent: GlNode | null,
-  opts?: GlNodeOptions
-): GlNode {
-  const children: GlNode[] = []
+  renderer: Renderer,
+  ctx: unknown,
+  rcOptions: Record<string, unknown> | undefined,
+  parent: GfxNode | null,
+  opts?: GfxNodeOptions
+): GfxNode {
+  const children: GfxNode[] = []
   // 根节点自身无绘制逻辑 —— 纯容器，直接递归子树
   const drawSelf = opts?.draw ?? ((drawChildren: () => void) => drawChildren())
 
-  const node: GlNode = {
+  const node: GfxNode = {
     ctx,
     rcOptions,
+    renderer,
     parent,
     children,
     bounds: opts?.bounds ?? undefined,
+
+    addShape: (batchKey, vertices, color, transform, uv, texture, vertexColors, depthWrite, normals, layer, skipTonemap, premultiplied, blendMode, indices, translationOnly, packedColor) => {
+      void batchKey
+      renderer.addShape(vertices, color, toMatrix(transform), uv, texture, vertexColors, depthWrite, normals, layer, skipTonemap, premultiplied, blendMode, indices, translationOnly, packedColor)
+    },
+    beginMesh: (vertexCount, indexCount) => renderer.beginMesh(vertexCount, indexCount),
+    endMesh: (span, vertexCount, indexCount, texture, blendMode, premultiplied, skipTonemap) =>
+      renderer.endMesh(span, vertexCount, indexCount, texture, blendMode, premultiplied, skipTonemap),
+    createTexture: (source, options) => renderer.createTexture(source, options),
+    deleteTexture: (texture) => renderer.deleteTexture(texture),
+
+    getCurrentTransform: () => renderer.getCurrentTransform(),
+    pushTransform: (transform) => renderer.pushTransform(transform),
+    popTransform: () => renderer.popTransform(),
+    getViewMatrix: () => renderer.getViewMatrix(),
+    camera: renderer.camera,
+    addPointerHandler: (handler) => renderer.addPointerHandler(handler),
+    markDirty: () => renderer.markDirty(),
+
     draw() {
       // Container semantics: drawSelf decides WHERE the subtree renders
       // (between its own transform push/pop). Leaves simply ignore it.
@@ -125,32 +212,32 @@ function attachNode(
         const i = parent.children.indexOf(node)
         if (i >= 0) parent.children.splice(i, 1)
       } else {
-        rc.removeRoot(node)
+        renderer.removeRoot(node)
       }
-      rc.markDirty()
-    }
+      renderer.markDirty()
+    },
   }
 
   if (parent) {
     parent.children.push(node)
     // 结构变化即标脏：向已有子树追加节点必须触发重绘
     // （根路径的 addRoot 内部已 markDirty）
-    rc.markDirty()
+    renderer.markDirty()
   } else {
-    rc.addRoot(node)
+    renderer.addRoot(node)
   }
 
   // 依赖 → 标脏（全量重绘；GL 场景本就无 2D bounds 可言）
   let stop: (() => void) | undefined
   if (opts?.deps) {
-    stop = getReactiveRuntime().subscribe(opts.deps, () => rc.markDirty())
+    stop = getReactiveRuntime().subscribe(opts.deps, () => renderer.markDirty())
   }
 
   return node
 }
 
 /**
- * 创建渲染根 —— 官方的「从裸 ctx 得到根节点」入口。
+ * 创建渲染根 —— 官方的「从裸 ctx 得到根节点」入口（WebGL）。
  *
  * dom <canvas> 桥与测试都经此把一个原始渲染上下文物化成真实的
  * 场景树根；组件一律通过 createNode 挂在这棵树下。
@@ -160,12 +247,28 @@ function attachNode(
  */
 export function createRoot(
   ctx: GlContext,
-  options?: import('./render-context').RenderContextOptions
-): GlNode & { requestRedraw(): void } {
-  const rc = ensureRenderContext(ctx, options)
-  const root = attachNode(rc, ctx, options, null)
+  options?: import('./renderer/gl/index').RenderContextOptions
+): GfxNode & { requestRedraw(): void } {
+  // One renderer per GL context (the registry dedupes): repeated createRoot
+  // calls add roots to the SAME engine — a scene may be assembled across
+  // multiple createRoot call sites.
+  const has = hasRenderContext(ctx)
+  const renderer = has ? getRenderContext(ctx) : new WebGLRenderer(ctx, options ?? {})
+  return createRootNode(renderer, ctx, options)
+}
+
+/**
+ * 创建一棵以「拥有 renderer 的根节点」为顶的场景树（任意后端）。
+ * dom <canvas> 桥在 WebGPU 路径用它包装 WebGPURenderer。
+ */
+export function createRootNode(
+  renderer: Renderer,
+  ctx: unknown,
+  rcOptions?: Record<string, unknown>
+): GfxNode & { requestRedraw(): void } {
+  const root = attachNode(renderer, ctx, rcOptions, null)
   return Object.assign(root, {
-    requestRedraw: () => rc.requestRedraw()
+    requestRedraw: () => renderer.requestRedraw(),
   })
 }
 
@@ -173,14 +276,18 @@ export function createRoot(
  * 创建场景节点并挂到 parent 下（纯树操作）。
  *
  * @param parent 接收到的挂载宿主——group 节点则成为其子节点；
- *               顶层组件的宿主是 createRoot 物化的渲染根。
+ *               顶层组件的宿主是渲染根（createRoot 物化的 GL 根，
+ *               或 WebGPURoot 自身）。
  */
-export function createNode(parent: GlNode, opts: GlNodeOptions): GlNode {
-  const rc = ensureRenderContext(parent.ctx, parent.rcOptions)
-  return attachNode(rc, parent.ctx, parent.rcOptions, parent, opts)
+export function createNode(parent: GfxNode, opts: GfxNodeOptions): GfxNode {
+  return attachNode(parent.renderer, parent.ctx, parent.rcOptions, parent, opts)
 }
 
 /**
- * WebGL 组件造型：业务 props 入参，返回以 GlNode 为节点的 Mountable
+ * 组件造型：业务 props 入参，返回以 GfxNode 为节点的 Mountable
  */
-export type Component3D<P> = (props: P) => import('@rasenjs/core').Mountable<GlNode>
+export type Component3D<P> = (props: P) => import('@rasenjs/core').Mountable<GfxNode>
+
+/** 兼容别名：旧名 GlNode / GlNodeOptions 指向同一抽象。 */
+export type GlNode = GfxNode
+export type GlNodeOptions = GfxNodeOptions

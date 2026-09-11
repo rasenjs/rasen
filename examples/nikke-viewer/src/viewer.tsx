@@ -36,7 +36,7 @@ import {
   type SkeletonData,
   type SpineAtlas
 } from '@rasenjs/assets'
-import { spine as SpineWebgl } from '@rasenjs/gfx'
+import { spine as SpineWebgl, getWebGPURenderer } from '@rasenjs/gfx'
 import { spine as SpineCanvas } from '@rasenjs/canvas-2d'
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,24 @@ const panX = ref(0)
 const panY = ref(0)
 const zoom = ref(1)
 const showBones = ref(false)
-const renderMode = ref<'webgl' | 'canvas'>('canvas')
+const renderMode = ref<'webgl' | 'webgpu' | 'canvas'>('canvas')
+
+// WebGPU device (requested lazily on first switch to the webgpu renderer;
+// the canvas bridge mounts synchronously, so the device must exist by then).
+const webgpuDevice = ref<GPUDevice | null>(null)
+async function ensureWebgpuDevice(): Promise<boolean> {
+  if (webgpuDevice.value) return true
+  const gpu = (navigator as Navigator & { gpu?: GPU }).gpu
+  if (!gpu) return false
+  try {
+    const adapter = await gpu.requestAdapter()
+    if (!adapter) return false
+    webgpuDevice.value = await adapter.requestDevice()
+    return true
+  } catch {
+    return false
+  }
+}
 const showTechInfo = ref(false)
 
 // ---------------------------------------------------------------------------
@@ -141,6 +158,26 @@ watch([bg, renderMode, showBones], () => {
     /* persistence is best-effort (private mode / quota) */
   }
 })
+
+// Renderer mode switch: the canvas remounts and a pending async WebGPU pixel
+// fit (if any) belongs to the OLD mode's frame — invalidate it so it cannot
+// clobber the new mode's camera with stale content bounds.
+watch(renderMode, () => {
+  fitGeneration++
+})
+
+// A restored webgpu renderMode mounts the webgpu canvas immediately — but the
+// device request is async and the canvas bridge mount is sync. Request the
+// device up front and gate the canvas on its presence (see the webgpu branch
+// in the stage JSX); the canvas simply renders once the device resolves.
+if (renderMode.value === 'webgpu') {
+  void ensureWebgpuDevice().then((ok) => {
+    if (!ok) {
+      renderMode.value = 'webgl'
+      status.value = 'WebGPU is not available in this browser — switched to WebGL'
+    }
+  })
+}
 
 // ---------------------------------------------------------------------------
 // Router — character / pose / animation selection is URL-driven so any view
@@ -213,11 +250,12 @@ const state = ref<AnimationState | null>(null)
  */
 /**
  * Measure the rendered content bbox from canvas pixels and re-fit ONCE.
- * Returns true when the fit was applied, false when there was nothing to
- * measure yet (the first draw may land a frame or two later on slow devices
- * — the caller retries) or when the readback failed (tainted canvas, lost
- * context). Works for every model type: pixels reflect meshes that extend
- * beyond bones, scene backgrounds, and camera-style animations alike.
+ * Returns true when the fit was applied (or scheduled, for the async WebGPU
+ * readback), false when there was nothing to measure yet (the first draw may
+ * land a frame or two later on slow devices — the caller retries) or when
+ * the readback failed (tainted canvas, lost context). Works for every model
+ * type: pixels reflect meshes that extend beyond bones, scene backgrounds,
+ * and camera-style animations alike.
  */
 function refineFitFromPixels(): boolean {
   const cv = getCanvas()
@@ -228,8 +266,44 @@ function refineFitFromPixels(): boolean {
   const BH = cv.height
   let minX = BW, minY = BH, maxX = -1, maxY = -1
 
-  if (renderMode.value === 'webgl') {
-    const gl = cv.getContext('webgl') as WebGLRenderingContext | null
+  if (renderMode.value === 'webgpu') {
+    // WebGPU canvas pixels are unreadable from the main thread after
+    // presentation — but the renderer's flushAndRead re-runs the FULL frame
+    // inside a readback command buffer, giving the same ground-truth pixels
+    // the GL path measures. (A previous fallback here faked the whole canvas
+    // as the content bbox, which clobbered the deterministic bone fit —
+    // after a mode/model switch the camera disagreed with the other modes.)
+    const renderer = getWebGPURenderer(cv)
+    if (!renderer || BW === 0 || BH === 0) return false
+    const dpr0 = dpr
+    const gen = fitGeneration
+    void renderer
+      .flushAndRead()
+      .then((px: Uint8ClampedArray) => {
+        if (gen !== fitGeneration || renderMode.value !== 'webgpu') return
+        let mnX = BW, mnY = BH, mxX = -1, mxY = -1
+        for (let y = 0; y < BH; y += 2) {
+          for (let x = 0; x < BW; x += 2) {
+            const i = (y * BW + x) * 4
+            if (px[i + 3] > 10) {
+              if (x < mnX) mnX = x
+              if (x > mxX) mxX = x
+              if (y < mnY) mnY = y
+              if (y > mxY) mxY = y
+            }
+          }
+        }
+        if (mxX < 0) return
+        applyPixelFit(mnX, mnY, mxX, mxY, dpr0)
+      })
+      .catch(() => {
+        /* readback failed — keep the deterministic bone fit */
+      })
+    return true
+  } else if (renderMode.value === 'webgl') {
+    // The bridge mounts WebGL2-first; getContext('webgl') on a webgl2 canvas
+    // returns null, so query webgl2 first (same policy as the bridge).
+    const gl = (cv.getContext('webgl2') ?? cv.getContext('webgl')) as WebGLRenderingContext | null
     if (!gl) return false
     const px = new Uint8Array(BW * BH * 4)
     gl.readPixels(0, 0, BW, BH, gl.RGBA, gl.UNSIGNED_BYTE, px)
@@ -272,14 +346,27 @@ function refineFitFromPixels(): boolean {
     }
   }
   if (maxX < 0) return false
+  applyPixelFit(minX, minY, maxX, maxY, dpr)
+  return true
+}
 
+/**
+ * Convert a measured content bbox (canvas physical px) into a fitBounds
+ * update. Shared by the synchronous readbacks (WebGL / Canvas 2D) and the
+ * async WebGPU readback, so every mode fits from the same ground truth and
+ * the camera stays consistent across renderer switches.
+ */
+function applyPixelFit(
+  minX: number, minY: number, maxX: number, maxY: number,
+  dpr: number
+): void {
   // Pixel bbox (physical) → logical px → world coords via the current fit.
   const lx0 = minX / dpr
   const lx1 = maxX / dpr
   const ly0 = minY / dpr
   const ly1 = maxY / dpr
   let wx0: number, wx1: number, wy0: number, wy1: number
-  if (renderMode.value === 'webgl') {
+  if (renderMode.value !== 'canvas') {
     const cam = camera.value
     wx0 = cam.x + (lx0 - stageW.value / 2) / cam.zoom
     wx1 = cam.x + (lx1 - stageW.value / 2) / cam.zoom
@@ -299,8 +386,9 @@ function refineFitFromPixels(): boolean {
     w: Math.max(1e-6, (wx1 - wx0) * pad),
     h: Math.max(1e-6, (wy1 - wy0) * pad)
   }
+  fitStats.pixelFits++
+  fitStats.lastPixelFit = `bboxPx=(${minX},${minY},${maxX},${maxY}) dpr=${dpr} cam=${JSON.stringify(camera.value)} mode=${renderMode.value}`
   // updateCamera re-runs via the fitBounds watcher.
-  return true
 }
 
 function updateCamera(): void {
@@ -346,12 +434,25 @@ const stageRef = ref<HTMLElement | null>(null)
 // of re-measuring, so the framing never visibly shifts or wobbles.
 const fitBounds = ref<{ cx: number; cy: number; w: number; h: number } | null>(null)
 
+/**
+ * Fit generation: bumped whenever the fit's subject changes (model/animation
+ * load, renderer mode switch). The WebGPU pixel fit resolves ASYNC (readback
+ * command buffer); the generation guard makes a stale resolution — one that
+ * started before a model/mode switch — a no-op instead of clobbering the new
+ * subject's fit with the old frame's content box.
+ */
+let fitGeneration = 0
+/** Diagnostics: how many times each fit path applied, and the last outcome. */
+const fitStats = { pixelFits: 0, lastPixelFit: '' as string }
+
 // One-shot pixel fit: after the model's first frame is actually drawn,
 // measure the rendered content bbox from canvas pixels and re-fit once.
 // Pixels are ground truth — they are immune to garbage skel headers, bone
 // endpoints not bounding meshes, and camera-style animations that travel.
 let pendingPixelFit = false
 let framesSinceFitRequest = 0
+/** Completed pixel-fit rounds for the current fit cycle (converges in ≤3). */
+let pixelFitRounds = 0
 
 /**
  * Measure the bone bbox UNION over the whole animation loop, by sampling the
@@ -645,9 +746,11 @@ async function loadCharacter(char: string, pose: PoseKind = 'fb'): Promise<boole
       currentAnim.value = names[0]
       // Capture a rough fit from the animation timeline (see above), then
       // refine it from the actual first painted frame (pixel fit).
+      fitGeneration++
       captureFitBounds()
       pendingPixelFit = true
       framesSinceFitRequest = 0
+      pixelFitRounds = 0
     } else {
       currentAnim.value = ''
     }
@@ -714,9 +817,11 @@ async function applySelection(match: { params: Record<string, unknown> } | null)
       state.value.setAnimation(anim, true)
       currentAnim.value = anim
       // Re-frame once for the new animation's full loop, then pixel-refine.
+      fitGeneration++
       captureFitBounds()
       pendingPixelFit = true
       framesSinceFitRequest = 0
+      pixelFitRounds = 0
     }
     // Unknown anim in the URL (e.g. stale link): keep the default animation.
   }
@@ -744,6 +849,18 @@ const mobilePanelOpen = ref(false)
 const activePointers = new Map<number, { x: number; y: number }>()
 let pinchStartDist = 0
 let pinchStartZoom = 1
+
+/**
+ * Pointer events arrive at device rate (often 120Hz+ on trackpads/touch),
+ * each one previously writing panX/panY (or zoom) directly — every write ran
+ * the full reactive chain (RefImpl set → updateCamera → camera.value set →
+ * bridge camera watch → projection recompute). During a drag that chain ran
+ * MULTIPLE times per rendered frame (the drag trace shows ~28% of JS time in
+ * ref get/set). Now the event handlers only ACCUMULATE deltas; the rAF tick
+ * applies them once per rendered frame.
+ */
+const pendingPan = { x: 0, y: 0 }
+let pendingZoom: number | null = null
 
 function hideImgOnError(e: Event): void {
   ;(e.target as HTMLElement).style.display = 'none'
@@ -996,13 +1113,15 @@ const Stage = com(() => (
         const [a, b] = [...activePointers.values()]
         const dist = Math.hypot(a.x - b.x, a.y - b.y)
         if (pinchStartDist > 0) {
-          zoom.value = Math.min(5, Math.max(0.3, pinchStartZoom * (dist / pinchStartDist)))
+          // Coalesce: store the target zoom; the tick applies it.
+          pendingZoom = Math.min(5, Math.max(0.3, pinchStartZoom * (dist / pinchStartDist)))
         }
         return
       }
       if (!dragging) return
-      panX.value = panX.value + (e.clientX - lastX) / scale
-      panY.value = panY.value + (e.clientY - lastY) / scale
+      // Coalesce: accumulate deltas; the tick applies them once per frame.
+      pendingPan.x += (e.clientX - lastX) / scale
+      pendingPan.y += (e.clientY - lastY) / scale
       lastX = e.clientX
       lastY = e.clientY
     }}
@@ -1031,13 +1150,48 @@ const Stage = com(() => (
     }}
     onWheel={(e: WheelEvent) => {
       e.preventDefault()
-      const next = Math.min(5, Math.max(0.3, zoom.value * (1 - e.deltaY * 0.001)))
-      zoom.value = next
+      // Coalesced like pointer drags: the tick applies the latest zoom once
+      // per frame (wheel events also arrive faster than the display).
+      pendingZoom = Math.min(5, Math.max(0.3, zoom.value * (1 - e.deltaY * 0.001)))
     }}
   >
     {when({
-      condition: () => renderMode.value === 'webgl',
+      condition: () => renderMode.value === 'webgpu' && !!webgpuDevice.value,
       then: () => (
+        <canvas
+          style={{
+            width: '100%',
+            height: '100%',
+            'object-fit': 'contain',
+            'touch-action': 'none',
+            'user-select': 'none',
+          }}
+          width={stageW}
+          height={stageH}
+          contextType="webgpu"
+          webgpuDevice={webgpuDevice.value ?? undefined}
+          renderOptions={{ clearColor: 'rgba(0,0,0,0)', continuousRender: true } as never}
+          camera={camera}
+        >
+          <SpineWebgl
+            skeleton={skeleton}
+            atlas={atlas}
+            atlasImg={atlasImg}
+            atlasImgs={atlasImgs}
+            state={state}
+            animation={currentAnim}
+            showBones={showBones}
+            frame={frame}
+            width={stageW}
+            height={stageH}
+            skipTonemap={true}
+          />
+        </canvas>
+      ),
+      else: () =>
+        when({
+          condition: () => renderMode.value === 'webgl',
+          then: () => (
         <canvas
           style={{
             width: '100%',
@@ -1067,8 +1221,8 @@ const Stage = com(() => (
             skipTonemap={true}
           />
         </canvas>
-      ),
-      else: () => (
+          ),
+          else: () => (
         <canvas
           style={{
             width: '100%',
@@ -1098,7 +1252,8 @@ const Stage = com(() => (
             bg={bg}
           />
         </canvas>
-      )
+          )
+        })
     })}
     {when({
       condition: () => !loaded.value,
@@ -1244,6 +1399,17 @@ const ControlPanel = com(() => (
           class={() => 'flex-1 px-3 py-1.5 text-xs transition ' + (renderMode.value === 'webgl' ? 'bg-brand-600 text-white' : 'bg-white/5 text-neutral-400 hover:bg-white/10')}
           onClick={() => (renderMode.value = 'webgl')}
         >WebGL</button>
+        <button
+          class={() => 'flex-1 px-3 py-1.5 text-xs transition ' + (renderMode.value === 'webgpu' ? 'bg-brand-600 text-white' : 'bg-white/5 text-neutral-400 hover:bg-white/10')}
+          onClick={async () => {
+            const ok = await ensureWebgpuDevice()
+            if (!ok) {
+              status.value = 'WebGPU is not available in this browser'
+              return
+            }
+            renderMode.value = 'webgpu'
+          }}
+        >WebGPU</button>
         <button
           class={() => 'flex-1 px-3 py-1.5 text-xs transition ' + (renderMode.value === 'canvas' ? 'bg-brand-600 text-white' : 'bg-white/5 text-neutral-400 hover:bg-white/10')}
           onClick={() => (renderMode.value = 'canvas')}
@@ -1578,6 +1744,24 @@ function findDefaultChar(): string {
   return (list.find((e) => /^c\d+$/.test(e.id)) ?? list[0])?.id ?? ''
 }
 
+// Debug/inspection hook (harmless in production): lets tooling read the
+// camera-fit state to verify cross-renderer consistency.
+;(window as unknown as { __nikkeFitState?: () => unknown }).__nikkeFitState = () => ({
+  renderMode: renderMode.value,
+  camera: camera.value,
+  fitBounds: fitBounds.value,
+  zoomUser: zoom.value,
+  panX: panX.value,
+  panY: panY.value,
+  stageW: stageW.value,
+  stageH: stageH.value,
+  fitScale: fitScale.value,
+  pendingPixelFit,
+  fitStats,
+  atlasReady: !!(atlasImg.value || atlasImgs.value),
+  skeletonReady: !!skeleton.value
+})
+
 void boot()
 
 let lastTime = performance.now()
@@ -1588,21 +1772,45 @@ function tick(now: number): void {
     state.value.update(dt)
     state.value.apply()
   }
-  if (pendingPixelFit && ++framesSinceFitRequest >= 2) {
-    // Wait 2 frames so the first real draw with the new skeleton happened,
-    // then measure. On slow devices the first draw can land later (texture
-    // upload jank, rAF throttling) or the readback can fail (tainted canvas,
-    // lost context) — retry until pixels are actually measurable, bounded to
-    // ~1.5s so a genuinely empty model cannot loop forever.
+  // Apply coalesced drag/pinch/wheel deltas ONCE per rendered frame (each
+  // individual event write previously ran the whole reactive camera chain).
+  if (pendingPan.x !== 0 || pendingPan.y !== 0) {
+    panX.value += pendingPan.x
+    panY.value += pendingPan.y
+    pendingPan.x = 0
+    pendingPan.y = 0
+  }
+  if (pendingZoom !== null) {
+    zoom.value = pendingZoom
+    pendingZoom = null
+  }
+  if (pendingPixelFit && (atlasImg.value || atlasImgs.value) && ++framesSinceFitRequest >= 6) {
+    // Wait 6 frames AFTER the atlas is ready (the first real draw needs the
+    // atlas — assets stream from the network and can land many seconds after
+    // the model load that armed this fit), then measure. The fit is
+    // ITERATIVE: each round maps the measured pixel bbox back to world
+    // through the CURRENT camera, so when the deterministic bone-union box
+    // is garbage (camera-style bones far off screen, c810), one round
+    // cannot converge — re-measure a few rounds until fitBounds stabilises
+    // or the round budget runs out (rounds, not raw frames, so the readback
+    // cost stays bounded).
     let applied = false
     try {
       applied = refineFitFromPixels()
     } catch {
       applied = false
     }
-    if (applied || framesSinceFitRequest >= 90) {
+    if (applied) {
+      pixelFitRounds++
+      framesSinceFitRequest = -10 // next round in 16 frames
+      if (pixelFitRounds >= 3) {
+        pendingPixelFit = false
+        framesSinceFitRequest = 0
+      }
+    } else if (framesSinceFitRequest >= 90) {
       pendingPixelFit = false
       framesSinceFitRequest = 0
+      pixelFitRounds = 0
     }
   }
   frame.value = frame.value + 1

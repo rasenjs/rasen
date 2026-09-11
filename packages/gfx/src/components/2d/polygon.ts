@@ -3,10 +3,10 @@
  * Supports both regular polygons (sides + radius) and custom polygons (points array)
  */
 
-import type { Component3D, GlContext } from '../../node'
+import type { Component3D } from '../../node'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds, Point } from '../../types'
 import { unref, parseColor } from '../../utils'
-import { getRenderContext } from '../../render-context'
+import type { GfxNode } from '../../node'
 import { element } from '../element'
 
 export interface PolygonProps extends CommonDrawProps, Transform2DProps {
@@ -130,7 +130,7 @@ export const polygon: Component3D<PolygonProps> = (props: PolygonProps) => {
       }
     },
 
-    draw: (gl: GlContext) => {
+    draw: (node: GfxNode) => {
       const x = unref(props.x) ?? 0
       const y = unref(props.y) ?? 0
       const z = unref(props.z) ?? 0
@@ -146,8 +146,6 @@ export const polygon: Component3D<PolygonProps> = (props: PolygonProps) => {
       const rotation = unref(props.rotation) ?? 0
       const scaleX = unref(props.scaleX) ?? 1
       const scaleY = unref(props.scaleY) ?? 1
-
-      const renderContext = getRenderContext(gl)
 
       if (fill) {
         const { points, centerX, centerY } = calculatePoints(x, y, sides, radius, customPoints)
@@ -177,7 +175,7 @@ export const polygon: Component3D<PolygonProps> = (props: PolygonProps) => {
         if (cachedGeometry) {
           const color = parseColor(fill)
           
-          const transform = renderContext.getCurrentTransform()
+          const transform = node.getCurrentTransform()
           
           const finalOpacity = opacity * transform.opacity
           color.a *= finalOpacity
@@ -202,7 +200,7 @@ export const polygon: Component3D<PolygonProps> = (props: PolygonProps) => {
             scaleZ: transform.scaleZ
           }
           
-          renderContext.addShape(
+          node.addShape(
             `polygon-${points.length}`,
             cachedGeometry,
             color,

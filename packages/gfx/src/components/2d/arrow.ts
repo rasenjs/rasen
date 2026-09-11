@@ -2,10 +2,10 @@
  * Arrow component
  */
 
-import type { Component3D, GlContext } from '../../node'
+import type { Component3D } from '../../node'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
-import { getRenderContext } from '../../render-context'
+import type { GfxNode } from '../../node'
 import { element } from '../element'
 
 export interface ArrowProps extends CommonDrawProps, Transform2DProps {
@@ -95,7 +95,7 @@ export const arrow: Component3D<ArrowProps> = (props: ArrowProps) => {
       }
     },
 
-    draw: (gl: GlContext) => {
+    draw: (node: GfxNode) => {
       const x1 = unref(props.x1)
       const y1 = unref(props.y1)
       const z = unref(props.z) ?? 0
@@ -108,8 +108,6 @@ export const arrow: Component3D<ArrowProps> = (props: ArrowProps) => {
       const opacity = unref(props.opacity) ?? 1
 
       if (!visible || opacity <= 0 || !fill) return
-
-      const renderContext = getRenderContext(gl)
 
       const dx = x2 - x1
       const dy = y2 - y1
@@ -128,7 +126,7 @@ export const arrow: Component3D<ArrowProps> = (props: ArrowProps) => {
       
       const color = parseColor(fill)
       
-      const groupTransform = renderContext.getCurrentTransform()
+      const groupTransform = node.getCurrentTransform()
       
       const finalOpacity = opacity * groupTransform.opacity
       color.a *= finalOpacity
@@ -150,7 +148,7 @@ export const arrow: Component3D<ArrowProps> = (props: ArrowProps) => {
         scaleZ: groupTransform.scaleZ
       }
       
-      renderContext.addShape(
+      node.addShape(
         `arrow-${lineWidth}-${arrowSize}`,
         cachedGeometry,
         color,

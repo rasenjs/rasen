@@ -2,10 +2,10 @@
  * Line component (2D/3D unified)
  */
 
-import type { Component3D, GlContext } from '../../node'
+import type { Component3D } from '../../node'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
-import { getRenderContext } from '../../render-context'
+import type { GfxNode } from '../../node'
 import { element } from '../element'
 
 /**
@@ -80,7 +80,7 @@ export const line: Component3D<LineProps> = (props: LineProps) => {
       }
     },
 
-    draw: (gl: GlContext) => {
+    draw: (node: GfxNode) => {
       const x1 = unref(props.x1)
       const y1 = unref(props.y1)
       const z = unref(props.z) ?? 0
@@ -96,8 +96,6 @@ export const line: Component3D<LineProps> = (props: LineProps) => {
       const scaleY = unref(props.scaleY) ?? 1
 
       if (!visible || opacity <= 0 || !stroke) return
-
-      const renderContext = getRenderContext(gl)
 
       if (!cachedGeometry || 
           cachedX1 !== x1 ||
@@ -115,7 +113,7 @@ export const line: Component3D<LineProps> = (props: LineProps) => {
       
       const color = parseColor(stroke)
       
-      const transform = renderContext.getCurrentTransform()
+      const transform = node.getCurrentTransform()
       
       const finalOpacity = opacity * transform.opacity
       color.a *= finalOpacity
@@ -137,7 +135,7 @@ export const line: Component3D<LineProps> = (props: LineProps) => {
         scaleZ: transform.scaleZ
       }
 
-      renderContext.addShape(
+      node.addShape(
         `line-${lineWidth}`,
         cachedGeometry,
         color,

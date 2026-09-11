@@ -11,10 +11,9 @@
  * submitted straight to the BatchRenderer.
  */
 
-import type { Component3D } from '../../../node'
+import type { Component3D, GfxNode } from '../../../node'
 import type { MaybeRef, CommonDrawProps } from '../../../types'
-import { unref, createTexture, type BitmapSource } from '../../../utils'
-import { getRenderContext } from '../../../render-context'
+import { unref, type BitmapSource } from '../../../utils'
 import { element } from '../../element'
 
 export interface BillboardProps extends CommonDrawProps {
@@ -59,7 +58,7 @@ export const billboard: Component3D<BillboardProps> = (props: BillboardProps) =>
   return element({
     getBounds: () => null, // 3D — full redraw
 
-    draw: (gl) => {
+    draw: (node: GfxNode) => {
       const width = unref(props.width)
       const height = unref(props.height)
       const textureSource = unref(props.texture)
@@ -73,11 +72,7 @@ export const billboard: Component3D<BillboardProps> = (props: BillboardProps) =>
 
       if (!visible || opacity <= 0 || !textureSource) return
 
-      const renderContext = getRenderContext(gl)
-      const batch = renderContext.getBatchRenderer()
-      if (!batch) return
-
-      const transform = renderContext.getCurrentTransform()
+      const transform = node.getCurrentTransform()
       const color = { r: 1, g: 1, b: 1, a: opacity * transform.opacity }
 
       if (!cachedVerts || cachedW !== width || cachedH !== height || cachedFlip !== scaleX) {
@@ -92,9 +87,9 @@ export const billboard: Component3D<BillboardProps> = (props: BillboardProps) =>
         cachedFlip = scaleX
       }
 
-      const texture = createTexture(gl, textureSource)
+      const texture = node.createTexture(textureSource)
 
-      const view = renderContext.getViewMatrix().source
+      const view = node.getViewMatrix().source
 
       // Billboard transform: camera rotation (from the view matrix) + translate.
       // The quad's +Z normal is therefore pointed at the camera.
@@ -128,7 +123,7 @@ export const billboard: Component3D<BillboardProps> = (props: BillboardProps) =>
         ]
       }
 
-      batch.addShape(cachedVerts, color, mat, QUAD_UV, texture)
+      node.addShape('billboard', cachedVerts, color, mat, QUAD_UV, texture)
     },
 
     deps: () => [

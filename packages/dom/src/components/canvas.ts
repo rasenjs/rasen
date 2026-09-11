@@ -4,21 +4,22 @@ import type {
   CanvasNode,
   RenderContextOptions as Canvas2DRenderOptions
 } from '@rasenjs/canvas-2d'
-import type { GlNode, GlContext, CameraConfig } from '@rasenjs/gfx'
+import type { GfxNode, GlContext, CameraConfig } from '@rasenjs/gfx'
 import { createRoot as createCanvas2DRoot } from '@rasenjs/canvas-2d'
-import { createRoot as createGlRoot, getRenderContext } from '@rasenjs/gfx'
+import { createRoot as createGlRoot, createRootNode, getRenderContext, WebGPURenderer, type WebGPURendererOptions, type WebGLRenderer as RenderContextType } from '@rasenjs/gfx'
 
 /**
  * contextType → 渲染器节点与配置的类型映射。
  *
  * 仅类型层引用（运行时直接调用各渲染器包导出的 createRoot），
- * 用户写 `contextType: 'webgl'` 即自动获得 `Mountable<GlNode>` 的
+ * 用户写 `contextType: 'webgl'` 即自动获得 `Mountable<GfxNode>` 的
  * children 约束与强类型的 renderOptions —— 无字符串口袋、无 cast。
  */
 interface HostTypes {
   '2d': { node: CanvasNode; rc: Canvas2DRenderOptions }
-  webgl: { node: GlNode; rc: import('@rasenjs/gfx').RenderContextOptions }
-  webgl2: { node: GlNode; rc: import('@rasenjs/gfx').RenderContextOptions }
+  webgl: { node: GfxNode; rc: import('@rasenjs/gfx').RenderContextOptions }
+  webgl2: { node: GfxNode; rc: import('@rasenjs/gfx').RenderContextOptions }
+  webgpu: { node: GfxNode; rc: import('@rasenjs/gfx').WebGPURendererOptions }
 }
 
 export interface CanvasProps<T extends keyof HostTypes = '2d'> {
@@ -28,6 +29,15 @@ export interface CanvasProps<T extends keyof HostTypes = '2d'> {
   contextType?: T
   /** WebGL 上下文属性（preserveDrawingBuffer 等）；'2d' 不接受 */
   contextOptions?: T extends '2d' ? never : WebGLContextAttributes
+  /**
+   * WebGPU only: the device, created by the caller via
+   * `navigator.gpu.requestAdapter().requestDevice()`.
+   *
+   * Mounting is synchronous while requestDevice is async, so the device cannot
+   * be created inside the bridge — the caller must have it ready before this
+   * canvas mounts (await it in a ref, then render the canvas conditionally).
+   */
+  webgpuDevice?: T extends 'webgpu' ? GPUDevice : never
   /** 渲染器配置（clearColor/continuousRender 等），强类型，直通 createRoot */
   renderOptions?: HostTypes[T]['rc']
   /**
@@ -63,7 +73,7 @@ export interface CanvasProps<T extends keyof HostTypes = '2d'> {
  * // 2D（缺省）
  * canvas({ width: 400, height: 400, children: [rect({ ... })] })
  *
- * // WebGL —— children 自动收窄为 Mountable<GlNode>[]
+ * // WebGL —— children 自动收窄为 Mountable<GfxNode>[]
  * canvas({
  *   width: 800,
  *   height: 600,
@@ -117,8 +127,23 @@ export function canvas<T extends keyof HostTypes = '2d'>(
 
     // 获取渲染上下文（原生获取内联；不对外暴露 getter）
     const contextType = props.contextType ?? ('2d' as T)
+    // WebGPU: the device must be provided by the caller (requestDevice is async,
+    // mounting is sync). The webgpu canvas context itself is acquired inline.
+    const webgpuDevice =
+      contextType === 'webgpu'
+        ? (props as { webgpuDevice?: GPUDevice }).webgpuDevice
+        : undefined
     let ctx: unknown
-    if (contextType === '2d') {
+    if (contextType === 'webgpu') {
+      if (!webgpuDevice) {
+        throw new Error(
+          'contextType "webgpu" requires the `webgpuDevice` prop: create it first with\n' +
+            '  await navigator.gpu.requestAdapter().requestDevice()\n' +
+            '(requestDevice is async and this mount is sync, so it cannot happen here.)'
+        )
+      }
+      ctx = canvasEl.getContext('webgpu')
+    } else if (contextType === '2d') {
       ctx = canvasEl.getContext('2d')
     } else {
       // WebGL2-first policy: 'webgl' means "the GL family" — prefer a WebGL2
@@ -163,7 +188,20 @@ export function canvas<T extends keyof HostTypes = '2d'>(
         (props.renderOptions as import('@rasenjs/gfx').RenderContextOptions | undefined)?.camera,
     }
     const root =
-      contextType === '2d'
+      contextType === 'webgpu'
+        ? createRootNode(
+            new WebGPURenderer(canvasEl, webgpuDevice as GPUDevice, {
+              schedule,
+              clearColor: (props.renderOptions as WebGPURendererOptions | undefined)?.clearColor,
+              continuousRender: (props.renderOptions as WebGPURendererOptions | undefined)?.continuousRender,
+              // Logical size for camera math — the drawing buffer is dpr× larger.
+              logicalWidth: width,
+              logicalHeight: height,
+              camera: toValue(props.camera) as { x?: number; y?: number; zoom?: number } | undefined,
+            }),
+            canvasEl
+          )
+        : contextType === '2d'
         ? createCanvas2DRoot(ctx as Parameters<typeof createCanvas2DRoot>[0], {
             schedule,
           })
@@ -172,8 +210,16 @@ export function canvas<T extends keyof HostTypes = '2d'>(
     const requestRedraw = root.requestRedraw.bind(root)
 
     // WebGL: capture the RenderContext once for reactive camera updates.
+    // WebGPU: the root itself takes the BatchTarget/camera/resize role, so it is
+    // used in place of the RenderContext for everything below. `getRenderContext`
+    // is GL-only (it looks up a registry keyed by a WebGL context) and would
+    // return undefined here.
     const glRc =
-      contextType === '2d' ? null : getRenderContext(ctx as GlContext)
+      contextType === '2d'
+        ? null
+        : contextType === 'webgpu'
+          ? (root as { renderer: unknown }).renderer as unknown as RenderContextType
+          : getRenderContext(ctx as GlContext)
 
     // 指针事件绑定（两个渲染器都有纯 dispatchPointer 入口）：DOM 适配器的
     // 职责——监听原生事件、换算画布本地坐标，再喂给渲染器的纯入口。
@@ -196,12 +242,15 @@ export function canvas<T extends keyof HostTypes = '2d'>(
         if (contextType === '2d') {
           // canvas.width reset clears the transform — re-apply DPR scale.
           ;(ctx as CanvasRenderingContext2D).setTransform(dpr, 0, 0, dpr, 0, 0)
+        } else if (contextType === 'webgpu') {
+          // WebGPU ties its drawing buffer to the canvas size explicitly.
+          ;((root as { renderer: unknown }).renderer as unknown as WebGPURenderer).resize(w, h)
         } else {
           // The WebGL projection aspect derives from the logical size, which
           // was captured at mount (before the first ResizeObserver callback —
           // usually a placeholder). Keep it in sync with the resized viewport,
           // otherwise the scene is drawn stretched after a resize.
-          glRc?.setLogicalSize(w, h)
+          ;(glRc as RenderContextType).setLogicalSize(w, h)
         }
         // Drawing buffer was cleared by the resize — ask the renderer to
         // repaint (direct call; replaces the old 'rasen:resize' event).
@@ -216,15 +265,20 @@ export function canvas<T extends keyof HostTypes = '2d'>(
     )
 
     // Watch for camera prop changes and push them into the WebGL
-    // RenderContext (the 2D renderer has no renderer-level camera).
-    // The getter re-evaluates the camera ref; a new config object each change
-    // defeats Object.is equality → setCamera fires → projection recomputed.
+    // RenderContext / the WebGPU renderer. The getter re-evaluates the
+    // camera ref; a new config object each change defeats Object.is
+    // equality → the camera recomputes its projection matrices.
     let stopCameraWatch: (() => void) | null = null
-    if (glRc) {
+    if (glRc && contextType !== '2d') {
+      const gpuRenderer = contextType === 'webgpu'
+        ? ((root as { renderer: unknown }).renderer as unknown as { setCamera(cam: unknown): void } | null)
+        : null
       stopCameraWatch = runtime.subscribe(
         () => toValue(props.camera),
         (cam) => {
-          if (cam) glRc.setCamera(cam as CameraConfig)
+          if (!cam) return
+          if (gpuRenderer) gpuRenderer.setCamera(cam)
+          else (glRc as RenderContextType).setCamera(cam as CameraConfig)
         },
       )
     }

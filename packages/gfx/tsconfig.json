@@ -2,7 +2,13 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    // WebGPU globals (GPUBuffer, GPUTextureFormat, …) are not part of lib.dom.
+    // Without this entry the backend's types silently resolve to `any` and tsc
+    // under-reports — and `yarn build` (tsup) does NOT type-check at all, so a
+    // missing entry here produced a "successful" build of code full of
+    // unresolved names.
+    "types": ["@webgpu/types", "vitest/globals"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

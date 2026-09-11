@@ -6,6 +6,17 @@ import { vi } from 'vitest'
 import type { ReactiveRuntime, Ref } from '@rasenjs/core'
 import type { GlContext } from '../node'
 
+export {
+  createMockGPUCanvas,
+  installMockNavigatorGPU,
+  MockCommandEncoder,
+  MockGPUDevice,
+  MockQueue,
+  type MockBindGroup,
+  type MockGPUBuffer,
+  type RecordedWrite
+} from './mock-webgpu'
+
 // domlike GL 句柄别名（与 node.ts 的 Context 造型策略一致：自实现最小造型）
 type GlShader = object
 type GlProgram = object
@@ -129,85 +140,6 @@ export function createMockWebGLContext(): GlContext {
 
   return mockGL as unknown as GlContext
 }
-
-/**
- * Create a mock **WebGL2** context.
- *
- * Why this is a separate factory rather than an upgrade of the one above:
- * `BatchRenderer` decides which shader/UBO path to take with
- * `this.isWebGL2 = 'createVertexArray' in gl`, so *adding* a WebGL2 member to
- * the default mock silently switches every existing test onto the WebGL2 path.
- * That is not a harmless refactor — it changes what the whole suite exercises.
- * The two contexts are therefore modelled explicitly and the call site opts in.
- *
- * Consequence worth knowing: the default mock is a **WebGL1** context, so the
- * existing suite covers the WebGL1 fallback path. The WebGL2 path (ES3 shaders,
- * the Frame UBO, VAOs) is exercised only by tests that ask for this one.
- */
-export function createMockWebGL2Context(): GlContext {
-  const base = createMockWebGLContext() as unknown as Record<string, unknown> & GlContext
-
-  const methods: Record<string, unknown> = {
-    // --- WebGL2 detection + ES3 / UBO path
-    createVertexArray: vi.fn(() => ({}) as WebGLVertexArrayObject),
-    bindVertexArray: vi.fn(),
-    deleteVertexArray: vi.fn(),
-    getUniformBlockIndex: vi.fn(() => 0),
-    uniformBlockBinding: vi.fn(),
-    bindBufferBase: vi.fn(),
-    UBO_BINDING: 0,
-    UNIFORM_BUFFER: 0x8a11,
-    INVALID_INDEX: 0xffffffff,
-
-    // --- indexed / instanced draws
-    bufferSubData: vi.fn(),
-    drawElements: vi.fn(),
-    drawArraysInstanced: vi.fn(),
-    drawElementsInstanced: vi.fn(),
-
-    // --- render targets
-    createFramebuffer: vi.fn(() => ({}) as WebGLFramebuffer),
-    bindFramebuffer: vi.fn(),
-    deleteFramebuffer: vi.fn(),
-    framebufferTexture2D: vi.fn(),
-    framebufferRenderbuffer: vi.fn(),
-    checkFramebufferStatus: vi.fn(() => 0x8cd5),
-    createRenderbuffer: vi.fn(() => ({}) as WebGLRenderbuffer),
-    bindRenderbuffer: vi.fn(),
-    deleteRenderbuffer: vi.fn(),
-    renderbufferStorage: vi.fn(),
-
-    // --- misc state the GpuDevice surface promises
-    clearDepth: vi.fn(),
-    depthMask: vi.fn(),
-    blendFuncSeparate: vi.fn(),
-    scissor: vi.fn(),
-    colorMask: vi.fn(),
-    vertexAttribDivisor: vi.fn(),
-  }
-  Object.assign(base, methods)
-
-  const constants: Record<string, number> = {
-    ELEMENT_ARRAY_BUFFER: 0x8893,
-    UNSIGNED_SHORT: 0x1403,
-    UNSIGNED_INT: 0x1405,
-    SCISSOR_TEST: 0x0c11,
-    REPEAT: 0x2901,
-    UNPACK_FLIP_Y_WEBGL: 0x9240,
-    UNPACK_PREMULTIPLY_ALPHA_WEBGL: 0x9241,
-    ZERO: 0,
-    DST_ALPHA: 0x0304,
-    ONE_MINUS_DST_ALPHA: 0x0305,
-    LESS: 0x0201,
-    EQUAL: 0x0202,
-    ALWAYS: 0x0207,
-    FRAMEBUFFER_COMPLETE: 0x8cd5,
-  }
-  Object.assign(base, constants)
-
-  return base as unknown as GlContext
-}
-
 /**
  * Create mock reactive runtime for testing
  *

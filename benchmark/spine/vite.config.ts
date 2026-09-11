@@ -25,6 +25,7 @@ export default defineConfig({
         pixi: resolve(__dirname, 'pixi.html'),
         'rasen-webgl': resolve(__dirname, 'rasen-webgl.html'),
         'rasen-canvas': resolve(__dirname, 'rasen-canvas.html'),
+        'rasen-webgpu': resolve(__dirname, 'rasen-webgpu.html'),
         c233: resolve(__dirname, 'c233.html')
       }
     }

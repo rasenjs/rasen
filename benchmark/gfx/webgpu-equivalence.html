@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>GPU Backend Equivalence — WebGL2 vs WebGPU</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font: 13px/1.5 ui-monospace, monospace; }
+      .row { display: flex; gap: 12px; padding: 12px; }
+      .cell { display: flex; flex-direction: column; gap: 6px; }
+      canvas { border: 1px solid #333; image-rendering: pixelated; }
+      #log { padding: 12px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="cell">
+        <span>WebGL2 (reference)</span>
+        <canvas id="gl" width="256" height="256"></canvas>
+      </div>
+      <div class="cell">
+        <span>WebGPU</span>
+        <canvas id="gpu" width="256" height="256"></canvas>
+      </div>
+    </div>
+    <div id="log"></div>
+    <script type="module" src="/src/webgpu-equivalence.ts"></script>
+  </body>
+</html>

@@ -7,7 +7,7 @@
  * scene's sun. Works on both WebGL1 (WEBGL_depth_texture ext) and WebGL2.
  */
 
-import type { GlContext } from '../node'
+import type { GlContext } from '../../node'
 import { ShaderProgram } from './shader'
 import { Mat4x4f } from '@rasenjs/math'
 

@@ -17,10 +17,7 @@ import { com, toValue, type Mountable, type HostHooks } from '@rasenjs/core'
 import type { PropValue } from '@rasenjs/core'
 import { element } from './element'
 import { Mat4x4f } from '@rasenjs/math'
-import { createTexture } from '../utils'
-import { getRenderContext } from '../render-context'
-import type { GlNode } from '../node'
-import type { GlContext } from '../node'
+import type { GfxNode } from '../node'
 import {
   computeAttachmentWorld,
   computeAttachmentWorldVertices,
@@ -200,7 +197,7 @@ export interface SpineWebglPickEvent extends SpineHit {
   worldY: number
 }
 
-export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
+export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
   // Rebuild the single continuous mesh every animation frame. The pose is
   // already applied by the viewer's tick loop (state.apply()), so we just
   // flatten every attachment's triangles into one vertex/UV buffer.
@@ -256,7 +253,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
     /** Non-seq: the single layout (null = not drawable). */
     layout: AttachmentLayout | null
     /** Non-seq: page texture (null = fall back to the default texture). */
-    texture: WebGLTexture | null
+    texture: unknown | null
     resolved: boolean
     /** Staged-color marker: the packed RGBA8 stream is static per slot —
      * once copied into staging at colStagedVBase with colVersion it stays
@@ -279,7 +276,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
   // slot → { attachmentName, attachment } — avoids findAttachment every frame.
   const slotAttCache = new Map<object, { name: string; att: unknown }>()
   // page file name → WebGL texture (multi-page atlases).
-  const pageTextureCache = new Map<string, WebGLTexture>()
+  const pageTextureCache = new Map<string, unknown>()
   let lastSkeleton: Skeleton | null = null
   // Per-attachment submission cache — everything STATIC about drawing one
   // attachment, resolved once and reused every frame: the region-naming
@@ -316,7 +313,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
   // Build the flattened triangle list and submit one draw call per slot so
   // each slot's tint/alpha (animated by `color` timelines) and the `draworder`
   // layering are respected. Returns the total vertex count drawn (0 = empty).
-  const buildGeometry = (gl: GlContext): number => {
+  const buildGeometry = (node: GfxNode): number => {
     const sk = toValue(props.skeleton) as Skeleton | null
     const at = toValue(props.atlas) as SpineAtlas | null
     const img = toValue(props.atlasImg) as HTMLImageElement | null
@@ -369,7 +366,8 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
     // Camera is canvas-level (<canvas camera={...}>): the projection matrix in
     // the batch renderer maps world → screen. This component submits raw
     // world-space vertices and knows nothing about pan/zoom/fit.
-    const renderContext = getRenderContext(gl)
+    //
+
 
     // Resolve the WebGL texture for an atlas page file name. Multi-page
     // atlases need one texture per page; the primary page is `img`.
@@ -377,7 +375,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       const cached = pageTextureCache.get(pageName)
       if (cached) return cached
       const pageImg = pageImgs?.get(pageName) ?? img
-      const tex = createTexture(gl, pageImg, { minFilter: 0x2601, magFilter: 0x2601 })
+      const tex = node.createTexture(pageImg, { minFilter: 0x2601, magFilter: 0x2601 })
       pageTextureCache.set(pageName, tex)
       return tex
     }
@@ -473,7 +471,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       }
       let regionKey: string
       let layout: AttachmentLayout | null
-      let slotTexture: WebGLTexture | null
+      let slotTexture: unknown | null
       if (sub.seq) {
         // Sequence-driven region swap — re-resolve per frame. Layouts stay
         // in the two-level cache so each region's geometry is built once.
@@ -533,7 +531,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       // layout.verts buffer AND the per-vertex re-copy pass in drawGroup.
       const nVerts = layout.uvs.length / 2
       const triCount = layout.triangles.length
-      const m = renderContext.beginMesh(nVerts, triCount)
+      const m = node.beginMesh(nVerts, triCount)
       if (!m) {
         // No batch renderer (headless/test env) — nothing to submit.
         if (endClip) {
@@ -622,7 +620,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         // Spine blend mode (additive/multiply/screen effects — e.g. aura, foot
         // glow, gun muzzle — must not render with normal alpha blending).
         const blendMode = slot.data.blend ?? 'normal'
-        renderContext.endMesh(m, nVerts, triCount, slotTexture, blendMode, premultiplied, skip === true)
+        node.endMesh(m, nVerts, triCount, slotTexture, blendMode, premultiplied, skip === true)
         total += nVerts
 
         if (endClip) {
@@ -734,7 +732,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
       // Spine blend mode (additive/multiply/screen effects — e.g. aura, foot
       // glow, gun muzzle — must not render with normal alpha blending).
       const blendMode = slot.data.blend ?? 'normal'
-      renderContext.addShape(
+      node.addShape(
         'spine',
         vertexBuf.subarray(0, vi),
         color,
@@ -793,7 +791,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
         boneBuf[bi++] = x0 + hx; boneBuf[bi++] = y0 + hy; boneBuf[bi++] = 0
       }
       if (bi > 0) {
-        renderContext.addShape(
+        node.addShape(
           'spine-bones',
           boneBuf.subarray(0, bi),
           BONE_COLOR,
@@ -821,9 +819,9 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
   // `gl` is available); unregistered on unmount.
   let unregisterPick: (() => void) | null = null
 
-  const attachPick = (gl: GlContext): void => {
+  const attachPick = (node: GfxNode): void => {
     if (unregisterPick) return
-    const rc = getRenderContext(gl)
+    const rc = node
     const resolve = (sx: number, sy: number): SpineWebglPickEvent | null => {
       const cam = rc.camera
       const W = toValue(props.width) as number
@@ -861,9 +859,9 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
   const mountable = element({
     getBounds: () => null, // full redraw
 
-    draw: (gl) => {
-      buildGeometry(gl)
-      attachPick(gl)
+    draw: (node) => {
+      buildGeometry(node)
+      attachPick(node)
     },
 
     // core's toValue tracks the Vue refs (proven by the canvas-2d renderer), so
@@ -882,8 +880,8 @@ export const spine = com((props: SpineWebglProps): Mountable<GlNode> => {
     ]
   })
 
-  return (node: GlNode, hooks: HostHooks<GlNode> | undefined) => {
-    const unmount = mountable(node, hooks)
+  return (mountParent: GfxNode, hooks: HostHooks<GfxNode> | undefined) => {
+    const unmount = mountable(mountParent, hooks)
     return () => {
       detachPick()
       unmount?.()

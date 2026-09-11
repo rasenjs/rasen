@@ -9,9 +9,15 @@
     "run": "perry run src/test.ts"
   },
   "perry": {
-    "compilePackages": ["@rasenjs/core", "@rasenjs/math"],
+    "compilePackages": [
+      "@rasenjs/core",
+      "@rasenjs/math"
+    ],
     "allow": {
-      "compilePackages": ["@rasenjs/core", "@rasenjs/math"]
+      "compilePackages": [
+        "@rasenjs/core",
+        "@rasenjs/math"
+      ]
     }
   },
   "dependencies": {

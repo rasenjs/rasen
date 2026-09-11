@@ -17,8 +17,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createRoot, createNode } from '../../node'
-import { getRenderContext } from '../../render-context'
-import { BatchRenderer } from '../../renderer/batch'
+import { getRenderContext } from '../../renderer/gl/index'
+import { WebGLRenderer as BatchRenderer } from '../../renderer/gl/index'
 import { createMockWebGLContext } from '../../test-utils'
 import { Mat4x4f } from '@rasenjs/math'
 import type { GlContext } from '../../node'

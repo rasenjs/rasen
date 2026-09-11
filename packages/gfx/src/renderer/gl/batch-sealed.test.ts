@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { BatchRenderer } from './batch'
-import { createMockWebGLContext } from '../test-utils'
-import type { BlendMode } from './batch'
+import { WebGLRenderer as BatchRenderer } from './index'
+import { createMockWebGLContext } from '../../test-utils'
+import type { BlendMode } from '../base'
 
 /**
  * Fast-lane (beginMesh/endMesh) sealed-run CONTRACT tests.

@@ -3,7 +3,10 @@
     "target": "ES2020",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -15,7 +18,17 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "@rasenjs/dom"
+    "jsxImportSource": "@rasenjs/dom",
+    "types": [
+      "@webgpu/types"
+    ],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "noImplicitReturns": true
   },
-  "include": ["src", "vite.config.ts", "unocss.config.ts"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "unocss.config.ts"
+  ]
 }

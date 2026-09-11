@@ -8,9 +8,8 @@
 
 import { com, type Mountable, type Unmount } from '@rasenjs/core'
 import type { PropValue } from '../../types'
-import { createNode, type GlNode } from '../../node'
+import { createNode, type GfxNode } from '../../node'
 import { unref } from '../../utils'
-import { getRenderContext } from '../../render-context'
 
 export interface GroupProps {
   x?: PropValue<number>
@@ -27,7 +26,7 @@ export interface GroupProps {
   visible?: PropValue<boolean>
   opacity?: PropValue<number>
 
-  children: Array<Mountable<GlNode>>
+  children: Array<Mountable<GfxNode>>
 }
 
 /**
@@ -61,10 +60,9 @@ export interface GroupProps {
  * ```
  */
 export const group = com(
-  (props: GroupProps): Mountable<GlNode> => {
-    return (parentNode: GlNode) => {
+  (props: GroupProps): Mountable<GfxNode> => {
+    return (parentNode: GfxNode) => {
       const childUnmounts: (Unmount | undefined)[] = []
-      const gl = parentNode.ctx
 
       const groupNode = createNode(parentNode, {
         // Container semantics: push transform → draw subtree → pop.
@@ -74,8 +72,7 @@ export const group = com(
           const opacity = (unref(props.opacity) as number) ?? 1
           if (!visible || opacity <= 0) return
 
-          const rc = getRenderContext(gl)
-          rc.pushTransform({
+          parentNode.pushTransform({
             tx: (unref(props.x) as number) ?? 0,
             ty: (unref(props.y) as number) ?? 0,
             tz: (unref(props.z) as number) ?? 0,
@@ -94,7 +91,7 @@ export const group = com(
 
           drawChildren()
 
-          rc.popTransform()
+          parentNode.popTransform()
         },
         deps: () => [
           unref(props.x),

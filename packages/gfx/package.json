@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@webgpu/types": "^0.1.72",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

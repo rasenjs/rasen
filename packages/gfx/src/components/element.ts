@@ -8,7 +8,7 @@
  */
 
 import { com, type Mountable } from '@rasenjs/core'
-import { createNode, type GlNode } from '../node'
+import { createNode, type GfxNode } from '../node'
 import type { Bounds } from '../types'
 
 export interface ElementProps {
@@ -19,7 +19,7 @@ export interface ElementProps {
    */
   getBounds: () => Bounds | null
   /** Draw function */
-  draw: (gl: GlNode['ctx']) => void
+  draw: (node: GfxNode) => void
   /** Collect reactive dependencies */
   deps: () => unknown[]
 }
@@ -33,10 +33,10 @@ export interface ElementProps {
  * - Cleanup (node removal detaches from the tree and stops subscriptions)
  */
 export const element = com(
-  (props: ElementProps): Mountable<GlNode> => {
-    return (parentNode: GlNode) => {
+  (props: ElementProps): Mountable<GfxNode> => {
+    return (parentNode: GfxNode) => {
       const node = createNode(parentNode, {
-        draw: () => props.draw(parentNode.ctx),
+        draw: () => props.draw(parentNode),
         bounds: props.getBounds,
         deps: props.deps
       })

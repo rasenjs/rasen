@@ -2,10 +2,10 @@
  * Star component (2D/3D unified)
  */
 
-import type { Component3D, GlContext } from '../../node'
+import type { Component3D } from '../../node'
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
-import { getRenderContext } from '../../render-context'
+import type { GfxNode } from '../../node'
 import { element } from '../element'
 
 export interface StarProps extends CommonDrawProps, Transform2DProps {
@@ -95,7 +95,7 @@ export const star: Component3D<StarProps> = (props: StarProps) => {
       return cachedBounds
     },
 
-    draw: (gl: GlContext) => {
+    draw: (node: GfxNode) => {
       const x = unref(props.x)
       const y = unref(props.y)
       const z = unref(props.z) ?? 0
@@ -111,8 +111,6 @@ export const star: Component3D<StarProps> = (props: StarProps) => {
 
       if (!visible || opacity <= 0) return
 
-      const renderContext = getRenderContext(gl)
-
       if (fill) {
         if (!cachedGeometry || 
             cachedPoints !== points ||
@@ -125,7 +123,7 @@ export const star: Component3D<StarProps> = (props: StarProps) => {
         }
         const color = parseColor(fill)
         
-        const transform = renderContext.getCurrentTransform()
+        const transform = node.getCurrentTransform()
         
         const finalOpacity = opacity * transform.opacity
         color.a *= finalOpacity
@@ -147,7 +145,7 @@ export const star: Component3D<StarProps> = (props: StarProps) => {
           scaleZ: transform.scaleZ
         }
         
-        renderContext.addShape(
+        node.addShape(
           `star-${points}`,
           cachedGeometry,
           color,

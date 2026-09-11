@@ -10,7 +10,7 @@ import { group } from './group'
 import { circle } from './circle'
 import { rect } from './rect'
 import { createMockWebGLContext, createMockReactiveRuntime } from '../../test-utils'
-import { getRenderContext } from '../../render-context'
+import { getRenderContext } from '../../renderer/gl/index'
 
 describe('group', () => {
   let gl: GlContext

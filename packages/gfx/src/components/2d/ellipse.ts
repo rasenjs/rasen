@@ -4,9 +4,9 @@
 
 import type { MaybeRef, CommonDrawProps, Transform2DProps, Bounds } from '../../types'
 import { unref, parseColor } from '../../utils'
-import { getRenderContext } from '../../render-context'
+import type { GfxNode } from '../../node'
 import { element } from '../element'
-import type { Component3D, GlContext } from '../../node'
+import type { Component3D } from '../../node'
 
 export interface EllipseProps extends CommonDrawProps, Transform2DProps {
   x: MaybeRef<number>
@@ -98,7 +98,7 @@ export const ellipse: Component3D<EllipseProps> = (props: EllipseProps) => {
       return cachedBounds
     },
 
-    draw: (gl: GlContext) => {
+    draw: (node: GfxNode) => {
       const x = unref(props.x)
       const y = unref(props.y)
       const z = unref(props.z) ?? 0
@@ -114,8 +114,6 @@ export const ellipse: Component3D<EllipseProps> = (props: EllipseProps) => {
 
       if (!visible || opacity <= 0) return
 
-      const renderContext = getRenderContext(gl)
-
       if (fill) {
         if (!cachedGeometry || 
             cachedRadiusX !== radiusX ||
@@ -128,7 +126,7 @@ export const ellipse: Component3D<EllipseProps> = (props: EllipseProps) => {
         }
         const color = parseColor(fill)
         
-        const transform = renderContext.getCurrentTransform()
+        const transform = node.getCurrentTransform()
         
         const finalOpacity = opacity * transform.opacity
         color.a *= finalOpacity
@@ -150,7 +148,7 @@ export const ellipse: Component3D<EllipseProps> = (props: EllipseProps) => {
           scaleZ: transform.scaleZ
         }
         
-        renderContext.addShape(
+        node.addShape(
           `ellipse-${radiusX}-${radiusY}-${segments}`,
           cachedGeometry,
           color,

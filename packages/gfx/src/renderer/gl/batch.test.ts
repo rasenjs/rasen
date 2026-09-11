@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { BatchRenderer } from './batch'
-import { createMockWebGLContext } from '../test-utils'
+import { WebGLRenderer as BatchRenderer } from './index'
+import { createMockWebGLContext } from '../../test-utils'
 
 /** WebGL mock capturing blendFuncSeparate calls. */
 function makeMockGl() {
