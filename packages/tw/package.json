@@ -1,0 +1,60 @@
+{
+  "name": "@rasenjs/tw",
+  "version": "0.1.0-alpha",
+  "description": "High-performance Tailwind-style class interpreter — converts class strings into a standard camelCase style record",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./perry": {
+      "types": "./dist/perry.d.ts",
+      "import": "./dist/perry.js",
+      "require": "./dist/perry.cjs"
+    }
+  },
+  "bin": {
+    "tw-generate": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "../../node_modules/.bin/tsup --watch",
+    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "test": "../../node_modules/.bin/vitest --run",
+    "typecheck": "../../node_modules/.bin/tsc --noEmit",
+    "lint": "../../node_modules/.bin/eslint src --ext .ts,.tsx",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "tailwind",
+    "tw",
+    "css",
+    "style",
+    "utility",
+    "react-native",
+    "perry",
+    "native"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/tw"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/tw",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT"
+}

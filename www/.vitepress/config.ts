@@ -37,7 +37,8 @@ export default defineConfig({
           { text: '@rasenjs/canvas-2d', link: '/packages/canvas-2d' },
           { text: '@rasenjs/react-native', link: '/packages/react-native' },
           { text: '@rasenjs/html', link: '/packages/html' },
-          { text: '@rasenjs/jsx', link: '/packages/jsx-runtime' }
+          { text: '@rasenjs/jsx', link: '/packages/jsx-runtime' },
+          { text: '@rasenjs/tw', link: '/packages/tw' }
         ]
       },
       {
@@ -72,6 +73,12 @@ export default defineConfig({
             { text: 'Reactive Runtime', link: '/guide/reactive-runtime' },
             { text: 'Render Targets', link: '/guide/render-targets' },
             { text: 'Components', link: '/guide/components' }
+          ]
+        },
+        {
+          text: 'Styling',
+          items: [
+            { text: 'Tailwind Classes (@rasenjs/tw)', link: '/guide/tw' }
           ]
         },
         {
@@ -119,6 +126,7 @@ export default defineConfig({
             { text: '@rasenjs/react-native', link: '/packages/react-native' },
             { text: '@rasenjs/html', link: '/packages/html' },
             { text: '@rasenjs/jsx', link: '/packages/jsx-runtime' },
+            { text: '@rasenjs/tw', link: '/packages/tw' },
             { text: '@rasenjs/reactive-vue', link: '/packages/reactive-vue' },
             {
               text: '@rasenjs/reactive-signals',
