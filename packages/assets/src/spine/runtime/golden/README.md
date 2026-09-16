@@ -34,7 +34,7 @@ adapter in `golden-gate.test.ts` — the golden VALUES must still match.
 - `spine-gate.json` — golden data (generated, committed to git)
 - `generate-golden.mjs` — regenerates the golden file from the built dist:
   `node generate-golden.mjs` (run from this directory, requires `yarn build` first)
-- `../golden-gate.test.ts` — the gate test (runs in `yarn test`)
+- `../__tests__/golden-gate.test.ts` — the gate test (runs in `yarn test`)
 
 ## When the gate fails
 
