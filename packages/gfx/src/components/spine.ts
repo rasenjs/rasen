@@ -1,12 +1,17 @@
 /**
- * WebGL Spine component — renders the whole skeleton as ONE continuous mesh.
+ * Spine component — renders the whole skeleton as ONE continuous mesh.
+ *
+ * Backend-neutral: geometry goes through `beginMesh`/`endMesh` and textures
+ * through `createTexture`, both of which the `Renderer` abstraction provides,
+ * so the same component runs on the GL and WebGPU renderers (and on native
+ * hosts that implement the abstraction).
  *
  * Unlike the canvas-2d renderer (which clips each attachment's triangles
  * separately and therefore shows dark seams at attachment boundaries against a
- * dark background), WebGL draws every attachment's triangles into a single
- * vertex/UV buffer and submits it in one draw call. There is no per-triangle
- * clipping, so the black rings around mouth/nose/eyes/chest disappear — the
- * same approach nikkeviewer.com uses.
+ * dark background), the batch renderer draws every attachment's triangles into
+ * a single vertex/UV buffer and submits it in one draw call. There is no
+ * per-triangle clipping, so the black rings around mouth/nose/eyes/chest
+ * disappear — the same approach nikkeviewer.com uses.
  *
  * The mesh is rebuilt every animation frame (the viewer's tick loop already
  * calls `state.apply()`), flattening shared vertices into a triangle list
@@ -18,6 +23,8 @@ import type { PropValue } from '@rasenjs/core'
 import { element } from './element'
 import { Mat4x4f } from '@rasenjs/math'
 import type { GfxNode } from '../node'
+import type { BitmapSource } from '../utils'
+import type { TextureHandle } from '../renderer/base'
 import {
   computeAttachmentWorld,
   computeAttachmentWorldVertices,
@@ -33,7 +40,7 @@ import {
   type AnimationState,
   type AttachmentData,
   type SpineEvent,
-  type SpineHit
+  type SpineHit,
 } from '@rasenjs/assets'
 
 /**
@@ -147,9 +154,15 @@ const clipOut: number[] = []
 export interface SpineWebglProps {
   skeleton: PropValue<Skeleton | null>
   atlas: PropValue<SpineAtlas | null>
-  atlasImg: PropValue<HTMLImageElement | null>
+  /**
+   * The primary atlas page. Typed as `BitmapSource` (= `object`) rather than
+   * `HTMLImageElement` so a host without DOM bitmaps can pass raw pixels — see
+   * `RawPixelSource`. Textures go through `createTexture`, so the backend
+   * decides how to read it.
+   */
+  atlasImg: PropValue<BitmapSource | null>
   /** All atlas page images, keyed by page file name (multi-page atlases). */
-  atlasImgs?: PropValue<Map<string, HTMLImageElement> | null>
+  atlasImgs?: PropValue<Map<string, BitmapSource> | null>
   state: PropValue<AnimationState | null>
   /** Animation name to play. Switches when the value changes. */
   animation?: PropValue<string>
@@ -213,8 +226,28 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
   // UVs). Using the attachment object as the primary cache key ensures each
   // slot's unique geometry is preserved. The secondary regionKey handles
   // Spine 4.1+ sequence attachments that swap atlas regions per frame.
-  let vertexBuf = new Float32Array(0)
-  let uvBuf = new Float32Array(0)
+  // Pooled output buffers for the CLIPPED path.
+  //
+  // These MUST NOT be a single reused pair. `addShape` stores the vertices/uv
+  // arrays BY REFERENCE and the renderer reads them at flush time
+  // (`addShapeInternal` -> `item.vertices = vertices`, consumed in the draw
+  // pass), while `maxBatchSize` (100000) is larger than a single frame of this
+  // component — so nothing is copied before the frame ends. Handing out one
+  // buffer that is rewritten per slot therefore made every clipped submission
+  // alias the LAST slot's geometry, and only that slot's triangles reached the
+  // GPU.
+  //
+  // That is the 777 regression: the scene carries two clipping attachments whose
+  // `end` slot is their own slot, so the clip is active for the whole draw order
+  // and every one of its ~150 drawables takes this path. Skeletons without
+  // clipping (c010, c310, c233) stay on the fast lane and never noticed.
+  //
+  // One buffer per submission, taken from a pool that is walked per frame and
+  // grown on demand, so ownership is unambiguous and steady state allocates
+  // nothing.
+  const clipVertPool: Float32Array[] = []
+  const clipUvPool: Float32Array[] = []
+  let clipPoolIdx = 0
   let boneBuf = new Float32Array(0)
   // Model matrix for the (x, y, z) position props + the key it was built for.
   // Identity until a non-zero position is set (see buildGeometry).
@@ -275,7 +308,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
   let layoutCache: WeakMap<object, Map<string, AttachmentLayout>> = new WeakMap()
   // slot → { attachmentName, attachment } — avoids findAttachment every frame.
   const slotAttCache = new Map<object, { name: string; att: unknown }>()
-  // page file name → WebGL texture (multi-page atlases).
+  // page file name → TextureHandle (multi-page atlases).
   const pageTextureCache = new Map<string, unknown>()
   let lastSkeleton: Skeleton | null = null
   // Per-attachment submission cache — everything STATIC about drawing one
@@ -319,6 +352,10 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
     const img = toValue(props.atlasImg) as HTMLImageElement | null
     const pageImgs = toValue(props.atlasImgs) as Map<string, HTMLImageElement> | null
     if (!sk || !at || !img) return 0
+    // Each frame starts handing out pool slot 0 again. The previous frame's
+    // slices have already been consumed by its flush, so reuse is safe — and it
+    // is what keeps steady state allocation-free.
+    clipPoolIdx = 0
 
     // Apply animation prop to state
     const st = toValue(props.state) as AnimationState | null
@@ -369,9 +406,11 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
     //
 
 
-    // Resolve the WebGL texture for an atlas page file name. Multi-page
+    // Resolve the atlas texture for a page file name, through the renderer
+    // abstraction (`node.createTexture` → `TextureHandle`), so the component
+    // stays backend-neutral: GL, WebGPU and native hosts all work. Multi-page
     // atlases need one texture per page; the primary page is `img`.
-    const textureForPage = (pageName: string): WebGLTexture => {
+    const textureForPage = (pageName: string): TextureHandle => {
       const cached = pageTextureCache.get(pageName)
       if (cached) return cached
       const pageImg = pageImgs?.get(pageName) ?? img
@@ -616,34 +655,45 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
           sub.stagedVBase = m.vBase
         }
 
-        // Multi-page atlas texture + blend mode resolved above (sub-cache).
-        // Spine blend mode (additive/multiply/screen effects — e.g. aura, foot
-        // glow, gun muzzle — must not render with normal alpha blending).
-        const blendMode = slot.data.blend ?? 'normal'
-        node.endMesh(m, nVerts, triCount, slotTexture, blendMode, premultiplied, skip === true)
-        total += nVerts
+      // Multi-page atlas texture + blend mode resolved above (sub-cache).
+      // Spine blend mode (additive/multiply/screen effects — e.g. aura, foot
+      // glow, gun muzzle — must not render with normal alpha blending).
+      const blendMode = slot.data.blend ?? 'normal'
+      node.endMesh(m, nVerts, triCount, slotTexture, blendMode, premultiplied, skip === true)
+      total += nVerts
 
-        if (endClip) {
-          clipPoly = null
-          clipEndSlotName = null
-        }
-        continue
+      if (endClip) {
+        clipPoly = null
+        clipEndSlotName = null
       }
+      continue
+    }
 
-      // Clipped path (rare): expand corners, clip against the active clip
-      // polygon (Sutherland–Hodgman) and emit the resulting polygon as a
-      // triangle fan. Clipped triangles share no vertices, so this stays a
-      // flat non-indexed submission.
-      let vi = 0
-      let ui = 0
+      // Clipped path (rare in general; every slot for a scene-wide clip):
+      // expand corners, clip against the active clip polygon
+      // (Sutherland–Hodgman) and emit the resulting polygon as a triangle fan.
+      // Clipped triangles share no vertices, so this stays a flat non-indexed
+      // submission.
+      //
+      // The buffers come from a per-frame pool, NOT from a shared pair: the
+      // renderer keeps the arrays by reference until flush, so each submission
+      // needs storage nobody else writes (see the pool declaration above).
       const triVertCap = layout.triangles.length * 3
       const triUvCap = layout.triangles.length * 2
-      if (vertexBuf.length < triVertCap) {
-        vertexBuf = new Float32Array(Math.max(triVertCap, vertexBuf.length * 2))
+      let vertexBuf = clipVertPool[clipPoolIdx]
+      let uvBuf = clipUvPool[clipPoolIdx]
+      if (!vertexBuf) {
+        vertexBuf = clipVertPool[clipPoolIdx] = new Float32Array(Math.max(triVertCap, 256))
+      } else if (vertexBuf.length < triVertCap) {
+        vertexBuf = clipVertPool[clipPoolIdx] = new Float32Array(Math.max(triVertCap, vertexBuf.length * 2))
       }
-      if (uvBuf.length < triUvCap) {
-        uvBuf = new Float32Array(Math.max(triUvCap, uvBuf.length * 2))
+      if (!uvBuf) {
+        uvBuf = clipUvPool[clipPoolIdx] = new Float32Array(Math.max(triUvCap, 256))
+      } else if (uvBuf.length < triUvCap) {
+        uvBuf = clipUvPool[clipPoolIdx] = new Float32Array(Math.max(triUvCap, uvBuf.length * 2))
       }
+      let vi = 0
+      let ui = 0
       for (let t = 0; t < layout.triangles.length; t += 3) {
         const i0 = layout.triangles[t]
         const i1 = layout.triangles[t + 1]
@@ -695,17 +745,21 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
         const corners = clipOut.length >> 2
         for (let f = 1; f + 1 < corners; f++) {
           // Grow the output buffers as needed — clipping can add vertices.
+          // The grown array is written back to the pool slot so the next frame
+          // starts from the larger size instead of re-allocating every time.
           if (vertexBuf.length < vi + 9) {
             const cap = Math.max(vi + 9, vertexBuf.length * 2)
             const nb = new Float32Array(cap)
             nb.set(vertexBuf.subarray(0, vi))
             vertexBuf = nb
+            clipVertPool[clipPoolIdx] = nb
           }
           if (uvBuf.length < ui + 6) {
             const cap = Math.max(ui + 6, uvBuf.length * 2)
             const nb = new Float32Array(cap)
             nb.set(uvBuf.subarray(0, ui))
             uvBuf = nb
+            clipUvPool[clipPoolIdx] = nb
           }
           for (let k = 0; k < 3; k++) {
             const ci = k === 0 ? 0 : k === 1 ? f : f + 1
@@ -732,6 +786,9 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
       // Spine blend mode (additive/multiply/screen effects — e.g. aura, foot
       // glow, gun muzzle — must not render with normal alpha blending).
       const blendMode = slot.data.blend ?? 'normal'
+      // This submission owns `clipVertPool[clipPoolIdx]` for the rest of the
+      // frame (the renderer reads it at flush), so advance before the next slot.
+      clipPoolIdx++
       node.addShape(
         'spine',
         vertexBuf.subarray(0, vi),
