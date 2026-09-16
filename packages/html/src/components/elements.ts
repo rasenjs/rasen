@@ -1,5 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import type { StringHost } from '../types'
+import type { SSRNode } from '../host-hooks'
 import { element } from './element'
 
 // ============================================================================
@@ -13,12 +13,12 @@ interface BaseProps {
   style?: PropValue<Record<string, string | number>>
   attrs?: PropValue<Record<string, string | number | boolean>>
   /** Text content or child mount functions */
-  children?: PropValue<string> | Array<string | (() => string | number) | Mountable<string>>
+  children?: PropValue<string> | Array<string | (() => string | number) | Mountable<SSRNode>>
   // SSR does not support events - removed on, onClick, onInput, etc.
 }
 
 /** Child type - 响应式文本函数优先匹配 */
-type Child = string | (() => string | number) | Mountable<string>
+type Child = string | (() => string | number) | Mountable<SSRNode>
 
 /**
  * Factory function to create HTML element components
@@ -28,7 +28,7 @@ function createElement(tag: string) {
   return (
     propsOrChild?: BaseProps | Child,
     ...restChildren: Child[]
-  ): Mountable<string> => {
+  ): Mountable<SSRNode> => {
     // No arguments
     if (propsOrChild === undefined) {
       return element({ tag })
@@ -147,7 +147,7 @@ export const input = (
     placeholder?: PropValue<string>
     disabled?: PropValue<boolean>
   }
-): Mountable<string> => {
+): Mountable<SSRNode> => {
   const { type, value, placeholder, disabled, attrs, ...restProps } = props as any
 
   const newAttrs = {
@@ -173,7 +173,7 @@ export const img = (props: BaseProps & {
   alt?: PropValue<string>
   width?: PropValue<string | number>
   height?: PropValue<string | number>
-}): Mountable<string> => {
+}): Mountable<SSRNode> => {
   return element({ tag: 'img', ...props })
 }
 
@@ -188,7 +188,7 @@ export const textarea = (
     rows?: PropValue<number>
     cols?: PropValue<number>
   }
-): Mountable<string> => {
+): Mountable<SSRNode> => {
   const { value, placeholder, disabled, rows, cols, attrs, ...restProps } = props as any
 
   const newAttrs = {
@@ -216,7 +216,7 @@ export const option = (
     value?: PropValue<string | number>
     selected?: PropValue<boolean>
   }
-): Mountable<string> => {
+): Mountable<SSRNode> => {
   const { value, selected, attrs, ...restProps } = props as any
 
   const newAttrs = {
@@ -244,7 +244,7 @@ export const video = (
     loop?: PropValue<boolean>
     muted?: PropValue<boolean>
   }
-): Mountable<string> => {
+): Mountable<SSRNode> => {
   const { src, poster, controls, autoplay, loop, muted, attrs, ...restProps } = props as any
 
   const newAttrs = {
@@ -275,7 +275,7 @@ export const audio = (
     loop?: PropValue<boolean>
     muted?: PropValue<boolean>
   }
-): Mountable<string> => {
+): Mountable<SSRNode> => {
   const { src, controls, autoplay, loop, muted, attrs, ...restProps } = props as any
 
   const newAttrs = {
@@ -302,7 +302,7 @@ export const source = (
     src?: PropValue<string>
     type?: PropValue<string>
   }
-): Mountable<string> => {
+): Mountable<SSRNode> => {
   const { src, type, attrs, ...restProps } = props as any
 
   const newAttrs = {
@@ -329,7 +329,7 @@ export const iframe = (
     frameborder?: PropValue<string | number>
     allowfullscreen?: PropValue<boolean>
   }
-): Mountable<string> => {
+): Mountable<SSRNode> => {
   const { src, width, height, frameborder, allowfullscreen, attrs, ...restProps } = props as any
 
   const newAttrs = {
@@ -356,7 +356,7 @@ export const canvas = (
     width?: PropValue<string | number>
     height?: PropValue<string | number>
   }
-): Mountable<string> => {
+): Mountable<SSRNode> => {
   const { width, height, attrs, ...restProps } = props as any
 
   const newAttrs = {

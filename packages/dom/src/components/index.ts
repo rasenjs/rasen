@@ -104,5 +104,8 @@ export {
   figure,
   figcaption,
   address,
-  time
+  time,
+  // 可静态提升的内置标签清单
+  INTRINSIC_TAGS
 } from './elements'
+export type { IntrinsicTag } from './elements'

@@ -1,24 +1,7 @@
 /**
- * JSX runtime entry for @rasenjs/web (SSR/SSG)
+ * JSX runtime entry for @rasenjs/web (SSR/SSG).
  *
- * Configured with HTML string intrinsic elements via @rasenjs/html.
- * Use as `jsxImportSource` in tsconfig.json for server-side apps.
+ * Thin re-export of @rasenjs/html's JSX runtime (HTML string intrinsic
+ * elements). Selected by the package's `node` conditional export.
  */
-import { jsx, jsxs, Fragment, configureTags, type TagComponent } from '@rasenjs/core'
-import type { Mountable } from '@rasenjs/core'
-import type { ElementProps, HTMLTagName } from '@rasenjs/dom'
-import * as tags from '@rasenjs/html'
-
-configureTags({ '': tags as unknown as Record<string, TagComponent> })
-
-export { jsx, jsxs, jsx as jsxDEV, Fragment }
-
-export namespace JSX {
-  export type IntrinsicElements = {
-    [K in HTMLTagName]: Omit<ElementProps<K>, 'tag'>
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export type Element = Mountable<any>
-  export interface ElementChildrenAttribute { children: unknown }
-  export interface IntrinsicAttributes { key?: string | number }
-}
+export * from '@rasenjs/html/jsx-runtime'

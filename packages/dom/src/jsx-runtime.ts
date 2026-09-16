@@ -8,7 +8,16 @@
  * { "jsxImportSource": "@rasenjs/dom" }
  * ```
  */
-import { jsx, jsxs, Fragment, configureTags, type TagComponent } from '@rasenjs/core'
+import {
+  jsx,
+  jsxs,
+  Fragment,
+  configureTags,
+  type TagComponent,
+  type JSXElement,
+  type JSXElementChildrenAttribute,
+  type JSXIntrinsicAttributes,
+} from '@rasenjs/core'
 import type { Mountable, PropValue } from '@rasenjs/core'
 import * as tags from './components'
 import type { ElementProps, HTMLTagName } from './components'
@@ -73,8 +82,7 @@ type HTMLIntrinsicElements = {
 
 export namespace JSX {
   export interface IntrinsicElements extends HTMLIntrinsicElements {}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export type Element = Mountable<any>
-  export interface ElementChildrenAttribute { children: unknown }
-  export interface IntrinsicAttributes { key?: string | number }
+  export type Element = JSXElement
+  export interface ElementChildrenAttribute extends JSXElementChildrenAttribute {}
+  export interface IntrinsicAttributes extends JSXIntrinsicAttributes {}
 }

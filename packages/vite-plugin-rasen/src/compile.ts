@@ -15,8 +15,8 @@ export interface CompileFileResult {
   fellBack: number
 }
 
-/** Compile a TSX/JSX module marked with `@rasen-compile`. Returns null when
- *  the file lacks the directive or contains nothing compilable. */
+/** Compile a TSX/JSX module. Static hoisting is ON by default; returns null
+ *  when the file contains no JSX. */
 export function compileFile(code: string): CompileFileResult | null {
   return compileModule(code)
 }

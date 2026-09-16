@@ -11,6 +11,10 @@
  */
 
 import type { RNElementPropMap } from '@rasenjs/rn-dom/elements'
+import type {
+  JSXElementChildrenAttribute,
+  JSXIntrinsicAttributes,
+} from '@rasenjs/core'
 import type { PressableProps } from './src/components/Pressable'
 import type { ButtonProps } from './src/components/Button'
 import type { TouchableOpacityProps } from './src/components/TouchableOpacity'
@@ -24,8 +28,8 @@ import type { FlatListProps } from './src/components/FlatList'
 
 declare global {
   namespace JSX {
-    interface ElementChildrenAttribute { children: unknown }
-    interface IntrinsicAttributes { key?: string | number }
+    interface ElementChildrenAttribute extends JSXElementChildrenAttribute {}
+    interface IntrinsicAttributes extends JSXIntrinsicAttributes {}
 
     interface IntrinsicElements {
       // Native tags (typed from RN's prop maps).

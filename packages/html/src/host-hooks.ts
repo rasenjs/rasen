@@ -19,7 +19,8 @@ import { createMarker } from './marker-constants'
 /**
  * SSR node space: content chunks and markers are plain strings, while the
  * container is the mutable StringHost buffer. The union is the honest type —
- * hooks methods accept both shapes.
+ * hooks methods accept both shapes (markers are strings, containers are
+ * StringHost).
  */
 export type SSRNode = string | StringHost
 
@@ -55,12 +56,12 @@ export const htmlHostHooks: HostHooks<SSRNode> = {
   batch: (
     _parent: SSRNode
   ): {
-    host: SSRNode
+    parent: SSRNode
     flush: (parent: SSRNode, ref: SSRNode | null) => void
   } => {
     const chunks: string[] = []
     return {
-      host: {
+      parent: {
         fragments: chunks,
         append: (chunk: string) => chunks.push(chunk),
         toString: () => chunks.join('')

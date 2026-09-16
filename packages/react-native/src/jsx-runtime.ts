@@ -8,8 +8,16 @@
  * { "jsxImportSource": "@rasenjs/react-native" }
  * ```
  */
-import { jsx, jsxs, Fragment, configureTags, type TagComponent } from '@rasenjs/core'
-import type { Mountable } from '@rasenjs/core'
+import {
+  jsx,
+  jsxs,
+  Fragment,
+  configureTags,
+  type TagComponent,
+  type JSXElement,
+  type JSXElementChildrenAttribute,
+  type JSXIntrinsicAttributes,
+} from '@rasenjs/core'
 import type { RNElementPropMap } from '@rasenjs/rn-dom/elements'
 import * as tags from './components'
 
@@ -57,8 +65,7 @@ export namespace JSX {
   } & {
     [tag: string]: Record<string, unknown>
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export type Element = Mountable<any>
-  export interface ElementChildrenAttribute { children: unknown }
-  export interface IntrinsicAttributes { key?: string | number }
+  export type Element = JSXElement
+  export interface ElementChildrenAttribute extends JSXElementChildrenAttribute {}
+  export interface IntrinsicAttributes extends JSXIntrinsicAttributes {}
 }

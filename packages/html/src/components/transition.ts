@@ -6,11 +6,11 @@
  * This maintains API compatibility with the DOM version.
  */
 import { type Mountable, type PropValue, com, toValue } from '@rasenjs/core'
-import type { StringHost } from '../types'
+import type { SSRNode } from '../host-hooks'
 
 export interface TransitionConfig {
   when: PropValue<boolean>
-  children: () => Mountable<string>
+  children: () => Mountable<SSRNode>
   name?: string
   appear?: boolean
   onEnter?: (el: unknown) => void
@@ -19,10 +19,10 @@ export interface TransitionConfig {
   onAfterLeave?: (el: unknown) => void
 }
 
-export const transition = com((config: TransitionConfig): Mountable<string> => {
+export const transition = com((config: TransitionConfig): Mountable<SSRNode> => {
   const { when, children } = config
   
-  return (host: StringHost) => {
+  return (host: SSRNode) => {
     let currentUnmount: (() => void) | undefined
     
     const render = (visible: boolean) => {
@@ -33,7 +33,7 @@ export const transition = com((config: TransitionConfig): Mountable<string> => {
       
       if (visible) {
         const mountable = children()
-        currentUnmount = mountable(host)
+        currentUnmount = mountable(host, undefined)
       }
     }
     

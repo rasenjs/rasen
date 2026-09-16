@@ -3,6 +3,7 @@
  */
 import { getReactiveRuntime, type Mountable, type FragmentChild } from '@rasenjs/core'
 import type { StringHost } from '../types'
+import type { SSRNode } from '../host-hooks'
 import { escapeHtml } from '../utils'
 import { MARKERS, createMarker } from '../marker-constants'
 
@@ -35,8 +36,8 @@ const hostHooks = {
  * Fragment function interface for HTML/SSR
  */
 interface FragmentFunction {
-  (config: { children: Array<Mountable<StringHost>> }): Mountable<string>
-  (strings: TemplateStringsArray, ...values: FragmentChild<StringHost>[]): Mountable<string>
+  (config: { children: Array<Mountable<StringHost>> }): Mountable<SSRNode>
+  (strings: TemplateStringsArray, ...values: FragmentChild<StringHost>[]): Mountable<SSRNode>
 }
 
 /**
@@ -58,7 +59,7 @@ interface FragmentFunction {
 export const fragment: FragmentFunction = (
   configOrStrings: { children: Array<Mountable<StringHost>> } | TemplateStringsArray,
   ...values: FragmentChild<StringHost>[]
-): Mountable<string> => {
+): Mountable<SSRNode> => {
   const runtime = getReactiveRuntime()
   
   // 检测是否是 tagged template 调用
@@ -67,7 +68,7 @@ export const fragment: FragmentFunction = (
     
     // 直接生成 HTML 字符串而不是通过 core fragment
     // 这样可以避免每个片段都被包装，减少注释标记
-    return (host: StringHost) => {
+    return (host: SSRNode) => {
       let html = ''
       for (let i = 0; i < strings.length; i++) {
         if (strings[i]) {
@@ -84,7 +85,7 @@ export const fragment: FragmentFunction = (
           // Mountables not supported in template strings for SSR
         }
       }
-      host.append(html)
+      ;(host as StringHost).append(html)
       return undefined
     }
   }

@@ -24,8 +24,9 @@ export const element = (props: {
   children?: PropValue<string> | Array<string | (() => string | number) | Mountable<SSRNode>>
   value?: PropValue<string | number>
   // SSR does not need events - removed for consistency
-}): Mountable<StringHost> => {
-  return (node: StringHost) => {
+}): Mountable<SSRNode> => {
+  return (node: SSRNode) => {
+    const host = node as StringHost
     const tag = props.tag
     const isVoid = isVoidElement(tag)
 
@@ -86,7 +87,7 @@ export const element = (props: {
 
     // 自闭合标签不需要内容和结束标签
     if (isVoid) {
-      node.append(html)
+      host.append(html)
       return undefined
     }
 
@@ -134,7 +135,7 @@ export const element = (props: {
     // 结束标签
     html += `</${tag}>`
 
-    node.append(html)
+    host.append(html)
 
     // SSR 不需要 unmount
     return undefined

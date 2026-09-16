@@ -18,6 +18,11 @@ import { getReactiveRuntime } from '../reactive'
 import { findTag } from './tag-config'
 export { registerTag, configureTags, clearTags, getRegisteredTags } from './tag-config'
 export type { TagConfig, TagComponent } from './tag-config'
+export type {
+  JSXElement,
+  JSXElementChildrenAttribute,
+  JSXIntrinsicAttributes,
+} from './jsx-namespace'
 
 // ── Helpers ────────────────────────────────────────────────────────────
 

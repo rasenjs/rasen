@@ -6,6 +6,7 @@
 
 import type { Mountable } from '@rasenjs/core'
 import type { StringHost } from '../types'
+import type { SSRNode } from '../host-hooks'
 import { escapeHtml } from '../utils'
 
 export interface TextProps {
@@ -28,14 +29,14 @@ export interface TextProps {
 export function text(props: TextProps): Mountable<SSRNode> {
   const { content } = props
 
-  return (node: StringHost) => {
+  return (node: SSRNode) => {
     // Resolve content
     const textContent = typeof content === 'function' 
       ? String(content())
       : String(content)
     
-    // Append escaped text
-    node.append(escapeHtml(textContent))
+    // Append escaped text (SSR node is always a StringHost)
+    ;(node as StringHost).append(escapeHtml(textContent))
     
     return undefined
   }

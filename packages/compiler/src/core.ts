@@ -33,9 +33,41 @@ const traverse: any = (traverseModule as any).default || traverseModule
 
 export const COMPILE_DIRECTIVE = '@rasen-compile'
 
+/**
+ * 默认可静态提升的宿主内置标签清单（DOM）。
+ *
+ * compiler 不依赖 @rasenjs/dom 运行时，故内置一份与 DOM 的
+ * `INTRINSIC_TAGS` 一致的默认清单；宿主可通过 `intrinsicTags` 覆盖。
+ */
+export const DEFAULT_INTRINSIC_TAGS = new Set([
+  // 结构性元素
+  'div', 'span', 'p', 'br', 'hr',
+  // 标题
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  // 文本格式
+  'strong', 'em', 'small', 'code', 'pre', 'mark', 'del', 'ins', 'sub', 'sup', 'b', 'i', 'u',
+  // 列表
+  'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+  // 链接和媒体
+  'a', 'img', 'picture', 'source', 'audio', 'video', 'track',
+  // 表单
+  'form', 'input', 'label', 'button', 'textarea', 'select', 'option', 'optgroup',
+  'fieldset', 'legend', 'datalist', 'output',
+  // 表格
+  'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
+  // 语义化元素
+  'section', 'article', 'header', 'footer', 'nav', 'main', 'aside', 'details', 'summary', 'dialog',
+  // 其他元素
+  'blockquote', 'figure', 'figcaption', 'address', 'time',
+])
+
 export interface CompilerOptions {
   /** Import path for runtime primitives (default: '@rasenjs/dom/template') */
   templateSource?: string
+  /** 静态提升开关（默认开启）。设为 false 时跳过编译，走标准 JSX。 */
+  enabled?: boolean
+  /** 可静态提升的宿主内置标签集合（默认 DOM 标签清单）。 */
+  intrinsicTags?: Set<string>
 }
 
 interface GenContext {
@@ -57,6 +89,8 @@ interface GenContext {
   ssrParts: string[]
   /** original source, for slicing user expression text */
   source: string
+  /** 可静态提升的宿主内置标签集合 */
+  intrinsicTags: Set<string>
 }
 
 function escapeHtml(s: string): string {
@@ -194,7 +228,9 @@ function compileElement(
 ): string | null {
   if (node.openingElement.name.type !== 'JSXIdentifier') return null
   const tag = node.openingElement.name.name
-  if (!/^[a-z][a-zA-Z0-9-]*$/.test(tag)) return null // component → fallback
+  // 可静态提升 = 标签名 ∈ 宿主内置标签清单（不靠大小写区分）。
+  // 不在清单里（div/rect/自定义元素/大写组件）→ 组件 → 回退。
+  if (!ctx.intrinsicTags.has(tag)) return null
 
   let html = `<${tag}`
   ctx.ssrParts.push(escapeTemplateLiteral(`<${tag}`))
@@ -366,12 +402,12 @@ function compileElement(
       continue
     }
     if (c.type === 'JSXElement') {
-      // Component child (PascalCase tag) → slot anchor + runtime mount.
+      // 组件子节点（不在宿主内置标签清单里）→ slot anchor + runtime mount.
       // Attributes must be plain JSXAttributes with simple expressions
       // (no spreads); children of components are not supported yet.
       const nameNode = c.openingElement.name
       const isComponent =
-        nameNode.type === 'JSXIdentifier' && /^[A-Z]/.test(nameNode.name)
+        nameNode.type === 'JSXIdentifier' && !ctx.intrinsicTags.has(nameNode.name)
       if (isComponent) {
         let propsSrc = ''
         let ok = true
@@ -450,7 +486,7 @@ function exprSrcOf(ast: any): string {
 
 /**
  * Transform a program AST in place. Returns stats, or null when the file
- * lacks the compile directive or contains nothing compilable.
+ * contains nothing compilable (no JSX at all).
  */
 export function transformProgram(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -458,7 +494,7 @@ export function transformProgram(
   source: string,
   options: CompilerOptions & { filename?: string } = {}
 ): { compiled: number; fellBack: number } | null {
-  if (!source.includes(COMPILE_DIRECTIVE)) return null
+  if (options.enabled === false) return null
 
   const ctx: GenContext & {
     navStatements: string[]
@@ -476,6 +512,7 @@ export function transformProgram(
     wireStatements: [],
     ssrParts: [],
     source,
+    intrinsicTags: options.intrinsicTags ?? DEFAULT_INTRINSIC_TAGS,
   }
 
   let compiled = 0
@@ -579,14 +616,14 @@ export interface CompileModuleResult {
 }
 
 /**
- * Compile a TSX/JSX module. Returns null when the file lacks the
- * {@link COMPILE_DIRECTIVE} or contains nothing compilable.
+ * Compile a TSX/JSX module. Static hoisting is ON by default (no directive
+ * needed); returns null when disabled, or when the file contains no JSX.
  */
 export function compileModule(
   code: string,
   options: CompilerOptions & { filename?: string } = {}
 ): CompileModuleResult | null {
-  if (!code.includes(COMPILE_DIRECTIVE)) return null
+  if (options.enabled === false) return null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let ast: any
@@ -601,6 +638,8 @@ export function compileModule(
 
   const stats = transformProgram(ast, code, { ...options, filename: options.filename })
   if (stats === null) return null
+  // 无 JSX（compiled=0 且 fellBack=0）→ 不处理，返回 null
+  if (stats.compiled === 0 && stats.fellBack === 0) return null
 
   const out = generate(ast, {
     sourceMaps: true,

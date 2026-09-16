@@ -177,15 +177,18 @@ export function registerApp(
 }
 
 // ── JSX Type Namespace (for jsxImportSource) ───────────────────────────
-// Self-contained — no dependency on @rasenjs/jsx.
+// Reuses the shared JSX namespace boilerplate from @rasenjs/core.
+// (interface can't extend an import expression — TS2499 — so alias first.)
+
+type _JSXElementChildrenAttribute = import('@rasenjs/core').JSXElementChildrenAttribute
+type _JSXIntrinsicAttributes = import('@rasenjs/core').JSXIntrinsicAttributes
 
 export namespace JSX {
   export interface IntrinsicElements {
     [tag: string]: Record<string, unknown>
   }
-  // Mountable is already imported at top of file
-  export type Element = import('@rasenjs/core').Mountable<unknown>
-  export interface ElementChildrenAttribute { children: unknown }
-  export interface IntrinsicAttributes { key?: string | number }
+  export type Element = import('@rasenjs/core').JSXElement
+  export interface ElementChildrenAttribute extends _JSXElementChildrenAttribute {}
+  export interface IntrinsicAttributes extends _JSXIntrinsicAttributes {}
 }
 
