@@ -35,6 +35,8 @@ describe('compileModule', () => {
     expect(r.compiled).toBe(1)
     expect(r.code).toMatch(/template\('<td class="c"> <\/td>'\)/)
     expect(r.code).toContain('bindText(')
+    // renderText unwraps a ref through the runtime before stringifying;
+    // plain String() would turn a signal into "[object Object]".
     expect(r.code).toContain('renderText(item.label)')
   })
 
@@ -99,14 +101,34 @@ const b = <><span>y</span></>`
     expect(r.code).not.toContain('template(')
   })
 
-  it('混合静态+动态文本：静态烧入，动态 bindText', () => {
+  // A text run (static text and/or dynamic values with no element between
+  // them) collapses into ONE text node once the browser parses the markup, so
+  // the whole run is written by a single binding at the run's own index.
+  // Previously the navigation asked for index 1 while only one text node
+  // existed (it asserted the defect) and `bindText` threw at mount.
+  it('混合静态+动态文本：整段一个绑定（单个文本节点）', () => {
     const code = `const el = <td>Hello {name}</td>`
     const r = compileModule(code)!
     expect(r.compiled).toBe(1)
     expect(r.fellBack).toBe(0)
-    expect(r.code).toMatch(/template\('<td>Hello <\/td>'\)/)
-    expect(r.code).toContain('bindText')
-    expect(r.code).toContain('renderText(name)')
+    // the binding owns the node, so the template holds a bare placeholder
+    expect(r.code).toMatch(/template\('<td> <\/td>'\)/)
+    // one binding, at index 0, rebuilding the whole run
+    expect(r.code).toContain('child(_r0, 0)')
+    expect(r.code).toContain('bindText(_x1, () => `Hello ${renderText(name)}`)')
+    // SSR emits the value in place — same single text node
+    expect(r.code).toContain('`<td>Hello ${escapeHtml(renderText(name))}</td>`')
+  })
+
+  it('多插值同一文本段：仍然只有一个绑定', () => {
+    const code = `const el = <p>a {x} b {y} c</p>`
+    const r = compileModule(code)!
+    expect(r.compiled).toBe(1)
+    expect(r.code).toContain('child(_r0, 0)')
+    expect(r.code).toContain(
+      'bindText(_x1, () => `a ${renderText(x)} b ${renderText(y)} c`)'
+    )
+    expect(r.code).not.toContain('child(_r0, 1)')
   })
 
   it('嵌套元素：递归编译，深层路径导航', () => {
@@ -159,9 +181,10 @@ const b = <span class="t">{y}</span>`
     expect(r.code).toContain('</td></tr>`')
     // 动态 class 插值（转义）
     expect(r.code).toContain('class="${escapeAttr(String(cls))}"')
-    // 动态文本插值（转义）
+    // 动态文本插值（转义）—— 纯动态文本段：空值兜底为一个空格，
+    // 与客户端模板里的占位文本节点同类型（注释会是另一种节点，导致水合错位）
     expect(r.code).toContain(
-      "${escapeHtml(renderText(item.label)) || '<!-- -->'}"
+      "${escapeHtml(renderText(item.label)) || ' '}"
     )
     // 静态属性烤入
     expect(r.code).toContain('<td class="c">')

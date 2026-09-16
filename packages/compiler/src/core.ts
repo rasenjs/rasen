@@ -145,10 +145,34 @@ function escapeAttr(s: string): string {
     .replace(/>/g, '&gt;')
 }
 
-function jsxTextToHtml(node: BabelTypes.JSXText): string | null {
+/** Encode a template HTML chunk as the body of a single-quoted JS string.
+ *  Backslashes must be escaped first, otherwise the escapes added below would
+ *  be escaped themselves. */
+function toSingleQuoted(s: string): string {
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+}
+
+/** Normalize a JSX text child to the string a browser would produce.
+ *
+ *  JSX text semantics: only whitespace that *contains a line break* is removed
+ *  (at the edges) or collapsed (in the middle); a plain space next to an
+ *  expression is significant (`is {x}` must not become `is{x}`). Collapsing
+ *  line breaks is also required by the template contract: the generated HTML is
+ *  embedded in a string literal, so a raw newline would split that literal.
+ *
+ *  Returns the RAW text (not HTML-escaped): the caller decides whether it ends
+ *  up in markup (escape it) or in a text-node write (keep it raw). */
+function normalizeJsxText(node: BabelTypes.JSXText): string | null {
   const raw = node.value
   if (!/\S/.test(raw)) return null // whitespace-only between tags → dropped
-  return escapeHtml(raw.trim())
+  return raw
+    .replace(/^[ \t]*\r?\n[ \t]*/, '')
+    .replace(/[ \t]*\r?\n[ \t]*$/, '')
+    .replace(/\s*\r?\n\s*/g, ' ')
 }
 
 /** Parse a snippet and return its single expression AST node. */
@@ -360,15 +384,86 @@ function compileElement(
   ctx.ssrParts.push('>')
 
   // ── children ────────────────────────────────────────────────────────
+  // Text children are grouped into *runs*: a maximal sequence of text /
+  // expression children with no element in between. Adjacent static text and a
+  // dynamic placeholder end up in the SAME text node once the browser parses
+  // the markup (`<td>Hello {x}</td>` is one text node, not two), so a run that
+  // contains any dynamic value must be written by a SINGLE binding that
+  // rebuilds the whole string — otherwise the generated navigation asks for a
+  // child index that does not exist and `bindText` throws at mount.
   let childIndex = 0
+  type RunPart =
+    | { kind: 'static'; raw: string }
+    | { kind: 'expr'; src: string }
+  let run: RunPart[] = []
+
+  const flushRun = () => {
+    if (run.length === 0) return
+    const hasExpr = run.some((p) => p.kind === 'expr')
+
+    if (!hasExpr) {
+      // Pure static run → bake into the template (one text node).
+      const raw = run.map((p) => (p as { raw: string }).raw).join('')
+      html += escapeHtml(raw)
+      ctx.ssrParts.push(escapeTemplateLiteral(escapeHtml(raw)))
+      childIndex++
+      run = []
+      return
+    }
+
+    ctx.helpers.add('child')
+    ctx.helpers.add('bindText')
+    ctx.helpers.add('renderText')
+    const x = `_x${ctx.counter++}`
+    ctx.navStatements.push(`const ${x} = child(${selfRef()}, ${childIndex})`)
+
+    // Client: rebuild the run from raw text + runtime-unwrapped values.
+    const clientBody = run
+      .map((p) =>
+        p.kind === 'static'
+          ? escapeTemplateLiteral(p.raw)
+          : `\${renderText(${p.src})}`
+      )
+      .join('')
+    ctx.wireStatements.push(
+      `offs.push(bindText(${x}, () => \`${clientBody}\`))`
+    )
+
+    // SSR: values are emitted in place, so server markup and the client
+    // template hold the same single text node (hydration indices align).
+    // NOTE: these are fragments of ONE template literal (ctx.ssrParts is
+    // concatenated into it) — never wrap a fragment in backticks.
+    ctx.helpers.add('escapeHtml')
+    const ssrBody = run
+      .map((p) =>
+        p.kind === 'static'
+          ? escapeTemplateLiteral(escapeHtml(p.raw))
+          : `\${escapeHtml(renderText(${p.src}))}`
+      )
+      .join('')
+    const hasStaticText = run.some((p) => p.kind === 'static' && p.raw !== '')
+    if (hasStaticText) {
+      ctx.ssrParts.push(ssrBody)
+    } else {
+      // A run made only of dynamic values can evaluate to ''; the node must
+      // still exist on the server, so fall back to the single space the client
+      // template holds (a comment would be a different node kind).
+      const concat = run
+        .map((p) => `escapeHtml(renderText(${(p as { src: string }).src}))`)
+        .join(' + ')
+      ctx.ssrParts.push(`\${(${concat}) || ' '}`)
+    }
+
+    // Client template: the binding owns this node's content.
+    html += ' '
+    childIndex++
+    run = []
+  }
+
   for (const c of node.children) {
     if (c.type === 'JSXText') {
-      const h = jsxTextToHtml(c)
-      if (h !== null) {
-        html += h
-        ctx.ssrParts.push(escapeTemplateLiteral(h))
-        childIndex++
-      }
+      const raw = normalizeJsxText(c)
+      if (raw !== null) run.push({ kind: 'static', raw })
       continue
     }
     if (c.type === 'JSXExpressionContainer') {
@@ -376,32 +471,15 @@ function compileElement(
       // Element-producing expressions (cond && <span/>, list.map(...), …)
       // are not text — fall back to the factory chain for this subtree.
       if (containsJsxOrArray(c.expression)) return null
-      // dynamic text placeholder at current childIndex
-      html += ' '
-      const holder = selfRef()
-      const x = `_x${ctx.counter++}`
-      ctx.helpers.add('child')
-      ctx.navStatements.push(`const ${x} = child(${holder}, ${childIndex})`)
-      const exprSrc = ctx.source.slice(c.expression.start!, c.expression.end!)
-      // React-style text filtering: null/undefined/booleans render as ''
-      ctx.wireStatements.push(
-        `offs.push(bindText(${x}, () => renderText(${exprSrc})))`
-      )
-      ctx.helpers.add('renderText')
-      ctx.helpers.add('bindText')
-      // SSR: real text replaces the placeholder positionally; escaped like
-      // the html package's text serialization so hydration aligns.
-      // Empty text must still occupy a childNode slot on the server (the
-      // client template has a placeholder text node there) — emit a comment
-      // as the stand-in, otherwise navigation indices shift.
-      ctx.ssrParts.push(
-        `\${escapeHtml(renderText(${exprSrc})) || '<!-- -->'}`
-      )
-      ctx.helpers.add('escapeHtml')
-      childIndex++
+      run.push({
+        kind: 'expr',
+        src: ctx.source.slice(c.expression.start!, c.expression.end!)
+      })
       continue
     }
     if (c.type === 'JSXElement') {
+      // A run always ends where an element begins.
+      flushRun()
       // 组件子节点（不在宿主内置标签清单里）→ slot anchor + runtime mount.
       // Attributes must be plain JSXAttributes with simple expressions
       // (no spreads); children of components are not supported yet.
@@ -473,6 +551,8 @@ function compileElement(
     }
     return null // fragment / spread child → fallback
   }
+
+  flushRun() // trailing text run
 
   const closing = `</${tag}>`
   html += closing
@@ -572,7 +652,12 @@ export function transformProgram(
         `  const ${rootVar} = ${tplName}(node)`,
         navBlock,
         wireBlock,
-        `  return () => { for (const f of offs) f() }`,
+        // Unmount must also detach the acquired root: the factory path's
+        // element removes its own element, and structural components
+        // (match/when/each) rely on that — a compiled component that only
+        // stops its bindings leaves its DOM in place, so swapping a branch
+        // would accumulate one subtree per switch.
+        `  return () => { for (const f of offs) f(); if (hooks && hooks.detach) hooks.detach(${rootVar}); else ${rootVar}.remove?.() }`,
         `}`,
       ]
         .filter((l) => l !== '')
@@ -598,7 +683,7 @@ export function transformProgram(
     ? parseStatements(`import { setValue } from '@rasenjs/core'`)
     : []
   const templateDecls = ctx.templates.flatMap((t) =>
-    parseStatements(`const ${t.name} = template('${t.html.replace(/'/g, "\\'")}')`)
+    parseStatements(`const ${t.name} = template('${toSingleQuoted(t.html)}')`)
   )
 
   const prelude = [...coreImport, ...templateImport, ...templateDecls]
