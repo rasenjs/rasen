@@ -127,9 +127,10 @@ function matchComponent<K extends string = string, N = unknown>(
 
         if (!factory) return
 
-        // 有界宿主：子树的所有追加都落在标记之前。
-        const targetHost =
-          marker && hooks?.boundedHost ? hooks.boundedHost(node, marker) : node
+        // 有界宿主：分支先挂到暂存区，再一次性插到标记之前。
+        // 与 each 同一模式（batch），不再用 Proxy 伪装宿主。
+        const batch = marker && hooks?.batch ? hooks.batch(node) : undefined
+        const targetHost = batch ? batch.parent : node
 
         const mountable =
           key != null && factory !== config.default && !Array.isArray(config.cases)
@@ -137,6 +138,7 @@ function matchComponent<K extends string = string, N = unknown>(
             : (factory as () => Mountable<N>)()
 
         currentUnmount = mountable(targetHost, hooks)
+        if (batch && marker) batch.flush(node, marker)
       }
 
       // Unwrap PropValue (function / ref / plain) via the active runtime.

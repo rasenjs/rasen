@@ -9,8 +9,8 @@
  *  - createMarker：创建标记（Comment），只创建不挂载，位置由 insert 决定
  *  - createText：创建游离文本节点，返回句柄（node + update）
  *  - insert / detach / nextSibling：定位与区间遍历原语
- *  - boundedHost：有界宿主视图，子树追加全部落在标记之前
- *  - batch：DocumentFragment 批量插入
+ *  - batch：DocumentFragment 批量插入（有界挂载的唯一方式：子树挂到 fragment，
+ *    再一次性插到 ref 之前。不再用 Proxy 伪装宿主。）
  */
 
 import type { TextHandle } from '@rasenjs/core'
@@ -118,30 +118,6 @@ export const hostHooks = {
         textNode.textContent = v
       },
     }
-  },
-
-  /**
-   * 有界宿主：透传所有宿主属性（ownerDocument 等），
-   * 只拦截 appendChild / insertBefore 重定向到标记之前。
-   */
-  boundedHost: (parent: HTMLElement, marker: Node): HTMLElement => {
-    return new Proxy(parent, {
-      get(target, prop, receiver) {
-        if (prop === 'appendChild') {
-          return (node: Node) => {
-            guardedInsertBefore(target, node, marker)
-            return node
-          }
-        }
-        if (prop === 'insertBefore') {
-          return (node: Node, ref: Node | null) => {
-            guardedInsertBefore(target, node, ref || marker)
-            return node
-          }
-        }
-        return Reflect.get(target, prop, receiver)
-      },
-    }) as HTMLElement
   },
 
   /** DocumentFragment 批量插入：在暂存宿主上挂载，flush 时一次性落位 */

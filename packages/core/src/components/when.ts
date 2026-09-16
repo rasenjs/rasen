@@ -70,14 +70,14 @@ function whenComponent<N = unknown>(
         const factory = branch === 'then' ? config.then : config.else
         if (!factory) return
 
-        // 有界宿主：子树的所有追加都落在标记之前。
-        // 无 boundedHost 能力时直接使用宿主（位置不精确但功能正确）。
-        const targetHost =
-          marker && hooks?.boundedHost ? hooks.boundedHost(node, marker) : node
+        // 有界宿主：分支先挂到暂存区，再一次性插到标记之前（与 match/each 一致）。
+        const batch = marker && hooks?.batch ? hooks.batch(node) : undefined
+        const targetHost = batch ? batch.parent : node
 
         const mountableChild = factory()
         if (!mountableChild) return
         currentUnmount = mountableChild(targetHost, hooks)
+        if (batch && marker) batch.flush(node, marker)
         currentBranch = branch
       }
 
