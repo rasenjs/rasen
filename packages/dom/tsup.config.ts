@@ -9,7 +9,13 @@ export default defineConfig({
   },
   format: ['esm', 'cjs'],
   dts: true,
-  splitting: false,
+  // Entries must share module state. With `splitting: false` every entry
+  // inlines its own copy of the package's internal modules, so the hydration
+  // cursor set by hydrate() (entry `index`) is invisible to the compiled path
+  // (entry `template`): compiled components then never adopt the
+  // server-rendered DOM. Other singleton state (event delegation, image
+  // adapter) has the same hazard.
+  splitting: true,
   sourcemap: true,
   clean: true,
   treeshake: true,

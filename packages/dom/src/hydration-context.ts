@@ -1,7 +1,13 @@
 /**
  * Hydration 上下文
  *
- * 管理客户端水合过程中的 DOM 遍历状态
+ * 管理客户端水合过程中的 DOM 遍历状态。
+ *
+ * ⚠️ 状态必须是**单例**：本包有多个入口（index/template/jsx-runtime/bindings），
+ * 若每个入口各内联一份模块状态（tsup `splitting: false`），`hydrate()`（走
+ * `index` 入口）设的游标对编译产物（`template` 入口）不可见，编译组件就不会
+ * 认领服务端 DOM。把状态放在 core 能解决但会把宿主状态混入 core；因此这里保持
+ * 宿主内聚，靠打包层保证单例（见 tsup.config.ts 的 `splitting: true`）。
  */
 
 export interface HydrationContext {
