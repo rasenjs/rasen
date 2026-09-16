@@ -1,0 +1,30 @@
+{
+  "//": [
+    "Typecheck-only config for the Perry example.",
+    "",
+    "Perry erases types, so it will compile nonsense that tsc rejects. This config",
+    "exists to catch misuse of the WebGPU / Spine API surfaces before paying for a",
+    "native build: `yarn tsc -p .`",
+    "",
+    "`perry/ui` is not an npm package — the compiler injects it, and the runtime has",
+    "no published declarations. The vendored copies under `types/perry/` are taken",
+    "from the Perry source tree (`types/perry/*/index.d.ts`) so the example can be",
+    "typechecked without a checkout present."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "perry/ui": ["types/perry/ui/index.d.ts"],
+      "perry/thread": ["types/perry/thread/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "types/**/*.d.ts"]
+}

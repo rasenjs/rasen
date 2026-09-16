@@ -3486,6 +3486,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@perryts/webgpu@npm:^0.3.0":
+  version: 0.3.0
+  resolution: "@perryts/webgpu@npm:0.3.0"
+  checksum: 10c0/65ccea38fed25ef5cd294a8bd2c5f0e1b4e74662edd3a8f1d91df18b68b5bcc7732d49ed67f56817af49d7ef510cdc448ae2f08ce63b1797101d5a07f1e3fe0e
+  languageName: node
+  linkType: hard
+
 "@pixi-spine/base@npm:^4.0.6":
   version: 4.0.6
   resolution: "@pixi-spine/base@npm:4.0.6"
@@ -4048,8 +4055,8 @@ __metadata:
 
 "@rasenjs/assets@file:../../packages/assets::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=99208f&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
-  checksum: 10c0/eff6854ef7aaf3f01f95192ed6141b84f5c9feafd0bb5b875e759415795bef55c65383cad4ef9963978ab4022e0f08cae798c541abdbd17ddbb99c14cfe0f677
+  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=6ffe05&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  checksum: 10c0/2faae0314b8957d3f5480c58319782ca0ad279aa653a18a4b53cb26157930c43c5c85fee2e162ef36fe0898dbdf3b48774a1230d6f28c1e32bfb3939f1d09275
   languageName: node
   linkType: hard
 
@@ -4138,13 +4145,13 @@ __metadata:
 
 "@rasenjs/dom@file:../../packages/dom::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=68d457&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=a80d8f&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/gfx": "workspace:*"
-  checksum: 10c0/82e0e926e34f24d6b1895a68dd9deeee0970ea0e16bd24d45253c63cb72fbe24edc704bf2a333b781ebf302b80da526d1023292b2a8967af62df3a2e3de30bb4
+  checksum: 10c0/f458600299e091b462a3d9c31bbe19e0f228c4e58ce86314b7016005ac8bee7ef63549be7002f40438b43df77043ee2325f4ddf628a1527df08aaad9ba983734
   languageName: node
   linkType: hard
 
@@ -4277,6 +4284,33 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@rasenjs/examples-perry-nikke-viewer@workspace:examples/perry-nikke-viewer":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/examples-perry-nikke-viewer@workspace:examples/perry-nikke-viewer"
+  dependencies:
+    "@perryts/webgpu": "npm:^0.3.0"
+    "@rasenjs/assets": "workspace:*"
+    "@rasenjs/core": "workspace:*"
+    "@rasenjs/gfx": "workspace:*"
+    "@rasenjs/math": "workspace:*"
+    "@rasenjs/reactive-alien-signals": "workspace:*"
+    typescript: "npm:^5.3.3"
+  languageName: unknown
+  linkType: soft
+
+"@rasenjs/examples-perry-spine@workspace:examples/perry-spine":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/examples-perry-spine@workspace:examples/perry-spine"
+  dependencies:
+    "@perryts/webgpu": "npm:^0.3.0"
+    "@rasenjs/assets": "workspace:*"
+    "@rasenjs/core": "workspace:*"
+    "@rasenjs/gfx": "workspace:*"
+    "@rasenjs/math": "workspace:*"
+    "@rasenjs/reactive-alien-signals": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
 "@rasenjs/examples-racing@workspace:examples/racing":
   version: 0.0.0-use.local
   resolution: "@rasenjs/examples-racing@workspace:examples/racing"
@@ -4335,23 +4369,23 @@ __metadata:
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=b1dcef&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=50fcc8&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/d244c8f64899d0574fd43c2274afdd99a27c58f771b81a78166d80b841e6d6f4194244445da1f6d8a663411a100af4794e16a03409bd773e636df87b2966ab87
+  checksum: 10c0/2d5c137d097f7afdceda3dfc473cde2843a1f070818fb8514bc0276e6b533f9be21e82c8186b64ead59300f811b1694b5a7ef4f75af1988096935d6dd8509ff1
   languageName: node
   linkType: hard
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=b1dcef&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=50fcc8&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/d244c8f64899d0574fd43c2274afdd99a27c58f771b81a78166d80b841e6d6f4194244445da1f6d8a663411a100af4794e16a03409bd773e636df87b2966ab87
+  checksum: 10c0/2d5c137d097f7afdceda3dfc473cde2843a1f070818fb8514bc0276e6b533f9be21e82c8186b64ead59300f811b1694b5a7ef4f75af1988096935d6dd8509ff1
   languageName: node
   linkType: hard
 

@@ -1,0 +1,5 @@
+# Compiled binaries (the build is `yarn build`; ~34 MB each).
+dist/
+
+# Perry's per-package caches.
+node_modules/.cache/

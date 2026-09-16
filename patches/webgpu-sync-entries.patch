@@ -1,0 +1,141 @@
+--- node_modules/@perryts/webgpu/src/index.ts	2026-09-12 17:12:30
++++ examples/perry-spine/node_modules/@perryts/webgpu/src/index.ts	2026-09-12 17:43:27
+@@ -1288,3 +1288,22 @@
+ export function surfaceDrop(_surface: GPUSurface): void {
+   throw new Error(NOT_NATIVE);
+ }
++
++// WORKAROUND sync entries (see lib.rs) — bypass the promise-object bug.
++export function adapterRequestDeviceSync(_adapter: GPUAdapter): GPUDevice {
++  throw new Error(NOT_NATIVE);
++}
++export function deviceGetQueueSync(_device: GPUDevice): GPUQueue {
++  throw new Error(NOT_NATIVE);
++}
++
++/**
++ * Release a texture view handle. Spec-extra: browsers garbage-collect views,
++ * but a native handle registry does not — a per-frame `textureCreateView`
++ * without this leaks the view and keeps the swapchain texture (and therefore
++ * the Metal drawable) alive, which stalls `surfaceGetCurrentTexture` once the
++ * drawable pool is exhausted.
++ */
++export function textureViewDestroy(_view: GPUTextureView): void {
++  throw new Error(NOT_NATIVE);
++}
+--- node_modules/@perryts/webgpu/src/lib.rs	2026-09-12 17:12:30
++++ examples/perry-spine/node_modules/@perryts/webgpu/src/lib.rs	2026-09-13 11:13:35
+@@ -241,6 +241,53 @@
+         }
+     });
+     raw
++}
++
++// wgpu 22 has no Device::queue() accessor, so stash the queue from
++// request_device in a side table keyed by the device handle.
++fn sync_queue_slot() -> &'static std::sync::Mutex<std::collections::HashMap<Handle, Queue>> {
++    static SLOT: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<Handle, Queue>>> =
++        std::sync::OnceLock::new();
++    SLOT.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
++}
++
++// WORKAROUND (Perry promise-object bug): the async adapter_request_device
++// resolves a {device, queue} object, but Perry's native-async completion
++// channel drops object pointers (JS side sees `null`). Device creation is
++// already synchronous internally (pollster::block_on); expose sync entries.
++#[no_mangle]
++pub extern "C" fn js_webgpu_adapter_request_device_sync(adapter_handle: Handle) -> Handle {
++    let outcome = with_handle::<WGPUAdapter, _, _>(adapter_handle, |a| {
++        pollster::block_on(a.0.request_device(
++            &wgpu::DeviceDescriptor {
++                label: Some("perry-webgpu-device"),
++                required_features: wgpu::Features::empty(),
++                required_limits: wgpu::Limits::downlevel_defaults(),
++                memory_hints: wgpu::MemoryHints::default(),
++            },
++            None,
++        ))
++    });
++    match outcome {
++        Some(Ok((device, queue))) => {
++            let dev_h = register_handle(WGPUDevice(device));
++            sync_queue_slot().lock().unwrap().insert(dev_h, queue);
++            dev_h
++        }
++        _ => 0,
++    }
++}
++
++#[no_mangle]
++pub extern "C" fn js_webgpu_device_get_queue_sync(device_handle: Handle) -> Handle {
++    let queue = sync_queue_slot().lock().unwrap().remove(&device_handle);
++    match queue {
++        Some(q) => register_handle(WGPUQueue {
++            queue: q,
++            device_handle,
++        }),
++        None => 0,
++    }
+ }
+ 
+ /// `adapter.drop()` — synchronous handle release. The spec doesn't
+@@ -1121,7 +1168,7 @@
+ /// encoder; subsequent calls on the encoder handle are no-ops.
+ #[no_mangle]
+ pub extern "C" fn js_webgpu_command_encoder_finish(encoder_handle: Handle) -> Handle {
+-    with_handle::<WGPUCommandEncoder, _, _>(encoder_handle, |ce| {
++    let out = with_handle::<WGPUCommandEncoder, _, _>(encoder_handle, |ce| {
+         let encoder = match ce.0.lock().take() {
+             Some(e) => e,
+             None => return 0,
+@@ -1129,7 +1176,11 @@
+         let cb = encoder.finish();
+         register_handle(WGPUCommandBuffer(Mutex::new(Some(cb))))
+     })
+-    .unwrap_or(0)
++    .unwrap_or(0);
++    // The encoder payload was taken above; its registry entry is dead weight.
++    let _ = take_handle::<WGPUCommandEncoder>(encoder_handle);
++    drop_handle(encoder_handle);
++    out
+ }
+ 
+ /// `pass.setPipeline(pipeline)` — synchronous.
+@@ -1225,6 +1276,9 @@
+         if let Some(cb) = taken {
+             buffers.push(cb);
+         }
++        // The payload was consumed above; reclaim the registry entry.
++        let _ = take_handle::<WGPUCommandBuffer>(*h);
++        drop_handle(*h);
+     }
+ 
+     let _ = with_handle::<WGPUQueue, _, _>(queue_handle, |q| {
+@@ -1580,6 +1634,18 @@
+     drop_handle(texture_handle);
+ }
+ 
++/// Release a texture view handle.
++///
++/// Without this the per-frame `createView` handle (and the swapchain texture
++/// it keeps alive) is never reclaimed, so the CAMetalLayer drawable pool
++/// (`maximumDrawableCount = desired_maximum_frame_latency + 1`) drains and the
++/// next `Surface::get_current_texture()` blocks the calling thread forever.
++#[no_mangle]
++pub extern "C" fn js_webgpu_texture_view_destroy(view_handle: Handle) {
++    let _ = take_handle::<WGPUTextureView>(view_handle);
++    drop_handle(view_handle);
++}
++
+ #[derive(Deserialize, Default)]
+ struct SamplerDescriptor {
+     #[serde(default)]
+@@ -3549,6 +3615,8 @@
+             .iter()
+             .map(|s| parse_texture_format(s))
+             .collect(),
++        // macOS FIFO swapchain deadlocks when >1 frame is in
++        // flight and the JS pump is slower than the GPU.
+         desired_maximum_frame_latency: 2,
+     };
+ 

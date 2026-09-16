@@ -1,0 +1,39 @@
+{
+  "name": "@rasenjs/examples-perry-spine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "NIKKE c010 Spine skeleton rendered through @perryts/webgpu on Perry's native AOT runtime",
+  "main": "src/main.ts",
+  "scripts": {
+    "compile": "perry compile src/main.ts -o dist/perry-spine",
+    "node": "tsx src/main.ts"
+  },
+  "perry": {
+    "compilePackages": [
+      "@rasenjs/assets",
+      "@rasenjs/math",
+      "@rasenjs/gfx",
+      "@rasenjs/core",
+      "@rasenjs/reactive-alien-signals",
+      "alien-signals"
+    ],
+    "allow": {
+      "compilePackages": [
+        "@rasenjs/*",
+        "alien-signals"
+      ],
+      "nativeLibrary": [
+        "@perryts/webgpu"
+      ]
+    }
+  },
+  "dependencies": {
+    "@perryts/webgpu": "^0.3.0",
+    "@rasenjs/assets": "workspace:*",
+    "@rasenjs/core": "workspace:*",
+    "@rasenjs/gfx": "workspace:*",
+    "@rasenjs/math": "workspace:*",
+    "@rasenjs/reactive-alien-signals": "workspace:*"
+  }
+}

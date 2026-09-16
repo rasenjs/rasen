@@ -1,0 +1,30 @@
+{
+  "//": [
+    "Typecheck-only config for the Perry NIKKE viewer.",
+    "",
+    "Perry erases types, so it will compile nonsense that tsc rejects. This",
+    "config catches misuse of the rasen / WebGPU / perry-ui API surfaces before",
+    "paying for a native build: `yarn tsc -p .`",
+    "",
+    "`perry/ui` is not an npm package - the compiler injects it and the runtime",
+    "ships no declarations. The vendored copy under `types/perry/` comes from the",
+    "Perry source tree (`types/perry/ui/index.d.ts`) so this example typechecks",
+    "without a checkout present."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "perry/ui": ["types/perry/ui/index.d.ts"],
+      "perry/thread": ["types/perry/thread/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "types/**/*.d.ts"]
+}
