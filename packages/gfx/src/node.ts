@@ -57,6 +57,32 @@ export type Gl2Context = Omit<WebGL2RenderingContext, 'canvas'> & {
  */
 export type GlContext = Gl1Context | Gl2Context
 
+/**
+ * domlike WebGPU canvas context — `GPUCanvasContext` with its `canvas` member
+ * narrowed to the self-implemented surface shape, exactly as {@link GlContext}
+ * narrows WebGL's.
+ *
+ * This is the WebGPU analogue of the GL seam: the renderer receives the
+ * context, it never derives it from a canvas itself, so a host with no DOM
+ * supplies its own implementation instead of the library reaching for
+ * `navigator`/`HTMLCanvasElement`. Only two members are ever called:
+ * `configure` (once, at construction) and `getCurrentTexture` (once per
+ * frame).
+ *
+ * The host is responsible for:
+ *  - exposing the real drawing-buffer size through `canvas.width/height` —
+ *    the same physical-pixel values a browser `<canvas>` reports, which is
+ *    what `logicalWidth/logicalHeight` scale against;
+ *  - honouring `configure`'s `usage`, which includes `COPY_SRC` because
+ *    frame readback copies out of the current texture;
+ *  - presenting after the queue is submitted. A browser canvas context does
+ *    this implicitly; a host-owned swapchain presents there. Making it the
+ *    host's call keeps presentation off the renderer's critical path.
+ */
+export type GpuCanvasContext = Omit<GPUCanvasContext, 'canvas'> & {
+  readonly canvas: CanvasSurface
+}
+
 /** Live staging-span view returned by beginMesh (see BatchRenderer). */
 export type MeshSpan = ReturnType<Renderer['beginMesh']>
 

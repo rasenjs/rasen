@@ -7,7 +7,7 @@ import type { ReactiveRuntime, Ref } from '@rasenjs/core'
 import type { GlContext } from '../node'
 
 export {
-  createMockGPUCanvas,
+  createMockGPUContext,
   installMockNavigatorGPU,
   MockCommandEncoder,
   MockGPUDevice,

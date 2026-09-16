@@ -13,7 +13,7 @@ export {
 } from './renderer/gl/index'
 export type { CameraConfig } from './camera'
 export { isLookAtCamera, computeCameraMatrix } from './camera'
-export { createRoot, createNode, createRootNode, type GfxNode, type GlNode, type GlContext, type MeshSpan } from './node'
+export { createRoot, createNode, createRootNode, type GfxNode, type GlNode, type GlContext, type CanvasSurface, type GpuCanvasContext, type MeshSpan } from './node'
 export { TransformStack } from './transform-stack'
 export type { InstanceData } from './renderer/gl/instanced'
 export * from './components'
@@ -29,7 +29,13 @@ export { ShadowRenderer } from './renderer/gl/shadow'
 
 // The WebGPU renderer and its WGSL. Same layer as BatchRenderer above: one
 // renderer per graphics API, no invented vocabulary in between.
-export { WebGPURenderer, getWebGPURenderer, type WebGPURendererOptions } from './renderer/gpu/index'
+export {
+  WebGPURenderer,
+  getWebGPURenderer,
+  isRawPixelSource,
+  type WebGPURendererOptions,
+  type RawPixelSource,
+} from './renderer/gpu/index'
 export { createWebGPURoot } from './renderer/gpu/index'
 export {
   DEFAULT_VERTEX_WGSL,

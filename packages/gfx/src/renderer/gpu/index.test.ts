@@ -15,15 +15,17 @@
  * A mock device records writeBuffer/drawIndexed calls; no real adapter.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { WebGPURenderer } from './index'
 import {
-  createMockGPUCanvas,
+  createMockGPUContext,
   installMockNavigatorGPU,
   MockGPUDevice,
+  MockCommandEncoder,
   type MockGPUBuffer
 } from '../../test-utils'
 import type { BatchItem, GroupStreams } from '../base'
+import type { GpuCanvasContext } from '../../node'
 
 // The renderer touches WebGPU spec constants at construction; node has none.
 const g = globalThis as unknown as Record<string, unknown>
@@ -44,10 +46,14 @@ g.GPUTextureUsage ??= {
 g.GPUShaderStage ??= { VERTEX: 0x1, FRAGMENT: 0x2 }
 
 function makeRenderer(): { renderer: WebGPURenderer; device: MockGPUDevice } {
-  installMockNavigatorGPU()
-  const canvas = createMockGPUCanvas()
-  const device = (canvas as unknown as { __mockDevice: MockGPUDevice }).__mockDevice
-  const renderer = new WebGPURenderer(canvas, device as unknown as GPUDevice, {})
+  const ctx = createMockGPUContext()
+  const device = (ctx as unknown as { __mockDevice: MockGPUDevice }).__mockDevice
+  // Host-shaped: the format is stated, so `navigator.gpu` is never consulted.
+  // That is the construction path a non-DOM host takes, and it keeps these
+  // command-recording tests independent of a browser global.
+  const renderer = new WebGPURenderer(ctx, device as unknown as GPUDevice, {
+    format: 'bgra8unorm'
+  })
   return { renderer, device }
 }
 
@@ -92,6 +98,118 @@ function fakeStreams(vertices: number[]): GroupStreams {
     indices: null
   } as unknown as GroupStreams
 }
+
+describe('WebGPURenderer canvas-context seam', () => {
+  it('takes the injected context and never reaches for a canvas', () => {
+    // A domlike context whose `getContext` would throw if the renderer ever
+    // tried to derive a context from a canvas — the browser habit the seam
+    // removes.
+    const ctx = createMockGPUContext() as unknown as {
+      __mockDevice: MockGPUDevice
+    }
+    ;(ctx as unknown as Record<string, unknown>).getContext = () => {
+      throw new Error('renderer must not call canvas.getContext()')
+    }
+    const renderer = new WebGPURenderer(ctx as unknown as GpuCanvasContext,
+      ctx.__mockDevice as unknown as GPUDevice, { format: 'bgra8unorm' })
+    expect(renderer.ctx).toBe(ctx)
+  })
+
+  it('configures the context with COPY_SRC usage so readback is legal', () => {
+    const configure = vi.fn()
+    const ctx = { canvas: { width: 8, height: 8 }, configure,
+      getCurrentTexture: () => ({ createView: () => ({}) }) }
+    new WebGPURenderer(ctx as unknown as GpuCanvasContext,
+      new MockGPUDevice() as unknown as GPUDevice, { format: 'bgra8unorm' })
+    expect(configure).toHaveBeenCalledTimes(1)
+    const cfg = configure.mock.calls[0][0] as { format: string; usage: number }
+    expect(cfg.format).toBe('bgra8unorm')
+    // COPY_SRC must be present or copyTextureToBuffer is a validation error.
+    const texUsage = g.GPUTextureUsage as { COPY_SRC: number }
+    expect(cfg.usage & texUsage.COPY_SRC).toBeTruthy()
+  })
+
+  it('consults navigator.gpu only when no format is supplied', () => {
+    installMockNavigatorGPU()
+    const ctx = createMockGPUContext()
+    const device = (ctx as unknown as { __mockDevice: MockGPUDevice }).__mockDevice
+    const renderer = new WebGPURenderer(ctx, device as unknown as GPUDevice, {})
+    expect(renderer.ctx).toBe(ctx)
+  })
+
+  it('applies a clear colour given after construction, without a rebuild', () => {
+    // A host that lets the user pick a background writes it between frames, so
+    // the value has to be read when the pass is encoded rather than baked in at
+    // construction. The observable proof is the clearValue the render pass is
+    // opened with.
+    const ctx = createMockGPUContext()
+    const device = (ctx as unknown as { __mockDevice: MockGPUDevice }).__mockDevice
+    const renderer = new WebGPURenderer(ctx, device as unknown as GPUDevice,
+      { format: 'bgra8unorm', clearColor: '#000000' })
+
+    const clearOfLastPass = () => {
+      const d = device as unknown as { lastCommandEncoder: MockCommandEncoder }
+      const pass = d.lastCommandEncoder.renderPassDescriptors[
+        d.lastCommandEncoder.renderPassDescriptors.length - 1
+      ]
+      expect(pass).toBeDefined()
+      const clear = pass.colorAttachments?.[0]?.clearValue
+      expect(clear).toBeDefined()
+      return clear!
+    }
+
+    // Baseline: the constructor's colour, so the assertion below is known to be
+    // reading the live value rather than a constant.
+    const hooks = hooksOf(renderer)
+    hooks.beginFrame()
+    hooks.endFrame()
+    expect(clearOfLastPass().r).toBeCloseTo(0)
+
+    renderer.setClearColor('#ff8000')
+    hooks.beginFrame()
+    hooks.endFrame()
+
+    // #ff8000 — the colour set after construction, not the constructor's black.
+    const clear = clearOfLastPass()
+    expect(clear.r).toBeCloseTo(1)
+    expect(clear.g).toBeCloseTo(128 / 255)
+    expect(clear.b).toBeCloseTo(0)
+  })
+
+  it('sizes the frame readback from the live drawing buffer, not the mount-time size', async () => {
+    // The dom bridge resizes the DRAWING BUFFER and then calls `resize(logical
+    // …)` — so a readback that cached the constructor-time size would copy the
+    // wrong rectangle from the second frame after any resize onward. Asserting
+    // the pixel count is what catches that; asserting the projection changed
+    // would not.
+    const ctx = createMockGPUContext() as unknown as {
+      canvas: { width: number; height: number }
+      __mockDevice: MockGPUDevice
+    }
+    const device = ctx.__mockDevice
+    const renderer = new WebGPURenderer(ctx as unknown as GpuCanvasContext,
+      device as unknown as GPUDevice, { format: 'bgra8unorm' })
+
+    // One staged item, so flushAndRead's "scene produced no items" guard passes.
+    const mat = new Float32Array(16)
+    mat[0] = 1; mat[5] = 1; mat[15] = 1
+    renderer.addShape(
+      new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0]),
+      { r: 1, g: 1, b: 1, a: 1 },
+      { source: mat } as never,
+      new Float32Array([0, 1, 1, 1, 1, 0]),
+      null,
+    )
+
+    // dpr 2: 150x200 logical becomes a 300x400 drawing buffer.
+    ctx.canvas.width = 300
+    ctx.canvas.height = 400
+    renderer.resize(150, 200)
+
+    const out = await renderer.flushAndRead()
+    expect(out.length).toBe(300 * 400 * 4)
+  })
+})
 
 describe('WebGPURenderer deferred-queue semantics', () => {
   let renderer: WebGPURenderer

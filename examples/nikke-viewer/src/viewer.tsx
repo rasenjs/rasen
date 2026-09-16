@@ -36,7 +36,7 @@ import {
   type SkeletonData,
   type SpineAtlas
 } from '@rasenjs/assets'
-import { spine as SpineWebgl, getWebGPURenderer } from '@rasenjs/gfx'
+import { spine as SpineWebgl, getWebGPURenderer, type GpuCanvasContext } from '@rasenjs/gfx'
 import { spine as SpineCanvas } from '@rasenjs/canvas-2d'
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,17 @@ function refineFitFromPixels(): boolean {
     // the GL path measures. (A previous fallback here faked the whole canvas
     // as the content bbox, which clobbered the deterministic bone fit —
     // after a mode/model switch the camera disagreed with the other modes.)
-    const renderer = getWebGPURenderer(cv)
+    // `getWebGPURenderer` is keyed by the WebGPU CONTEXT, not by the canvas
+    // element — the renderer registry is a WeakMap the renderer populates with
+    // the object `getContext('webgpu')` handed it. Passing the element used to
+    // return null on every call, and because the callers treat null as "readback
+    // unavailable, keep the deterministic bone fit", the WebGPU pixel fit was
+    // silently dead: this mode alone never refined its framing and stayed at the
+    // un-refined bone fit, which reads as "WebGPU renders far less of the scene"
+    // even though the geometry it draws is identical. (TypeScript flagged the
+    // old call as TS2345; the example's typecheck was not part of the build.)
+    const gpuCtx = cv.getContext('webgpu') as GpuCanvasContext | null
+    const renderer = gpuCtx ? getWebGPURenderer(gpuCtx) : null
     if (!renderer || BW === 0 || BH === 0) return false
     const dpr0 = dpr
     const gen = fitGeneration
@@ -296,8 +306,11 @@ function refineFitFromPixels(): boolean {
         if (mxX < 0) return
         applyPixelFit(mnX, mnY, mxX, mxY, dpr0)
       })
-      .catch(() => {
-        /* readback failed — keep the deterministic bone fit */
+      .catch((err) => {
+        // Not silent: a readback failure here means this mode keeps the
+        // un-refined bone fit, which looks like missing content. Say so
+        // instead of leaving the user to compare screenshots.
+        console.warn('[nikke] WebGPU pixel fit readback failed:', err)
       })
     return true
   } else if (renderMode.value === 'webgl') {

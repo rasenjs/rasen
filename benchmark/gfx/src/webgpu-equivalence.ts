@@ -10,9 +10,21 @@
  */
 
 import { createRootNode, createNode, WebGLRenderer, WebGPURenderer } from '@rasenjs/gfx'
+import type { GpuCanvasContext } from '@rasenjs/gfx'
 import { Mat4x4f, mat4x4f } from '@rasenjs/math'
 
 const SIZE = 256
+
+/**
+ * The canvas' webgpu context, in the shape the renderer takes.
+ *
+ * `WebGPURenderer` receives its context by injection rather than digging one
+ * out of a canvas, so both the dom bridge and this gate hand it the same
+ * thing: the result of `canvas.getContext('webgpu')`.
+ */
+function gpuContext(canvas: HTMLCanvasElement): GpuCanvasContext {
+  return canvas.getContext('webgpu') as unknown as GpuCanvasContext
+}
 
 /** A 64x64 checkerboard with a gradient band, so UV flips and half-texel shifts
  *  are visible rather than plausible. */
@@ -162,9 +174,9 @@ async function drawWebGPU(scene: ReturnType<typeof quadScene>, image: HTMLCanvas
     console.error('[webgpu device error]', ev.error.message)
     ;(window as unknown as { __gpuError: string }).__gpuError = ev.error.message
   }) as never)
-  const renderer = new WebGPURenderer(canvas, device, {})
+  const renderer = new WebGPURenderer(gpuContext(canvas), device, {})
   renderer.setProjectionMatrix(ortho(SIZE, SIZE))
-  const root = createRootNode(renderer, canvas)
+  const root = createRootNode(renderer, gpuContext(canvas))
 
   // Texture-upload probe: copy 4 texels back from the uploaded atlas and
   // report them. An all-zero readback means copyExternalImageToTexture lost
@@ -315,7 +327,7 @@ async function main() {
       const gpu2 = (navigator as unknown as { gpu: { requestAdapter(): Promise<unknown> } }).gpu
       const adapter2 = await gpu2.requestAdapter()
       const device2 = await (adapter2 as unknown as { requestDevice(): Promise<GPUDevice> }).requestDevice()
-      const renderer2 = new WebGPURenderer(gpuCanvas, device2, {})
+      const renderer2 = new WebGPURenderer(gpuContext(gpuCanvas), device2, {})
       renderer2.setProjectionMatrix(ortho(SIZE, SIZE))
       const sw = await modelSwitchCheck(renderer2)
       results.modelSwitch = sw.switched

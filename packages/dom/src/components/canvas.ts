@@ -4,7 +4,7 @@ import type {
   CanvasNode,
   RenderContextOptions as Canvas2DRenderOptions
 } from '@rasenjs/canvas-2d'
-import type { GfxNode, GlContext, CameraConfig } from '@rasenjs/gfx'
+import type { GfxNode, GlContext, GpuCanvasContext, CameraConfig } from '@rasenjs/gfx'
 import { createRoot as createCanvas2DRoot } from '@rasenjs/canvas-2d'
 import { createRoot as createGlRoot, createRootNode, getRenderContext, WebGPURenderer, type WebGPURendererOptions, type WebGLRenderer as RenderContextType } from '@rasenjs/gfx'
 
@@ -190,7 +190,7 @@ export function canvas<T extends keyof HostTypes = '2d'>(
     const root =
       contextType === 'webgpu'
         ? createRootNode(
-            new WebGPURenderer(canvasEl, webgpuDevice as GPUDevice, {
+            new WebGPURenderer(ctx as GpuCanvasContext, webgpuDevice as GPUDevice, {
               schedule,
               clearColor: (props.renderOptions as WebGPURendererOptions | undefined)?.clearColor,
               continuousRender: (props.renderOptions as WebGPURendererOptions | undefined)?.continuousRender,
@@ -199,7 +199,7 @@ export function canvas<T extends keyof HostTypes = '2d'>(
               logicalHeight: height,
               camera: toValue(props.camera) as { x?: number; y?: number; zoom?: number } | undefined,
             }),
-            canvasEl
+            ctx
           )
         : contextType === '2d'
         ? createCanvas2DRoot(ctx as Parameters<typeof createCanvas2DRoot>[0], {

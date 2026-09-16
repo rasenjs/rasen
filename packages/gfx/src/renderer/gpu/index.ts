@@ -35,6 +35,7 @@ import { Mat4x4f } from '@rasenjs/math'
 import { computeCameraMatrix, type CameraConfig } from '../../camera'
 import { Renderer, MAX_TEXTURES_PER_DRAW, type BatchItem, type BlendMode, type GroupStreams, type TextureHandle } from '../base'
 import type { TransformState, TransformInput } from '../../transform-stack'
+import type { GpuCanvasContext } from '../../node'
 import {
   DEFAULT_FRAGMENT_WGSL,
   DEFAULT_VERTEX_WGSL,
@@ -76,25 +77,67 @@ interface DrawRange {
   baseVertex: number
 }
 
-/** Canvas → renderer registry. The dom bridge mounts the renderer internally;
- * hosts that need the instance back (e.g. an async pixel readback for a
- * camera fit) look it up by the canvas element. WeakMap: GC-friendly when a
- * canvas is unmounted and its renderer dropped. */
-const rendererByCanvas = new WeakMap<HTMLCanvasElement, WebGPURenderer>()
+/** Context → renderer registry, mirroring the GL backend's `getRenderContext`.
+ * One renderer per WebGPU context; hosts that need the instance back look it
+ * up by the context they passed in. WeakMap: GC-friendly when a context is
+ * dropped (the browser path implies its canvas goes with it). */
+const rendererByContext = new WeakMap<GpuCanvasContext, WebGPURenderer>()
 
-/** Get the WebGPURenderer previously mounted on this canvas, if any. */
-export function getWebGPURenderer(canvas: HTMLCanvasElement): WebGPURenderer | null {
-  return rendererByCanvas.get(canvas) ?? null
+/**
+ * A bitmap supplied as raw RGBA8 pixels rather than a platform bitmap object.
+ *
+ * This is the WebGPU-side analogue of the library's `BitmapSource = object`
+ * policy: the backend accepts whatever bitmap the host can produce and picks
+ * the upload path by shape at runtime. `copyExternalImageToTexture` only
+ * accepts platform images, so a host with no DOM (and therefore no `ImageData`
+ * or `ImageBitmap` class) hands its decoded bytes here and they go in through
+ * `writeTexture` instead.
+ *
+ * Bytes are tightly packed, row-major, top-left origin, straight (not
+ * premultiplied) alpha — i.e. `ImageData`'s layout, which is what a PNG
+ * decoder produces.
+ */
+export interface RawPixelSource {
+  readonly width: number
+  readonly height: number
+  readonly bytes: Uint8Array
+}
+
+/**
+ * Structural test for {@link RawPixelSource}.
+ *
+ * Deliberately not `instanceof Uint8Array`: hosts that wrap their own buffer
+ * objects would fail that check even though the bytes are addressable.
+ */
+export function isRawPixelSource(source: unknown): source is RawPixelSource {
+  if (!source || typeof source !== 'object') return false
+  const s = source as Partial<RawPixelSource>
+  if (typeof s.width !== 'number' || typeof s.height !== 'number') return false
+  const bytes = s.bytes as Uint8Array | undefined
+  return !!bytes && typeof bytes === 'object' &&
+    typeof (bytes as Uint8Array).byteLength === 'number'
+}
+
+/** Get the WebGPURenderer previously mounted on this context, if any. */
+export function getWebGPURenderer(context: GpuCanvasContext): WebGPURenderer | null {
+  return rendererByContext.get(context) ?? null
 }
 
 export class WebGPURenderer extends Renderer {
   get ctx(): unknown {
-    return this.canvas
+    // The backend context handle a child component may need — same value the
+    // GL backend exposes (its context), so node.ctx means one thing per tree.
+    return this.context
   }
   private device: GPUDevice
-  private canvas: HTMLCanvasElement
-  private context: GPUCanvasContext
+  /** The domlike canvas context this renderer draws into (see
+   *  GpuCanvasContext) — injected, never derived from a canvas here. */
+  private context: GpuCanvasContext
   private format: GPUTextureFormat
+  /** Surface extent in PHYSICAL pixels — the readback size. Camera math uses
+   *  the LOGICAL `width`/`height` fields declared above. */
+  private widthPx: number
+  private heightPx: number
 
   private uniforms: GPUBuffer
   private uniformData: Float32Array
@@ -121,6 +164,19 @@ export class WebGPURenderer extends Renderer {
   private indexBufferBytes = 0
 
   private shadowTexture: GPUTexture | null = null
+  /** Reused interleave + index-rebase scratch.
+   *
+   * Both were allocated per draw — `new Float32Array(vCount * 13)` for a spine
+   * mesh is tens of thousands of floats every frame, which is sustained GC
+   * pressure for no reason: the size is stable across a looping animation, so
+   * one buffer per size class is enough.
+   *
+   * Sized EXACTLY rather than "at least": the upload passes `scratch.buffer`
+   * whole, so an oversized scratch would upload trailing bytes that belong to
+   * the previous draw. Exact-size reuse therefore allocates only when the mesh
+   * size actually changes — which for a looping animation is never. */
+  private interleaveScratch: Float32Array | null = null
+  private indexScratch: Uint32Array | null = null
   /** Stable identity for cache keys: GPUTexture has no intrinsic id, and
    * every texture falling back to the same key made the bind-group cache
    * return the FIRST model's atlas forever ("vertices update, texture
@@ -152,21 +208,31 @@ export class WebGPURenderer extends Renderer {
   private height: number
   camera?: CameraConfig
 
-  constructor(canvas: HTMLCanvasElement, device: GPUDevice, options: WebGPURendererOptions = {}) {
+  constructor(
+    context: GpuCanvasContext,
+    device: GPUDevice,
+    options: WebGPURendererOptions = {}
+  ) {
     super(options)
     this.device = device
-    this.canvas = canvas
-    rendererByCanvas.set(canvas, this)
-    // Camera math works in LOGICAL pixels; the drawing buffer may be dpr×
-    // larger (the dom bridge sizes canvas.width = logical * dpr).
-    this.width = options.logicalWidth ?? canvas.width
-    this.height = options.logicalHeight ?? canvas.height
-    this.format = (navigator as unknown as { gpu: { getPreferredCanvasFormat(): GPUTextureFormat } }).gpu.getPreferredCanvasFormat()
-    const ctx = canvas.getContext('webgpu') as GPUCanvasContext | null
-    if (!ctx) throw new Error('WebGPU: canvas.getContext("webgpu") returned null')
-    this.context = ctx
+    this.context = context
+    rendererByContext.set(context, this)
+
+    // Camera math works in LOGICAL pixels; the surface is PHYSICAL — the
+    // host reports its drawing buffer in `canvas.width/height`, exactly the
+    // physical values a browser <canvas> exposes (the dom bridge sizes
+    // canvas.width = logical * dpr).
+    this.widthPx = context.canvas.width
+    this.heightPx = context.canvas.height
+    this.width = options.logicalWidth ?? this.widthPx
+    this.height = options.logicalHeight ?? this.heightPx
+
+    // Only a browser can answer this; a host passes the format its surface was
+    // created with (see GpuCanvasContext).
+    this.format = options.format
+      ?? (navigator as unknown as { gpu: { getPreferredCanvasFormat(): GPUTextureFormat } }).gpu.getPreferredCanvasFormat()
     // COPY_SRC is required to read the frame back (see note 1 in the class doc).
-    ctx.configure({
+    context.configure({
       device,
       format: this.format,
       alphaMode: 'premultiplied',
@@ -200,6 +266,17 @@ export class WebGPURenderer extends Renderer {
     this.applyCameraProjection()
   }
 
+  /**
+   * Replace the clear colour.
+   *
+   * Symmetric with `setCamera`: `this.clear` is read when the frame's render
+   * pass is encoded, so a host that lets the user pick a background can write it
+   * between frames instead of rebuilding the renderer.
+   */
+  setClearColor(color: string): void {
+    this.clear = parseColor(color)
+  }
+
   /** Same camera math as the WebGL renderer (computeCameraMatrix), so both
    * backends fit/pan/zoom identically — including the NDC-centering ortho
    * and the y-flip (an ad-hoc ortho here rendered the character upside
@@ -222,10 +299,13 @@ export class WebGPURenderer extends Renderer {
    * filtering in the sampler, GL in texParameteri, and the difference is a real
    * rendering difference, not a naming one.
    */
-  createTexture(source: HTMLImageElement | HTMLCanvasElement | ImageBitmap, options?: { minFilter?: number; magFilter?: number; wrapS?: number; wrapT?: number }): GPUTexture {
-    // The GL helper sizes the texture from the source; WebGPU needs it up front.
-    const width = (source as HTMLImageElement).naturalWidth ?? (source as HTMLCanvasElement).width
-    const height = (source as HTMLImageElement).naturalHeight ?? (source as HTMLCanvasElement).height
+  createTexture(source: HTMLImageElement | HTMLCanvasElement | ImageBitmap | RawPixelSource, options?: { minFilter?: number; magFilter?: number; wrapS?: number; wrapT?: number }): GPUTexture {
+    // Raw pixels carry their own size; platform bitmaps are measured.
+    const raw = isRawPixelSource(source) ? source : null
+    const width = raw ? raw.width
+      : ((source as HTMLImageElement).naturalWidth ?? (source as HTMLCanvasElement).width)
+    const height = raw ? raw.height
+      : ((source as HTMLImageElement).naturalHeight ?? (source as HTMLCanvasElement).height)
     if (!width || !height) throw new Error('WebGPU createTexture: source has no size')
     const texture = this.device.createTexture({
       size: { width, height },
@@ -235,7 +315,25 @@ export class WebGPURenderer extends Renderer {
       // the whole command buffer.
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
     })
-    this.device.queue.copyExternalImageToTexture({ source }, { texture }, { width, height })
+    if (raw) {
+      // `copyExternalImageToTexture` only accepts platform bitmaps, so bytes
+      // go in through `writeTexture`. Same data, same format; this is the
+      // branch that lets a DOM-less host upload a decoded PNG.
+      this.device.queue.writeTexture(
+        { texture },
+        // The DOM lib types this parameter as GPUAllowSharedBufferSource, which
+        // a plain Uint8Array satisfies structurally; the cast is the lib gap,
+        // not a real mismatch.
+        raw.bytes as unknown as GPUAllowSharedBufferSource,
+        { bytesPerRow: width * 4, rowsPerImage: height },
+        { width, height },
+      )
+    } else {
+      // `raw` was null, so `source` is one of the platform bitmap types — TS
+      // cannot narrow it back from the `raw` test, hence the cast.
+      const bitmap = source as GPUCopyExternalImageSource
+      this.device.queue.copyExternalImageToTexture({ source: bitmap }, { texture }, { width, height })
+    }
     // GL's default mag/min filter is NEAREST in this engine's helper (0x2600),
     // so mirror that rather than WebGPU's linear default.
     const nearest = options?.magFilter === undefined || options.magFilter === 0x2600
@@ -277,6 +375,23 @@ export class WebGPURenderer extends Renderer {
       usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     })
     this.indexBufferBytes = cap
+  }
+
+  /** Interleave scratch holding exactly `floats` floats. See the field note for
+   *  why the size is exact. */
+  private scratchFloats(floats: number): Float32Array {
+    if (!this.interleaveScratch || this.interleaveScratch.length !== floats) {
+      this.interleaveScratch = new Float32Array(floats)
+    }
+    return this.interleaveScratch
+  }
+
+  /** Index-rebase scratch holding exactly `count` indices. */
+  private scratchIndices(count: number): Uint32Array {
+    if (!this.indexScratch || this.indexScratch.length !== count) {
+      this.indexScratch = new Uint32Array(count)
+    }
+    return this.indexScratch
   }
 
   /** Destroy buffers replaced since the last submission. Call after every
@@ -335,7 +450,18 @@ export class WebGPURenderer extends Renderer {
 
   // -- frame hooks (Renderer frame loop) --------------------------------------
 
-  /** open the command buffer + single clear render pass; draws record into it */
+  /** This frame's surface texture. One call per frame — a host-owned
+   *  swapchain is expected to rotate its image on each call, and calling it
+   *  twice in a frame would hand out two different images. */
+  private currentTexture(): GPUTexture {
+    return this.context.getCurrentTexture()
+  }
+
+  /** The view draws render into. */
+  private currentTextureView(): GPUTextureView {
+    return this.currentTexture().createView()
+  }
+
   protected beginFrame(): void {
     this.writeFrameUniforms()
     // All data written last frame has been consumed (submit happened in
@@ -346,7 +472,7 @@ export class WebGPURenderer extends Renderer {
     this.framePass = encoder.beginRenderPass({
       colorAttachments: [
         {
-          view: this.context.getCurrentTexture().createView(),
+          view: this.currentTextureView(),
           loadOp: 'clear',
           storeOp: 'store',
           clearValue: { r: this.clear[0], g: this.clear[1], b: this.clear[2], a: this.clear[3] },
@@ -379,6 +505,11 @@ export class WebGPURenderer extends Renderer {
     }
     this.submitLoosePasses()
     this.flushPendingDestroys()
+    // Presentation is deliberately NOT done here. A browser canvas context
+    // presents implicitly; a host-owned swapchain presents on its own, once
+    // the queue is submitted (see GpuCanvasContext). Keeping it out lets the
+    // host choose, and keeps a host that reads the frame back from presenting
+    // a torn image.
   }
 
   /** Logical-size update from the dom bridge (which has already resized the
@@ -387,6 +518,12 @@ export class WebGPURenderer extends Renderer {
   resize(width: number, height: number) {
     this.width = width
     this.height = height
+    // Re-read the PHYSICAL size: the bridge resizes the drawing buffer before
+    // calling this (`canvas.width = logical * dpr`), and `flushAndRead` sizes
+    // its readback buffer from it. Caching the constructor-time value here
+    // would make every readback after a resize copy the wrong rectangle.
+    this.widthPx = this.context.canvas.width
+    this.heightPx = this.context.canvas.height
     this.applyCameraProjection()
     this.markDirty()
   }
@@ -428,15 +565,15 @@ export class WebGPURenderer extends Renderer {
     }
     pass.end()
 
-    const width = this.canvas.width
-    const height = this.canvas.height
+    const width = this.widthPx
+    const height = this.heightPx
     const bytesPerRow = Math.ceil((width * 4) / 256) * 256
     const readback = this.device.createBuffer({
       size: bytesPerRow * height,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     })
     encoder.copyTextureToBuffer(
-      { texture: this.context.getCurrentTexture() },
+      { texture: this.currentTexture() },
       { buffer: readback, bytesPerRow, rowsPerImage: height },
       { width, height }
     )
@@ -518,7 +655,7 @@ export class WebGPURenderer extends Renderer {
     const encoder = this.device.createCommandEncoder({})
     const pass = encoder.beginRenderPass({
       colorAttachments: [
-        { view: this.context.getCurrentTexture().createView(), loadOp: 'load', storeOp: 'store' },
+        { view: this.currentTextureView(), loadOp: 'load', storeOp: 'store' },
       ],
     })
     this.loosePasses.push({ encoder, pass })
@@ -571,7 +708,7 @@ export class WebGPURenderer extends Renderer {
     this.ensureBufferCapacity(vCount)
     const base = this.writeCursor
     this.writeCursor += vCount
-    const scratch = new Float32Array(vCount * FLOATS_PER_VERTEX)
+    const scratch = this.scratchFloats(vCount * FLOATS_PER_VERTEX)
     const pos = st.positions!
     const col = st.packedColors!
     const uv = st.uvs!
@@ -608,7 +745,7 @@ export class WebGPURenderer extends Renderer {
     this.ensureBufferCapacity(vCount)
     const base = this.writeCursor
     this.writeCursor += vCount
-    const scratch = new Float32Array(vCount * FLOATS_PER_VERTEX)
+    const scratch = this.scratchFloats(vCount * FLOATS_PER_VERTEX)
     const packed = s.allPackedColor
     for (let v = 0; v < vCount; v++) {
       const o = v * FLOATS_PER_VERTEX
@@ -643,11 +780,11 @@ export class WebGPURenderer extends Renderer {
     this.indexWriteCursor += indexCount
     this.growIndexBuffer(this.indexWriteCursor)
     if (s.allIndexed) {
-      const rebased = new Uint32Array(indexCount)
+      const rebased = this.scratchIndices(indexCount)
       for (let i = 0; i < indexCount; i++) rebased[i] = s.indices[i] + base
       this.device.queue.writeBuffer(this.indexBuffer!, firstIndex * 4, rebased.buffer as ArrayBuffer)
     } else {
-      const trivial = new Uint32Array(indexCount)
+      const trivial = this.scratchIndices(indexCount)
       for (let i = 0; i < indexCount; i++) trivial[i] = base + i
       this.device.queue.writeBuffer(this.indexBuffer!, firstIndex * 4, trivial.buffer as ArrayBuffer)
     }
@@ -814,6 +951,15 @@ export class WebGPURenderer extends Renderer {
 }
 
 export interface WebGPURendererOptions {
+  /** Surface format to configure the context with.
+   *
+   *  Only a browser can ask for this (`navigator.gpu.getPreferredCanvasFormat()`),
+   *  so a host — which created its surface, and therefore knows its format —
+   *  states it here. Left unset, the browser answer is used. Note a host whose
+   *  surface is `bgra8unorm-srgb` must still pass the non-sRGB
+   *  `bgra8unorm`: the swapchain is configured non-sRGB in the browser too
+   *  (an sRGB swapchain double-gammas, washing colours out). */
+  format?: GPUTextureFormat
   clearColor?: string
   continuousRender?: boolean
   camera?: CameraConfig
@@ -827,11 +973,14 @@ export interface WebGPURendererOptions {
 
 /**
  * Async factory: `requestDevice` is awaited here so the caller gets a ready
- * root. The dom bridge's mount is synchronous, which is why the device is
+ * renderer. The dom bridge's mount is synchronous, which is why the device is
  * created before the canvas mounts rather than inside it.
+ *
+ * Browser-only by design: a host that has no `navigator.gpu` creates its own
+ * device and calls the constructor directly with a {@link GpuCanvasContext}.
  */
 export async function createWebGPURoot(
-  canvas: HTMLCanvasElement,
+  context: GpuCanvasContext,
   options: WebGPURendererOptions = {}
 ): Promise<WebGPURenderer> {
   const gpu = (navigator as unknown as { gpu?: { requestAdapter(o?: unknown): Promise<{ requestDevice(d?: unknown): Promise<GPUDevice> } | null> } }).gpu
@@ -839,5 +988,5 @@ export async function createWebGPURoot(
   const adapter = await gpu.requestAdapter()
   if (!adapter) throw new Error('WebGPU: requestAdapter() returned null')
   const device = await adapter.requestDevice()
-  return new WebGPURenderer(canvas, device, options)
+  return new WebGPURenderer(context, device, options)
 }
