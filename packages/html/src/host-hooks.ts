@@ -33,7 +33,7 @@ export const htmlHostHooks: HostHooks<SSRNode> = {
     return createMarker(kind)
   },
   /** Append node content (ref ignored — append order == document order) */
-  insert: (_parent: SSRNode, node: SSRNode, _ref: SSRNode | null): void => {
+  insert: (parent: SSRNode, node: SSRNode, _ref: SSRNode | null): void => {
     // Content chunks are strings by construction; the container (when the
     // compiler's SSR branch hands it back as `parent`) carries .append().
     const target = parent as unknown as StringHost
