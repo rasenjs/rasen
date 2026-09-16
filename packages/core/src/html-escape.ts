@@ -3,8 +3,11 @@
  *  - @rasenjs/dom (compiled SSR emitters, bindings)
  *  - @rasenjs/html (string renderer)
  *
- * Pure string transforms — no DOM access, safe in any environment.
+ * No DOM access — safe in any environment. `renderText` consults the active
+ * reactive runtime to unwrap a ref, which is itself host-agnostic.
  */
+
+import { getReactiveRuntime } from './reactive'
 
 const HTML_ESCAPE_MAP: Record<string, string> = {
   '&': '&amp;',
@@ -27,8 +30,21 @@ export function escapeAttr(value: string): string {
 /** React-style text child semantics: null / undefined / booleans render as an
  *  empty string; everything else is stringified. Matches jsx-runtime's
  *  processChildren skipping rules so compiled output stays aligned with the
- *  factory chain. */
+ *  factory chain.
+ *
+ *  A *ref* is unwrapped first, through the active runtime: `Ref` is an opaque
+ *  placeholder whose shape the reactive adapter defines (Vue's `.value`, TC39
+ *  Signals' `get()`, alien callables …), so the only legal read is the
+ *  runtime's `isRef` / `unref` pair — see `reactive.ts`. Stringifying the ref
+ *  object itself would yield "[object Object]".
+ *
+ *  Functions are deliberately NOT invoked: in a child position a function is a
+ *  mountable, not a getter. */
 export function renderText(value: unknown): string {
+  if (value !== null && typeof value === 'object') {
+    const runtime = getReactiveRuntime()
+    if (runtime.isRef(value)) return renderText(runtime.unref(value))
+  }
   if (value == null || typeof value === 'boolean') return ''
   return String(value)
 }
