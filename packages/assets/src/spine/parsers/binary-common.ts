@@ -147,6 +147,36 @@ export class BinaryInput {
 // Value readers
 // ---------------------------------------------------------------------------
 
+/**
+ * Read a list index off `input` and resolve it to that entry's `name`.
+ *
+ * Replaces the obvious `list[input.readInt(true)]?.name`, which is miscompiled
+ * by Perry: an optional-chained member access evaluates its **receiver twice**,
+ * so the reader consumes two varints per entry and the whole parse
+ * desynchronises — c010's `bones[1].name` decodes as `ody_1` instead of
+ * `body_1`. Reading the index into a local first pins it to one evaluation.
+ *
+ * Re-verified against the current compiler: `items[next()]?.name` calls `next`
+ * twice and yields the SECOND element's name, while the index-in-a-local form
+ * calls it once and yields the first. Unlike the other compiler-shaped notes
+ * that used to live in this package (constant-key `.length`, typed-array
+ * `.length`, union-typed stores — all of which turned out to be artifacts of a
+ * stale runtime archive and have been deleted), this one is real.
+ *
+ * @param input Binary reader, positioned at the index.
+ * @param list  Target list, or undefined when the section is absent.
+ * @returns The entry's name, or `undefined` when missing — matching `?.name`.
+ */
+export function readIndexedName(
+  input: BinaryInput,
+  list: readonly { name: string }[] | undefined
+): string | undefined {
+  const index = input.readInt(true)
+  if (!list) return undefined
+  const entry = list[index]
+  return entry ? entry.name : undefined
+}
+
 export function readCurve1D(input: BinaryInput): Curve {
   const type = input.readByte()
   if (type === 0) return undefined // linear

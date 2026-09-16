@@ -37,7 +37,8 @@ import {
   readFloatArray,
   readShortArray,
   rgbaToHex,
-  isAtLeast41
+  isAtLeast41,
+  readIndexedName
 } from './binary-common'
 import { readAnimation } from './spine-binary-animation'
 export function parseSpineBinary(bytes: Uint8Array, scale = 1): SkeletonData {
@@ -79,7 +80,7 @@ export function parseSpineBinary(bytes: Uint8Array, scale = 1): SkeletonData {
   for (let i = 0; i < boneCount; i++) {
     const name = input.readString()
     if (!name) throw new Error('Bone name must not be null')
-    const parent = i === 0 ? undefined : skeletonData.bones[input.readInt(true)]?.name
+    const parent = i === 0 ? undefined : readIndexedName(input, skeletonData.bones)
     const data: BoneData = {
       name,
       parent,
@@ -102,7 +103,7 @@ export function parseSpineBinary(bytes: Uint8Array, scale = 1): SkeletonData {
   for (let i = 0; i < slotCount; i++) {
     const slotName = input.readString()
     if (!slotName) throw new Error('Slot name must not be null')
-    const boneName = skeletonData.bones[input.readInt(true)]?.name
+    const boneName = readIndexedName(input, skeletonData.bones)
     // Binary layout (Spine 4.x): color int32 first, then darkColor int32
     // (-1 = none). Reading darkColor first turned every slot whose darkColor
     // is absent into color=-1 → "FFFFFFFF" (opaque white), making setup-
@@ -133,8 +134,8 @@ export function parseSpineBinary(bytes: Uint8Array, scale = 1): SkeletonData {
     }
     input.readBoolean()
     const bc = input.readInt(true)
-    for (let b = 0; b < bc; b++) data.bones.push(skeletonData.bones[input.readInt(true)]?.name ?? '')
-    data.target = skeletonData.bones[input.readInt(true)]?.name ?? ''
+    for (let b = 0; b < bc; b++) data.bones.push(readIndexedName(input, skeletonData.bones) ?? '')
+    data.target = readIndexedName(input, skeletonData.bones) ?? ''
     data.mix = input.readFloat()
     data.softness = input.readFloat() * scale
     data.bendDirection = input.readByte()
@@ -158,8 +159,8 @@ export function parseSpineBinary(bytes: Uint8Array, scale = 1): SkeletonData {
     }
     input.readBoolean()
     const bc = input.readInt(true)
-    for (let b = 0; b < bc; b++) data.bones.push(skeletonData.bones[input.readInt(true)]?.name ?? '')
-    data.target = skeletonData.bones[input.readInt(true)]?.name ?? ''
+    for (let b = 0; b < bc; b++) data.bones.push(readIndexedName(input, skeletonData.bones) ?? '')
+    data.target = readIndexedName(input, skeletonData.bones) ?? ''
     data.local = input.readBoolean()
     data.relative = input.readBoolean()
     data.offsetRotation = input.readFloat()
@@ -190,8 +191,8 @@ export function parseSpineBinary(bytes: Uint8Array, scale = 1): SkeletonData {
     }
     input.readBoolean()
     const bc = input.readInt(true)
-    for (let b = 0; b < bc; b++) data.bones.push(skeletonData.bones[input.readInt(true)]?.name ?? '')
-    data.target = skeletonData.slots[input.readInt(true)]?.name ?? ''
+    for (let b = 0; b < bc; b++) data.bones.push(readIndexedName(input, skeletonData.bones) ?? '')
+    data.target = readIndexedName(input, skeletonData.slots) ?? ''
     data.positionMode = POSITION_MODES[input.readInt(true)] ?? 'fixed'
     data.spacingMode = SPACING_MODES[input.readInt(true)] ?? 'length'
     data.rotateMode = ROTATE_MODES[input.readInt(true)] ?? 'tangent'
@@ -343,7 +344,7 @@ function readSkin(
     skin = { name: skinName, attachments: {} }
     const boneCount = input.readInt(true)
     skin.bones = []
-    for (let i = 0; i < boneCount; i++) skin.bones.push(skeletonData.bones[input.readInt(true)]?.name ?? '')
+    for (let i = 0; i < boneCount; i++) skin.bones.push(readIndexedName(input, skeletonData.bones) ?? '')
     for (let c = 0; c < 3; c++) {
       const n = input.readInt(true)
       for (let i = 0; i < n; i++) input.readInt(true)

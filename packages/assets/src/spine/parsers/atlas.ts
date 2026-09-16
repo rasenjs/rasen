@@ -662,6 +662,22 @@ function weightedWorldVerticesDeform(
  * current pose. Callers that cache UVs/triangles (e.g. a WebGL mesh builder)
  * can rebuild the mesh every animation frame without re-allocating UV arrays.
  *
+ * `out` is a CONCRETE `Float32Array` on purpose, and must stay one. It was
+ * briefly typed `Float32Array | number[]` "in case" a caller wanted a plain
+ * array; no caller ever did — every call site allocates a `Float32Array` — and
+ * the union was the direct cause of a Perry miscompile:
+ *
+ *   with a UNION-typed write target, a scaled loop index (`out[base + 2 * v]`)
+ *   and an index read from a parameter that has a DEFAULT, Perry drops every
+ *   store silently: the returned vertex count is right while all coordinates
+ *   stay 0.
+ *
+ * The earlier workaround rebound a narrowed local (`const out = outAny as
+ * Float32Array`) at the top of the body. Making the parameter itself concrete
+ * removes the first of those three conditions rather than dodging it, which also
+ * retires the `outAny` name that the rebinding forced (a parameter and a narrowed
+ * local cannot share a name).
+ *
  * @returns the vertex count written to `out`, or 0 if the attachment is not
  * drawable (boundingbox/path/clipping/point or missing geometry).
  */
@@ -671,7 +687,8 @@ export function computeAttachmentWorldVertices(
   skeleton: SkeletonRef,
   atlas: SpineAtlas,
   attachmentName: string | undefined,
-  out: Float32Array | number[],
+  /** Write target. */
+  out: Float32Array,
   outStride: number = 2,
   /** Write offset (in floats) into `out`. Lets a fast-lane caller write
    * straight into the batch renderer's shared position stream at
@@ -732,7 +749,7 @@ export function computeAttachmentWorldVertices(
   if (!weighted) {
     // Monomorphic fast path — the WebGL mesh builder's case (Float32Array
     // in/out at stride 3, no deform). See the specialization note above.
-    if (outStride === 3 && !deform && verts instanceof Float32Array && out instanceof Float32Array) {
+    if (outStride === 3 && !deform && verts instanceof Float32Array) {
       unweightedWorldVertices(verts, bone, vCount, out, outBase)
       return vCount
     }
@@ -784,7 +801,7 @@ export function computeAttachmentWorldVertices(
   } else {
     // Monomorphic fast paths — the WebGL mesh builder's case (Float32Array
     // in/out at stride 3). See the specialization note above.
-    if (outStride === 3 && verts instanceof Float32Array && out instanceof Float32Array) {
+    if (outStride === 3 && verts instanceof Float32Array) {
       if (deform) weightedWorldVerticesDeform(verts, skeleton.bones, vCount, out, outBase, deform)
       else weightedWorldVertices(verts, skeleton.bones, vCount, out, outBase)
       return vCount
