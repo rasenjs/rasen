@@ -22,7 +22,7 @@ import { WebGLRenderer as BatchRenderer } from '../../renderer/gl/index'
 import { createMockWebGLContext } from '../../test-utils'
 import { Mat4x4f } from '@rasenjs/math'
 import type { GlContext } from '../../node'
-import type { BlendMode } from '../../renderer/batch'
+import type { BlendMode } from '../../renderer/base'
 
 /** GL constants (real values — the mock mirrors them). */
 const SRC_ALPHA = 0x0302
