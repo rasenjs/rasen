@@ -23,16 +23,32 @@ export type Scope = { run: <T>(fn: () => T) => T | undefined; stop: () => void }
 
 declare const __DEV__: boolean | undefined
 
+// ── 挂载期宿主上下文（com 内部托管）────────────────────────────
+//
+// 用户写 setup 时**不需要**传 hooks：com 在挂载时把生效值设为当前值，挂载
+// 结束后还原。子组件在父 mount 的**同步递归**中挂载，读到的就是父上下文——
+// 因此 element 的 children 循环、mountSlot、编译产物都无需逐个转发。
+//
+// 显式第二参数优先；异步挂载（lazy / transition）超出父的同步递归，必须显式传。
+let current: HostHooks | undefined
+
 /**
  * wrapMount：把「mount 回调 + scope」适配成标准 Mountable 双参签名。
  * scope 生命周期由外层闭包持有，unmount 时一并 stop。
  */
 export function wrapMount(mount: MountFn, scope: Scope) {
   return (node: unknown, hooks: HostHooks | undefined) => {
+    const effective = hooks ?? current
+    const prev = current
+    current = effective
     let unmount: (() => void) | undefined
-    scope.run(() => {
-      unmount = mount(node, hooks)
-    })
+    try {
+      scope.run(() => {
+        unmount = mount(node, effective)
+      })
+    } finally {
+      current = prev
+    }
     return () => {
       unmount?.()
       scope.stop()
@@ -104,14 +120,10 @@ export function com<C extends (...args: any[]) => any>(component: C): C {
     if (result instanceof Promise) {
       return result.then((mountFn) => {
         const scope = getReactiveRuntime().effectScope()
-        let mUnmount: (() => void) | undefined
-        scope.run(() => {
-          mUnmount = (mountFn as MountFn)(inst.node, inst.hooks)
-        })
-        inst.unmount = () => {
-          mUnmount?.()
-          scope.stop()
-        }
+        inst.unmount = wrapMount(mountFn as MountFn, scope)(
+          inst.node,
+          inst.hooks
+        )
         return () => {
           inst.unmount?.()
           instances.delete(uid)
@@ -123,7 +135,8 @@ export function com<C extends (...args: any[]) => any>(component: C): C {
       inst.node = node
       inst.hooks = hooks
       try {
-        inst.unmount = doMount(inst, result as MountFn)
+        const scope = getReactiveRuntime().effectScope()
+        inst.unmount = wrapMount(result as MountFn, scope)(node, hooks)
       } catch (e) {
         console.error(`[rasen/hot] Error mounting ${key}:`, e)
       }
@@ -137,19 +150,4 @@ export function com<C extends (...args: any[]) => any>(component: C): C {
 
   setRegistryEntry(key, { impl, wrapper, instances })
   return wrapper as typeof component
-}
-
-function doMount(
-  inst: { node: unknown; hooks: HostHooks | undefined; unmount: (() => void) | null },
-  mountFn: MountFn
-): (() => void) | null {
-  const scope = getReactiveRuntime().effectScope()
-  let mountUnmount: (() => void) | undefined
-  scope.run(() => {
-    mountUnmount = mountFn(inst.node, inst.hooks)
-  })
-  return () => {
-    mountUnmount?.()
-    scope.stop()
-  }
 }
