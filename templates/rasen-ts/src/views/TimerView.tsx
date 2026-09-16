@@ -1,5 +1,3 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
 import { Timer } from '../components/Timer'
 
 export const TimerView = () => {

@@ -1,5 +1,3 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
 import { TodoList } from '../components/TodoList'
 
 export const TodoView = () => {

@@ -1,19 +1,22 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
 /**
  * SSR entry point
  */
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { createMemoryHistory } from '@rasenjs/router'
 import { renderToString } from '@rasenjs/html'
 import { createApp } from './App'
+
+// Install the signals runtime before anything reads a signal. The framework's
+// built-in runtime only understands its own callable refs, so the adapter that
+// knows about TC39 signals has to be registered first.
+useReactiveRuntime()
 
 // Import CSS content (in production, this would be extracted)
 import styleContent from './style.css?inline'
 
 export function render(url: string) {
   const history = createMemoryHistory(url)
-  const App = createApp(history)
-  const appHtml = renderToString(App())
+  const appHtml = renderToString(createApp(history))
   
   return `<!DOCTYPE html>
 <html lang="en">

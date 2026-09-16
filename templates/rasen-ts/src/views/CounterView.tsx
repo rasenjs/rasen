@@ -1,5 +1,3 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
 import { Counter } from '../components/Counter'
 
 export const CounterView = () => {

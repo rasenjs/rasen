@@ -1,8 +1,5 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
-import { com } from '@rasenjs/core'
-import { ref, computed } from '@rasenjs/reactive-signals'
-import { each } from '@rasenjs/core'
+import { Signal } from 'signal-polyfill'
+import { com, each } from '@rasenjs/core'
 
 interface Todo {
   id: number
@@ -10,55 +7,56 @@ interface Todo {
   completed: boolean
 }
 
+type Filter = 'all' | 'active' | 'completed'
+
 export const TodoList = com(() => {
-  const todos = ref<Todo[]>([
-    { id: 1, text: 'Learn Rasen basics', completed: true },
-    { id: 2, text: 'Build a reactive app', completed: false },
-    { id: 3, text: 'Deploy to production', completed: false },
-  ])
-  const inputValue = ref('')
-  const filter = ref<'all' | 'active' | 'completed'>('all')
-  
   let nextId = 4
 
-  const filteredTodos = computed(() => {
-    const list = todos.value
-    switch (filter.value) {
+  const todos = new Signal.State<Todo[]>([
+    { id: 1, text: 'Learn Rasen basics', completed: true },
+    { id: 2, text: 'Build a reactive app', completed: false },
+    { id: 3, text: 'Deploy to production', completed: false }
+  ])
+  const inputValue = new Signal.State('')
+  const filter = new Signal.State<Filter>('all')
+
+  const filteredTodos = new Signal.Computed(() => {
+    const list = todos.get()
+    switch (filter.get()) {
       case 'active':
-        return list.filter(t => !t.completed)
+        return list.filter((t) => !t.completed)
       case 'completed':
-        return list.filter(t => t.completed)
+        return list.filter((t) => t.completed)
       default:
         return list
     }
   })
 
-  const stats = computed(() => {
-    const total = todos.value.length
-    const completed = todos.value.filter(t => t.completed).length
-    const active = total - completed
-    return { total, completed, active }
+  const stats = new Signal.Computed(() => {
+    const list = todos.get()
+    const completed = list.filter((t) => t.completed).length
+    return { total: list.length, active: list.length - completed, completed }
   })
 
   const addTodo = () => {
-    const text = inputValue.value.trim()
-    if (!text) return
-    todos.value = [...todos.value, { id: nextId++, text, completed: false }]
-    inputValue.value = ''
+    const value = inputValue.get().trim()
+    if (!value) return
+    todos.set([...todos.get(), { id: nextId++, text: value, completed: false }])
+    inputValue.set('')
   }
 
   const toggleTodo = (id: number) => {
-    todos.value = todos.value.map(t =>
-      t.id === id ? { ...t, completed: !t.completed } : t
+    todos.set(
+      todos.get().map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
     )
   }
 
   const removeTodo = (id: number) => {
-    todos.value = todos.value.filter(t => t.id !== id)
+    todos.set(todos.get().filter((t) => t.id !== id))
   }
 
   const clearCompleted = () => {
-    todos.value = todos.value.filter(t => !t.completed)
+    todos.set(todos.get().filter((t) => !t.completed))
   }
 
   return (
@@ -69,12 +67,12 @@ export const TodoList = com(() => {
           type="text"
           class="todo-input"
           placeholder="What needs to be done?"
-          value={inputValue}
+          value={() => inputValue.get()}
           onInput={(e: Event) => {
-            inputValue.value = (e.target as HTMLInputElement).value
+            inputValue.set((e.target as HTMLInputElement).value)
           }}
-          onKeyPress={(e: Event) => {
-            if ((e as KeyboardEvent).key === 'Enter') addTodo()
+          onKeyDown={(e: KeyboardEvent) => {
+            if (e.key === 'Enter') addTodo()
           }}
         />
         <button onClick={addTodo} class="btn btn-primary">Add</button>
@@ -82,34 +80,28 @@ export const TodoList = com(() => {
 
       {/* Stats */}
       <div class="todo-stats">
-        <span class="stat-item">
-          {computed(() => `${stats.value.total} total`)}
-        </span>
-        <span class="stat-item">
-          {computed(() => `${stats.value.active} active`)}
-        </span>
-        <span class="stat-item">
-          {computed(() => `${stats.value.completed} done`)}
-        </span>
+        <span class="stat-item">{`${stats.get().total} total`}</span>
+        <span class="stat-item">{`${stats.get().active} active`}</span>
+        <span class="stat-item">{`${stats.get().completed} done`}</span>
       </div>
 
       {/* Filters */}
       <div class="todo-filters">
-        <button 
-          class={computed(() => `filter-btn ${filter.value === 'all' ? 'active' : ''}`)}
-          onClick={() => filter.value = 'all'}
+        <button
+          class={() => `filter-btn ${filter.get() === 'all' ? 'active' : ''}`}
+          onClick={() => filter.set('all')}
         >
           All
         </button>
-        <button 
-          class={computed(() => `filter-btn ${filter.value === 'active' ? 'active' : ''}`)}
-          onClick={() => filter.value = 'active'}
+        <button
+          class={() => `filter-btn ${filter.get() === 'active' ? 'active' : ''}`}
+          onClick={() => filter.set('active')}
         >
           Active
         </button>
-        <button 
-          class={computed(() => `filter-btn ${filter.value === 'completed' ? 'active' : ''}`)}
-          onClick={() => filter.value = 'completed'}
+        <button
+          class={() => `filter-btn ${filter.get() === 'completed' ? 'active' : ''}`}
+          onClick={() => filter.set('completed')}
         >
           Completed
         </button>
@@ -117,39 +109,39 @@ export const TodoList = com(() => {
 
       {/* List */}
       <ul class="todo-list">
-        {each(filteredTodos, (todo) => (
-          <li class={computed(() => `todo-item ${todo.completed ? 'completed' : ''}`)}>
-            <label class="todo-checkbox">
-              <input 
-                type="checkbox" 
-                checked={todo.completed}
-                onChange={() => toggleTodo(todo.id)}
-              />
-              <span class="checkmark"></span>
-            </label>
-            <span class="todo-text">{todo.text}</span>
-            <button 
-              class="todo-delete" 
-              onClick={() => removeTodo(todo.id)}
-            >
-              ×
-            </button>
-          </li>
-        ))}
+        {each(
+          () => filteredTodos.get(),
+          (todo) => (
+            <li class={() => `todo-item ${todo.completed ? 'completed' : ''}`}>
+              <label class="todo-checkbox">
+                <input
+                  type="checkbox"
+                  checked={() => todo.completed}
+                  onChange={() => toggleTodo(todo.id)}
+                />
+                <span class="checkmark"></span>
+              </label>
+              <span class="todo-text">{todo.text}</span>
+              <button class="todo-delete" onClick={() => removeTodo(todo.id)}>
+                ×
+              </button>
+            </li>
+          )
+        )}
       </ul>
 
       {/* Actions */}
       <div class="todo-actions">
-        <button 
-          onClick={clearCompleted} 
-          class={computed(() => `btn btn-text ${stats.value.completed > 0 ? '' : 'disabled'}`)}
+        <button
+          onClick={clearCompleted}
+          class={() => `btn btn-text ${stats.get().completed > 0 ? '' : 'disabled'}`}
         >
           Clear completed
         </button>
       </div>
 
       <p class="demo-hint">
-        This example shows <strong>reactive lists</strong> with filtering, 
+        This example shows <strong>reactive lists</strong> with filtering,
         computed statistics, and dynamic class bindings.
       </p>
     </div>

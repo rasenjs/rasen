@@ -1,22 +1,25 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
+import { Signal } from 'signal-polyfill'
 import { com } from '@rasenjs/core'
-import { ref, computed } from '@rasenjs/reactive-signals'
 
 export const Counter = com(() => {
-  const count = ref(0)
-  const double = computed(() => count.value * 2)
-  const isEven = computed(() => count.value % 2 === 0)
+  // Signals are the state primitive: read with get(), write with set().
+  const count = new Signal.State(0)
+  const double = new Signal.Computed(() => count.get() * 2)
+  const square = new Signal.Computed(() => count.get() * count.get())
+  const isEven = new Signal.Computed(() => count.get() % 2 === 0)
 
-  const increment = () => count.value++
-  const decrement = () => count.value--
-  const reset = () => (count.value = 0)
-  const addTen = () => (count.value += 10)
+  const increment = () => count.set(count.get() + 1)
+  const decrement = () => count.set(count.get() - 1)
+  const reset = () => count.set(0)
+  const addTen = () => count.set(count.get() + 10)
 
   return (
     <div class="counter-demo">
       <div class="counter-display">
         <div class="counter-value">
+          {/* A bare ref interpolates directly: the compiler emits a
+              renderText() binding that unwraps it via the active runtime.
+              Expressions derived from a ref still read explicitly. */}
           <span class="count-number">{count}</span>
           <span class="count-label">Current Value</span>
         </div>
@@ -26,11 +29,11 @@ export const Counter = com(() => {
             <span class="stat-label">Double</span>
           </div>
           <div class="stat">
-            <span class="stat-value">{computed(() => count.value * count.value)}</span>
+            <span class="stat-value">{square}</span>
             <span class="stat-label">Square</span>
           </div>
           <div class="stat">
-            <span class="stat-value">{computed(() => isEven.value ? 'Even' : 'Odd')}</span>
+            <span class="stat-value">{isEven.get() ? 'Even' : 'Odd'}</span>
             <span class="stat-label">Parity</span>
           </div>
         </div>
@@ -51,7 +54,7 @@ export const Counter = com(() => {
         Current count is {count}. That's {double} when doubled!
       </p>
       <p class="demo-hint">
-        This example demonstrates <strong>computed values</strong> that automatically 
+        This example demonstrates <strong>computed values</strong> that automatically
         update when the count changes.
       </p>
     </div>

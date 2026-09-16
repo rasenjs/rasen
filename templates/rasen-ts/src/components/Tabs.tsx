@@ -1,9 +1,5 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
-import { com } from '@rasenjs/core'
-import { computed } from '@rasenjs/reactive-signals'
-import type { Ref } from '@rasenjs/core'
-import { each } from '@rasenjs/web'
+import type { Signal } from 'signal-polyfill'
+import { com, each } from '@rasenjs/core'
 
 interface Tab {
   id: string
@@ -12,7 +8,7 @@ interface Tab {
 
 interface TabsProps {
   tabs: Tab[]
-  activeTab: Ref<string>
+  activeTab: Signal.State<string>
 }
 
 export const Tabs = com((props: TabsProps) => {
@@ -20,10 +16,10 @@ export const Tabs = com((props: TabsProps) => {
 
   return (
     <div class="tabs">
-      {each(() => tabs, (tab) => (
+      {each(tabs, (tab) => (
         <button
-          class={computed(() => `tab ${activeTab.value === tab.id ? 'active' : ''}`)}
-          onClick={() => activeTab.value = tab.id}
+          class={() => `tab ${activeTab.get() === tab.id ? 'active' : ''}`}
+          onClick={() => activeTab.set(tab.id)}
         >
           {tab.label}
         </button>

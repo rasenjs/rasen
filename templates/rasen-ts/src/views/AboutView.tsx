@@ -1,5 +1,3 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
 import { com } from '@rasenjs/core'
 
 export const AboutView = com(() => {

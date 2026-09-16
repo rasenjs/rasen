@@ -1,63 +1,70 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
-import { ref, computed, type Ref, useReactiveRuntime } from '@rasenjs/reactive-signals'
+/**
+ * Isomorphic root component.
+ *
+ * One factory serves both entries: the SSR entry hands it a memory history,
+ * the client entry a browser history. Routes, views and reactive bindings are
+ * therefore written once and used on both sides.
+ */
+import { Signal } from 'signal-polyfill'
 import { com } from '@rasenjs/core'
 import type { HistoryAdapter } from '@rasenjs/router'
 import { createRouter, route } from '@rasenjs/router'
 import { createRouterView, createRouterLink } from '@rasenjs/web'
 
-// Import views
+import { ThemeToggle } from './components/ThemeToggle'
 import { HomeView } from './views/HomeView'
 import { CounterView } from './views/CounterView'
 import { TodoView } from './views/TodoView'
 import { TimerView } from './views/TimerView'
 import { AboutView } from './views/AboutView'
 
-// Import components
-import { ThemeToggle } from './components/ThemeToggle'
-
-// Global theme state (initialized in createApp)
-export let isDark: Ref<boolean>
-
-// Define routes configuration
 const routesConfig = {
   home: route('/'),
   counter: route('/counter'),
   todo: route('/todo'),
   timer: route('/timer'),
-  about: route('/about'),
+  about: route('/about')
 }
 
+const NotFound = () => (
+  <div class="view-container">
+    <div class="view-header">
+      <h2 class="view-title">404</h2>
+      <p class="view-desc">No route matches this URL.</p>
+    </div>
+  </div>
+)
+
 /**
- * Create isomorphic App component
- * @param history - History adapter (BrowserHistory for client, MemoryHistory for SSR)
+ * Root component. Declared with com() at module scope so the component
+ * lifetime (effectScope, HMR remount) is managed by the framework.
  */
-export function createApp(history: HistoryAdapter) {
-  // CRITICAL: Ensure reactive runtime is set before any reactive operations
-  // This works because @rasenjs/core is externalized (not in vite.config noExternal)
-  useReactiveRuntime()
-  
-  // Initialize global theme state (will be reused across SSR and client)
-  if (!isDark) {
-    isDark = ref(true)
-  }
-  
-  // Create router with the provided history
+const App = com((history: HistoryAdapter) => {
   const router = createRouter(routesConfig, { history })
-  
-  // Create router components
-  const RouterView = createRouterView(router, {
-    home: () => HomeView(),
-    counter: () => CounterView(),
-    todo: () => TodoView(),
-    timer: () => TimerView(),
-    about: () => AboutView(),
-  })
+
+  // The router's `current` is a plain property, not a signal. Mirror
+  // navigation into a signal so class bindings can subscribe to it.
+  const path = new Signal.State(router.current?.path ?? '/')
+  router.afterEach((to) => path.set(to.path))
+
+  const RouterView = createRouterView(
+    router,
+    {
+      home: () => HomeView(),
+      counter: () => CounterView(),
+      todo: () => TodoView(),
+      timer: () => TimerView(),
+      about: () => AboutView()
+    },
+    { default: () => NotFound() }
+  )
 
   const Link = createRouterLink(router)
 
-  return com(() => {
-    const currentPath = computed(() => router.current?.path || '/')
+  // Destructuring matters: the compiler wraps complex attribute expressions
+  // (`to={router.routes.home}`) in a getter, and Link needs the Route object
+  // itself. A plain identifier is passed through untouched.
+  const { home, counter, todo, timer, about } = router.routes
 
   return (
     <div class="app">
@@ -65,7 +72,7 @@ export function createApp(history: HistoryAdapter) {
       <header class="header">
         <div class="header-content">
           <div class="logo-section">
-            <Link to={router.routes.home} class="logo-link">
+            <Link to={home} class="logo-link">
               <img src="/logo.svg" class="logo" alt="Rasen logo" />
               <div class="brand">
                 <h1 class="title">Rasen</h1>
@@ -85,41 +92,48 @@ export function createApp(history: HistoryAdapter) {
       {/* Navigation */}
       <nav class="nav">
         <div class="nav-content">
-          <Link 
-            to={router.routes.home} 
-            class={computed(() => currentPath.value === '/' ? 'nav-link active' : 'nav-link')}
+          <Link
+            to={home}
+            class={() => (path.get() === '/' ? 'nav-link active' : 'nav-link')}
           >
             🏠 Home
           </Link>
-          <Link 
-            to={router.routes.counter} 
-            class={computed(() => currentPath.value === '/counter' ? 'nav-link active' : 'nav-link')}
+          <Link
+            to={counter}
+            class={() => (path.get() === '/counter' ? 'nav-link active' : 'nav-link')}
           >
             🔢 Counter
           </Link>
-          <Link 
-            to={router.routes.todo} 
-            class={computed(() => currentPath.value === '/todo' ? 'nav-link active' : 'nav-link')}
+          <Link
+            to={todo}
+            class={() => (path.get() === '/todo' ? 'nav-link active' : 'nav-link')}
           >
             📝 Todo
           </Link>
-          <Link 
-            to={router.routes.timer} 
-            class={computed(() => currentPath.value === '/timer' ? 'nav-link active' : 'nav-link')}
+          <Link
+            to={timer}
+            class={() => (path.get() === '/timer' ? 'nav-link active' : 'nav-link')}
           >
             ⏱️ Timer
           </Link>
-          <Link 
-            to={router.routes.about} 
-            class={computed(() => currentPath.value === '/about' ? 'nav-link active' : 'nav-link')}
+          <Link
+            to={about}
+            class={() => (path.get() === '/about' ? 'nav-link active' : 'nav-link')}
           >
             ℹ️ About
           </Link>
         </div>
       </nav>
 
-      {/* Router View */}
-      <RouterView />
+      {/* Router View
+          A dedicated outlet element matters: a structural component mounts
+          its content by appending to its host, so `<RouterView />` placed
+          directly inside `.app` would append after the footer. Giving it an
+          outlet whose last child it owns keeps the server-rendered order and
+          the client-mounted order identical. */}
+      <div class="route-outlet">
+        <RouterView />
+      </div>
 
       {/* Footer */}
       <footer class="footer">
@@ -134,5 +148,13 @@ export function createApp(history: HistoryAdapter) {
       </footer>
     </div>
   )
-  })
+})
+
+/**
+ * Create the mountable app for a history adapter.
+ *
+ * @param history - Browser history on the client, memory history during SSR
+ */
+export function createApp(history: HistoryAdapter) {
+  return App(history)
 }

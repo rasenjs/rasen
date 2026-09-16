@@ -1,5 +1,3 @@
-/// <reference types="@rasenjs/jsx/jsx" />
-
 import { com } from '@rasenjs/core'
 
 export const HomeView = com(() => {
@@ -48,17 +46,17 @@ export const HomeView = com(() => {
               <span class="code-lang">TSX</span>
             </div>
             <pre class="code-block">
-              <code>{`import { ref, computed } from '@rasenjs/reactive-signals'
+              <code>{`import { Signal } from 'signal-polyfill'
 
 export const Counter = () => {
-  const count = ref(0)
-  const double = computed(() => count.value * 2)
+  const count = new Signal.State(0)
+  const double = new Signal.Computed(() => count.get() * 2)
 
   return (
     <div>
       <p>Count: {count}</p>
       <p>Double: {double}</p>
-      <button onClick={() => count.value++}>
+      <button onClick={() => count.set(count.get() + 1)}>
         Increment
       </button>
     </div>
