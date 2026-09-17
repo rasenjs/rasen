@@ -1,14 +1,15 @@
 /**
  * 帧源（调度）—— 「何时推进一帧」的契约与默认实现。
  *
- * 刻意只有**一个类型 + 一个默认实现**（加一个只在非浏览器环境用的降级）。
- * 因为这是一个契约，不是一套调度框架：
+ * 刻意只有**一个类型 + 一个实现**。因为这是一个契约，不是一套调度框架：
  *
  * - 契约只回答"何时叫我一帧"。它**不表达"一帧内做什么、按什么顺序"** ——
  *   顺序属于拥有这一帧的人（宿主 / 应用）。库若替它决定，就得引入全局单例，
  *   还会让"两个画布各用不同帧源"变得无法表达。
- * - 默认实现只是把宿主的 rAF 包一层。这不是新概念：`dom/canvas.ts` 一直在
- *   注入同样的几行，渲染器与 animation 又各自 fallback 了一份，共四处。
+ * - 默认实现优先用宿主的 rAF，**没有 rAF 就用 setTimeout 兜底** —— 因此它永远
+ *   返回一个可用的帧源，调用方不需要、也不应该再写降级分支。这不是新概念：
+ *   `dom/canvas.ts` 一直在注入同样的几行，渲染器与 animation 又各自 fallback
+ *   了一份，共四处。
  *
  * ## 形状为什么带时间戳
  *
@@ -36,19 +37,8 @@ interface HostFrameApi {
   cancelAnimationFrame?: (id: number) => void
 }
 
-/**
- * 宿主 rAF 帧源。环境没有 rAF 时返回 `null`（不 import 任何 DOM 类型，
- * 在 Node / SSR 下也能安全加载）。降级与否由调用方决定。
- */
-export function rafSchedule(): FrameSchedule | null {
-  const host = globalThis as unknown as HostFrameApi
-  const raf = host.requestAnimationFrame
-  if (typeof raf !== 'function') return null
-  return (cb) => {
-    const id = raf(cb)
-    return () => host.cancelAnimationFrame?.(id)
-  }
-}
+/** 兜底帧间隔（ms）：约 60Hz。只在宿主没有 rAF 时用。 */
+const FALLBACK_FRAME_MS = 16
 
 function nowMs(): number {
   const perf = (globalThis as { performance?: { now(): number } }).performance
@@ -56,15 +46,24 @@ function nowMs(): number {
 }
 
 /**
- * 微任务帧源 —— **只够"排一次刷新"**（测试 / SSR 里把一次重绘挪到当前任务之后）。
+ * 宿主帧源。有 `requestAnimationFrame` 就用它（与合成器对齐，页面不可见时会
+ * 自动暂停）；没有就用 `setTimeout` 按 ~60Hz 兜底（Node / SSR / 某些嵌入宿主）。
  *
- * ⚠️ 不能当**连续**帧源用：在微任务里再排微任务是自我续期的链条，事件循环会在
- * 归还之前被反复塞满、永不推进（页面卡死 / 进程挂住），而且它的 cancel 是空操作。
- * 连续渲染（`continuousRender`）必须先用 `rafSchedule()` 判断有没有真帧源。
+ * **保证返回可用帧源**：两者都是"每帧重新订阅"的一次性契约，取消也都真能停下，
+ * 所以拿到的永远是可连续驱动的帧源，调用方不必判断环境。
+ * 不 import 任何 DOM 类型，在 Node / SSR 下也能安全加载。
  */
-export function microtaskSchedule(): FrameSchedule {
+export function rafSchedule(): FrameSchedule {
+  const host = globalThis as unknown as HostFrameApi
+  const raf = host.requestAnimationFrame
+  if (typeof raf === 'function') {
+    return (cb) => {
+      const id = raf(cb)
+      return () => host.cancelAnimationFrame?.(id)
+    }
+  }
   return (cb) => {
-    queueMicrotask(() => cb(nowMs()))
-    return () => {}
+    const id = setTimeout(() => cb(nowMs()), FALLBACK_FRAME_MS)
+    return () => clearTimeout(id)
   }
 }

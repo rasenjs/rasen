@@ -1,6 +1,6 @@
 import { getReactiveRuntime, type Ref } from '@rasenjs/core'
 import type { AnimationOptions, FrameRef, FrameOptions } from './types'
-import { rafSchedule, runFrames, warnNoSchedule } from './schedule'
+import { rafSchedule, runFrames } from './schedule'
 const DEFAULT_FRAME_RATE = 60
 
 function createFrameRef(options: FrameOptions & AnimationOptions): FrameRef & Ref<number> {
@@ -60,8 +60,7 @@ function createFrameRef(options: FrameOptions & AnimationOptions): FrameRef & Re
     // 恢复即重新订阅。旧实现只在 rafId === null 时订阅，而 pause 既没取消也没清空
     // rafId，于是"暂停跨过一帧后 play()"永远订阅不上 —— 画面无声冻死。
     if (!unsubscribe) {
-      if (!schedule) warnNoSchedule()
-      else unsubscribe = runFrames(schedule, advance)
+      unsubscribe = runFrames(schedule, advance)
     }
   }
 

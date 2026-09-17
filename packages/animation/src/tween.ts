@@ -1,7 +1,7 @@
 import { getReactiveRuntime, type Ref } from '@rasenjs/core'
 import type { AnimationOptions, TweenRef, TweenOptions } from './types'
 import { getEasing } from './easing'
-import { rafSchedule, runFrames, warnNoSchedule } from './schedule'
+import { rafSchedule, runFrames } from './schedule'
 function createTweenRef(initial: number, options?: AnimationOptions): TweenRef {
   const runtime = getReactiveRuntime()
   const valueRef: Ref<number> = runtime.ref<number>(initial)
@@ -51,10 +51,6 @@ function createTweenRef(initial: number, options?: AnimationOptions): TweenRef {
     // 延迟窗口内可能已经被 stop()/set() 停掉 —— 这里必须再确认一次，
     // 否则定时器到点会照样启动动画（旧实现正是这样漏的）。
     if (!isAnimating) return
-    if (!schedule) {
-      warnNoSchedule()
-      return
-    }
     // 每次开始都新建一轮订阅 —— "上一帧基准"随之重置。
     unsubscribe = runFrames(schedule, advance)
   }

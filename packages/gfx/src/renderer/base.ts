@@ -21,7 +21,7 @@
  */
 
 import { Mat4x4f, mat4x4f } from '@rasenjs/math'
-import { microtaskSchedule, rafSchedule } from '@rasenjs/core'
+import { rafSchedule } from '@rasenjs/core'
 import type { Color } from '../types'
 import type { BitmapSource, TextureOptions } from '../utils'
 import { TransformStack } from '../transform-stack'
@@ -282,25 +282,16 @@ export abstract class Renderer {
     }
     this.projectionMatrix = Mat4x4f.identity()
     this.viewMatrix = Mat4x4f.identity()
-    // 帧源：注入 > 宿主 rAF > 微任务降级（见 @rasenjs/core frame.ts）。
-    // 前两者才算「真帧源」—— 微任务只够一次性刷新，拿它当连续帧源会让事件循环
-    // 永不归还且停不下来，所以 continuousRender 只在有真帧源时启动。
-    const hostSchedule = options.schedule ?? rafSchedule()
-    this.scheduleFrame = hostSchedule ?? microtaskSchedule()
+    // 帧源：注入优先，否则用 core 的默认（rAF，无 rAF 时 setTimeout 兜底）。
+    // 它保证返回可用帧源，所以连续渲染不需要再判断"有没有帧源"。
+    this.scheduleFrame = options.schedule ?? rafSchedule()
     if (this.options.continuousRender) {
-      if (hostSchedule) {
-        const loop = () => {
-          this.needsFullRedraw = true
-          this.draw()
-          this.cancelContinuous = this.scheduleFrame(loop)
-        }
+      const loop = () => {
+        this.needsFullRedraw = true
+        this.draw()
         this.cancelContinuous = this.scheduleFrame(loop)
-      } else {
-        console.warn(
-          '[Rasen Gfx] continuousRender 需要真实帧源（如 rAF）：当前环境没有 rAF ' +
-            '也未注入 schedule，已跳过连续渲染。'
-        )
       }
+      this.cancelContinuous = this.scheduleFrame(loop)
     }
   }
 

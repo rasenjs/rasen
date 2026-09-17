@@ -1,6 +1,6 @@
 import { getReactiveRuntime, type Ref } from '@rasenjs/core'
 import type { AnimationOptions, SpringRef, SpringOptions } from './types'
-import { rafSchedule, runFrames, warnNoSchedule } from './schedule'
+import { rafSchedule, runFrames } from './schedule'
 const DEFAULT_STIFFNESS = 100
 const DEFAULT_DAMPING = 10
 const DEFAULT_MASS = 1
@@ -101,8 +101,7 @@ function createSpringRef(initial: number, options?: SpringOptions & AnimationOpt
       isAnimating = true
       isSettled = false
       if (!unsubscribe) {
-        if (!schedule) warnNoSchedule()
-        else unsubscribe = runFrames(schedule, advance)
+        unsubscribe = runFrames(schedule, advance)
       }
     })
   }

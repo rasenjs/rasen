@@ -5,7 +5,7 @@
  * per-node/区域脏区优化留作后续迭代（节点已携带 bounds 钩子位）。
  */
 
-import { microtaskSchedule, rafSchedule } from '@rasenjs/core'
+import { rafSchedule } from '@rasenjs/core'
 import type { Context2D } from './node'
 import type { CanvasNode } from './node'
 import type { CanvasPointerEventType } from './events'
@@ -69,8 +69,8 @@ export class RenderContext {
     options: RenderContextOptions = {}
   ) {
     this.resolution = options.resolution ?? 1
-    // 帧源：注入 > 宿主 rAF > 微任务降级（见 @rasenjs/core frame.ts）
-    this.scheduleFrame = options.schedule ?? rafSchedule() ?? microtaskSchedule()
+    // 帧源：注入优先，否则用 core 的默认（rAF，无 rAF 时 setTimeout 兜底）
+    this.scheduleFrame = options.schedule ?? rafSchedule()
     contextMap.set(ctx, this)
   }
 

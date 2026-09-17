@@ -2,7 +2,8 @@
  * 帧步进 —— 驱动一个动画循环，并保证「时间」只出现在每个动画自己的闭包里。
  *
  * 帧源契约本身在 `@rasenjs/core`（`FrameSchedule` / `rafSchedule`）：那是一份
- * 宿主的 rAF 包装，渲染器和动画共用同一个形状，宿主可以把同一份帧源交给两者。
+ * 宿主帧源（有 rAF 用 rAF，没有就用 setTimeout 兜底，**保证非空**），渲染器和
+ * 动画共用同一个形状，宿主可以把同一份帧源交给两者。
  * 本文件只做两件事：
  *
  * 1. 每帧求 `dt` —— "上一帧时间" 关在 `runFrames` 的闭包里，动画只关心"推进多少"，
@@ -64,22 +65,4 @@ export function runFrames(
     cancel?.()
     cancel = null
   }
-}
-
-let warnedNoSchedule = false
-
-/**
- * 没有任何可用帧源时提示一次。
- *
- * 这是本包**唯一**一处模块状态，只为避免每个动画各刷一条同样的警告。
- * 不静默失败，也不退化成微任务（微任务里再排微任务是自我续期的链条，
- * 会让事件循环永不归还）。
- */
-export function warnNoSchedule(): void {
-  if (warnedNoSchedule) return
-  warnedNoSchedule = true
-  console.warn(
-    '[Rasen Animation] 没有可用帧源（宿主无 requestAnimationFrame，也未在 options 里给 schedule）：' +
-      '动画不会推进。测试或非浏览器环境请显式传入帧源。'
-  )
 }
