@@ -3,3 +3,9 @@ report.json
 report.html
 traces
 .partial-results.json
+# profiling / variant builds (dom-profile.mjs --outDir, dom-ab.mjs dir#outDir)
+dist-prof
+dist-prof-*
+dist-deleg
+dist-ab-*
+traces-ab

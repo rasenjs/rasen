@@ -539,6 +539,49 @@ function calculateStats(times) {
 }
 
 /**
+ * One measured iteration, exactly the official protocol:
+ *   fresh page -> untraced init (build + warmup) -> CPU throttle ->
+ *   trace start -> 50ms settle -> forced GC -> ONE traced interaction ->
+ *   100ms settle -> trace stop -> duration read back out of the trace.
+ *
+ * Extracted so one implementation serves both the sequential harness
+ * (runBenchmark) and the interleaved A/B runner (dom-ab.mjs). Interleaving is
+ * not a nicety on this machine: absolute times drift a lot with display / lock
+ * state (the same unchanged vanilla build measured 19.5ms, 30.9ms and 41.9ms
+ * for 03_update across three sessions), so only same-session round-robin
+ * numbers can be compared.
+ */
+async function measureIteration(browser, benchmark, tracePath) {
+  const page = await browser.newPage();
+  try {
+    page.setDefaultNavigationTimeout(CONFIG.timeout);
+    page.setDefaultTimeout(CONFIG.timeout);
+
+    await page.goto(CONFIG.serverUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+
+    // Untraced init: build the table + warmup cycles.
+    await benchmark.init(page);
+
+    const throttle = benchmark.throttle;
+    if (throttle) await page.emulateCPUThrottling(throttle);
+
+    await page.tracing.start({ path: tracePath, screenshots: false, categories: TRACE_CATEGORIES });
+    await waitMs(50);
+    await forceGC(page);
+
+    await benchmark.run(page);
+
+    await waitMs(100);
+    await page.tracing.stop();
+    if (throttle) await page.emulateCPUThrottling(1);
+
+    return computeResultsCPU(tracePath);
+  } finally {
+    await page.close();
+  }
+}
+
+/**
  * 运行单个基准测试（官方方法论：trace 计时 + CPU 节流 + 强制 GC）
  */
 async function runBenchmark(browser, benchmark, iterations) {
@@ -553,33 +596,11 @@ async function runBenchmark(browser, benchmark, iterations) {
     // The official runner retries an iteration when the trace invariants
     // fail ("exactly one click event is expected").
     for (let attempt = 1; attempt <= 3 && time === null; attempt++) {
-      const page = await browser.newPage();
       try {
-        page.setDefaultNavigationTimeout(CONFIG.timeout);
-        page.setDefaultTimeout(CONFIG.timeout);
-
-        await page.goto(CONFIG.serverUrl, { waitUntil: 'networkidle0', timeout: 30000 });
-
-        // Untraced init: build the table + warmup cycles.
-        await benchmark.init(page);
-
-        const throttle = benchmark.throttle;
-        if (throttle) await page.emulateCPUThrottling(throttle);
-
         if (!fs.existsSync(TRACES_DIR)) fs.mkdirSync(TRACES_DIR, { recursive: true });
         const tracePath = path.join(TRACES_DIR, `${benchmark.id}_${Date.now()}_${i}.json`);
-
-        await page.tracing.start({ path: tracePath, screenshots: false, categories: TRACE_CATEGORIES });
-        await waitMs(50);
-        await forceGC(page);
-
-        await benchmark.run(page);
-
-        await waitMs(100);
-        await page.tracing.stop();
-        if (throttle) await page.emulateCPUThrottling(1);
-
-        time = computeResultsCPU(tracePath);
+        // measureIteration owns the page and closes it in its own finally.
+        time = await measureIteration(browser, benchmark, tracePath);
       } catch (error) {
         const msg = String((error && error.message) || error);
         if (attempt < 3 && /click event|commit event|mousedown/.test(msg)) {
@@ -587,8 +608,6 @@ async function runBenchmark(browser, benchmark, iterations) {
         } else {
           console.error(`  ✗ 迭代 ${i + 1}/${totalRuns} 失败: ${msg}`);
         }
-      } finally {
-        await page.close();
       }
     }
     if (time !== null) {
@@ -1349,10 +1368,25 @@ async function finalizeMultiplierReport(allResults) {
 }
 
 module.exports = {
+  // report layer
   fetchOfficialResults,
   buildMultiplierRows,
   generateMultiplierReport,
-  finalizeMultiplierReport
+  finalizeMultiplierReport,
+  // protocol internals, exported so alternative runners (dom-ab.mjs) can reuse
+  // the exact same measurement instead of re-implementing it
+  BENCHMARKS,
+  BENCHMARK_OFFICIAL_ID,
+  OFFICIAL_COMPARISONS,
+  CONFIG,
+  TRACE_CATEGORIES,
+  TRACES_DIR,
+  CHROME_ARGS,
+  launchBrowser,
+  measureIteration,
+  runBenchmark,
+  calculateStats,
+  computeResultsCPU
 };
 
 if (require.main === module) {

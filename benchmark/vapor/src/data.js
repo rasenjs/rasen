@@ -27,13 +27,22 @@ function _random(max) {
   return Math.round(Math.random() * 1000) % max
 }
 
+// Row ids must keep incrementing across buildData() calls: the official
+// js-framework-benchmark protocol asserts an exact id after chained
+// run/clear cycles (init expects row 1 to be "1", then "1001", … and the
+// traced run expects the 1000th row to be "6000"). With a per-call
+// `id: i + 1` those assertions can never hold, so this local port could not be
+// measured on 01_run1k / 02_runlots / 07_clear at all. Matches upstream
+// vue-vapor-keyed, which uses a module-level counter.
+let nextId = 1
+
 // Per-row label refs (official vue-vapor-keyed design): update() mutates
 // only the touched rows' refs, so exactly those rows re-render.
 export function buildData(count = 1000) {
   const data = []
   for (let i = 0; i < count; i++) {
     data.push({
-      id: i + 1,
+      id: nextId++,
       label: ref(
         `${adjectives[_random(adjectives.length)]} ${
           colours[_random(colours.length)]
