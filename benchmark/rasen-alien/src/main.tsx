@@ -47,9 +47,13 @@ let nextId = 1
 /** Per-row label cell: a raw alien-signals callable (read `label()`, write `label(v)`). */
 type LabelSignal = { (): string; (value: string): void }
 
+/** Per-row selection flag, same callable shape. */
+type SelectedSignal = { (): boolean; (value: boolean): void }
+
 interface RowData {
   id: number
   label: LabelSignal
+  selected: SelectedSignal
 }
 
 function buildData(count: number): RowData[] {
@@ -59,7 +63,8 @@ function buildData(count: number): RowData[] {
       id: nextId++,
       label: signal(
         `${adjectives[random(adjectives.length)]} ${colours[random(colours.length)]} ${nouns[random(nouns.length)]}`
-      )
+      ),
+      selected: signal(false)
     })
   }
   return data
@@ -70,7 +75,20 @@ function buildData(count: number): RowData[] {
 // ============================================================================
 
 const data = ref<RowData[]>([])
-const selected = ref<number>(0)
+
+// Per-row selection (same model as benchmark/rasen): a single global
+// "selected id" signal would make every row's class binding read that one
+// signal, so a single click — or the reset in run()/clear() — would wake all
+// 1000 row effects and schedule 1000 jobs to end up writing two classes.
+// One signal per row keeps wakeups proportional to what actually changed,
+// which is the fine-grained granularity alien-signals is designed for.
+let rowById: Map<number, RowData> = new Map()
+let lastSelectedId = 0
+
+function rebuildIndex() {
+  rowById = new Map()
+  for (const r of data()) rowById.set(r.id, r)
+}
 
 // ============================================================================
 // Actions
@@ -78,18 +96,21 @@ const selected = ref<number>(0)
 
 function run() {
   data(buildData(1000))
-  selected(0)
+  rebuildIndex()
+  lastSelectedId = 0
 }
 
 function runLots() {
   data(buildData(10000))
-  selected(0)
+  rebuildIndex()
+  lastSelectedId = 0
 }
 
 function add() {
   // Reassign to a new array so the single-subscription `each` re-runs.
   // Mutating in place would not notify the watcher.
   data([...data(), ...buildData(1000)])
+  for (const r of data()) if (!rowById.has(r.id)) rowById.set(r.id, r)
 }
 
 function update() {
@@ -104,7 +125,8 @@ function update() {
 
 function clear() {
   data([])
-  selected(0)
+  rowById = new Map()
+  lastSelectedId = 0
 }
 
 function swapRows() {
@@ -119,11 +141,18 @@ function swapRows() {
 }
 
 function select(id: number) {
-  selected(id)
+  // Two per-row signal writes: exactly the two affected rows re-render.
+  if (lastSelectedId === id) return
+  const prev = rowById.get(lastSelectedId)
+  if (prev?.selected()) prev.selected(false)
+  const next = rowById.get(id)
+  if (next) next.selected(true)
+  lastSelectedId = id
 }
 
 function remove(id: number) {
   data(data().filter((d: RowData) => d.id !== id))
+  rowById.delete(id)
 }
 
 // ============================================================================
@@ -147,7 +176,7 @@ document.getElementById('swaprows')!.onclick = swapRows
 /** @rasen-compile */
 function Row(item: RowData) {
   return (
-    <tr class={selected() === item.id ? 'danger' : ''}>
+    <tr class={item.selected() ? 'danger' : ''}>
       <td class="col-md-1">{String(item.id)}</td>
       <td class="col-md-4">
         <a class="lbl" onClick={() => select(item.id)}>
