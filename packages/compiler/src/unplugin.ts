@@ -2,10 +2,22 @@
  * Bundler-agnostic plugin (vite / webpack / rspack / esbuild via unplugin).
  *
  * Pipeline per module (in order):
- *   1. Standard JSX handling — wrap complex attribute expressions in getters.
- *   2. Static hoisting — compile intrinsic-tag subtrees into template calls.
+ *   1. Static hoisting — compile intrinsic-tag subtrees into template calls.
+ *      Consumes RAW JSX: its shape detection (`cond ? 'cls' : ''` →
+ *      bindClassToggle, static StringLiteral attrs, …) only holds for the
+ *      expressions the author wrote.
+ *   2. Standard JSX handling — wrap the attribute expressions that are LEFT
+ *      (fallback / component subtrees) in getters so the runtime props layer
+ *      sees a reactive source.
  *   3. HMR — inject enterHmrModule/exitHmrModule around modules using com()
  *      (dev only; hot-accept is left to the bundler's own HMR).
+ *
+ * ⚠️ Order matters: running step 2 first would rewrite every complex prop
+ * expression to `() => expr` before step 1 sees it. The hoisting pass then
+ * fails its shape checks and wraps the getter *again* (`() => () => expr`), so
+ * `bindClass`/`bindProp` would receive a getter that returns a function and
+ * stringify it into the attribute. Locked by the pipeline tests in
+ * `__tests__/pipeline.test.ts`.
  *
  * Static hoisting is ON by default (no `@rasen-compile` directive needed);
  * disable via `compile: false` for testing.
@@ -37,6 +49,42 @@ function isExcluded(id: string, exclusions: Set<string>): boolean {
     if (id.includes(p)) return true
   }
   return false
+}
+
+/**
+ * The per-module pipeline. See the module header for why the order is fixed
+ * (static hoisting must see the author's raw expressions).
+ *
+ * `hmr` here means "inject the wrappers"; the caller owns the dev-only check.
+ * Returns the rewritten code, or null when nothing changed. Throws when static
+ * hoisting fails, so the plugin can report it against the offending module.
+ */
+export function transformModule(
+  code: string,
+  filename: string,
+  options: RasenCompilerPluginOptions = {}
+): string | null {
+  const { jsxTransform = true, compile = true, hmr = false } = options
+  let out = code
+
+  // 1. Static hoisting — consumes raw JSX.
+  if (compile) {
+    const result = compileModule(out, { ...options, filename })
+    if (result) out = result.code
+  }
+
+  // 2. JSX attribute handling for whatever hoisting left behind (fallbacks,
+  //    component subtrees).
+  if (jsxTransform) {
+    out = transformJsxExpressions(out)
+  }
+
+  // 3. HMR wrapping — modules using com().
+  if (hmr && usesCom(out) && !hasHmrWrapping(out)) {
+    out = injectHmr(out, filename)
+  }
+
+  return out === code ? null : out
 }
 
 export const rasenCompile = createUnplugin(
@@ -78,33 +126,21 @@ export const rasenCompile = createUnplugin(
         if (!enabled) return null
         if (isExcluded(id, excludeSet)) return null
 
-        let out = code
-
-        // 1. Standard JSX handling — wrap complex attribute expressions.
-        if (jsxTransform) {
-          out = transformJsxExpressions(out)
+        let out: string | null
+        try {
+          out = transformModule(code, id.split('?')[0], {
+            ...options,
+            jsxTransform,
+            compile,
+            // HMR wrapping is dev-only; the pipeline itself is env-agnostic.
+            hmr: hmr && dev,
+          })
+        } catch (error) {
+          this.error(error as Error)
+          return null
         }
 
-        // 2. Static hoisting (default on).
-        if (compile) {
-          try {
-            const result = compileModule(out, {
-              ...options,
-              filename: id.split('?')[0],
-            })
-            if (result) out = result.code
-          } catch (error) {
-            this.error(error as Error)
-            return null
-          }
-        }
-
-        // 3. HMR wrapping (dev only, modules using com()).
-        if (hmr && dev && usesCom(out) && !hasHmrWrapping(out)) {
-          out = injectHmr(out, id.split('?')[0])
-        }
-
-        if (out === code) return null
+        if (out === null) return null
         return { code: out, map: null }
       },
     }
