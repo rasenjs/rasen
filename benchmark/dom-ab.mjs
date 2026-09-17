@@ -24,6 +24,11 @@
  * Usage (write to a log and run it in the background):
  *   node dom-ab.mjs --iters 9 > /tmp/dom-ab.log 2>&1
  *   node dom-ab.mjs --targets rasen,vanillajs --bench 01_run1k,03_update --iters 7
+ *
+ * Runs headless by default. That is not just politeness: a visible window can
+ * be occluded or backgrounded while the user works, and Chrome throttles rAF /
+ * compositing for hidden pages, which makes the numbers drift with whatever the
+ * operator is doing. Pass --headful to watch the run instead.
  */
 import puppeteer from 'puppeteer'
 import { spawn } from 'node:child_process'
@@ -54,6 +59,7 @@ const WANTED_BENCH = String(argOf('bench', '01_run1k,03_update,05_swap,06_remove
 const ITERS = Number(argOf('iters', 9))
 const OUT_JSON = argOf('json', null)
 const BASELINE = String(argOf('baseline', 'vanillajs'))
+const HEADLESS = !argv.includes('--headful')
 
 const BENCHMARKS = bench.BENCHMARKS.filter((b) => WANTED_BENCH.includes(b.id))
 const TRACE_ROOT = path.join(__dirname, 'traces-ab')
@@ -127,7 +133,8 @@ async function main() {
   console.log('=== interleaved A/B (same browser, round-robin targets) ===')
   console.log(`targets : ${TARGETS.map(targetLabel).join(', ')}`)
   console.log(`benches : ${BENCHMARKS.map((b) => b.id).join(', ')}`)
-  console.log(`iters   : ${ITERS}   baseline for ratios: ${BASELINE}\n`)
+  console.log(`iters   : ${ITERS}   baseline for ratios: ${BASELINE}`)
+  console.log(`browser : ${HEADLESS ? 'headless (default)' : 'HEADFUL — expect rAF/compositor drift'}\n`)
 
   const servers = []
   const urls = {}
@@ -142,7 +149,7 @@ async function main() {
       console.log(`server up: ${dir} → ${url}`)
     }
 
-    const browser = await bench.launchBrowser(false)
+    const browser = await bench.launchBrowser(HEADLESS)
     // samples[label][benchId] = [ms, ...]
     const samples = {}
     const failures = {}
