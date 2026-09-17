@@ -6,8 +6,8 @@
  * (no gimbal issues from fixed rotation order).
  */
 
-import type { LoadedGLTF } from '@rasenjs/gfx'
-import { createTexture, getRenderContext, element, unref } from '@rasenjs/gfx'
+import type { GfxNode, LoadedGLTF } from '@rasenjs/gfx'
+import { element, unref } from '@rasenjs/gfx'
 import { Mat4x4f } from '@rasenjs/math'
 import type { Player } from './player'
 
@@ -44,12 +44,8 @@ export const weapon = (props: WeaponProps) => {
   return element({
     getBounds: () => null,
 
-    draw: (gl) => {
-      const renderContext = getRenderContext(gl)
-      const batch = renderContext.getBatchRenderer()
-      if (!batch) return
-
-      const texture = createTexture(gl, geometry.texture!)
+    draw: (node: GfxNode) => {
+      const texture = node.createTexture(geometry.texture!)
       const recoil = unref(props.recoil) ?? 0
 
       // Weapon world matrix = viewInverse · R_Y(π) · T(offset) · S
@@ -60,7 +56,7 @@ export const weapon = (props: WeaponProps) => {
       // (right 1.2, up -1, forward 2.75 — OpenGL camera forward is -Z, so the
       // Z component is -2.75), rotation (0,180,0), scale 1.0.
       // Recoil adds +Z (toward camera) so the weapon visibly kicks back.
-      const view = renderContext.getViewMatrix()
+      const view = node.getViewMatrix()
       // Order: S → R_Y(π) (rotate model) → T(offset) (place in camera space) → viewInverse.
       // (If T came before R_Y, the model would be rotated around the origin and
       //  end up BEHIND the camera — invisible.)
@@ -72,18 +68,40 @@ export const weapon = (props: WeaponProps) => {
       // Weapon IS lit (pass normals) so it has shading depth like the original
       // weapon camera — flat unlit weapon looks 2D.
       // Layer 2 → rendered by the overlay (weapon) camera.
-      batch.addShape(geometry.vertices, { r: 1, g: 1, b: 1, a: 1 }, matrix, geometry.uv, texture, undefined, undefined, geometry.normals, 2)
+      node.addShape(
+        'weapon',
+        geometry.vertices,
+        { r: 1, g: 1, b: 1, a: 1 },
+        matrix,
+        geometry.uv,
+        texture,
+        undefined,
+        undefined,
+        geometry.normals,
+        2,
+      )
 
       // Muzzle flash — burst sprite at the gun muzzle (Godot Muzzle at
       // (1.5, -0.75, -6) in CameraItem space, AnimatedSprite3D burst.png).
       const muzzleFlash = unref(props.muzzleFlash)
       const burstTexture = unref(props.burstTexture)
       if (muzzleFlash && burstTexture) {
-        const burst = createTexture(gl, burstTexture)
+        const burst = node.createTexture(burstTexture)
         const muzzleMatrix = view.invert()
           .multiply(Mat4x4f.translate(1.5, -0.75, -6))
           .multiply(Mat4x4f.scale(1.0, 1.0, 1.0))
-        batch.addShape(MUZZLE_VERTS, { r: 1, g: 1, b: 1, a: 1 }, muzzleMatrix, MUZZLE_UV, burst, undefined, undefined, undefined, 2)
+        node.addShape(
+          'weapon-muzzle',
+          MUZZLE_VERTS,
+          { r: 1, g: 1, b: 1, a: 1 },
+          muzzleMatrix,
+          MUZZLE_UV,
+          burst,
+          undefined,
+          undefined,
+          undefined,
+          2,
+        )
       }
     },
 
