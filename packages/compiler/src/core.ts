@@ -81,6 +81,9 @@ interface GenContext {
   needsCoreSetValue: boolean
   /** navigation statements hoisted to the component-root scope */
   navStatements: string[]
+  /** memoised absolute child paths for the current component: path key ->
+   *  variable already holding that node (see compileElement's selfRef). */
+  navCache: Map<string, string>
   /** wiring statements (offs.push(...)) hoisted likewise */
   wireStatements: string[]
 
@@ -261,6 +264,16 @@ function compileElement(
 
   function selfRef(): string {
     if (pathSoFar.length === 0) return rootVar
+    // Absolute child paths are walked once per component and reused: the same
+    // path is requested by several sites (an element's own attribute binding
+    // and the bindings on its descendants), and re-walking it emitted
+    // duplicate `child()` calls — the compiled Row walked two paths twice, i.e.
+    // 2 wasted calls per row on a 1,000-row list. Safe because every nav
+    // statement is emitted before the wire block, so no structural mutation
+    // happens between a path's definition and its uses.
+    const key = pathSoFar.join('.')
+    const cached = ctx.navCache.get(key)
+    if (cached !== undefined) return cached
     ctx.helpers.add('child')
     let cur = rootVar
     for (const idx of pathSoFar) {
@@ -268,6 +281,7 @@ function compileElement(
       ctx.navStatements.push(`const ${v} = child(${cur}, ${idx})`)
       cur = v
     }
+    ctx.navCache.set(key, cur)
     return cur
   }
 
@@ -400,6 +414,7 @@ function compileElement(
   const flushRun = () => {
     if (run.length === 0) return
     const hasExpr = run.some((p) => p.kind === 'expr')
+    const singleDynamic = run.length === 1 && run[0].kind === 'expr'
 
     if (!hasExpr) {
       // Pure static run → bake into the template (one text node).
@@ -426,7 +441,13 @@ function compileElement(
       )
       .join('')
     ctx.wireStatements.push(
-      `offs.push(bindText(${x}, () => \`${clientBody}\`))`
+      // A run that is a single dynamic value needs no template literal: the
+      // binding stringifies anyway and renderText already returns a string, so
+      // wrapping it only adds a per-update template evaluation (and hid a
+      // redundant String() in the source that the author never wrote).
+      singleDynamic
+        ? `offs.push(bindText(${x}, () => renderText(${(run[0] as { src: string }).src})))`
+        : `offs.push(bindText(${x}, () => \`${clientBody}\`))`
     )
 
     // SSR: values are emitted in place, so server markup and the client
@@ -591,6 +612,7 @@ export function transformProgram(
     navStatements: [],
     wireStatements: [],
     ssrParts: [],
+    navCache: new Map<string, string>(),
     source,
     intrinsicTags: options.intrinsicTags ?? DEFAULT_INTRINSIC_TAGS,
   }
@@ -669,6 +691,7 @@ export function transformProgram(
       ctx.navStatements = []
       ctx.wireStatements = []
       ctx.ssrParts = []
+      ctx.navCache = new Map<string, string>()
     }
   })
 

@@ -40,6 +40,37 @@ describe('compileModule', () => {
     expect(r.code).toContain('renderText(item.label)')
   })
 
+  it('纯动态文本段不再套模板字面量（父元素自带绑定时）', () => {
+    // A single dynamic value needs no template: bindText stringifies anyway and
+    // renderText already returns a string, so wrapping costs a template
+    // evaluation per update for nothing. This shape (a binding on the parent as
+    // well as on the text) is what the benchmark Row compiles to.
+    const code = `const el = <tr><td class="a"><a class="lbl" onClick={() => go()}>{label}</a></td></tr>`
+    const r = compileModule(code)!
+    expect(r.code).toMatch(/bindText\(_x\d+, \(\) => renderText\(label\)\)/)
+    expect(r.code).not.toMatch(/=> `\$\{renderText/)
+  })
+
+  it('静态+动态混合文本段仍用一个模板重建整段', () => {
+    // Guard: mixed runs must keep the single-template rebuild (the removal
+    // above only applies to a lone dynamic value, which is not the case here).
+    const code = `const el = <td>a {x} b</td>`
+    const r = compileModule(code)!
+    expect(r.code).toContain('bindText(_x1, () => `a ${renderText(x)} b`)')
+  })
+
+  it('同一绝对路径只导航一次（含子节点重复引用）', () => {
+    // The <a> is needed twice — for its own attribute binding and as the parent
+    // of its text — and must be navigated once, not re-walked. The compiled
+    // benchmark Row used to walk two paths twice, i.e. one wasted child() call
+    // per row on a 1,000-row list.
+    const code = `const el = <tr><td class="a"><a onClick={() => go()}>{x}</a></td></tr>`
+    const r = compileModule(code)!
+    expect(r.compiled).toBe(1)
+    // paths: (0) the td, (0,0) the a, (0,0,0) the text node — exactly three
+    expect((r.code.match(/child\(/g) || []).length).toBe(3)
+  })
+
   it('class/style 表达式分别发射 bindClass/bindStyle', () => {
     const code = `const el = <div class={cls} style={st}>x</div>`
     const r = compileModule(code)!
