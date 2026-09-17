@@ -398,13 +398,18 @@ export class WebGLRenderer extends Renderer {
     if (!this.overlayTex) return
     if (!this.blitProgram) {
       this.blitProgram = new ShaderProgram(gl)
+      // The fragment stage needs an explicit float precision: GLSL ES 1.00
+      // gives vertex shaders a default (highp) but leaves fragment shaders
+      // with none, and the compiler rejects the whole program without it —
+      // which silently cost the overlay composite.
       this.blitProgram.compile(
         `attribute vec2 a_uv;
          varying vec2 v_uv;
          void main() {
            v_uv = a_uv;
          }`,
-        `varying vec2 v_uv;
+        `precision mediump float;
+         varying vec2 v_uv;
          uniform sampler2D u_tex;
          void main() {
            gl_FragColor = texture2D(u_tex, v_uv);
