@@ -1,4 +1,5 @@
 export * from './types'
+export * from './frame'
 export * from './reactive'
 export * from './components'
 export * from './marker-constants'

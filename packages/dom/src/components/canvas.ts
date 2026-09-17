@@ -1,5 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import { getReactiveRuntime, toValue } from '@rasenjs/core'
+import { getReactiveRuntime, rafSchedule, toValue } from '@rasenjs/core'
 import type {
   CanvasNode,
   RenderContextOptions as Canvas2DRenderOptions
@@ -171,10 +171,13 @@ export function canvas<T extends keyof HostTypes = '2d'>(
 
     // 具象化真实渲染根：由对应渲染器包的官方入口完成。
     // 此后子组件挂在这棵真实的场景树下 —— node 就是 node。
-    // 帧调度注入：宿主提供 rAF（渲染器不再触达全局 BOM）。
-    const schedule = (cb: () => void): (() => void) => {
-      const id = requestAnimationFrame(cb)
-      return () => cancelAnimationFrame(id)
+    // 帧调度注入：宿主提供帧源（渲染器不再触达全局 BOM）。
+    // 必须是真帧源 —— 连续的微任务链条会让事件循环永不归还，所以这里不降级，直接失败。
+    const schedule = rafSchedule()
+    if (!schedule) {
+      throw new Error(
+        '[Rasen DOM] canvas 需要 requestAnimationFrame：当前环境没有帧源，无法驱动绘制。'
+      )
     }
     const glOptions = {
       logicalWidth: width,

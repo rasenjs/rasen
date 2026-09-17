@@ -21,6 +21,7 @@
  */
 
 import { Mat4x4f, mat4x4f } from '@rasenjs/math'
+import { microtaskSchedule, rafSchedule } from '@rasenjs/core'
 import type { Color } from '../types'
 import type { BitmapSource, TextureOptions } from '../utils'
 import { TransformStack } from '../transform-stack'
@@ -281,24 +282,25 @@ export abstract class Renderer {
     }
     this.projectionMatrix = Mat4x4f.identity()
     this.viewMatrix = Mat4x4f.identity()
-    this.scheduleFrame =
-      options.schedule ??
-      (typeof requestAnimationFrame !== 'undefined'
-        ? (cb) => {
-            const id = requestAnimationFrame(cb)
-            return () => cancelAnimationFrame(id)
-          }
-        : (cb) => {
-            queueMicrotask(cb)
-            return () => {}
-          })
+    // 帧源：注入 > 宿主 rAF > 微任务降级（见 @rasenjs/core frame.ts）。
+    // 前两者才算「真帧源」—— 微任务只够一次性刷新，拿它当连续帧源会让事件循环
+    // 永不归还且停不下来，所以 continuousRender 只在有真帧源时启动。
+    const hostSchedule = options.schedule ?? rafSchedule()
+    this.scheduleFrame = hostSchedule ?? microtaskSchedule()
     if (this.options.continuousRender) {
-      const loop = () => {
-        this.needsFullRedraw = true
-        this.draw()
+      if (hostSchedule) {
+        const loop = () => {
+          this.needsFullRedraw = true
+          this.draw()
+          this.cancelContinuous = this.scheduleFrame(loop)
+        }
         this.cancelContinuous = this.scheduleFrame(loop)
+      } else {
+        console.warn(
+          '[Rasen Gfx] continuousRender 需要真实帧源（如 rAF）：当前环境没有 rAF ' +
+            '也未注入 schedule，已跳过连续渲染。'
+        )
       }
-      this.cancelContinuous = this.scheduleFrame(loop)
     }
   }
 
@@ -329,9 +331,12 @@ export abstract class Renderer {
   }
 
   /**
-   * 宿主显式请求重绘（如 dom <canvas> 改了绘图缓冲尺寸后调用）。
-   * 与 markDirty 的区别：无视 continuousRender 模式（连续模式下
-   * scheduleDraw 是 no-op，但宿主主动触发的重绘仍应执行）。
+   * 宿主显式请求重绘 —— **同步执行**（如 dom <canvas> 改了绘图缓冲尺寸后调用：
+   * 尺寸变了就得立刻按新尺寸画一帧，否则会看到一帧拉伸 / 空白）。
+   *
+   * 与 markDirty 的区别：1) 同步（markDirty 只排一次绘制）；
+   * 2) 无视 continuousRender 模式（连续模式下 scheduleDraw 是 no-op，
+   * 但宿主主动触发的重绘仍应执行）。canvas-2d 后端的同名方法语义与此一致。
    */
   requestRedraw() {
     if (this.cancelScheduled !== null) {

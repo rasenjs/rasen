@@ -5,6 +5,7 @@
  * per-node/区域脏区优化留作后续迭代（节点已携带 bounds 钩子位）。
  */
 
+import { microtaskSchedule, rafSchedule } from '@rasenjs/core'
 import type { Context2D } from './node'
 import type { CanvasNode } from './node'
 import type { CanvasPointerEventType } from './events'
@@ -68,18 +69,8 @@ export class RenderContext {
     options: RenderContextOptions = {}
   ) {
     this.resolution = options.resolution ?? 1
-    // 帧调度：注入优先；缺省 rAF，环境缺失（测试/SSR）退化 queueMicrotask
-    this.scheduleFrame =
-      options.schedule ??
-      (typeof requestAnimationFrame !== 'undefined'
-        ? (cb) => {
-            const id = requestAnimationFrame(cb)
-            return () => cancelAnimationFrame(id)
-          }
-        : (cb) => {
-            queueMicrotask(cb)
-            return () => {}
-          })
+    // 帧源：注入 > 宿主 rAF > 微任务降级（见 @rasenjs/core frame.ts）
+    this.scheduleFrame = options.schedule ?? rafSchedule() ?? microtaskSchedule()
     contextMap.set(ctx, this)
   }
 
@@ -137,11 +128,17 @@ export class RenderContext {
   private needsPointerBinding = false
 
   /**
-   * 宿主显式请求重绘（如 dom <canvas> 改了绘图缓冲尺寸后调用）。
-   * 当前与 markDirty 等价；保留独立入口以承载未来的尺寸相关处理。
+   * 宿主显式请求重绘 —— **同步执行**（如 dom `<canvas>` 改了绘图缓冲尺寸后调用：
+   * 尺寸变了就得立刻按新尺寸画一帧，否则会看到一帧拉伸 / 空白）。
+   *
+   * 与 `markDirty()` 的区别是「何时」：`markDirty` 只排一次绘制（稍后的帧回调里画），
+   * 本方法是现在就画 —— 因此先取消已排的那次，避免同一帧画两遍。
+   * 这条语义与 gfx 后端的 `Renderer.requestRedraw()` 一致：两个后端同名 API 曾经
+   * 一个是同步、一个是延迟，宿主按 resize 调用却表现不同，是个真实的坑。
    */
   requestRedraw(): void {
-    this.scheduleDraw()
+    this.cancelScheduled?.()
+    this.draw()
   }
 
   private scheduleDraw() {
