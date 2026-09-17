@@ -60,8 +60,15 @@ Thumbs.db
 .temp
 
 # Screenshots / debug images
+# Everything below is a stray capture or generated report and stays out of the
+# repo — but example app assets must SHIP with the app, so `public/` is
+# re-included right after. Negations only work if they come after the rule.
 *.png
 *.jpg
+!examples/*/public/**
+# ...but this one is a leftover reference screenshot, not a runtime asset
+# (nothing references it) — keep the stray capture out of the re-included tree.
+examples/fps/public/orig-screenshot.png
 
 # Generated comparison artifacts (vector-recreation pixel-alignment studio)
 recreate.html
