@@ -40,6 +40,37 @@ describe('compileModule', () => {
     expect(r.code).toContain('renderText(item.label)')
   })
 
+  it('函数子节点是 mountable：回退到工厂链，不被字符串化', () => {
+    // renderText 刻意不调用函数（见 core/html-escape.ts 的注释），所以提升这个
+    // 子树会产出 renderText(() => …) —— 浏览器把箭头函数的**源码**当文本显示。
+    // 只有工厂链知道「调用一次、渲染返回的 string/number」这个契约
+    // （dom / html 的 element.ts 各自实现了一份）。
+    const code = 'const el = <div>{() => `WORLD ${g.worldLabel.value}`}</div>'
+    const r = compileModule(code)!
+    expect(r.fellBack).toBe(1)
+    expect(r.compiled).toBe(0)
+    expect(r.code).not.toContain('renderText(')
+  })
+
+  it('回退不污染后续组件：不得残留 _rN 引用与 SSR 片段', () => {
+    // 被中止的尝试已经把 nav/wire/ssr 压进了共享累加器。不清理的话，下一个成功
+    // 编译的组件会带上 bindClass(_r0, …) —— 那一轮里 _r0 根本不存在，挂载必然
+    // 抛错；同时它的 SSR 模板会以被中止子树的标记开头。
+    const code = [
+      'const A = () => <div class={cls}>{cond && <span>hi</span>}</div>',
+      'const B = () => <div class="b"><span>plain</span></div>'
+    ].join('\n')
+    const r = compileModule(code)!
+    expect(r.compiled).toBe(1)
+    expect(r.fellBack).toBe(1)
+    // B's body must not *call* the aborted attempt's bindings (an unused import
+    // of a helper the attempt registered is harmless and not asserted here).
+    expect(r.code).not.toMatch(/bindClass\(/)
+    expect(r.code).not.toContain('escapeAttr(String(cls))')
+    expect(r.code).toContain(`template('<div class="b"><span>plain</span></div>')`)
+    expect(r.code).toContain('node.append(`<div class="b"><span>plain</span></div>`)')
+  })
+
   it('纯动态文本段不再套模板字面量（父元素自带绑定时）', () => {
     // A single dynamic value needs no template: bindText stringifies anyway and
     // renderText already returns a string, so wrapping costs a template

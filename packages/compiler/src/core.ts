@@ -96,6 +96,23 @@ interface GenContext {
   intrinsicTags: Set<string>
 }
 
+/**
+ * Drop the per-component accumulators.
+ *
+ * Both paths must call this. A failed `compileElement` attempt has already
+ * pushed navigation statements, wiring statements and SSR fragments onto the
+ * shared context, so leaving them behind leaks the aborted subtree into the
+ * next component that compiles: that component then runs bindings against
+ * `_rN` variables which only existed inside the aborted attempt, and its SSR
+ * string opens with the aborted subtree's markup.
+ */
+function resetComponentContext(ctx: GenContext): void {
+  ctx.navStatements = []
+  ctx.wireStatements = []
+  ctx.ssrParts = []
+  ctx.navCache = new Map<string, string>()
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
@@ -235,6 +252,21 @@ function containsJsxOrArray(node: any): boolean {
     }
   }
   return false
+}
+
+/**
+ * A function in a child position is a *mountable factory*, not a value.
+ *
+ * `renderText` refuses to invoke it on purpose (see core/html-escape.ts):
+ * stringifying the function would print its source into the page. Only the
+ * factory chain knows the contract — it calls the child once and renders a
+ * string / number result — so such a subtree must not be hoisted.
+ */
+function isFunctionChild(node: any): boolean {
+  return (
+    node.type === 'ArrowFunctionExpression' ||
+    node.type === 'FunctionExpression'
+  )
 }
 
 /**
@@ -492,6 +524,10 @@ function compileElement(
       // Element-producing expressions (cond && <span/>, list.map(...), …)
       // are not text — fall back to the factory chain for this subtree.
       if (containsJsxOrArray(c.expression)) return null
+      // …and neither is a function: it is a mountable, so only the factory
+      // chain can honour it. Hoisting would emit `renderText(() => …)` and the
+      // page would show the arrow function's source text.
+      if (isFunctionChild(c.expression)) return null
       run.push({
         kind: 'expr',
         src: ctx.source.slice(c.expression.start!, c.expression.end!)
@@ -637,6 +673,9 @@ export function transformProgram(
       const html = compileElement(path.node, ctx, rootVar, [])
       if (html === null) {
         fellBack++
+        // The aborted attempt already pushed onto the shared accumulators —
+        // drop them, or they leak into the next component that compiles.
+        resetComponentContext(ctx)
         return // leave original jsx() call intact
       }
 
@@ -688,10 +727,7 @@ export function transformProgram(
       path.replaceWith(parseExpression(mountableSrc))
 
       // Reset per-component accumulators
-      ctx.navStatements = []
-      ctx.wireStatements = []
-      ctx.ssrParts = []
-      ctx.navCache = new Map<string, string>()
+      resetComponentContext(ctx)
     }
   })
 
