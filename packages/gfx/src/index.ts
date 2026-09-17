@@ -14,6 +14,7 @@ export {
 export type { CameraConfig } from './camera'
 export { isLookAtCamera, computeCameraMatrix } from './camera'
 export { createRoot, createNode, createRootNode, type GfxNode, type GlNode, type GlContext, type CanvasSurface, type GpuCanvasContext, type MeshSpan } from './node'
+export { gfxHostHooks } from './host-hooks'
 export { TransformStack } from './transform-stack'
 export type { InstanceData } from './renderer/gl/instanced'
 export * from './components'

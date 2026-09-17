@@ -5,8 +5,8 @@ import type {
   RenderContextOptions as Canvas2DRenderOptions
 } from '@rasenjs/canvas-2d'
 import type { GfxNode, GlContext, GpuCanvasContext, CameraConfig } from '@rasenjs/gfx'
-import { createRoot as createCanvas2DRoot } from '@rasenjs/canvas-2d'
-import { createRoot as createGlRoot, createRootNode, getRenderContext, WebGPURenderer, type WebGPURendererOptions, type WebGLRenderer as RenderContextType } from '@rasenjs/gfx'
+import { createRoot as createCanvas2DRoot, canvasHostHooks } from '@rasenjs/canvas-2d'
+import { createRoot as createGlRoot, createRootNode, getRenderContext, gfxHostHooks, WebGPURenderer, type WebGPURendererOptions, type WebGLRenderer as RenderContextType } from '@rasenjs/gfx'
 
 /**
  * contextType → 渲染器节点与配置的类型映射。
@@ -258,11 +258,17 @@ export function canvas<T extends keyof HostTypes = '2d'>(
       },
     )
 
-    // 挂载子组件到渲染根：canvas 子树无 marker 节点操作需求，
-    // 显式传空 hooks（全降级）——hooks 即上下文，显式传递。
-    const childUnmounts = props.children.map((child) =>
-      (child as Mountable<unknown>)(root, undefined)
-    )
+    // 子树换到了另一个宿主，必须显式传入**那个宿主自己**的钩子。传 undefined
+    // 是不行的：com 会把省略的 hooks 从当前挂载回填，子树于是静默继承外层
+    // DOM 那套，第一个 each 就会对一个场景节点调 insertBefore。
+    const childUnmounts =
+      contextType === '2d'
+        ? (props.children as Array<Mountable<CanvasNode>>).map((child) =>
+            child(root as unknown as CanvasNode, canvasHostHooks)
+          )
+        : (props.children as Array<Mountable<GfxNode>>).map((child) =>
+            child(root as unknown as GfxNode, gfxHostHooks)
+          )
 
     // Watch for camera prop changes and push them into the WebGL
     // RenderContext / the WebGPU renderer. The getter re-evaluates the
