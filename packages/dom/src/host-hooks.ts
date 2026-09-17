@@ -31,6 +31,18 @@ function guardedInsertBefore(
 }
 
 /**
+ * extractRange 允许区域外存活的最多节点数，超过则退回 Range 摘除。
+ *
+ * 真实应用的宿主容器从来不是干净的：App 的 index.html 里总会有换行空白文本
+ * 与占位注释（如 <tbody> 里的 `<!-- rows will be rendered here -->`），所以
+ * “区域覆盖宿主全部子节点”这个旧判据在实践中永远为假——测试 fixture 里的干净
+ * 容器是唯一的例外，快路径事实上是死代码（千行清空因此退化成一干次
+ * removeChild）。留出少量名额即可覆盖这类宿主样板；真出现大量区域外节点时退回
+ * Range，行为与旧版一致。
+ */
+const MAX_OUTSIDE_NODES = 8
+
+/**
  * DOM 宿主钩子
  *
  * 支持 SSR hydration：在水合模式下 createMarker/createText 会 claim 已有节点而不是创建新节点。
@@ -74,21 +86,33 @@ export const hostHooks = {
 
   /** 区间批量摘除：整段覆盖时走 textContent 快速路径，否则 Range 摘除 */
   extractRange: (parent: HTMLElement, start: Node, end: Node): void => {
-    // 快速路径：区域 (start, end) 覆盖宿主全部子节点时，等价于原生
-    // textContent=''（浏览器单次批量弃子，无 fragment 构建），随后恢复
-    // end 哨兵。千行级 tbody 清空与 vanilla 的 removeAllRows 同级成本。
-    if (start.previousSibling === null && end.nextSibling === null &&
-        start.parentNode === parent && end.parentNode === parent) {
-      parent.textContent = ''
-      parent.appendChild(end)
-      return
+    if (start.parentNode === parent && end.parentNode === parent) {
+      // 区域 (start, end) 之外的节点属于宿主自身的标记（占位注释、空白文本），
+      // 必须保下来。先数一下：只要这类节点不多，就用「整段弃子 + 回插幸存节点」，
+      // 因为浏览器清空子列表是一次原生批量操作，而逐个 removeChild 是 N 次。
+      const before: Node[] = []
+      for (let n = parent.firstChild; n && n !== start; n = n.nextSibling) {
+        before.push(n)
+      }
+      const after: Node[] = []
+      for (let n = end.nextSibling; n; n = n.nextSibling) after.push(n)
+
+      if (before.length + after.length <= MAX_OUTSIDE_NODES) {
+        parent.textContent = ''
+        for (const n of before) parent.appendChild(n)
+        parent.appendChild(end)
+        for (const n of after) parent.appendChild(n)
+        return
+      }
     }
 
     const range = (parent.ownerDocument || document).createRange()
     range.setStartAfter(start)
     range.setEndBefore(end)
-    // 摘下的 fragment 直接丢弃，由 GC 回收
-    range.extractContents()
+    // deleteContents 而不是 extractContents：摘下来的节点是直接丢弃的，而
+    // extractContents 会先把它们全部搬进一个随即被扔掉的 DocumentFragment
+    // （千行规模下这是实打实的分配与迁移成本）。
+    range.deleteContents()
   },
 
   /** 下一个兄弟节点（区间遍历用） */

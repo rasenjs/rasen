@@ -92,7 +92,14 @@ export function template(html: string): (host?: HTMLElement) => HTMLElement {
   }
 }
 
-/** nth child node of parent (childNodes-based; see contract above). */
+/** nth child node of parent (childNodes-based; see contract above).
+ *
+ *  A firstChild/nextSibling walk was tried here (2026-09-17): it is 3x cheaper
+ *  per call in isolation (12.5ns vs 37.5ns over 8000 navigations/rep, min-of-40)
+ *  but that is ~25ns x 2000 calls ≈ 0.05ms per 1,000-row create — below this
+ *  benchmark's ~2-3% noise floor, and the same-session A/B could not resolve it
+ *  (01_run1k moved -0.5%/-1.6% between min and median). Reverted: not worth the
+ *  out-of-range difference (walk yields `null`, this yields `undefined`). */
 export function child(parent: ParentNode, index: number): ChildNode {
   return parent.childNodes[index]
 }

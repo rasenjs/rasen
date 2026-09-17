@@ -1248,6 +1248,51 @@ describe('@rasenjs/dom', () => {
       unmount?.()
     })
 
+    it('should take the bulk-removal path even when the host has its own markup', async () => {
+      // Real hosts are never clean: an app's <tbody> carries the whitespace and
+      // placeholder comments written in index.html. The old guard ("the region
+      // covers every child of the host") could therefore only ever fire in a
+      // clean test fixture, so in real apps every clear fell back to N
+      // removeChild calls. This test pins the real-world shape.
+      container.appendChild(document.createTextNode('\n          '))
+      container.appendChild(
+        document.createComment(' rows will be rendered here ')
+      )
+      container.appendChild(document.createTextNode('\n        '))
+
+      const items = ref([
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' }
+      ])
+
+      const unmount = mount(each(items, (item) =>
+        div({ children: item.name })
+      ), container)
+
+      expect(container.querySelectorAll('div').length).toBe(2)
+
+      const createRange = vi.spyOn(document, 'createRange')
+
+      items.value = []
+      await Promise.resolve()
+
+      // cleared …
+      expect(container.querySelectorAll('div').length).toBe(0)
+      // … through the bulk path rather than the Range fallback …
+      expect(createRange).not.toHaveBeenCalled()
+      // … and the host's own placeholder survived
+      expect(
+        [...container.childNodes].some(
+          (n) =>
+            n.nodeType === 8 &&
+            (n.textContent ?? '').includes('rows will be rendered here')
+        )
+      ).toBe(true)
+
+      createRange.mockRestore()
+      unmount?.()
+    })
+
     it('should cleanup on unmount', () => {
       const items = ref([
         { id: 1, name: 'Alice' },
