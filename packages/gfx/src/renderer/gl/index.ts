@@ -200,12 +200,34 @@ export class WebGLRenderer extends Renderer {
       this.applyCameraProjection()
     }
 
-    // Enable depth testing for 3D (lookAt) cameras
+    // Enable depth testing for 3D (lookAt) cameras — through the same
+    // accounting as enableDepth(), because clearBuffers() reads depthCount to
+    // decide whether to clear the depth buffer. Enabling the GL state behind
+    // its back left the depth buffer uncleared: stale depths then reject each
+    // new frame's geometry and the scene smears as the camera turns.
     if (isLookAtCamera(options.camera)) {
-      gl.enable(gl.DEPTH_TEST)
+      this.depthCount++
+      this.activateDepth()
     }
 
     renderContextMap.set(gl, this)
+  }
+
+  /**
+   * Turn the GL depth state on. Pure state — the ref-count and the "turn it
+   * back off" decision live at the call sites, so both entry points (a lookAt
+   * camera in the options, and an explicit enableDepth) stay accounted for.
+   *
+   * Back-face culling is intentionally NOT enabled: the lookAt view matrix
+   * mirrors winding order, so the classic CCW-front convention flips and
+   * visible faces get culled. Depth testing alone is correct for the scenes
+   * this renderer targets.
+   */
+  private activateDepth(): void {
+    const gl = this.gl
+    gl.enable(gl.DEPTH_TEST)
+    gl.depthFunc(gl.LEQUAL)
+    gl.disable(gl.CULL_FACE)
   }
 
   private setupWebGL() {
@@ -315,19 +337,11 @@ export class WebGLRenderer extends Renderer {
    * after every caller has called `disableDepth`. This replaces the old
    * 2D/3D mode switch — depth is just a per-scene flag, and 2D scenes
    * (no camera) never enable it.
-   *
-   * Back-face culling is intentionally NOT enabled: the lookAt view matrix
-   * mirrors winding order, so the classic CCW-front convention flips and
-   * visible faces get culled. Depth testing alone is correct for the scenes
-   * this renderer targets.
    */
   enableDepth() {
     this.depthCount++
     if (this.depthCount === 1) {
-      const gl = this.gl
-      gl.enable(gl.DEPTH_TEST)
-      gl.depthFunc(gl.LEQUAL)
-      gl.disable(gl.CULL_FACE)
+      this.activateDepth()
       this.needsFullRedraw = true
       this.scheduleDrawPublic()
     }
