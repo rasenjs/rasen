@@ -2,6 +2,20 @@
  * Animation types for @rasenjs/animation
  */
 
+import type { FrameSchedule } from './schedule'
+
+/** 所有动画共用的构造选项。 */
+export interface AnimationOptions {
+  /**
+   * 帧源（与渲染器 `schedule` 选项同一形状）。缺省用宿主 rAF。
+   *
+   * 注入手动帧源即可逐帧驱动并断言精确状态 —— 这是动画行为唯一可被真正
+   * 测到的方式（在没注入之前，用例只能断言同步标志，于是三个驱动器 bug
+   * 一直活着）。
+   */
+  schedule?: FrameSchedule
+}
+
 export interface AnimatedRef {
   readonly value: number
   stop(): void

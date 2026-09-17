@@ -1,5 +1,6 @@
 export type {
   AnimatedRef,
+  AnimationOptions,
   TweenOptions,
   SpringOptions,
   FrameOptions,
@@ -16,3 +17,4 @@ export { tween } from './tween'
 export { spring } from './spring'
 export { frame } from './frame'
 export { all } from './all'
+export type { FrameSchedule } from './schedule'
