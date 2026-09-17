@@ -23,14 +23,20 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 function relevantTypes(e, startLogicEventName) {
-  if (e.name === 'EventDispatch') {
-    const type = e.args?.data?.type
-    if (type === startLogicEventName) return 'startLogicEvent'
-    if (type === 'click') return 'click'
-    if (type === 'mousedown') return 'mousedown'
-    if (type === 'pointerup') return 'pointerup'
-  }
-  return null
+  if (e.name !== 'EventDispatch') return null
+  const type = e.args?.data?.type
+  // bench.js pushes BOTH a startLogicEvent AND a click entry for the click
+  // dispatch. The click entry is what keeps work that happens *inside* the
+  // dispatch in the window: `during` accepts `e.ts > click.end || type ===
+  // 'click'`, so without it a benchmark whose work all runs inside the click
+  // dispatch (04_select: the signal fan-out plus its microtask flush) yields an
+  // empty window and the section silently disappears.
+  const out = []
+  if (type === startLogicEventName) out.push('startLogicEvent')
+  if (type === 'click') out.push('click')
+  if (type === 'mousedown') out.push('mousedown')
+  if (type === 'pointerup') out.push('pointerup')
+  return out.length ? out : null
 }
 
 /** Same window rule as bench.js computeResultsCPU (click ts -> commit end). */
@@ -38,8 +44,11 @@ function windowOf(traceEvents, startLogicEventName = 'click') {
   const events = []
   for (const e of traceEvents) {
     const rel = relevantTypes(e, startLogicEventName)
-    if (rel) events.push({ type: rel, ts: +e.ts, end: +e.ts + +(e.dur || 0), pid: e.pid })
-    else if ((e.name === 'Commit' || e.name === 'Layout' || e.name === 'Paint') && e.ph === 'X')
+    if (rel) {
+      for (const type of rel) {
+        events.push({ type, ts: +e.ts, end: +e.ts + +(e.dur || 0), pid: e.pid })
+      }
+    } else if ((e.name === 'Commit' || e.name === 'Layout' || e.name === 'Paint') && e.ph === 'X')
       events.push({ type: e.name.toLowerCase(), ts: +e.ts, end: +e.ts + +e.dur, pid: e.pid })
     else if (e.name === 'FireAnimationFrame' && e.ph === 'X')
       events.push({ type: 'fireAnimationFrame', ts: +e.ts, end: +e.ts + +e.dur, pid: e.pid })
