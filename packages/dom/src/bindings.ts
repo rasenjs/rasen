@@ -336,7 +336,7 @@ export function bindKey(
   const getter = toGetter(value as PropValue<unknown>)
   return isDOMProperty(tag, key)
     ? bindProp(el, key, getter)
-    : bindAttr(el, key, getter)
+    : bindAttr(el, getDOMAttrName(key), getter)
 }
 
 /** Register an event listener; returns its removal function.

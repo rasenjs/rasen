@@ -1,9 +1,13 @@
 /**
- * Collapsible - 可折叠组件
+ * Collapsible - expandable content region.
  *
- * 可以展开或折叠内容区域，支持受控和非受控模式。
+ * Controlled and uncontrolled modes. Composed on @rasenjs/dom element
+ * factories; the context exposes the open state as a ref so parts can
+ * bind to it reactively.
  */
 import type { Mountable, Ref } from '@rasenjs/core'
+import { getReactiveRuntime } from '@rasenjs/core'
+import { div, button } from '@rasenjs/dom'
 
 export type CollapsibleState = 'open' | 'closed'
 
@@ -14,7 +18,7 @@ export interface CollapsibleRootProps {
   class?: string
   style?: Record<string, string | number> | string
   onOpenChange?: (open: boolean) => void
-  children?: () => Mountable<HTMLElement>
+  children?: (getContext: () => CollapsibleContext | undefined) => Mountable<HTMLElement>
 }
 
 export interface CollapsibleTriggerProps {
@@ -40,119 +44,142 @@ export interface CollapsibleContext {
 }
 
 /**
- * 创建 Collapsible Root 组件
+ * Create the Collapsible Root component.
  */
 export function createCollapsibleRoot(): (
   props?: CollapsibleRootProps
 ) => Mountable<HTMLElement> {
   return (props?: CollapsibleRootProps) => {
-    return (host: HTMLElement) => {
-      // Root 容器
-      const root = document.createElement('div')
-      if (props?.class) root.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(root.style, props.style)
-        }
-      }
+    const rt = getReactiveRuntime()
+    const open = rt.ref(props?.defaultOpen ?? false)
 
-      // 渲染 children
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children()(root, undefined)
-      }
-
-      host.appendChild(root)
-
-      return () => {
-        childUnmount?.()
-        root.remove()
-      }
+    const toggle = () => {
+      if (props?.disabled) return
+      const next = !rt.unref(open)
+      rt.setValue(open, next)
+      props?.onOpenChange?.(next)
     }
+
+    const getContext = (): CollapsibleContext => ({
+      open,
+      disabled: props?.disabled ?? false,
+      toggle
+    })
+
+    return div({
+      dataState: () => (rt.unref(open) ? 'open' : 'closed'),
+      dataDisabled: () => (props?.disabled ? '' : undefined),
+      class: props?.class,
+      style: props?.style,
+      // rota children contract: invoke to get a Mountable, hand it to the
+      // element factory (a Mountable IS a (host) => cleanup function).
+      children: props?.children ? [props.children()] : undefined
+    })
   }
 }
 
 /**
- * 创建 Collapsible Trigger 组件
+ * Create the Collapsible Trigger component.
  */
 export function createCollapsibleTrigger(): (
-  props?: CollapsibleTriggerProps
+  props?: CollapsibleTriggerProps,
+  getContext?: () => CollapsibleContext | undefined
 ) => Mountable<HTMLElement> {
-  return (props?: CollapsibleTriggerProps) => {
-    return (host: HTMLElement) => {
-      const button = document.createElement('button')
-      button.type = 'button'
+  return (
+    props?: CollapsibleTriggerProps,
+    getContext?: () => CollapsibleContext | undefined
+  ) => {
+    const rt = getReactiveRuntime()
 
-      if (props?.class) button.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(button.style, props.style)
-        }
-      }
-
-      button.onclick = () => {
+    return button({
+      type: 'button',
+      ariaExpanded: () => String(rt.unref(getContext?.().open) ?? false),
+      dataState: () => (rt.unref(getContext?.().open) ? 'open' : 'closed'),
+      dataDisabled: () => (getContext?.().disabled ? '' : undefined),
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children()] : undefined,
+      onClick: () => {
         props?.onClick?.()
+        getContext?.().toggle()
       }
-
-      host.appendChild(button)
-      return () => button.remove()
-    }
+    })
   }
 }
 
 /**
- * 创建 Collapsible Content 组件
+ * Create the Collapsible Content component.
  */
 export function createCollapsibleContent(): (
-  props?: CollapsibleContentProps
+  props?: CollapsibleContentProps,
+  getContext?: () => CollapsibleContext | undefined
 ) => Mountable<HTMLElement> {
-  return (props?: CollapsibleContentProps) => {
-    return (host: HTMLElement) => {
-      const content = document.createElement('div')
-      content.id = 'collapsible-content'
+  return (
+    props?: CollapsibleContentProps,
+    getContext?: () => CollapsibleContext | undefined
+  ) => {
+    const rt = getReactiveRuntime()
+    const forceMount = props?.forceMount ?? false
 
-      if (props?.class) content.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(content.style, props.style)
-        }
-      }
-
-      const forceMount = props?.forceMount ?? false
-      if (!forceMount) {
-        content.style.display = 'none'
-      }
-      content.dataset.state = forceMount ? 'open' : 'closed'
-
-      // 渲染 children
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children()(content, undefined)
-      }
-
-      host.appendChild(content)
-
-      return () => {
-        childUnmount?.()
-        content.remove()
-      }
-    }
+    return div({
+      id: 'collapsible-content',
+      role: 'region',
+      dataState: () => (rt.unref(getContext?.().open) ? 'open' : 'closed'),
+      hidden: () => (forceMount || rt.unref(getContext?.().open) ? false : true),
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children()] : undefined
+    })
   }
 }
 
 /**
- * Collapsible 组合组件
+ * Collapsible preset: root + trigger + content wired to one context.
  */
 export function createCollapsible(): (
-  props?: CollapsibleRootProps
+  props?: CollapsibleRootProps & {
+    triggerClass?: string
+    triggerStyle?: Record<string, string | number> | string
+    contentClass?: string
+    contentStyle?: Record<string, string | number> | string
+    trigger?: () => Mountable<HTMLElement>
+    content?: () => Mountable<HTMLElement>
+  }
 ) => Mountable<HTMLElement> {
   const Root = createCollapsibleRoot()
+  const Trigger = createCollapsibleTrigger()
+  const Content = createCollapsibleContent()
 
-  return (props?: CollapsibleRootProps) => {
-    return (host: HTMLElement) => {
-      return Root(props)(host, undefined)
-    }
-  }
+  return (props) =>
+    Root({
+      defaultOpen: props?.defaultOpen,
+      open: props?.open,
+      disabled: props?.disabled,
+      class: props?.class,
+      style: props?.style,
+      onOpenChange: props?.onOpenChange,
+      children: (getContext) =>
+        div({
+          children: [
+            Trigger(
+              {
+                class: props?.triggerClass,
+                style: props?.triggerStyle,
+                children: props?.trigger
+              },
+              getContext
+            ),
+            Content(
+              {
+                class: props?.contentClass,
+                style: props?.contentStyle,
+                children: props?.content
+              },
+              getContext
+            )
+          ]
+        })
+    })
 }
 
 export const collapsible = createCollapsible()

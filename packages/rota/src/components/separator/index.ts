@@ -1,11 +1,14 @@
 /**
- * Separator - 分隔符组件
+ * Separator - divider component.
  *
- * 用于分隔内容区域，支持水平和垂直方向。
- * 可配置为装饰性（无语义）或语义性（有 ARIA 属性）。
+ * Separates content regions, horizontally or vertically. Can be decorative
+ * (no semantics) or semantic (exposed to assistive technology).
+ *
+ * Composed on @rasenjs/dom element factories; styling is left to the
+ * consumer (headless contract) — orientation is exposed via data attribute.
  */
 import type { Mountable } from '@rasenjs/core'
-import { primitive } from '../../primitives'
+import { hr } from '@rasenjs/dom'
 
 export interface SeparatorProps {
   orientation?: 'horizontal' | 'vertical'
@@ -15,7 +18,7 @@ export interface SeparatorProps {
 }
 
 /**
- * 创建 Separator 组件
+ * Create the Separator component.
  */
 export function createSeparator(): (
   props?: SeparatorProps
@@ -24,39 +27,38 @@ export function createSeparator(): (
     const orientation = props?.orientation ?? 'horizontal'
     const decorative = props?.decorative ?? false
 
-    return primitive('hr')({
+    return hr({
       role: decorative ? undefined : 'separator',
-      'aria-orientation': decorative ? undefined : orientation,
-      'data-orientation': orientation,
+      ariaOrientation: decorative ? undefined : orientation,
+      dataOrientation: orientation,
       class: props?.class,
+      // The 1px sizing IS the visible output of a separator — functional
+      // defaults, still overridable via style/class.
       style: {
-        ...(typeof props?.style === 'object' ? props.style : {}),
-        // 默认样式
         border: 'none',
-        margin: orientation === 'vertical' ? '0 8px' : '8px 0',
         flexShrink: 0,
-        // 根据方向设置尺寸
         ...(orientation === 'vertical'
-          ? { width: '1px', height: 'auto' }
-          : { width: 'auto', height: '1px' })
+          ? { width: '1px', height: 'auto', margin: '0 8px' }
+          : { width: 'auto', height: '1px', margin: '8px 0' }),
+        ...(typeof props?.style === 'object' ? props.style : {})
       }
     })
   }
 }
 
 /**
- * Separator 组件预设
+ * Separator component preset.
  */
 export const separator = createSeparator()
 
 /**
- * 水平分隔符
+ * Horizontal separator.
  */
 export const hseparator = (props?: Omit<SeparatorProps, 'orientation'>) =>
   separator({ ...props, orientation: 'horizontal' })
 
 /**
- * 垂直分隔符
+ * Vertical separator.
  */
 export const vseparator = (props?: Omit<SeparatorProps, 'orientation'>) =>
   separator({ ...props, orientation: 'vertical' })

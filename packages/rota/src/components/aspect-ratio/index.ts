@@ -1,10 +1,11 @@
 /**
- * AspectRatio - 宽高比容器组件
+ * AspectRatio - fixed aspect ratio container.
  *
- * 用于保持子元素的固定宽高比。
- * 常用于图片、视频、卡片等需要保持特定比例的场景。
+ * Keeps children locked to a width/height ratio (images, videos, cards...).
+ * Composed on @rasenjs/dom element factories.
  */
 import type { Mountable } from '@rasenjs/core'
+import { div } from '@rasenjs/dom'
 
 export interface AspectRatioProps {
   ratio?: number
@@ -13,7 +14,7 @@ export interface AspectRatioProps {
 }
 
 /**
- * 创建 AspectRatio 组件
+ * Create the AspectRatio component.
  */
 export function createAspectRatio(): (
   props?: AspectRatioProps,
@@ -25,55 +26,37 @@ export function createAspectRatio(): (
   ) => {
     const ratio = props?.ratio ?? 1
 
-    return (host: HTMLElement) => {
-      // 外层容器
-      const container = document.createElement('div')
-      container.style.position = 'relative'
-      container.style.width = '100%'
-      container.style.overflow = 'hidden'
-
-      // 使用 padding-bottom 实现宽高比
-      container.style.paddingBottom = `${(1 / ratio) * 100}%`
-
-      // 应用自定义样式
-      if (props?.style) {
-        if (typeof props?.style === 'object') {
-          Object.assign(container.style, props?.style)
-        }
-      }
-
-      // 应用自定义类名
-      if (props?.class) {
-        container.className = props.class
-      }
-
-      // 内容容器
-      const content = document.createElement('div')
-      content.style.position = 'absolute'
-      content.style.top = '0'
-      content.style.right = '0'
-      content.style.bottom = '0'
-      content.style.left = '0'
-
-      container.appendChild(content)
-
-      // 渲染子内容
-      let unmount: (() => void) | undefined
-      if (children) {
-        unmount = children()(content, undefined)
-      }
-
-      host.appendChild(container)
-
-      return () => {
-        unmount?.()
-        container.remove()
-      }
-    }
+    return div({
+      dataRatio: String(ratio),
+      class: props?.class,
+      // The padding-bottom technique IS the ratio mechanism — these inline
+      // styles are functional, not cosmetic, and remain user-overridable.
+      style: {
+        position: 'relative',
+        width: '100%',
+        overflow: 'hidden',
+        paddingBottom: `${(1 / ratio) * 100}%`,
+        ...(typeof props?.style === 'object' ? props.style : {})
+      },
+      children: [
+        // Content wrapper: fills the padding-established box.
+        div({
+          dataAspectRatioContent: '',
+          style: {
+            position: 'absolute',
+            top: '0',
+            right: '0',
+            bottom: '0',
+            left: '0'
+          },
+          children: children ? [children()] : undefined
+        })
+      ]
+    })
   }
 }
 
 /**
- * AspectRatio 组件预设
+ * AspectRatio component preset.
  */
 export const aspectRatio = createAspectRatio()

@@ -1,9 +1,12 @@
 /**
- * Progress - 进度条组件
+ * Progress - task completion indicator.
  *
- * 显示任务完成进度的指示器，支持确定和不确定状态。
+ * Determinate and indeterminate states. Composed on @rasenjs/dom element
+ * factories; the context is resolved once at mount (static value contract,
+ * same as before the element-factory migration).
  */
 import type { Mountable } from '@rasenjs/core'
+import { div } from '@rasenjs/dom'
 
 export type ProgressState = 'indeterminate' | 'loading' | 'complete'
 
@@ -31,72 +34,50 @@ export interface ProgressContext {
 }
 
 /**
- * 创建 Progress Root 组件
+ * Create the Progress Root component.
  */
 export function createProgressRoot(): (
   props?: ProgressRootProps
 ) => Mountable<HTMLElement> {
   return (props?: ProgressRootProps) => {
-    return (host: HTMLElement) => {
-      const root = document.createElement('div')
-      root.style.position = 'relative'
-      root.style.overflow = 'hidden'
+    const max = props?.max ?? 100
+    const value = props?.value ?? null
 
-      if (props?.class) root.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(root.style, props.style)
-        }
-      }
+    const percentage =
+      value === null ? null : Math.min(Math.max((value / max) * 100, 0), 100)
 
-      const max = props?.max ?? 100
-      const value = props?.value ?? null
+    const state: ProgressState =
+      value === null ? 'indeterminate' : value >= max ? 'complete' : 'loading'
 
-      const percentage =
-        value === null ? null : Math.min(Math.max((value / max) * 100, 0), 100)
+    const valueLabel = props?.getValueLabel
+      ? props.getValueLabel(value ?? 0, max)
+      : value === null
+        ? 'loading'
+        : `${Math.round(percentage ?? 0)}%`
 
-      const state: ProgressState =
-        value === null ? 'indeterminate' : value >= max ? 'complete' : 'loading'
+    const context: ProgressContext = { value, max, percentage, state }
+    const getContext = (): ProgressContext => context
 
-      const valueLabel = props?.getValueLabel
-        ? props.getValueLabel(value ?? 0, max)
-        : value === null
-          ? '加载中'
-          : `${Math.round(percentage ?? 0)}%`
-
-      root.setAttribute('role', 'progressbar')
-      root.setAttribute('aria-valuemin', '0')
-      root.setAttribute('aria-valuemax', String(max))
-      root.setAttribute('data-state', state)
-      root.setAttribute('data-max', String(max))
-
-      if (value !== null) {
-        root.setAttribute('aria-valuenow', String(value))
-        root.setAttribute('data-value', String(value))
-      }
-      root.setAttribute('aria-valuetext', valueLabel)
-
-      const context: ProgressContext = { value, max, percentage, state }
-      const getContext = (): ProgressContext => context
-
-      // 渲染 children
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children(getContext)(root, undefined)
-      }
-
-      host.appendChild(root)
-
-      return () => {
-        childUnmount?.()
-        root.remove()
-      }
-    }
+    return div({
+      role: 'progressbar',
+      'aria-valuemin': 0,
+      'aria-valuemax': max,
+      'aria-valuenow': value !== null ? value : undefined,
+      'aria-valuetext': valueLabel,
+      dataState: state,
+      dataMax: max,
+      dataValue: value !== null ? value : undefined,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children
+        ? [(el) => props.children!(getContext)(el)]
+        : undefined
+    })
   }
 }
 
 /**
- * 创建 Progress Indicator 组件
+ * Create the Progress Indicator component.
  */
 export function createProgressIndicator(): (
   props?: ProgressIndicatorProps,
@@ -106,40 +87,27 @@ export function createProgressIndicator(): (
     props?: ProgressIndicatorProps,
     getContext?: () => ProgressContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const indicator = document.createElement('div')
-      indicator.style.width = '100%'
-      indicator.style.height = '100%'
-      indicator.style.transition = 'transform 0.3s ease'
+    const ctx = getContext?.()
 
-      if (props?.class) indicator.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(indicator.style, props.style)
-        }
+    return div({
+      dataState: ctx?.state,
+      dataValue: ctx?.value !== null && ctx?.value !== undefined ? ctx.value : undefined,
+      dataMax: ctx?.max,
+      class: props?.class,
+      style: {
+        width: '100%',
+        height: '100%',
+        ...(ctx?.percentage !== null && ctx?.percentage !== undefined
+          ? { transform: `translateX(-${100 - ctx.percentage}%)` }
+          : {}),
+        ...(typeof props?.style === 'object' ? props.style : {})
       }
-
-      const ctx = getContext?.()
-      if (ctx) {
-        indicator.setAttribute('data-state', ctx.state)
-        if (ctx.value !== null) {
-          indicator.setAttribute('data-value', String(ctx.value))
-        }
-        indicator.setAttribute('data-max', String(ctx.max))
-
-        if (ctx.percentage !== null) {
-          indicator.style.transform = `translateX(-${100 - ctx.percentage}%)`
-        }
-      }
-
-      host.appendChild(indicator)
-      return () => indicator.remove()
-    }
+    })
   }
 }
 
 /**
- * Progress 组合组件
+ * Progress preset: root + indicator wired to one context.
  */
 export function createProgress(): (
   props?: ProgressRootProps & {
@@ -150,30 +118,22 @@ export function createProgress(): (
   const Root = createProgressRoot()
   const Indicator = createProgressIndicator()
 
-  return (
-    props?: ProgressRootProps & {
-      indicatorClass?: string
-      indicatorStyle?: Record<string, string | number> | string
-    }
-  ) => {
-    return (host: HTMLElement) => {
-      return Root({
-        value: props?.value,
-        max: props?.max,
-        getValueLabel: props?.getValueLabel,
-        class: props?.class,
-        style: props?.style,
-        children: (getContext) =>
-          Indicator(
-            {
-              class: props?.indicatorClass,
-              style: props?.indicatorStyle
-            },
-            getContext
-          )
-      })(host, undefined)
-    }
-  }
+  return (props) =>
+    Root({
+      value: props?.value,
+      max: props?.max,
+      getValueLabel: props?.getValueLabel,
+      class: props?.class,
+      style: props?.style,
+      children: (getContext) =>
+        Indicator(
+          {
+            class: props?.indicatorClass,
+            style: props?.indicatorStyle
+          },
+          getContext
+        )
+    })
 }
 
 export const progress = createProgress()

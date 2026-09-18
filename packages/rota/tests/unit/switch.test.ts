@@ -221,15 +221,15 @@ describe('@rasenjs/rota - Switch', () => {
       expect(el?.style.backgroundColor).toBe('red')
     })
 
-    it('should have default thumb styles', () => {
+    it('should not hardcode default inline styles (headless contract)', () => {
       const container = document.createElement('div')
       const Thumb = createSwitchThumb()
       Thumb()(container)
 
       const el = container.querySelector('span')
-      expect(el?.style.display).toBe('block')
-      expect(el?.style.borderRadius).toBe('9999px')
-      expect(el?.style.transition).toContain('transform')
+      // Inline styles beat any user stylesheet; a headless component must
+      // leave styling entirely to the consumer.
+      expect(el?.getAttribute('style')).toBeNull()
     })
   })
 
