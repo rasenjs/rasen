@@ -201,6 +201,44 @@ const textureCache = new WeakMap<
 export type BitmapSource = object
 
 /**
+ * Compressed GPU texture source — the capability seam for ASTC / ETC2 /
+ * S3TC-style blocks. The bytes are ALREADY in the GPU's compressed block
+ * format: no CPU decode happens, and VRAM usage is the compressed size
+ * (typically 1/4 to 1/8 of RGBA8). Identified structurally (like
+ * RawPixelSource) via the `compressed: true` marker so any host can build
+ * one without importing a class.
+ *
+ * `glFormat` is the WebGL compressed-format enum for the FIRST mip level's
+ * internalformat (e.g. the COMPRESSED_RGBA_ASTC_4x4_KHR constant). `levels`
+ * carries one entry per mip, smallest first is NOT required — index 0 is the
+ * full-resolution level, matching texImage2D conventions.
+ */
+export interface CompressedTextureSource {
+  readonly compressed: true
+  readonly width: number
+  readonly height: number
+  /** WebGL compressed internal-format enum for level 0. */
+  readonly glFormat: number
+  /** WebGPU GPUTextureFormat string for level 0 (e.g. 'astc-4x4-unorm').
+   *  Optional: WebGPU uploads without it throw at creation time. */
+  readonly gpuFormat?: string
+  /** Block footprint in bytes per 4x4-ish block (informational). */
+  readonly levels: ReadonlyArray<{ readonly data: Uint8Array }>
+}
+
+/** Structural test for {@link CompressedTextureSource}. */
+export function isCompressedTextureSource(source: unknown): source is CompressedTextureSource {
+  if (!source || typeof source !== 'object') return false
+  const s = source as Partial<CompressedTextureSource>
+  return s.compressed === true &&
+    typeof s.width === 'number' && typeof s.height === 'number' &&
+    typeof s.glFormat === 'number' &&
+    Array.isArray(s.levels) && s.levels.length > 0 &&
+    s.levels.every((l) => l && typeof l.data === 'object' &&
+      typeof (l.data as Uint8Array).byteLength === 'number')
+}
+
+/**
  * Texture sampling options (overrides the pixelated sprite defaults).
  */
 export interface TextureOptions {
@@ -249,9 +287,21 @@ export function createTexture(
 
   gl.bindTexture(gl.TEXTURE_2D, texture)
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
-  // The single DOM-lib touchpoint: BitmapSource is structurally a
-  // texImage2D-acceptable bitmap; the GL call validates at runtime.
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource)
+  if (isCompressedTextureSource(source)) {
+    // Compressed blocks go straight to the GPU — no CPU decode, VRAM is the
+    // compressed size. Each mip level uploads at its own (halved) extent.
+    const gl2 = gl as { compressedTexImage2D?: (...a: unknown[]) => void }
+    if (!gl2.compressedTexImage2D) throw new Error('compressedTexImage2D unavailable in this GL context')
+    for (let level = 0; level < source.levels.length; level++) {
+      const lw = Math.max(1, source.width >> level)
+      const lh = Math.max(1, source.height >> level)
+      gl2.compressedTexImage2D(gl.TEXTURE_2D, level, source.glFormat, lw, lh, 0, source.levels[level].data)
+    }
+  } else {
+    // The single DOM-lib touchpoint: BitmapSource is structurally a
+    // texImage2D-acceptable bitmap; the GL call validates at runtime.
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource)
+  }
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, options?.wrapS ?? gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, options?.wrapT ?? gl.CLAMP_TO_EDGE)
   const minFilter = options?.minFilter ?? gl.NEAREST

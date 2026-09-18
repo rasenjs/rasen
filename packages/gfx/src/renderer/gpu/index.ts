@@ -33,6 +33,7 @@
 
 import { Mat4x4f } from '@rasenjs/math'
 import { computeCameraMatrix, type CameraConfig } from '../../camera'
+import { isCompressedTextureSource, type CompressedTextureSource } from '../../utils'
 import { Renderer, MAX_TEXTURES_PER_DRAW, type BatchItem, type BlendMode, type GroupStreams, type TextureHandle } from '../base'
 import type { TransformState, TransformInput } from '../../transform-stack'
 import type { GpuCanvasContext } from '../../node'
@@ -299,7 +300,30 @@ export class WebGPURenderer extends Renderer {
    * filtering in the sampler, GL in texParameteri, and the difference is a real
    * rendering difference, not a naming one.
    */
-  createTexture(source: HTMLImageElement | HTMLCanvasElement | ImageBitmap | RawPixelSource, options?: { minFilter?: number; magFilter?: number; wrapS?: number; wrapT?: number }): GPUTexture {
+  createTexture(source: HTMLImageElement | HTMLCanvasElement | ImageBitmap | RawPixelSource | CompressedTextureSource, options?: { minFilter?: number; magFilter?: number; wrapS?: number; wrapT?: number }): GPUTexture {
+    // Compressed blocks: the bytes are already in GPU block format — upload
+    // level by level at the format the host declares. No CPU decode ever.
+    if (isCompressedTextureSource(source)) {
+      if (!source.gpuFormat) throw new Error('WebGPU createTexture: compressed source needs gpuFormat')
+      const texture = this.device.createTexture({
+        size: { width: source.width, height: source.height },
+        format: source.gpuFormat as GPUTextureFormat,
+        mipLevelCount: source.levels.length,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
+      })
+      for (let level = 0; level < source.levels.length; level++) {
+        const lw = Math.max(1, source.width >> level)
+        const lh = Math.max(1, source.height >> level)
+        this.device.queue.writeTexture(
+          { texture, mipLevel: level },
+          source.levels[level].data as unknown as GPUAllowSharedBufferSource,
+          { bytesPerRow: source.levels[level].data.byteLength / Math.max(1, lh), rowsPerImage: lh },
+          { width: lw, height: lh },
+        )
+      }
+      ;(texture as unknown as { __filter: 'nearest' | 'linear' }).__filter = 'linear'
+      return texture
+    }
     // Raw pixels carry their own size; platform bitmaps are measured.
     const raw = isRawPixelSource(source) ? source : null
     const width = raw ? raw.width
