@@ -356,12 +356,20 @@ export function each<T extends object, N = unknown>(
                   cur = next
                 }
               }
-              // 两种摘除策略对 start 边界的处理不同：textContent 快速路径
-              // 连 start 一起清掉，Range 路径保留 start。统一补一刀——
-              // 已不在树上时 detach 内部的 parentNode 保护使其成为 no-op。
-              if ((startNode as unknown as { parentNode?: unknown }).parentNode) {
-                hooks!.detach!(startNode)
-              }
+              // The two removal strategies treat the start boundary
+              // differently: the textContent fast path clears start along with
+              // everything else, the Range path keeps it. Detach it either way.
+              //
+              // Unconditionally, with no "is it still attached?" probe: detach is
+              // idempotent on every host — DOM uses `parentNode?.removeChild`,
+              // canvas-2d/gfx `remove()` checks `indexOf >= 0` first, lynx's
+              // `unlink` clears `parentNode` (so the guard below it is skipped),
+              // and SSR's is a no-op. The probe this replaced read
+              // `startNode.parentNode`, a DOM member name. A canvas or gfx node
+              // has `parent`, so on those two hosts the guard was always false,
+              // this detach never ran, and every clear leaked the first row's
+              // marker while still walking it on every frame.
+              hooks!.detach!(startNode)
             }
             // 逐实例卸载（事件监听等清理必须执行；DOM 已不在树上，
             // 组件的 el.remove() 成为安全的 no-op）
