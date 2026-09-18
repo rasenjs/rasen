@@ -8,7 +8,8 @@
     "packages/*",
     "examples/*",
     "benchmark/*",
-    "www"
+    "www",
+    "packages/rota/www"
   ],
   "scripts": {
     "build": "yarn workspaces foreach -Apt run build",

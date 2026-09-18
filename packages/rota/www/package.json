@@ -1,0 +1,16 @@
+{
+  "name": "@rasenjs/rota-www",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rota component library site: guides and live component demos",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.5.0",
+    "vue": "^3.5.13"
+  }
+}

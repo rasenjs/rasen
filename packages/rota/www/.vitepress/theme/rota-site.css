@@ -1,0 +1,531 @@
+/* ===========================================================================
+   Rota site styles
+   ---------------------------------------------------------------------------
+   Two halves:
+
+   1. Site chrome — the demo card that wraps every live example.
+   2. The styling contract — every rule below targets the ARIA roles and
+      `data-*` attributes the components expose, never internal classes. This
+      file is the worked example the "Styling" guide points at: a headless
+      component is styled entirely from the outside, which is why the library
+      ships no CSS of its own.
+   =========================================================================== */
+
+/* --- 1. Site chrome ------------------------------------------------------ */
+
+.rota-demo {
+  margin: 1rem 0 2rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--vp-c-bg-soft);
+}
+
+.rota-demo__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-alt);
+}
+
+.rota-demo__title {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.rota-demo__desc {
+  color: var(--vp-c-text-2);
+  font-size: 0.84rem;
+}
+
+.rota-demo__stage {
+  padding: 1.5rem 1rem;
+  background: var(--vp-c-bg);
+}
+
+/* --- shared demo layout helpers ------------------------------------------ */
+
+.rota-demo__stage .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.rota-demo__stage .row--between {
+  justify-content: space-between;
+}
+
+.rota-demo__stage .row--end {
+  justify-content: flex-end;
+}
+
+.rota-demo__stage .stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  width: 100%;
+}
+
+.rota-demo__stage .card {
+  padding: 1rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+}
+
+.rota-demo__stage .btn {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.rota-demo__stage .btn:hover {
+  border-color: var(--vp-c-brand-1);
+}
+
+.rota-demo__stage .btn--ghost {
+  background: transparent;
+}
+
+.rota-demo__stage .btn--danger {
+  background: #d33;
+  border-color: #d33;
+  color: #fff;
+}
+
+.rota-demo__stage .panel {
+  padding: 0.75rem 0;
+  color: var(--vp-c-text-2);
+}
+
+.rota-demo__stage .panel__inner {
+  display: block;
+  padding: 0.75rem;
+  border: 1px dashed var(--vp-c-divider);
+  border-radius: 6px;
+}
+
+.rota-demo__stage .text-input {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+/* --- 2. The styling contract -------------------------------------------- */
+
+/* Switch: role="switch" with aria-checked + data-state, thumb is the child. */
+.rota-demo__stage [role='switch'] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 2.6rem;
+  height: 1.5rem;
+  padding: 2px;
+  border: none;
+  border-radius: 999px;
+  background: var(--vp-c-bg-soft);
+  box-shadow: inset 0 0 0 1px var(--vp-c-divider);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.rota-demo__stage [role='switch'][aria-checked='true'] {
+  background: var(--vp-c-brand-1);
+  box-shadow: none;
+}
+
+.rota-demo__stage [role='switch'] > span {
+  display: block;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: #fff;
+  transition: transform 150ms ease;
+}
+
+.rota-demo__stage [role='switch'][aria-checked='true'] > span {
+  transform: translateX(1.1rem);
+}
+
+.rota-demo__stage [role='switch'][aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Checkbox: tri-state through aria-checked (true | false | mixed). */
+.rota-demo__stage [role='checkbox'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 5px;
+  background: var(--vp-c-bg);
+  cursor: pointer;
+}
+
+.rota-demo__stage [role='checkbox'][aria-checked='true'],
+.rota-demo__stage [role='checkbox'][aria-checked='mixed'] {
+  background: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.rota-demo__stage [role='checkbox'] > span {
+  font-size: 0.8rem;
+  line-height: 1;
+  color: #fff;
+}
+
+.rota-demo__stage [role='checkbox'][aria-checked='true'] > span::before {
+  content: '✓';
+}
+
+.rota-demo__stage [role='checkbox'][aria-checked='mixed'] > span::before {
+  content: '–';
+}
+
+.rota-demo__stage [role='checkbox'][aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Collapsible: trigger carries aria-expanded, content carries data-state. */
+.rota-demo__stage [aria-expanded] {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.rota-demo__stage [aria-expanded]::after {
+  content: '▾';
+  transition: transform 150ms ease;
+}
+
+.rota-demo__stage [aria-expanded='true']::after {
+  transform: rotate(180deg);
+}
+
+.rota-demo__stage [role='region'][data-state='closed'] {
+  display: none;
+}
+
+/* Tabs */
+.rota-demo__stage .tabs__list {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+}
+
+.rota-demo__stage .tabs__trigger {
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.rota-demo__stage .tabs__trigger[data-state='active'] {
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.rota-demo__stage .tabs__trigger[data-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rota-demo__stage .tabs__panel {
+  padding: 0.9rem 0.25rem;
+  color: var(--vp-c-text-2);
+}
+
+.rota-demo__stage .tabs__panel[hidden] {
+  display: none;
+}
+
+/* Accordion */
+.rota-demo__stage .acc {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rota-demo__stage .acc__item + .acc__item {
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.rota-demo__stage .acc__trigger {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: none;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.rota-demo__stage .acc__trigger::after {
+  content: '+';
+  color: var(--vp-c-text-2);
+}
+
+.rota-demo__stage .acc__trigger[data-state='open']::after {
+  content: '–';
+}
+
+.rota-demo__stage .acc__content {
+  padding: 0.75rem 1rem;
+  color: var(--vp-c-text-2);
+  font-size: 0.88rem;
+}
+
+.rota-demo__stage .acc__content[data-state='closed'] {
+  display: none;
+}
+
+/* Progress: the indicator is translated; the track is the root. */
+.rota-demo__stage .prog {
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--vp-c-bg-soft);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--vp-c-divider);
+}
+
+.rota-demo__stage .prog__bar {
+  background: var(--vp-c-brand-1);
+}
+
+.rota-demo__stage .prog[data-state='indeterminate'] .prog__bar {
+  background: linear-gradient(90deg, transparent, var(--vp-c-brand-1), transparent);
+  animation: rota-indeterminate 1.2s linear infinite;
+}
+
+@keyframes rota-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Separator */
+.rota-demo__stage .sep {
+  background: var(--vp-c-divider);
+}
+
+.rota-demo__stage .sep--v {
+  display: inline-block;
+  height: 1.2rem;
+}
+
+/* Avatar: the root box is functional (inline), the look is ours. */
+.rota-demo__stage .avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: var(--vp-c-bg-soft);
+  box-shadow: 0 0 0 1px var(--vp-c-divider);
+}
+
+.rota-demo__stage .avatar img {
+  border-radius: 999px;
+}
+
+.rota-demo__stage .avatar span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+}
+
+/* AlertDialog: overlay + panel are hidden until open. */
+.rota-demo__stage .overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgb(0 0 0 / 0.5);
+}
+
+.rota-demo__stage .overlay[hidden] {
+  display: none;
+}
+
+.rota-demo__stage .dialog__panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 41;
+  width: min(92vw, 24rem);
+  padding: 1.25rem;
+  transform: translate(-50%, -50%);
+  border-radius: 10px;
+  background: var(--vp-c-bg);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.25);
+}
+
+.rota-demo__stage .dialog__panel[hidden] {
+  display: none;
+}
+
+.rota-demo__stage .dialog__panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.rota-demo__stage .dialog__panel p {
+  margin: 0 0 1rem;
+  color: var(--vp-c-text-2);
+  font-size: 0.88rem;
+}
+
+/* NumberField */
+.rota-demo__stage .nf {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--vp-c-bg);
+}
+
+.rota-demo__stage .nf__input {
+  width: 4rem;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--vp-c-text-1);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.rota-demo__stage .nf__btn {
+  width: 2rem;
+  border: none;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rota-demo__stage .nf__btn:hover {
+  background: var(--vp-c-bg-alt);
+}
+
+/* PinInput */
+.rota-demo__stage [role='group'] {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.rota-demo__stage .pin__cell {
+  width: 2.4rem;
+  height: 2.8rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font: inherit;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.rota-demo__stage .pin__cell:focus {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 1px;
+}
+
+/* TagsInput */
+.rota-demo__stage .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.4rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+}
+
+.rota-demo__stage .tags__item {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: var(--vp-c-bg-soft);
+  font-size: 0.82rem;
+}
+
+.rota-demo__stage .tags__item[data-state='selected'] {
+  outline: 1px solid var(--vp-c-brand-1);
+}
+
+.rota-demo__stage .tags__delete {
+  border: none;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rota-demo__stage .tags__input {
+  flex: 1 1 6rem;
+  min-width: 6rem;
+  padding: 0.25rem;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--vp-c-text-1);
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+/* AspectRatio: the ratio mechanism is inline; the frame is ours. */
+.rota-demo__stage .ar {
+  width: 12rem;
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  box-shadow: inset 0 0 0 1px var(--vp-c-divider);
+}
+
+.rota-demo__stage .ar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vp-c-text-2);
+  font-size: 0.85rem;
+}
