@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime, getReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import {
   createTagsInputRoot,
@@ -14,6 +14,9 @@ import {
 beforeEach(() => {
   setReactiveRuntime(createReactiveRuntime())
 })
+
+/** The composed component, as a consumer calls it. */
+const TagsInputPreset = createTagsInput()
 
 describe('@rasenjs/rota - TagsInput', () => {
   describe('createTagsInputRoot', () => {
@@ -101,7 +104,7 @@ describe('@rasenjs/rota - TagsInput', () => {
           expect(ctx?.value).toEqual(['tag1', 'tag2'])
           expect(ctx?.disabled).toBe(false)
           expect(ctx?.max).toBe(undefined)
-          expect(ctx?.allowCustomValue).toBe(true)
+          expect(ctx?.allowDuplicates).toBe(true)
           expect(ctx?.focusedIndex).toBe(null)
 
           const span = document.createElement('span')
@@ -315,7 +318,7 @@ describe('@rasenjs/rota - TagsInput', () => {
         delimiter: 'Enter',
         addOnPaste: false,
         addOnBlur: false,
-        allowCustomValue: true,
+        allowDuplicates: true,
         focusedIndex: null,
         updateValue: () => {},
         setFocusedIndex: () => {},
@@ -339,7 +342,7 @@ describe('@rasenjs/rota - TagsInput', () => {
         delimiter: 'Enter',
         addOnPaste: false,
         addOnBlur: false,
-        allowCustomValue: true,
+        allowDuplicates: true,
         focusedIndex: null,
         updateValue: onChangeMock,
         setFocusedIndex: () => {},
@@ -370,7 +373,7 @@ describe('@rasenjs/rota - TagsInput', () => {
         delimiter: 'Enter',
         addOnPaste: false,
         addOnBlur: false,
-        allowCustomValue: true,
+        allowDuplicates: true,
         focusedIndex: null,
         updateValue: onChangeMock,
         setFocusedIndex: () => {},
@@ -405,7 +408,7 @@ describe('@rasenjs/rota - TagsInput', () => {
         delimiter: 'Enter',
         addOnPaste: false,
         addOnBlur: false,
-        allowCustomValue: true,
+        allowDuplicates: true,
         focusedIndex: null,
         updateValue: () => {},
         setFocusedIndex: setFocusedIndexMock,
@@ -473,7 +476,7 @@ describe('@rasenjs/rota - TagsInput', () => {
         delimiter: 'Enter',
         addOnPaste: false,
         addOnBlur: false,
-        allowCustomValue: true,
+        allowDuplicates: true,
         focusedIndex: 1,
         updateValue: () => {},
         setFocusedIndex: () => {},
@@ -506,7 +509,7 @@ describe('@rasenjs/rota - TagsInput', () => {
         delimiter: 'Enter',
         addOnPaste: false,
         addOnBlur: false,
-        allowCustomValue: true,
+        allowDuplicates: true,
         focusedIndex: null,
         updateValue: () => {},
         setFocusedIndex: setFocusedIndexMock,
@@ -602,7 +605,7 @@ describe('@rasenjs/rota - TagsInput', () => {
         delimiter: 'Enter',
         addOnPaste: false,
         addOnBlur: false,
-        allowCustomValue: true,
+        allowDuplicates: true,
         focusedIndex: null,
         updateValue: () => {},
         setFocusedIndex: () => {},
@@ -628,7 +631,7 @@ describe('@rasenjs/rota - TagsInput', () => {
         delimiter: 'Enter',
         addOnPaste: false,
         addOnBlur: false,
-        allowCustomValue: true,
+        allowDuplicates: true,
         focusedIndex: null,
         updateValue: () => {},
         setFocusedIndex: () => {},
@@ -651,7 +654,7 @@ describe('@rasenjs/rota - TagsInput', () => {
         delimiter: 'Enter',
         addOnPaste: false,
         addOnBlur: false,
-        allowCustomValue: true,
+        allowDuplicates: true,
         focusedIndex: null,
         updateValue: () => {},
         setFocusedIndex: () => {},
@@ -908,5 +911,133 @@ describe('@rasenjs/rota - TagsInput', () => {
 
       expect(container.querySelector('[role="listbox"]')).toBeFalsy()
     })
+  })
+})
+
+/**
+ * The paths a user actually takes: typing into the input, pasting, leaving
+ * the field — not just calling context methods directly.
+ */
+describe('@rasenjs/rota - TagsInput / input paths', () => {
+  const mount = (props: Parameters<ReturnType<typeof createTagsInput>>[0] = {}) => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    TagsInputPreset(props)(container)
+    return container
+  }
+
+  const type = (container: HTMLElement, value: string) => {
+    const input = container.querySelector('input') as HTMLInputElement
+    input.value = value
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return input
+  }
+
+  const enter = (container: HTMLElement) => {
+    const input = container.querySelector('input') as HTMLInputElement
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    )
+  }
+
+  it('should refuse a tag past `max`', () => {
+    const container = mount({ defaultValue: ['a'], max: 2 })
+    const input = type(container, 'b')
+    enter(container)
+    expect(container.querySelectorAll('[role="option"]').length).toBe(2)
+
+    input.value = 'c'
+    enter(container)
+    // Still two: the limit is enforced on the typed path too.
+    expect(container.querySelectorAll('[role="option"]').length).toBe(2)
+  })
+
+  it('should split on a custom delimiter while typing', () => {
+    const container = mount({ delimiter: ',' })
+    type(container, 'one,two,')
+    enter(container)
+
+    expect(
+      Array.from(container.querySelectorAll('[role="option"]')).map(
+        (el) => el.textContent
+      )
+    ).toEqual(['one×', 'two×'])
+  })
+
+  it('should distribute a pasted list when addOnPaste is on', () => {
+    const container = mount({ addOnPaste: true })
+    const input = container.querySelector('input') as HTMLInputElement
+
+    const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & {
+      clipboardData: { getData: (type: string) => string }
+    }
+    event.clipboardData = { getData: () => 'alpha, beta;gamma' }
+    input.dispatchEvent(event)
+
+    expect(
+      Array.from(container.querySelectorAll('[role="option"]')).map(
+        (el) => el.textContent
+      )
+    ).toEqual(['alpha×', 'beta×', 'gamma×'])
+  })
+
+  it('should ignore a paste when addOnPaste is off', () => {
+    const container = mount()
+    const input = container.querySelector('input') as HTMLInputElement
+
+    const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & {
+      clipboardData: { getData: (type: string) => string }
+    }
+    event.clipboardData = { getData: () => 'alpha beta' }
+    input.dispatchEvent(event)
+
+    expect(container.querySelectorAll('[role="option"]').length).toBe(0)
+  })
+
+  it('should commit a pending tag on blur when addOnBlur is on', () => {
+    const container = mount({ addOnBlur: true })
+    const input = type(container, 'pending')
+    input.dispatchEvent(new FocusEvent('blur'))
+
+    expect(
+      Array.from(container.querySelectorAll('[role="option"]')).map(
+        (el) => el.textContent
+      )
+    ).toEqual(['pending×'])
+  })
+
+  it('should keep a pending tag on blur when addOnBlur is off', () => {
+    const container = mount()
+    const input = type(container, 'pending')
+    input.dispatchEvent(new FocusEvent('blur'))
+
+    expect(container.querySelectorAll('[role="option"]').length).toBe(0)
+  })
+
+  it('should reject duplicates when allowDuplicates is off', () => {
+    const container = mount({ defaultValue: ['a'], allowDuplicates: false })
+    const input = type(container, 'a')
+    enter(container)
+
+    expect(container.querySelectorAll('[role="option"]').length).toBe(1)
+
+    input.value = 'b'
+    enter(container)
+    expect(container.querySelectorAll('[role="option"]').length).toBe(2)
+  })
+
+  it('should follow a getter-valued list', () => {
+    const rt = getReactiveRuntime()
+    const tags = rt.ref<string[]>(['first'])
+    const container = mount({ value: () => rt.unref(tags) })
+
+    expect(container.querySelectorAll('[role="option"]').length).toBe(1)
+
+    rt.setValue(tags, ['first', 'second'])
+    expect(
+      Array.from(container.querySelectorAll('[role="option"]')).map(
+        (el) => el.textContent
+      )
+    ).toEqual(['first×', 'second×'])
   })
 })

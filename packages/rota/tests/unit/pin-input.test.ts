@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { setReactiveRuntime, getReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import {
@@ -12,6 +12,10 @@ import {
 
 beforeEach(() => {
   setReactiveRuntime(createReactiveRuntime())
+})
+
+afterEach(() => {
+  document.body.innerHTML = ''
 })
 
 /**
@@ -74,7 +78,8 @@ describe('@rasenjs/rota - PinInput', () => {
         type: 'alphanumeric',
         children: (getContext) => (host) => {
           const ctx = getContext()
-          expect(ctx?.value).toBe('12')
+          // Positional: one character per cell, unfilled = space.
+          expect(ctx?.value).toBe('12' + ' '.repeat(4))
           expect(ctx?.length).toBe(6)
           expect(ctx?.type).toBe('alphanumeric')
           expect(ctx?.focusedIndex).toBe(0)
@@ -128,7 +133,25 @@ describe('@rasenjs/rota - PinInput', () => {
       })(container)
     })
 
-    it('should call onValueChange with the raw value', () => {
+    it('should emit the value without trailing placeholders', () => {
+    const container = document.createElement('div')
+    const seen: string[] = []
+
+    createPinInputRoot()({
+      length: 4,
+      onValueChange: (value) => seen.push(value),
+      children: (getContext) => (host) => {
+        getContext()?.setValue('12')
+        const span = document.createElement('span')
+        host.appendChild(span)
+        return () => span.remove()
+      }
+    })(container)
+
+    expect(seen).toEqual(['12'])
+  })
+
+  it('should call onValueChange with the raw value', () => {
       const container = document.createElement('div')
       const changes: string[] = []
 
@@ -154,8 +177,9 @@ describe('@rasenjs/rota - PinInput', () => {
         children: (getContext) => (host) => {
           const ctx = getContext()
           ctx?.setValue('1111')
-          // Controlled: the value comes from props, not internal state.
-          expect(ctx?.value).toBe('98')
+          // Controlled: the value comes from props, not internal state —
+          // padded to the configured length, since positions are the model.
+          expect(ctx?.value).toBe('98  ')
 
           const span = document.createElement('span')
           host.appendChild(span)
@@ -275,5 +299,103 @@ describe('@rasenjs/rota - PinInput', () => {
 
       expect(container.querySelectorAll('input').length).toBe(4)
     })
+  })
+})
+
+/**
+ * Typing, pasting and the completion callback — the paths a user takes.
+ */
+describe('@rasenjs/rota - PinInput / input paths', () => {
+  const mountPin = (props: Parameters<ReturnType<typeof createPinInput>>[0] = {}) => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    createPinInput()(props)(container)
+    return container
+  }
+
+  const cells = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('input')) as HTMLInputElement[]
+
+  const type = (cell: HTMLInputElement, char: string) => {
+    cell.value = char
+    cell.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  it('should fill a cell, then move on and complete', () => {
+    const completions: string[] = []
+    const container = mountPin({
+      length: 3,
+      onComplete: (value) => completions.push(value)
+    })
+    const inputs = cells(container)
+
+    type(inputs[0]!, '1')
+    type(inputs[1]!, '2')
+    // Not complete yet: the last position is unfilled.
+    expect(completions).toEqual([])
+
+    type(inputs[2]!, '3')
+    expect(completions).toEqual(['123'])
+    expect(inputs.map((el) => el.value)).toEqual(['1', '2', '3'])
+  })
+
+  it('should reject a character that does not match the type', () => {
+    const container = mountPin({ length: 2, type: 'numeric' })
+    const input = cells(container)[0]!
+
+    type(input, 'a')
+
+    expect(input.value).toBe('')
+    expect(cells(container).map((el) => el.value)).toEqual(['', ''])
+  })
+
+  it('should distribute a paste from the focused cell', () => {
+    const container = mountPin({ length: 4 })
+    const inputs = cells(container)
+
+    const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & {
+      clipboardData: { getData: (type: string) => string }
+    }
+    event.clipboardData = { getData: () => '98-76' }
+    inputs[2]!.dispatchEvent(event)
+
+    // Only the valid characters land, starting at the cell that pasted.
+    expect(inputs.map((el) => el.value)).toEqual(['', '', '9', '8'])
+  })
+
+  it('should clear the cell on Backspace', () => {
+    const container = mountPin({ length: 3, defaultValue: '123' })
+    const inputs = cells(container)
+
+    inputs[1]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true })
+    )
+
+    // Clearing a position leaves the others where they were.
+    expect(cells(container).map((el) => el.value)).toEqual(['1', '', '3'])
+  })
+
+  it('should move with the arrow keys', () => {
+    const container = mountPin({ length: 3 })
+    const inputs = cells(container)
+
+    inputs[1]!.focus()
+    inputs[1]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })
+    )
+    expect(document.activeElement).toBe(inputs[0])
+
+    inputs[0]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    )
+    expect(document.activeElement).toBe(inputs[1])
+  })
+
+  it('should not accept typing while disabled', () => {
+    const container = mountPin({ length: 2, disabled: true })
+    const inputs = cells(container)
+
+    expect(inputs.every((el) => el.disabled)).toBe(true)
+    expect(container.querySelector('[role="group"]')!.getAttribute('data-disabled')).toBe('')
   })
 })

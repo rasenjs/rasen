@@ -6,9 +6,10 @@
  * exposed through getter-backed context properties, so each cell's value and
  * selection update reactively.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, input as inputEl } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 import { createElementRef, type ElementRef } from '../../internal/element-ref'
 
 export type PinInputType = 'numeric' | 'alphanumeric' | 'text'
@@ -27,12 +28,12 @@ export interface PinInputContext {
 }
 
 export interface PinInputRootProps {
-  value?: string
-  defaultValue?: string
+  value?: PropValue<string>
+  defaultValue?: PropValue<string>
   length?: number
   type?: PinInputType
   otp?: boolean
-  disabled?: boolean
+  disabled?: PropValue<boolean>
   placeholder?: string
   onValueChange?: (value: string) => void
   onComplete?: (value: string) => void
@@ -72,7 +73,7 @@ export function createPinInputRoot(): (
     const disabled = props?.disabled ?? false
 
     const isControlled = props?.value !== undefined
-    const internalValue = rt.ref(props?.value ?? props?.defaultValue ?? '')
+    const internalValue = rt.ref(readProp(props?.defaultValue, ''))
     const focused = rt.ref(0)
 
     // One element cell per position: parts move focus through these refs
@@ -84,18 +85,30 @@ export function createPinInputRoot(): (
     const cellRef = (index: number): ElementRef<HTMLInputElement> =>
       cells[Math.max(0, Math.min(length - 1, index))]!
 
-    const normalizeValue = (val: string): string => val.slice(0, length)
+    /**
+     * The value is positional: always `length` characters, with a space for a
+     * position the user has not filled. Cells read `value[index]`, and a paste
+     * into the third cell lands in the third cell — a compact string would put
+     * it at the front, because there is nothing to splice it into.
+     */
+    const normalizeValue = (val: string): string =>
+      val.slice(0, length).padEnd(length, ' ')
 
     const currentValue = (): string =>
-      normalizeValue(isControlled ? (props?.value ?? '') : rt.unref(internalValue))
+      normalizeValue(
+        isControlled ? readProp(props?.value, '') : rt.unref(internalValue)
+      )
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
     const setValue = (newValue: string): void => {
       const normalized = normalizeValue(newValue)
       if (!isControlled) {
         rt.setValue(internalValue, normalized)
       }
-      props?.onValueChange?.(normalized)
-      if (normalized.length === length) {
+      // Consumers see the value without the trailing placeholders; a
+      // round-trip through `value` pads it back to the same positions.
+      props?.onValueChange?.(normalized.replace(/\s+$/, ''))
+      if (!normalized.includes(' ')) {
         props?.onComplete?.(normalized)
       }
     }
@@ -111,7 +124,7 @@ export function createPinInputRoot(): (
         return type
       },
       get disabled() {
-        return disabled
+        return isDisabled()
       },
       get otp() {
         return props?.otp
@@ -169,8 +182,7 @@ export function createPinInputInput(): (
       }
 
       const value = current.value
-      const next =
-        value.slice(0, index) + char + value.slice(index + 1)
+      const next = value.slice(0, index) + char + value.slice(index + 1)
       current.setValue(next)
 
       if (index < current.length - 1) {
@@ -187,15 +199,18 @@ export function createPinInputInput(): (
       switch (e.key) {
         case 'Backspace': {
           e.preventDefault()
-          if (value[index]) {
+          const filled = value[index] !== undefined && value[index] !== ' '
+          if (filled) {
+            // Clear this position; the others keep theirs.
             current.setValue(
-              value.slice(0, index) + value.slice(index + 1)
+              value.slice(0, index) + ' ' + value.slice(index + 1)
             )
           } else if (index > 0) {
+            // Already empty: step back and clear that one.
             current.setFocusedIndex(index - 1)
             focusCell(index - 1)
             current.setValue(
-              value.slice(0, index - 1) + value.slice(index)
+              value.slice(0, index - 1) + ' ' + value.slice(index)
             )
           }
           break
@@ -203,9 +218,9 @@ export function createPinInputInput(): (
 
         case 'Delete':
           e.preventDefault()
-          if (value[index]) {
+          if (value[index] !== undefined && value[index] !== ' ') {
             current.setValue(
-              value.slice(0, index) + value.slice(index + 1)
+              value.slice(0, index) + ' ' + value.slice(index + 1)
             )
           }
           break
@@ -262,7 +277,9 @@ export function createPinInputInput(): (
       ref: getContext?.()?.cellRef(index),
       value: () => {
         const value = getContext?.()?.value ?? ''
-        return value[index] ?? ''
+        const char = value[index]
+        // A space marks "not filled yet" — render it as an empty cell.
+        return char === undefined || char === ' ' ? '' : char
       },
       disabled: () => getContext?.()?.disabled ?? false,
       'data-disabled': () => (getContext?.()?.disabled ? '' : undefined),

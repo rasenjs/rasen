@@ -5,9 +5,10 @@
  * Composed on @rasenjs/dom element factories: the value is a runtime ref and
  * the input/steppers bind to it reactively.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, input as inputEl, text } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 
 export interface NumberFieldContext {
   /** Reactive value snapshot. */
@@ -20,14 +21,14 @@ export interface NumberFieldContext {
 }
 
 export interface NumberFieldRootProps {
-  value?: number
-  defaultValue?: number
-  min?: number
-  max?: number
-  step?: number
+  value?: PropValue<number>
+  defaultValue?: PropValue<number>
+  min?: PropValue<number>
+  max?: PropValue<number>
+  step?: PropValue<number>
   formatOptions?: Intl.NumberFormatOptions
   locale?: string
-  disabled?: boolean
+  disabled?: PropValue<boolean>
   required?: boolean
   name?: string
   onValueChange?: (value: number | null) => void
@@ -64,17 +65,15 @@ export function createNumberFieldRoot(): (
   const component = (props?: NumberFieldRootProps) => {
     const rt = getReactiveRuntime()
 
-    const min = props?.min ?? 0
-    const max = props?.max ?? 100
-    const step = props?.step ?? 1
-    const disabled = props?.disabled ?? false
+    const min = (): number => readProp(props?.min, 0)
+    const max = (): number => readProp(props?.max, 100)
+    const step = (): number => readProp(props?.step, 1)
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
     const isControlled = props?.value !== undefined
-    const internal = rt.ref<number | null>(
-      props?.value ?? props?.defaultValue ?? 0
-    )
+    const internal = rt.ref<number | null>(readProp(props?.defaultValue, 0))
     const current = (): number | null =>
-      isControlled ? (props?.value ?? null) : rt.unref(internal)
+      isControlled ? readProp(props?.value, null) : rt.unref(internal)
 
     const updateValue = (newValue: number | null): void => {
       if (!isControlled) {
@@ -85,17 +84,25 @@ export function createNumberFieldRoot(): (
 
     const context: NumberFieldContext = {
       value: current,
-      min,
-      max,
-      step,
-      disabled,
+      get min() {
+        return min()
+      },
+      get max() {
+        return max()
+      },
+      get step() {
+        return step()
+      },
+      get disabled() {
+        return isDisabled()
+      },
       updateValue
     }
     const getContext = (): NumberFieldContext => context
 
     return div({
       role: 'group',
-      'data-disabled': disabled ? '' : undefined,
+      'data-disabled': () => (isDisabled() ? '' : undefined),
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children(getContext)] : undefined

@@ -5,33 +5,38 @@
  * error or while loading. Composed on @rasenjs/dom element factories;
  * load status is a runtime ref so the fallback reacts without polling.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { span, img } from '@rasenjs/dom'
 import { createElementRef } from '../../internal/element-ref'
+import { readProp } from '../../internal/props'
+import { toMountables } from '../../internal/children'
 
 export type ImageLoadingStatus = 'loading' | 'loaded' | 'error'
 export type FallbackVisibility = 'visible' | 'hidden'
 
 export interface AvatarRootProps {
-  class?: string
-  style?: Record<string, string | number> | string
-  children?: (getContext: () => AvatarContext | undefined) => Mountable<HTMLElement>
+  class?: PropValue<string>
+  style?: PropValue<string | Record<string, string | number>>
+  /** May return several parts: they become children of the root box. */
+  children?: (
+    getContext: () => AvatarContext | undefined
+  ) => Mountable<HTMLElement> | Mountable<HTMLElement>[]
 }
 
 export interface AvatarImageProps {
-  src?: string
-  srcSet?: string
-  sizes?: string
-  alt?: string
-  loading?: 'eager' | 'lazy'
+  src?: PropValue<string>
+  srcSet?: PropValue<string>
+  sizes?: PropValue<string>
+  alt?: PropValue<string>
+  loading?: PropValue<'eager' | 'lazy'>
   class?: string
   style?: Record<string, string | number> | string
   onLoadingStatusChange?: (status: ImageLoadingStatus) => void
 }
 
 export interface AvatarFallbackProps {
-  delayMs?: number
+  delayMs?: PropValue<number>
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
@@ -75,10 +80,14 @@ export function createAvatarRoot(): (
                 setStatus: (s) => rt.setValue(statusRef, s)
               })
               contextMap.set(el, getContext())
-              const unmount = props.children!(getContext)(el, undefined)
+              const produced = props.children!(getContext)
+              const parts = toMountables(produced) ?? []
+              const unmounts = parts.map((part) => part(el, undefined))
               return () => {
                 contextMap.delete(el)
-                unmount?.()
+                for (const unmount of unmounts) {
+                  if (typeof unmount === 'function') unmount()
+                }
               }
             }
           ]
@@ -110,7 +119,10 @@ export function createAvatarImage(): (
       sizes: props?.sizes,
       alt: props?.alt,
       loading: props?.loading,
-      'data-state': 'loading',
+      // Follows the loading status: pinned to 'loading' it would keep
+      // reporting that after the image had loaded or failed.
+      'data-state': () => getContext?.()?.status() ?? 'loading',
+      hidden: () => getContext?.()?.status() === 'error',
       class: props?.class,
       // Fill the root box over the fallback — functional positioning.
       style: {
@@ -143,27 +155,28 @@ export function createAvatarFallback(): (
     getContext?: () => AvatarContext | undefined
   ) => {
     const rt = getReactiveRuntime()
-    const delayMs = props?.delayMs ?? 0
-    const delayedVisible = rt.ref(delayMs === 0)
+    const delayMs = (): number => readProp(props?.delayMs, 0)
+    const delayedVisible = rt.ref(readProp(props?.delayMs, 0) === 0)
     const fallbackRef = createElementRef<HTMLSpanElement>(rt)
 
     const shouldShow = () => {
       const status = getContext?.()?.status() ?? 'loading'
       return (
         status !== 'loaded' &&
-        (delayMs === 0 || rt.unref(delayedVisible))
+        (delayMs() === 0 || rt.unref(delayedVisible))
       )
     }
 
     // The delay timer starts once the element is in the DOM (the ref is
     // written during mount). It flips a component-local ref, so a fire after
     // unmount is harmless; the element lifetime owns the start, not the stop.
-    if (delayMs > 0) {
+    if (delayMs() > 0) {
+      const wait = delayMs()
       rt.subscribe(
         () => fallbackRef.value,
         (el) => {
           if (!el) return
-          setTimeout(() => rt.setValue(delayedVisible, true), delayMs)
+          setTimeout(() => rt.setValue(delayedVisible, true), wait)
         }
       )
     }
@@ -208,13 +221,10 @@ export function createAvatar(): (props?: {
     Root({
       class: props?.class,
       style: props?.style,
-      children: (getContext) =>
-        span({
-          children: [
-            Image({ src: props?.src, alt: props?.alt }, getContext),
-            Fallback({ delayMs: 0, children: props?.fallback }, getContext)
-          ]
-        })
+      children: (getContext) => [
+        Image({ src: props?.src, alt: props?.alt }, getContext),
+        Fallback({ children: props?.fallback }, getContext)
+      ]
     })
 }
 

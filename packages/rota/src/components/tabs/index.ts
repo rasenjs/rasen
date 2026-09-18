@@ -5,9 +5,10 @@
  * Composed on @rasenjs/dom element factories: the active tab is a runtime
  * ref, so triggers and contents update through reactive attribute bindings.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, text } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 
 export type TabsOrientation = 'horizontal' | 'vertical'
 
@@ -23,8 +24,8 @@ export interface TabsContext {
 }
 
 export interface TabsRootProps {
-  defaultValue?: string
-  value?: string
+  defaultValue?: PropValue<string>
+  value?: PropValue<string>
   onValueChange?: (value: string) => void
   orientation?: TabsOrientation
   class?: string
@@ -44,9 +45,9 @@ export interface TabsListProps {
 
 export interface TabsTriggerProps {
   value: string
-  disabled?: boolean
-  class?: string
-  style?: Record<string, string | number> | string
+  disabled?: PropValue<boolean>
+  class?: PropValue<string>
+  style?: PropValue<string | Record<string, string | number>>
   children?: () => Mountable<HTMLElement>
 }
 
@@ -69,9 +70,9 @@ export function createTabsRoot(): (
     const orientation = props?.orientation ?? 'horizontal'
 
     const isControlled = props?.value !== undefined
-    const internal = rt.ref(props?.value ?? props?.defaultValue ?? '')
+    const internal = rt.ref(readProp(props?.defaultValue, ''))
     const current = (): string =>
-      isControlled ? (props?.value ?? '') : rt.unref(internal)
+      isControlled ? readProp(props?.value, '') : rt.unref(internal)
 
     const setValue = (value: string): void => {
       if (value === current()) return
@@ -150,7 +151,7 @@ export function createTabsTrigger(): (
       throw new Error('TabsTrigger: "value" prop is required')
     }
 
-    const disabled = props?.disabled ?? false
+    const disabled = (): boolean => readProp(props?.disabled, false)
     const ctx = getContext?.()
 
     return button({
@@ -160,13 +161,13 @@ export function createTabsTrigger(): (
       'aria-selected': () => String(ctx?.value() === props.value),
       'data-state': () => (ctx?.value() === props.value ? 'active' : 'inactive'),
       'data-orientation': ctx?.orientation,
-      'aria-disabled': disabled ? 'true' : undefined,
-      'data-disabled': disabled ? '' : undefined,
+      'aria-disabled': () => (disabled() ? 'true' : undefined),
+      'data-disabled': () => (disabled() ? '' : undefined),
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children()] : undefined,
       onClick: () => {
-        if (!disabled) ctx?.setValue(props.value)
+        if (!disabled()) ctx?.setValue(props.value)
       }
     })
   }

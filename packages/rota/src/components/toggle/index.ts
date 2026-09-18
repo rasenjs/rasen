@@ -5,14 +5,16 @@
  * `data-state` rather than switching roles. Use ToggleGroup when the buttons
  * belong together.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { button, text } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 
 export interface ToggleProps {
-  pressed?: boolean
-  defaultPressed?: boolean
-  disabled?: boolean
+  pressed?: PropValue<boolean>
+  defaultPressed?: PropValue<boolean>
+  disabled?: PropValue<boolean>
+  id?: PropValue<string>
   onPressedChange?: (pressed: boolean) => void
   class?: string
   style?: Record<string, string | number> | string
@@ -27,13 +29,13 @@ export function createToggle(): (props?: ToggleProps) => Mountable<HTMLElement> 
     const rt = getReactiveRuntime()
 
     const isControlled = props?.pressed !== undefined
-    const internal = rt.ref(props?.pressed ?? props?.defaultPressed ?? false)
+    const internal = rt.ref(readProp(props?.defaultPressed, false))
     const isPressed = (): boolean =>
-      isControlled ? (props?.pressed ?? false) : rt.unref(internal)
-    const disabled = props?.disabled ?? false
+      isControlled ? readProp(props?.pressed, false) : rt.unref(internal)
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
     const toggle = (): void => {
-      if (disabled) return
+      if (isDisabled()) return
       const next = !isPressed()
       if (!isControlled) {
         rt.setValue(internal, next)
@@ -43,10 +45,11 @@ export function createToggle(): (props?: ToggleProps) => Mountable<HTMLElement> 
 
     return button({
       type: 'button',
+      id: props?.id,
       'aria-pressed': () => String(isPressed()),
       'data-state': () => (isPressed() ? 'on' : 'off'),
-      disabled,
-      'data-disabled': disabled ? '' : undefined,
+      disabled: () => isDisabled(),
+      'data-disabled': () => (isDisabled() ? '' : undefined),
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children()] : undefined,

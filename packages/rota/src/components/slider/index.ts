@@ -10,9 +10,11 @@
  * mechanism, exactly like AspectRatio's padding. Everything cosmetic (colour,
  * thickness, thumb look) is yours through `data-*` and `data-orientation`.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, span } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
+import { toValue } from '@rasenjs/core'
 import { createElementRef, type ElementRef } from '../../internal/element-ref'
 
 export type SliderOrientation = 'horizontal' | 'vertical'
@@ -50,13 +52,13 @@ export interface SliderContext {
 }
 
 export interface SliderRootProps {
-  value?: number[]
-  defaultValue?: number[]
-  min?: number
-  max?: number
-  step?: number
+  value?: PropValue<number[]>
+  defaultValue?: PropValue<number[]>
+  min?: PropValue<number>
+  max?: PropValue<number>
+  step?: PropValue<number>
   orientation?: SliderOrientation
-  disabled?: boolean
+  disabled?: PropValue<boolean>
   /** Ids applied to the thumbs, in order. */
   name?: string
   onValueChange?: (value: number[]) => void
@@ -101,26 +103,32 @@ export function createSliderRoot(): (
     const rt = getReactiveRuntime()
 
     const orientation = props?.orientation ?? 'horizontal'
-    const disabled = props?.disabled ?? false
-    const min = props?.min ?? 0
-    const max = props?.max ?? 100
-    const step = props?.step ?? 1
+    const min = (): number => readProp(props?.min, 0)
+    const max = (): number => readProp(props?.max, 100)
+    const step = (): number => readProp(props?.step, 1)
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
     const isControlled = props?.value !== undefined
-    const initial = props?.value ?? props?.defaultValue ?? [min]
+    const initial = readProp(props?.defaultValue, [min()])
     const internal = rt.ref<number[]>([...initial])
     const current = (): number[] =>
-      isControlled ? (props?.value ?? []) : rt.unref(internal)
+      isControlled ? readProp(props?.value, []) : rt.unref(internal)
 
-    const clamp = (raw: number): number => Math.min(Math.max(raw, min), max)
+    const clamp = (raw: number): number =>
+      Math.min(Math.max(raw, min()), max())
     const normalize = (raw: number): number => {
-      const snapped = Math.round((raw - min) / step) * step + min
+      const base = min()
+      const stride = step()
+      const snapped = Math.round((raw - base) / stride) * stride + base
       // Floating point: 0.1 steps produce 0.30000000000000004 otherwise.
       return clamp(Number(snapped.toFixed(10)))
     }
 
-    const percent = (value: number): number =>
-      max === min ? 0 : ((value - min) / (max - min)) * 100
+    const percent = (value: number): number => {
+      const lowest = min()
+      const highest = max()
+      return highest === lowest ? 0 : ((value - lowest) / (highest - lowest)) * 100
+    }
 
     const trackRef = createElementRef<HTMLDivElement>(rt)
     const thumbRefs = new Map<number, ElementRef<HTMLButtonElement>>()
@@ -153,11 +161,11 @@ export function createSliderRoot(): (
 
     const stepBy = (index: number, steps: number): void => {
       const value = current()
-      setValueAt(index, (value[index] ?? min) + steps * step)
+      setValueAt(index, (value[index] ?? min()) + steps * step())
     }
 
     const jumpTo = (index: number, edge: 'min' | 'max'): void => {
-      setValueAt(index, edge === 'min' ? min : max)
+      setValueAt(index, edge === 'min' ? min() : max())
     }
 
     const commit = (): void => {
@@ -166,10 +174,18 @@ export function createSliderRoot(): (
 
     const context: SliderContext = {
       orientation,
-      disabled,
-      min,
-      max,
-      step,
+      get disabled() {
+        return isDisabled()
+      },
+      get min() {
+        return min()
+      },
+      get max() {
+        return max()
+      },
+      get step() {
+        return step()
+      },
       get value() {
         return current()
       },
@@ -188,8 +204,8 @@ export function createSliderRoot(): (
     return div({
       role: 'group',
       'data-orientation': orientation,
-      'data-disabled': disabled ? '' : undefined,
-      'aria-disabled': disabled ? 'true' : undefined,
+      'data-disabled': () => (isDisabled() ? '' : undefined),
+      'aria-disabled': () => (isDisabled() ? 'true' : undefined),
       class: props?.class,
       // The track fills the root box, so these are the mechanism.
       style: {
@@ -467,7 +483,8 @@ export function createSlider(): (props?: SliderProps) => Mountable<HTMLElement> 
               const range = Range({ class: props?.rangeClass }, getCtx)(el, undefined)
               if (typeof range === 'function') inner.push(range)
 
-              for (let index = 0; index < initial.length; index++) {
+              const count = Math.max(toValue(props?.value ?? initial).length, 1)
+              for (let index = 0; index < count; index++) {
                 const thumb = Thumb(
                   { index, class: props?.thumbClass },
                   getCtx

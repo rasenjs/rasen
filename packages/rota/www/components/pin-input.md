@@ -17,6 +17,15 @@ One-time-code / PIN entry with per-cell focus management and paste distribution.
 | --- | --- | --- |
 | `data-disabled` | present | On root and cells |
 
+## Value shape
+
+The value is **positional**: it is always `length` characters long, and a
+position the user has not filled yet is a space. That is what makes a paste
+into the third cell land in the third cell, and what lets Backspace clear one
+cell without shifting the others. `onValueChange` reports the value without
+the trailing placeholders, so a consumer sees `'12'`; passing it back as
+`value` pads it to the same positions.
+
 ## Keyboard
 
 | Key | Behaviour |

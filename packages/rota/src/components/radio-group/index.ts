@@ -8,9 +8,10 @@
  * With `name` set, each item renders a hidden radio input so the group
  * participates in a form the way a native radio group does.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, input, text } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 import {
   createRovingFocus,
   type Orientation,
@@ -44,11 +45,11 @@ export interface RadioGroupContext extends RovingFocus {
 }
 
 export interface RadioGroupRootProps {
-  value?: string
-  defaultValue?: string
+  value?: PropValue<string>
+  defaultValue?: PropValue<string>
   onValueChange?: (value: string) => void
-  disabled?: boolean
-  required?: boolean
+  disabled?: PropValue<boolean>
+  required?: PropValue<boolean>
   name?: string
   orientation?: RadioGroupOrientation
   /** Whether arrow navigation wraps around (default `true`). */
@@ -88,17 +89,17 @@ export function createRadioGroupRoot(): (
     const rt = getReactiveRuntime()
 
     const orientation = props?.orientation ?? 'vertical'
-    const disabled = props?.disabled ?? false
-    const required = props?.required ?? false
+    const isRequired = (): boolean => readProp(props?.required, false)
 
     const isControlled = props?.value !== undefined
-    const internal = rt.ref(props?.value ?? props?.defaultValue ?? '')
+    const internal = rt.ref(readProp(props?.defaultValue, ''))
     const current = (): string =>
-      isControlled ? (props?.value ?? '') : rt.unref(internal)
+      isControlled ? readProp(props?.value, '') : rt.unref(internal)
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
     const roving = createRovingFocus({
       rt,
-      isGroupDisabled: () => disabled,
+      isGroupDisabled: isDisabled,
       loop: props?.loop ?? true
     })
 
@@ -114,8 +115,12 @@ export function createRadioGroupRoot(): (
     const context: RadioGroupContext = {
       ...roving,
       orientation,
-      disabled,
-      required,
+      get disabled() {
+        return isDisabled()
+      },
+      get required() {
+        return isRequired()
+      },
       name: props?.name,
       get value() {
         return current()
@@ -127,9 +132,9 @@ export function createRadioGroupRoot(): (
     return div({
       role: 'radiogroup',
       'aria-orientation': orientation,
-      'aria-required': required ? 'true' : undefined,
+      'aria-required': () => (isRequired() ? 'true' : undefined),
       'data-orientation': orientation,
-      'data-disabled': disabled ? '' : undefined,
+      'data-disabled': () => (isDisabled() ? '' : undefined),
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children(getContext)] : undefined

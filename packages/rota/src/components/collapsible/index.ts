@@ -5,16 +5,17 @@
  * factories; the context exposes the open state as a ref so parts can
  * bind to it reactively.
  */
-import type { Mountable, Ref } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 
 export type CollapsibleState = 'open' | 'closed'
 
 export interface CollapsibleRootProps {
-  defaultOpen?: boolean
-  open?: boolean
-  disabled?: boolean
+  defaultOpen?: PropValue<boolean>
+  open?: PropValue<boolean>
+  disabled?: PropValue<boolean>
   class?: string
   style?: Record<string, string | number> | string
   onOpenChange?: (open: boolean) => void
@@ -38,7 +39,8 @@ export interface CollapsibleContentProps {
 }
 
 export interface CollapsibleContext {
-  open: Ref<boolean>
+  /** The effective open state (controlled or not). */
+  isOpen: () => boolean
   disabled: boolean
   toggle: () => void
 }
@@ -51,24 +53,31 @@ export function createCollapsibleRoot(): (
 ) => Mountable<HTMLElement> {
   const component = (props?: CollapsibleRootProps) => {
     const rt = getReactiveRuntime()
-    const open = rt.ref(props?.defaultOpen ?? false)
+    const isControlled = props?.open !== undefined
+    const open = rt.ref(readProp(props?.defaultOpen, false))
+
+    const isOpen = (): boolean =>
+      isControlled ? readProp(props?.open, false) : rt.unref(open)
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
     const toggle = () => {
-      if (props?.disabled) return
-      const next = !rt.unref(open)
-      rt.setValue(open, next)
+      if (isDisabled()) return
+      const next = !isOpen()
+      if (!isControlled) {
+        rt.setValue(open, next)
+      }
       props?.onOpenChange?.(next)
     }
 
     const getContext = (): CollapsibleContext => ({
-      open,
-      disabled: props?.disabled ?? false,
+      isOpen,
+      disabled: isDisabled(),
       toggle
     })
 
     return div({
-      'data-state': () => (rt.unref(open) ? 'open' : 'closed'),
-      'data-disabled': () => (props?.disabled ? '' : undefined),
+      'data-state': () => (isOpen() ? 'open' : 'closed'),
+      'data-disabled': () => (isDisabled() ? '' : undefined),
       class: props?.class,
       style: props?.style,
       // rota children contract: invoke with the context getter to get a
@@ -91,8 +100,7 @@ export function createCollapsibleTrigger(): (
     props?: CollapsibleTriggerProps,
     getContext?: () => CollapsibleContext | undefined
   ) => {
-    const rt = getReactiveRuntime()
-    const isOpen = (): boolean => rt.unref(getContext?.()?.open) ?? false
+    const isOpen = (): boolean => getContext?.()?.isOpen() ?? false
 
     return button({
       type: 'button',
@@ -122,9 +130,8 @@ export function createCollapsibleContent(): (
     props?: CollapsibleContentProps,
     getContext?: () => CollapsibleContext | undefined
   ) => {
-    const rt = getReactiveRuntime()
     const forceMount = props?.forceMount ?? false
-    const isOpen = (): boolean => rt.unref(getContext?.()?.open) ?? false
+    const isOpen = (): boolean => getContext?.()?.isOpen() ?? false
 
     return div({
       id: 'collapsible-content',

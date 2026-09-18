@@ -1,12 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime, getReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { div, text } from '@rasenjs/dom'
 import {
   createCollapsibleRoot,
   createCollapsibleTrigger,
   createCollapsibleContent,
-  createCollapsible
+  createCollapsible,
+  collapsible
 } from '@rasenjs/rota/components/collapsible'
+
+const Trigger = createCollapsibleTrigger()
+const Content = createCollapsibleContent()
 
 beforeEach(() => {
   setReactiveRuntime(createReactiveRuntime())
@@ -185,5 +190,84 @@ describe('@rasenjs/rota - Collapsible', () => {
 
       expect(container.querySelector('div')).toBeFalsy()
     })
+  })
+})
+
+/**
+ * The interaction a user performs, and the controlled/uncontrolled split.
+ */
+describe('@rasenjs/rota - Collapsible / behaviour', () => {
+  it('should open and close the region when the trigger is clicked', () => {
+    const container = document.createElement('div')
+    const Root = createCollapsibleRoot()
+    const Trigger = createCollapsibleTrigger()
+    const Content = createCollapsibleContent()
+
+    Root({
+      children: (getContext) =>
+        div({
+          children: [
+            Trigger({ children: () => text({ content: 'Toggle' }) }, getContext),
+            Content({ children: () => text({ content: 'Body' }) }, getContext)
+          ]
+        })
+    })(container)
+
+    const trigger = container.querySelector('button')!
+    const region = container.querySelector('[role="region"]')!
+
+    expect(region.hasAttribute('hidden')).toBe(true)
+
+    trigger.click()
+    expect(region.hasAttribute('hidden')).toBe(false)
+    expect(region.getAttribute('data-state')).toBe('open')
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+
+    trigger.click()
+    expect(region.hasAttribute('hidden')).toBe(true)
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('should follow a getter-valued `open` and not close itself', () => {
+    const rt = getReactiveRuntime()
+    const flag = rt.ref(false)
+    const seen: boolean[] = []
+    const container = document.createElement('div')
+    const Root = createCollapsibleRoot()
+
+    Root({
+      open: () => rt.unref(flag),
+      onOpenChange: (next) => seen.push(next),
+      children: (getContext) =>
+        Trigger({ children: () => text({ content: 'Toggle' }) }, getContext)
+    })(container)
+
+    const trigger = container.querySelector('button')!
+
+    rt.setValue(flag, true)
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+
+    trigger.click()
+    // Controlled: the component reports and waits for the owner.
+    expect(seen).toEqual([false])
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('should ignore clicks while disabled', () => {
+    const seen: boolean[] = []
+    const container = document.createElement('div')
+    const Root = createCollapsibleRoot()
+
+    Root({
+      disabled: true,
+      onOpenChange: (next) => seen.push(next),
+      children: (getContext) =>
+        Trigger({ children: () => text({ content: 'Toggle' }) }, getContext)
+    })(container)
+
+    container.querySelector('button')!.click()
+
+    expect(seen).toEqual([])
+    expect(container.querySelector('button')!.getAttribute('data-disabled')).toBe('')
   })
 })

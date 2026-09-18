@@ -6,10 +6,11 @@
  * @rasenjs/dom element factories: the open state is a runtime ref and the
  * parts bind to it, replacing the previous 50ms polling loops.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, h2, p } from '@rasenjs/dom'
 import { createElementRef } from '../../internal/element-ref'
+import { readProp } from '../../internal/props'
 
 export interface AlertDialogContext {
   /** Reactive open state (property getter; wrap to read reactively). */
@@ -29,8 +30,8 @@ export interface AlertDialogContext {
 }
 
 export interface AlertDialogRootProps {
-  defaultOpen?: boolean
-  open?: boolean
+  defaultOpen?: PropValue<boolean>
+  open?: PropValue<boolean>
   onOpenChange?: (open: boolean) => void
   class?: string
   style?: Record<string, string | number> | string
@@ -108,9 +109,9 @@ export function createAlertDialogRoot(): (
     const rt = getReactiveRuntime()
 
     const isControlled = props?.open !== undefined
-    const internal = rt.ref(props?.open ?? props?.defaultOpen ?? false)
+    const internal = rt.ref(readProp(props?.defaultOpen, false))
     const currentOpen = (): boolean =>
-      isControlled ? (props?.open ?? false) : rt.unref(internal)
+      isControlled ? readProp(props?.open, false) : rt.unref(internal)
 
     let currentTitleId: string | null = null
     let currentDescriptionId: string | null = null

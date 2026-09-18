@@ -3,34 +3,40 @@
  *
  * Composed on top of @rasenjs/dom element factories: no direct element
  * creation or host manipulation here. The framework owns element creation,
- * attribute/event binding (static or reactive) and unmount cleanup, so the
- * same component benefits from hydration-aware bindings for free.
+ * attribute/event binding (static or reactive) and unmount cleanup.
+ *
+ * Value props are `PropValue`s, so `checked`, `disabled` and friends accept a
+ * plain value, a ref or a getter — the JSX transform passes a getter for a
+ * dynamic expression, and a controlled switch follows it.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { button, span } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 
 export interface SwitchRootProps {
-  checked?: boolean
-  defaultChecked?: boolean
-  disabled?: boolean
-  required?: boolean
-  name?: string
-  value?: string
+  checked?: PropValue<boolean>
+  defaultChecked?: PropValue<boolean>
+  disabled?: PropValue<boolean>
+  required?: PropValue<boolean>
+  name?: PropValue<string>
+  value?: PropValue<string>
+  id?: PropValue<string>
   onCheckedChange?: (checked: boolean) => void
-  class?: string
-  style?: Record<string, string | number> | string
+  class?: PropValue<string>
+  style?: PropValue<string | Record<string, string | number>>
   children?: (
     getContext: () => SwitchContext | undefined
   ) => Mountable<HTMLElement>
 }
 
 export interface SwitchThumbProps {
-  class?: string
-  style?: Record<string, string | number> | string
+  class?: PropValue<string>
+  style?: PropValue<string | Record<string, string | number>>
 }
 
 export interface SwitchContext {
+  /** Reactive getters: a part follows the root by reading these in a binding. */
   checked: boolean
   disabled: boolean
 }
@@ -39,8 +45,8 @@ export interface SwitchContext {
  * Create the Switch Root component.
  *
  * Controlled mode: pass `checked` (display follows it; call
- * `onCheckedChange` to change it). Uncontrolled mode: pass
- * `defaultChecked`; the component owns the state.
+ * `onCheckedChange` to change it). Uncontrolled mode: pass `defaultChecked`
+ * and the component owns the state.
  */
 export function createSwitchRoot(): (
   props?: SwitchRootProps,
@@ -51,17 +57,18 @@ export function createSwitchRoot(): (
     _getContext?: () => SwitchContext | undefined
   ) => {
     const rt = getReactiveRuntime()
-    const checked = rt.ref(props?.defaultChecked ?? false)
+    const isControlled = props?.checked !== undefined
+    const internal = rt.ref(readProp(props?.defaultChecked, false))
 
-    const isChecked = () =>
-      props?.checked !== undefined ? props.checked : rt.unref(checked)
-    const isDisabled = () => props?.disabled ?? false
+    const isChecked = (): boolean =>
+      isControlled ? readProp(props?.checked, false) : rt.unref(internal)
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
-    const toggle = () => {
+    const toggle = (): void => {
       if (isDisabled()) return
       const next = !isChecked()
-      if (props?.checked === undefined) {
-        rt.setValue(checked, next)
+      if (!isControlled) {
+        rt.setValue(internal, next)
       }
       props?.onCheckedChange?.(next)
     }
@@ -78,11 +85,13 @@ export function createSwitchRoot(): (
     return button({
       type: 'button',
       role: 'switch',
+      id: props?.id,
       'aria-checked': () => String(isChecked()),
       'aria-disabled': () => String(isDisabled()),
-      'aria-required': props?.required ? 'true' : undefined,
+      'aria-required': () => (readProp(props?.required, false) ? 'true' : undefined),
       'data-state': () => (isChecked() ? 'checked' : 'unchecked'),
       'data-disabled': () => (isDisabled() ? '' : undefined),
+      disabled: () => isDisabled(),
       name: props?.name,
       value: props?.value,
       class: props?.class,
@@ -126,19 +135,22 @@ export function createSwitchThumb(): (
   return com(component)
 }
 
+/** Switch preset props: root props plus the thumb's own styling hooks. */
+export type SwitchProps = Omit<SwitchRootProps, 'children'> & {
+  thumbClass?: PropValue<string>
+  thumbStyle?: PropValue<string | Record<string, string | number>>
+}
+
 /**
  * Switch preset: root with a thumb wired to the root context.
  */
 export function createSwitch(): (
-  props?: Omit<SwitchRootProps, 'children'> & {
-    thumbClass?: string
-    thumbStyle?: Record<string, string | number> | string
-  }
+  props?: SwitchProps
 ) => Mountable<HTMLElement> {
   const Root = createSwitchRoot()
   const Thumb = createSwitchThumb()
 
-  return (props) =>
+  const component = (props?: SwitchProps) =>
     Root({
       checked: props?.checked,
       defaultChecked: props?.defaultChecked,
@@ -146,15 +158,15 @@ export function createSwitch(): (
       required: props?.required,
       name: props?.name,
       value: props?.value,
+      id: props?.id,
       onCheckedChange: props?.onCheckedChange,
       class: props?.class,
       style: props?.style,
       children: (getContext) =>
-        Thumb(
-          { class: props?.thumbClass, style: props?.thumbStyle },
-          getContext
-        )
+        Thumb({ class: props?.thumbClass, style: props?.thumbStyle }, getContext)
     })
+
+  return com(component)
 }
 
 export const switchRoot = createSwitchRoot()

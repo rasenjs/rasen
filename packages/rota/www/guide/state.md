@@ -19,6 +19,22 @@ without the component knowing anything about your state container.
 
 <RotaDemo name="checkbox" />
 
+## Props accept a value, a ref, or a getter
+
+Every value-carrying prop is a `PropValue<T>`. The JSX transform wraps a
+dynamic expression in a getter, so this is how a controlled component follows
+your state:
+
+```tsx
+<Switch checked={enabled.value} onCheckedChange={(next) => (enabled.value = next)} />
+<Progress value={uploaded.value} max={total.value} />
+<Slider value={range.value} onValueCommit={(next) => save(next)} />
+```
+
+Reading such a prop directly would compare the function itself; components read
+them through the runtime, so a ref or a getter is tracked like any other
+binding.
+
 ## Contexts are getter-backed
 
 A context is a plain object, but the reactive fields are **getters**. Reading

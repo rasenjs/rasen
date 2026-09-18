@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { text } from '@rasenjs/dom'
 import {
   createAvatarRoot,
   createAvatarImage,
@@ -209,5 +210,62 @@ describe('@rasenjs/rota - Avatar', () => {
 
       expect(container.querySelector('span')).toBeFalsy()
     })
+  })
+})
+
+/**
+ * The reason the component exists: show the image when it loads, the fallback
+ * when it fails or is still loading.
+ */
+describe('@rasenjs/rota - Avatar / load status', () => {
+  const mountAvatar = (src: string) => {
+    const container = document.createElement('div')
+    avatar({ src, alt: 'A user', fallback: () => text({ content: 'AB' }) })(
+      container
+    )
+    return container
+  }
+
+  it('should hide the fallback once the image loads', () => {
+    const container = mountAvatar('ok.png')
+    const img = container.querySelector('img')!
+    const fallback = container.querySelector('span span')!
+
+    // Starts visible: the image has not loaded yet.
+    expect(fallback.getAttribute('data-state')).toBe('visible')
+    expect(fallback.style.opacity).toBe('1')
+
+    img.dispatchEvent(new Event('load'))
+
+    expect(img.getAttribute('data-state')).toBe('loaded')
+    expect(fallback.getAttribute('data-state')).toBe('hidden')
+    expect(fallback.style.opacity).toBe('0')
+  })
+
+  it('should keep the fallback visible when the image fails', () => {
+    const container = mountAvatar('broken.png')
+    const img = container.querySelector('img')!
+    const fallback = container.querySelector('span span')!
+
+    img.dispatchEvent(new Event('error'))
+
+    expect(img.getAttribute('data-state')).toBe('error')
+    expect(fallback.getAttribute('data-state')).toBe('visible')
+    expect(fallback.style.opacity).toBe('1')
+  })
+
+  it('should report status changes to the consumer', () => {
+    const seen: string[] = []
+    const container = document.createElement('div')
+    createAvatarImage()({
+      src: 'x.png',
+      onLoadingStatusChange: (status) => seen.push(status)
+    })(container)
+
+    const img = container.querySelector('img')!
+    img.dispatchEvent(new Event('load'))
+    img.dispatchEvent(new Event('error'))
+
+    expect(seen).toEqual(['loaded', 'error'])
   })
 })

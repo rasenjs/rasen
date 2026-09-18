@@ -10,9 +10,10 @@
  *   belongs to instead of walking up the DOM looking for `[data-index]`
  * - events are bound as props (onKeyDown/onPaste/onBlur/onClick)
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, span, button, input as inputEl, text } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 import { createElementRef, type ElementRef } from '../../internal/element-ref'
 import { rekeyedList } from '../../internal/rekeyed-list'
 
@@ -24,7 +25,8 @@ export interface TagsInputContext {
   delimiter: string | RegExp
   addOnPaste: boolean
   addOnBlur: boolean
-  allowCustomValue: boolean
+  /** Reject a tag already in the list (default `true`: duplicates allowed). */
+  allowDuplicates: boolean
   focusedIndex: number | null
   /** Element cells for parts that need to move or test focus. */
   rootRef: ElementRef<HTMLDivElement>
@@ -36,17 +38,22 @@ export interface TagsInputContext {
 }
 
 export interface TagsInputRootProps {
-  value?: string[]
-  defaultValue?: string[]
+  value?: PropValue<string[]>
+  defaultValue?: PropValue<string[]>
   onValueChange?: (value: string[]) => void
-  max?: number
-  delimiter?: string | RegExp
-  addOnPaste?: boolean
-  addOnBlur?: boolean
-  allowCustomValue?: boolean
-  disabled?: boolean
-  class?: string
-  style?: Record<string, string | number> | string
+  max?: PropValue<number>
+  delimiter?: PropValue<string | RegExp>
+  addOnPaste?: PropValue<boolean>
+  addOnBlur?: PropValue<boolean>
+  /**
+   * Whether the same tag may appear twice (default `true`). Note there is no
+   * "allowed values" list here: restricting input to a fixed set is a
+   * combobox concern, not a tags field's.
+   */
+  allowDuplicates?: PropValue<boolean>
+  disabled?: PropValue<boolean>
+  class?: PropValue<string>
+  style?: PropValue<string | Record<string, string | number>>
   /** Keyboard handling for the listbox (escape, arrows, delete). */
   onKeyDown?: (event: KeyboardEvent) => void
   /** May return several parts: they become siblings inside the listbox. */
@@ -97,23 +104,24 @@ export function createTagsInputRoot(): (
   const component = (props?: TagsInputRootProps) => {
     const rt = getReactiveRuntime()
 
-    const disabled = props?.disabled ?? false
-    const max = props?.max
-    const delimiter = props?.delimiter ?? 'Enter'
-    const addOnPaste = props?.addOnPaste ?? false
-    const addOnBlur = props?.addOnBlur ?? false
-    const allowCustomValue = props?.allowCustomValue ?? true
+    const addOnPaste = (): boolean => readProp(props?.addOnPaste, false)
+    const addOnBlur = (): boolean => readProp(props?.addOnBlur, false)
+    const allowDuplicates = (): boolean =>
+      readProp(props?.allowDuplicates, true)
+    const max = (): number =>
+      readProp(props?.max, Number.POSITIVE_INFINITY)
+    const delimiterNow = (): string | RegExp =>
+      readProp(props?.delimiter, 'Enter')
 
     const isControlled = props?.value !== undefined
-    const internalValue = rt.ref<string[]>(
-      props?.value ?? props?.defaultValue ?? []
-    )
+    const internalValue = rt.ref<string[]>(readProp(props?.defaultValue, []))
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
     const focused = rt.ref<number | null>(null)
     const rootRef = createElementRef<HTMLDivElement>(rt)
     const inputRef = createElementRef<HTMLInputElement>(rt)
 
     const currentValue = (): string[] =>
-      isControlled ? (props?.value ?? []) : rt.unref(internalValue)
+      isControlled ? readProp(props?.value, []) : rt.unref(internalValue)
 
     const updateValue = (newValue: string[]): void => {
       if (!isControlled) {
@@ -124,15 +132,15 @@ export function createTagsInputRoot(): (
 
     const addTag = (tag: string): void => {
       const trimmed = tag.trim()
-      if (!trimmed || disabled) return
+      if (!trimmed || isDisabled()) return
       const value = currentValue()
-      if (max !== undefined && value.length >= max) return
-      if (!allowCustomValue) return
+      if (value.length >= max()) return
+      if (!allowDuplicates() && value.includes(trimmed)) return
       updateValue([...value, trimmed])
     }
 
     const removeTag = (index: number): void => {
-      if (disabled) return
+      if (isDisabled()) return
       const value = currentValue()
       if (index < 0 || index >= value.length) return
       const next = [...value]
@@ -157,22 +165,23 @@ export function createTagsInputRoot(): (
         return currentValue()
       },
       get disabled() {
-        return disabled
+        return isDisabled()
       },
       get max() {
-        return max
+        const limit = max()
+        return Number.isFinite(limit) ? limit : undefined
       },
       get delimiter() {
-        return delimiter
+        return delimiterNow()
       },
       get addOnPaste() {
-        return addOnPaste
+        return addOnPaste()
       },
       get addOnBlur() {
-        return addOnBlur
+        return addOnBlur()
       },
-      get allowCustomValue() {
-        return allowCustomValue
+      get allowDuplicates() {
+        return allowDuplicates()
       },
       get focusedIndex() {
         return rt.unref(focused)
@@ -190,8 +199,8 @@ export function createTagsInputRoot(): (
       role: 'listbox',
       'aria-label': 'Tags',
       'aria-multiselectable': 'true',
-      'aria-disabled': disabled ? 'true' : undefined,
-      'data-disabled': disabled ? '' : undefined,
+      'aria-disabled': () => (isDisabled() ? 'true' : undefined),
+      'data-disabled': () => (isDisabled() ? '' : undefined),
       tabIndex: 0,
       ref: rootRef,
       class: props?.class,
@@ -450,7 +459,7 @@ export function createTagsInput(): (
       delimiter: props?.delimiter,
       addOnPaste: props?.addOnPaste,
       addOnBlur: props?.addOnBlur,
-      allowCustomValue: props?.allowCustomValue,
+      allowDuplicates: props?.allowDuplicates,
       disabled: props?.disabled,
       class: props?.class,
       style: props?.style,

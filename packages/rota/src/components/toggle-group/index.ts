@@ -6,7 +6,7 @@
  * Both share one roving-focus implementation: arrows move between items and
  * only one item is a tab stop.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, text } from '@rasenjs/dom'
 import {
@@ -15,6 +15,7 @@ import {
   type RovingFocus
 } from '../../internal/roving-focus'
 import { withCleanup } from '../../internal/with-cleanup'
+import { readProp } from '../../internal/props'
 
 export type ToggleGroupType = 'single' | 'multiple'
 export type ToggleGroupOrientation = Orientation
@@ -31,10 +32,10 @@ export interface ToggleGroupContext extends RovingFocus {
 
 export interface ToggleGroupRootProps {
   type?: ToggleGroupType
-  value?: string[]
-  defaultValue?: string[]
+  value?: PropValue<string[]>
+  defaultValue?: PropValue<string[]>
   onValueChange?: (value: string[]) => void
-  disabled?: boolean
+  disabled?: PropValue<boolean>
   orientation?: ToggleGroupOrientation
   /** Whether arrow navigation wraps around (default `true`). */
   loop?: boolean
@@ -64,16 +65,16 @@ export function createToggleGroupRoot(): (
 
     const type = props?.type ?? 'single'
     const orientation = props?.orientation ?? 'horizontal'
-    const disabled = props?.disabled ?? false
 
     const isControlled = props?.value !== undefined
-    const internal = rt.ref<string[]>(props?.value ?? props?.defaultValue ?? [])
+    const internal = rt.ref<string[]>(readProp(props?.defaultValue, []))
     const current = (): string[] =>
-      isControlled ? (props?.value ?? []) : rt.unref(internal)
+      isControlled ? readProp(props?.value, []) : rt.unref(internal)
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
     const roving = createRovingFocus({
       rt,
-      isGroupDisabled: () => disabled,
+      isGroupDisabled: isDisabled,
       loop: props?.loop ?? true
     })
 
@@ -106,7 +107,9 @@ export function createToggleGroupRoot(): (
       ...roving,
       type,
       orientation,
-      disabled,
+      get disabled() {
+        return isDisabled()
+      },
       get value() {
         return current()
       },
@@ -118,8 +121,8 @@ export function createToggleGroupRoot(): (
     return div({
       role: type === 'single' ? 'radiogroup' : 'group',
       'data-orientation': orientation,
-      'aria-disabled': disabled ? 'true' : undefined,
-      'data-disabled': disabled ? '' : undefined,
+      'aria-disabled': () => (isDisabled() ? 'true' : undefined),
+      'data-disabled': () => (isDisabled() ? '' : undefined),
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children(getContext)] : undefined

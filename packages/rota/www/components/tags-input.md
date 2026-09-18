@@ -8,7 +8,7 @@ A tag field: Enter commits, Backspace focuses the last tag, paste can add severa
 
 | Part | Element | Notes |
 | --- | --- | --- |
-| `Root` | `<div role="listbox">` | Owns the tag array and the focused index. Props: `value`, `defaultValue`, `onValueChange`, `max`, `delimiter`, `addOnPaste`, `addOnBlur`, `allowCustomValue`, `disabled`, `onKeyDown` |
+| `Root` | `<div role="listbox">` | Owns the tag array and the focused index. Props: `value`, `defaultValue`, `onValueChange`, `max`, `delimiter`, `addOnPaste`, `addOnBlur`, `allowDuplicates`, `disabled`, `onKeyDown` |
 | `Item` | `<span role="option">` | `value`, `index`; its children receive that index |
 | `ItemText` | `<span>` | The tag label |
 | `ItemDelete` | `<button>` | `index` — the tag it removes |
@@ -33,5 +33,10 @@ A tag field: Enter commits, Backspace focuses the last tag, paste can add severa
 | `Escape` | Clear focus and return to the input |
 
 ## Notes
+
+`allowDuplicates` (default `true`) rejects a tag that is already in the list.
+There is no "allowed values" list: restricting input to a fixed set is a
+combobox's job, not a tags field's.
+
 
 Parts are told their index instead of searching the DOM for it.

@@ -226,3 +226,61 @@ describe('@rasenjs/rota - Slider', () => {
     expect(container.querySelectorAll('[role="slider"]').length).toBe(0)
   })
 })
+
+/**
+ * Two thumbs are two values: the keyboard and the pointer must both act on the
+ * thumb that was used, not on the first one.
+ */
+describe('@rasenjs/rota - Slider / range thumbs', () => {
+  it('should move only the thumb that was used', () => {
+    const c = mountSlider({ defaultValue: [20, 80], step: 10 })
+    const [low, high] = thumbs(c)
+
+    press(high!, 'ArrowRight')
+    expect(thumbs(c).map((el) => el.getAttribute('aria-valuenow'))).toEqual([
+      '20',
+      '90'
+    ])
+
+    press(low!, 'ArrowRight')
+    expect(thumbs(c).map((el) => el.getAttribute('aria-valuenow'))).toEqual([
+      '30',
+      '90'
+    ])
+  })
+
+  it('should let the thumbs cross', () => {
+    const c = mountSlider({ defaultValue: [40, 60], step: 10 })
+
+    press(thumbs(c)[1]!, 'ArrowLeft')
+    press(thumbs(c)[1]!, 'ArrowLeft')
+    press(thumbs(c)[1]!, 'ArrowLeft')
+
+    // Nothing stops a range slider from being inverted; both values are kept.
+    expect(thumbs(c).map((el) => el.getAttribute('aria-valuenow'))).toEqual([
+      '40',
+      '30'
+    ])
+  })
+
+  it('should position the range between the two values', () => {
+    const c = mountSlider({ defaultValue: [25, 75], rangeClass: 'range' })
+    const range = c.querySelector('.range') as HTMLElement
+
+    expect(range.style.left).toBe('25%')
+    expect(range.style.right).toBe('25%')
+  })
+
+  it('should commit once when a drag ends', () => {
+    const commits: number[][] = []
+    const c = mountSlider({
+      defaultValue: [10],
+      onValueCommit: (next) => commits.push(next)
+    })
+    const thumb = thumbs(c)[0]!
+
+    // jsdom has no pointer capture; the component only needs the events.
+    press(thumb, 'ArrowRight')
+    expect(commits).toEqual([[11]])
+  })
+})

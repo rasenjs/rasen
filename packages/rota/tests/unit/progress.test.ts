@@ -189,10 +189,10 @@ describe('@rasenjs/rota - Progress', () => {
       const container = document.createElement('div')
       const Indicator = createProgressIndicator()
       Indicator({}, () => ({
-        value: 50,
-        max: 100,
-        percentage: 50,
-        state: 'loading'
+        value: () => 50,
+        max: () => 100,
+        percentage: () => 50,
+        state: () => 'loading'
       }))(container)
 
       const el = container.querySelector('div')
@@ -203,10 +203,10 @@ describe('@rasenjs/rota - Progress', () => {
       const container = document.createElement('div')
       const Indicator = createProgressIndicator()
       Indicator({}, () => ({
-        value: 100,
-        max: 100,
-        percentage: 100,
-        state: 'complete'
+        value: () => 100,
+        max: () => 100,
+        percentage: () => 100,
+        state: () => 'complete'
       }))(container)
 
       const el = container.querySelector('div')
@@ -217,10 +217,10 @@ describe('@rasenjs/rota - Progress', () => {
       const container = document.createElement('div')
       const Indicator = createProgressIndicator()
       Indicator({}, () => ({
-        value: 75,
-        max: 100,
-        percentage: 75,
-        state: 'loading'
+        value: () => 75,
+        max: () => 100,
+        percentage: () => 75,
+        state: () => 'loading'
       }))(container)
 
       const el = container.querySelector('div')
@@ -231,10 +231,10 @@ describe('@rasenjs/rota - Progress', () => {
       const container = document.createElement('div')
       const Indicator = createProgressIndicator()
       Indicator({}, () => ({
-        value: null,
-        max: 100,
-        percentage: null,
-        state: 'indeterminate'
+        value: () => null,
+        max: () => 100,
+        percentage: () => null,
+        state: () => 'indeterminate'
       }))(container)
 
       const el = container.querySelector('div')

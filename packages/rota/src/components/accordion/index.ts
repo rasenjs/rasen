@@ -7,9 +7,10 @@
  * while the element registries that keyboard navigation needs stay here
  * (they hold live elements, not reactive state).
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, h3, text } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 import type { ElementRef } from '../../internal/element-ref'
 import {
   createRovingFocus,
@@ -48,10 +49,10 @@ export interface AccordionItemContext {
 export interface AccordionRootProps {
   type: AccordionType
   collapsible?: boolean
-  defaultValue?: string | string[]
-  value?: string | string[]
+  defaultValue?: PropValue<string | string[]>
+  value?: PropValue<string | string[]>
   onValueChange?: (value: string | string[]) => void
-  disabled?: boolean
+  disabled?: PropValue<boolean>
   orientation?: AccordionOrientation
   class?: string
   style?: Record<string, string | number> | string
@@ -135,24 +136,22 @@ export function createAccordionRoot(): (
 
     const type = props?.type ?? 'single'
     const collapsible = props?.collapsible ?? false
-    const disabled = props?.disabled ?? false
     const orientation = props?.orientation ?? 'vertical'
 
     const isControlled = props?.value !== undefined
+    const empty = type === 'multiple' ? [] : ''
     const internal = rt.ref<string | string[]>(
-      normalizeValue(
-        props?.value ?? props?.defaultValue ?? (type === 'multiple' ? [] : ''),
-        type
-      )
+      normalizeValue(readProp(props?.defaultValue, empty), type)
     )
     const current = (): string | string[] =>
       isControlled
-        ? normalizeValue(props?.value ?? (type === 'multiple' ? [] : ''), type)
+        ? normalizeValue(readProp(props?.value, empty), type)
         : rt.unref(internal)
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
     const roving = createRovingFocus<HTMLButtonElement>({
       rt,
-      isGroupDisabled: () => disabled,
+      isGroupDisabled: isDisabled,
       loop: true
     })
     const triggerIds = new Map<string, string>()
@@ -225,7 +224,9 @@ export function createAccordionRoot(): (
     const context: AccordionContext = {
       type,
       collapsible,
-      disabled,
+      get disabled() {
+        return isDisabled()
+      },
       orientation,
       value: current,
       setValue,
@@ -242,7 +243,7 @@ export function createAccordionRoot(): (
 
     return div({
       'data-orientation': orientation,
-      'data-disabled': disabled ? '' : undefined,
+      'data-disabled': () => (isDisabled() ? '' : undefined),
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children(getContext)] : undefined

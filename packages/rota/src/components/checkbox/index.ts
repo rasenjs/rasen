@@ -5,9 +5,10 @@
  * modes. Root + Indicator composition, Reka/Radix-style API.
  * Composed on @rasenjs/dom element factories.
  */
-import type { Mountable } from '@rasenjs/core'
+import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { button, span } from '@rasenjs/dom'
+import { readProp } from '../../internal/props'
 
 export type CheckboxCheckedState = boolean | 'indeterminate'
 
@@ -17,12 +18,13 @@ export interface CheckboxContext {
 }
 
 export interface CheckboxRootProps {
-  checked?: CheckboxCheckedState
-  defaultChecked?: CheckboxCheckedState
-  disabled?: boolean
-  required?: boolean
-  name?: string
-  value?: string
+  checked?: PropValue<CheckboxCheckedState>
+  defaultChecked?: PropValue<CheckboxCheckedState>
+  disabled?: PropValue<boolean>
+  required?: PropValue<boolean>
+  name?: PropValue<string>
+  value?: PropValue<string>
+  id?: PropValue<string>
   onCheckedChange?: (checked: CheckboxCheckedState) => void
   class?: string
   style?: Record<string, string | number> | string
@@ -61,18 +63,17 @@ export function createCheckboxRoot(): (
   props?: CheckboxRootProps
 ) => Mountable<HTMLElement> {
   const component = (props?: CheckboxRootProps) => {
-    const disabled = props?.disabled ?? false
-
     const isControlled = props?.checked !== undefined
     const rt = getReactiveRuntime()
     const internal = rt.ref<CheckboxCheckedState>(
-      props?.checked ?? props?.defaultChecked ?? false
+      readProp(props?.defaultChecked, false)
     )
     const current = (): CheckboxCheckedState =>
-      isControlled ? (props?.checked ?? false) : rt.unref(internal)
+      isControlled ? readProp(props?.checked, false) : rt.unref(internal)
+    const isDisabled = (): boolean => readProp(props?.disabled, false)
 
     const toggle = (): void => {
-      if (disabled) return
+      if (isDisabled()) return
 
       const cur = current()
       let newValue: CheckboxCheckedState
@@ -103,12 +104,15 @@ export function createCheckboxRoot(): (
     return button({
       type: 'button',
       role: 'checkbox',
-      tabIndex: disabled ? -1 : 0,
+      id: props?.id,
+      tabIndex: () => (isDisabled() ? -1 : 0),
       'aria-checked': () => state().ariaChecked,
       'data-state': () => state().dataState,
-      'aria-disabled': disabled ? 'true' : undefined,
-      'data-disabled': disabled ? '' : undefined,
-      'aria-required': props?.required ? 'true' : undefined,
+      'aria-disabled': () => (isDisabled() ? 'true' : undefined),
+      'data-disabled': () => (isDisabled() ? '' : undefined),
+      'aria-required': () =>
+        readProp(props?.required, false) ? 'true' : undefined,
+      disabled: () => isDisabled(),
       name: props?.name,
       value: props?.value,
       class: props?.class,
