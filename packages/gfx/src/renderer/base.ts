@@ -123,6 +123,10 @@ export interface BatchItem {
    * group marker: the backend uploads the staging ranges directly and draws
    * indexed — no per-vertex transform/copy pass. */
   sealed?: SealedMesh
+  /** World-space AABB (minX, minY, minZ, maxX, maxY, maxZ), computed at
+   *  submission time when culling is enabled. Items without bounds are
+   *  always drawn (conservative). */
+  bounds?: Float32Array
 }
 
 /** Max textures merged into one draw call (sampler array size in the
@@ -276,6 +280,10 @@ export abstract class Renderer {
     clearColor: string
     continuousRender: boolean
     schedule?: (cb: () => void) => () => void
+    /** View-frustum culling (off by default). When on, every submission
+     *  computes a world-space AABB and flush rejects items whose AABB lies
+     *  entirely outside the current view×projection. See flush(). */
+    culling: boolean
   }
 
   /** 解析后的帧调度器（构造期确定，不依赖全局探测时序） */
@@ -289,11 +297,12 @@ export abstract class Renderer {
   /** Scene-registered pointer handlers (pure — fed by the host adapter). */
   protected pointerHandlers = new Set<GlPointerHandler>()
 
-  constructor(options: { clearColor?: string; continuousRender?: boolean; schedule?: (cb: () => void) => () => void } = {}) {
+  constructor(options: { clearColor?: string; continuousRender?: boolean; schedule?: (cb: () => void) => () => void; culling?: boolean } = {}) {
     this.options = {
       clearColor: options.clearColor ?? '#000000',
       continuousRender: options.continuousRender ?? false,
       schedule: options.schedule,
+      culling: options.culling ?? false,
     }
     this.projectionMatrix = Mat4x4f.identity()
     this.viewMatrix = Mat4x4f.identity()
@@ -446,11 +455,13 @@ export abstract class Renderer {
   setViewMatrix(view: Mat4x4f) {
     this.viewMatrix = view
     this.frameDirty = true
+    this.frustumDirty = true
   }
 
   setProjectionMatrix(projection: Mat4x4f) {
     this.projectionMatrix = projection
     this.frameDirty = true
+    this.frustumDirty = true
   }
 
   /**
@@ -583,6 +594,14 @@ export abstract class Renderer {
     item.indices = indices
     item.translationOnly = effectiveTranslationOnly
     item.packedColor = packedColor
+    // Culling bounds: computed per submission from the source arrays + the
+    // item's transform (the same data drawGroup will read). Only when the
+    // option is on — otherwise the O(V) min/max pass is skipped entirely.
+    if (this.options.culling) {
+      item.bounds = this.computeItemBounds(vertices, indices, transformMatrix, item.bounds)
+    } else if (item.bounds !== undefined) {
+      item.bounds = undefined
+    }
     this.batchItems.push(item)
     this._pendingVertexCount += vertices.length / 3
 
@@ -765,6 +784,25 @@ export abstract class Renderer {
     item.packedColor = undefined
     item.vertexColors = undefined
     item.translationOnly = undefined
+      // Culling bounds for a sealed run: scan the staged positions (they are
+      // freshly written and cache-hot). Only when the option is on.
+      if (this.options.culling) {
+        const pos = this.positionsArray!
+        let minX = Infinity, minY = Infinity, minZ = Infinity
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+        for (let v = span.vBase * 3, end = (span.vBase + vertexCount) * 3; v < end; v += 3) {
+          const x = pos[v], y = pos[v + 1], z = pos[v + 2]
+          if (x < minX) minX = x; if (x > maxX) maxX = x
+          if (y < minY) minY = y; if (y > maxY) maxY = y
+          if (z < minZ) minZ = z; if (z > maxZ) maxZ = z
+        }
+        const b = item.bounds ?? new Float32Array(6)
+        b[0] = minX; b[1] = minY; b[2] = minZ
+        b[3] = maxX; b[4] = maxY; b[5] = maxZ
+        item.bounds = b
+      } else if (item.bounds !== undefined) {
+        item.bounds = undefined
+      }
     this.batchItems.push(item)
   }
 
@@ -797,6 +835,95 @@ export abstract class Renderer {
     this.ensureBufferCapacity(next)
   }
 
+  /** Compute the world-space AABB of a legacy submission: min/max over the
+   *  (indexed or sequential) source vertices, then expanded by the
+   *  transformation's absolute row sums (conservative bound for rotation +
+   *  scale; exact for translation). Reuses `out` when given. */
+  private computeItemBounds(
+    vertices: Float32Array,
+    indices: Uint16Array | number[] | undefined,
+    transform: Mat4x4f,
+    out: Float32Array | undefined,
+  ): Float32Array {
+    const s = transform.source
+    let minX = Infinity, minY = Infinity, minZ = Infinity
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+    if (indices !== undefined && indices.length > 0) {
+      for (let i = 0; i < indices.length; i++) {
+        const v = indices[i] * 3
+        const x = vertices[v], y = vertices[v + 1], z = vertices[v + 2]
+        if (x < minX) minX = x; if (x > maxX) maxX = x
+        if (y < minY) minY = y; if (y > maxY) maxY = y
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z
+      }
+    } else {
+      for (let v = 0; v < vertices.length; v += 3) {
+        const x = vertices[v], y = vertices[v + 1], z = vertices[v + 2]
+        if (x < minX) minX = x; if (x > maxX) maxX = x
+        if (y < minY) minY = y; if (y > maxY) maxY = y
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z
+      }
+    }
+    // World bound = |M| expansion + translation (conservative under rotation).
+    const ax = Math.abs(s[0]) * maxX + Math.abs(s[4]) * maxY + Math.abs(s[8]) * maxZ
+    const bx = Math.abs(s[0]) * minX + Math.abs(s[4]) * minY + Math.abs(s[8]) * minZ
+    const ay = Math.abs(s[1]) * maxX + Math.abs(s[5]) * maxY + Math.abs(s[9]) * maxZ
+    const by = Math.abs(s[1]) * minX + Math.abs(s[5]) * minY + Math.abs(s[9]) * minZ
+    const az = Math.abs(s[2]) * maxX + Math.abs(s[6]) * maxY + Math.abs(s[10]) * maxZ
+    const bz = Math.abs(s[2]) * minX + Math.abs(s[6]) * minY + Math.abs(s[10]) * minZ
+    const b = out ?? new Float32Array(6)
+    b[0] = Math.min(bx, ax) + s[12]; b[3] = Math.max(bx, ax) + s[12]
+    b[1] = Math.min(by, ay) + s[13]; b[4] = Math.max(by, ay) + s[13]
+    b[2] = Math.min(bz, az) + s[14]; b[5] = Math.max(bz, az) + s[14]
+    return b
+  }
+
+  /** View-frustum planes extracted at flush time from view×projection
+   *  (Gribb–Hartmann), 6 × [nx, ny, nz, d], normals pointing INWARD —
+   *  the visible volume satisfies dot(n, p) + d >= 0. Recomputed only
+   *  when the matrices change. */
+  private frustumPlanes: Float32Array | null = null
+  private frustumDirty = true
+
+  /** Extract the 6 view-frustum planes from view×projection. */
+  private updateFrustumPlanes(): void {
+    const v = this.viewMatrix.source
+    const p = this.projectionMatrix.source
+    // M·N element (row i, col j), column-major sources.
+    const elem = (i: number, j: number): number =>
+      p[i] * v[j * 4] + p[4 + i] * v[j * 4 + 1] + p[8 + i] * v[j * 4 + 2] + p[12 + i] * v[j * 4 + 3]
+    const planes = this.frustumPlanes ?? (this.frustumPlanes = new Float32Array(24))
+    // Gribb–Hartmann: left = row3+row0, right = row3−row0, bottom = row3+row1,
+    // top = row3−row1, near = row3+row2, far = row3−row2.
+    const rows: Array<[number, number]> = [[0, 1], [0, -1], [1, 1], [1, -1], [2, 1], [2, -1]]
+    let o = 0
+    for (const [a, sign] of rows) {
+      let nx = elem(3, 0) + sign * elem(a, 0)
+      let ny = elem(3, 1) + sign * elem(a, 1)
+      let nz = elem(3, 2) + sign * elem(a, 2)
+      const d = elem(3, 3) + sign * elem(a, 3)
+      const len = Math.hypot(nx, ny, nz) || 1
+      nx /= len; ny /= len; nz /= len
+      planes[o] = nx; planes[o + 1] = ny; planes[o + 2] = nz; planes[o + 3] = d / len
+      o += 4
+    }
+    this.frustumDirty = false
+  }
+
+  /** Conservative frustum test: is the AABB entirely outside ANY plane?
+   *  p-vertex test — the box corner most positive along the plane normal. */
+  private aabbOutsideFrustum(b: Float32Array): boolean {
+    const planes = this.frustumPlanes!
+    for (let o = 0; o < 24; o += 4) {
+      const nx = planes[o], ny = planes[o + 1], nz = planes[o + 2], d = planes[o + 3]
+      const px = nx >= 0 ? b[3] : b[0]
+      const py = ny >= 0 ? b[4] : b[1]
+      const pz = nz >= 0 ? b[5] : b[2]
+      if (nx * px + ny * py + nz * pz + d < 0) return true
+    }
+    return false
+  }
+
   // --- flush ----------------------------------------------------------------
 
   /**
@@ -806,9 +933,20 @@ export abstract class Renderer {
   flush(filterLayer?: number) {
     if (this.batchItems.length === 0) return
 
-    const toDraw = filterLayer === undefined
+    let queue = filterLayer === undefined
       ? this.batchItems
       : this.batchItems.filter((it) => it.layer === filterLayer)
+    // View-frustum culling (opt-in): drop items whose submission-time AABB
+    // lies entirely outside the frustum implied by THIS flush's camera
+    // matrices — the same matrices the draws below execute with, so a
+    // rejected item is exactly one the stale-or-current camera would not
+    // have rasterized. Items without bounds (culling was off when they were
+    // submitted, or a producer that bypasses bounds) are always drawn.
+    if (this.options.culling && this.frustumDirty) this.updateFrustumPlanes()
+    if (this.options.culling && this.frustumPlanes !== null) {
+      queue = queue.filter((it) => it.bounds === undefined || !this.aabbOutsideFrustum(it.bounds))
+    }
+    const toDraw = queue
     if (toDraw.length === 0) return
 
     // Merged grouping where the backend supports it (sampler array);

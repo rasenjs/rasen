@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createRoot, createNode } from '../../node'
-import { getRenderContext } from '../../renderer/gl/index'
+import { getRenderContext, hasRenderContext } from '../../renderer/gl/index'
 import { WebGLRenderer as BatchRenderer } from '../../renderer/gl/index'
 import { createMockWebGLContext } from '../../test-utils'
 import { Mat4x4f } from '@rasenjs/math'
@@ -265,5 +265,97 @@ describe('BatchRenderer contract (WebGL2 perf-refactor safety net)', () => {
       rc.addShape('test', quad(0, 0, 8, 8), { r: 1, g: 1, b: 1, a: 1 }, translate(0, 0))
     })
     expect((gl.useProgram as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+// -- view-frustum culling (opt-in) -------------------------------------------
+
+/** Ortho projection mapping [0,size)² to clip space (z → [−1,1]). */
+function ortho(size: number): Mat4x4f {
+  const m = new Mat4x4f()
+  const s = m.source
+  s[0] = 2 / size; s[5] = 2 / size; s[10] = -1
+  s[12] = -1; s[13] = -1; s[15] = 1
+  return m
+}
+
+describe('BatchRenderer frustum culling (opt-in)', () => {
+  let gl: GlContext
+  let rafCallbacks: Array<() => void>
+  let rafSpy: ReturnType<typeof vi.spyOn>
+
+  /** All drawArrays TRIANGLES vertex counts so far (local: draws() in the
+   *  contract describe is scoped there). */
+  function culledDraws(): number[] {
+    return (gl.drawArrays as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .filter((c) => c[0] === gl.TRIANGLES)
+      .map((c) => c[2] as number)
+  }
+
+  beforeEach(() => {
+    if (typeof globalThis.requestAnimationFrame !== 'function') {
+      ;(globalThis as unknown as { requestAnimationFrame: (cb: FrameRequestCallback) => number }).requestAnimationFrame = () => 0
+    }
+    gl = createMockWebGLContext()
+    rafCallbacks = []
+    rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb as () => void)
+      return 0
+    })
+  })
+  afterEach(() => {
+    rafSpy.mockRestore()
+    if (hasRenderContext(gl)) (getRenderContext(gl) as unknown as { destroy?: () => void }).destroy?.()
+  })
+
+  /** One in-frustum quad + one fully outside (right edge) at the identity
+   *  camera over a 100×100 ortho view. */
+  function submitInsideAndOutside(br: BatchRenderer): void {
+    const tex = { id: 't' } as unknown as WebGLTexture
+    const color = { r: 1, g: 1, b: 1, a: 1 }
+    br.addShape(quad(10, 10, 8, 8), color, Mat4x4f.identity(), undefined, tex)  // inside
+    br.addShape(quad(500, 10, 8, 8), color, Mat4x4f.identity(), undefined, tex) // x ≥ 500 ≫ 100
+  }
+
+  it('culling off (default): both quads draw', () => {
+    const br = new BatchRenderer(gl, { projectionMatrix: ortho(100) })
+    submitInsideAndOutside(br)
+    ;(gl.drawArrays as unknown as ReturnType<typeof vi.fn>).mockClear()
+    br.flush()
+    expect(culledDraws()).toEqual([12]) // one merged group, both quads
+    br.destroy()
+  })
+
+  it('culling on: the out-of-frustum quad is dropped, the visible one draws', () => {
+    const br = new BatchRenderer(gl, { projectionMatrix: ortho(100), culling: true })
+    submitInsideAndOutside(br)
+    ;(gl.drawArrays as unknown as ReturnType<typeof vi.fn>).mockClear()
+    br.flush()
+    expect(culledDraws()).toEqual([6]) // only the in-frustum quad
+    br.destroy()
+  })
+
+  it('culling on: moving the camera brings the rejected quad back', () => {
+    const br = new BatchRenderer(gl, { projectionMatrix: ortho(100), culling: true })
+    // Frame 1: far quad culled.
+    const tex = { id: 't' } as unknown as WebGLTexture
+    const color = { r: 1, g: 1, b: 1, a: 1 }
+    br.addShape(quad(10, 10, 8, 8), color, Mat4x4f.identity(), undefined, tex)
+    br.addShape(quad(500, 10, 8, 8), color, Mat4x4f.identity(), undefined, tex)
+    br.flush()
+    expect(culledDraws()).toEqual([6])
+
+    // Frame 2 (items are re-submitted every frame by real producers): slide
+    // the ortho window to x=460..560 — the previously rejected quad is now
+    // in frustum and the near one is out.
+    ;(gl.drawArrays as unknown as ReturnType<typeof vi.fn>).mockClear()
+    const shifted = ortho(100)
+    shifted.source[12] = -1 - (2 * 460) / 100
+    br.setProjectionMatrix(shifted)
+    br.addShape(quad(10, 10, 8, 8), color, Mat4x4f.identity(), undefined, tex)
+    br.addShape(quad(500, 10, 8, 8), color, Mat4x4f.identity(), undefined, tex)
+    br.flush()
+    expect(culledDraws()).toEqual([6]) // only the far quad now
+    br.destroy()
   })
 })
