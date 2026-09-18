@@ -10,13 +10,18 @@
 import type { Mountable } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, h3, text } from '@rasenjs/dom'
-import { createElementRef, type ElementRef } from '../../internal/element-ref'
+import type { ElementRef } from '../../internal/element-ref'
+import {
+  createRovingFocus,
+  type RovingFocus
+} from '../../internal/roving-focus'
+import { withCleanup } from '../../internal/with-cleanup'
 
 export type AccordionType = 'single' | 'multiple'
 export type AccordionOrientation = 'vertical' | 'horizontal'
 export type AccordionState = 'open' | 'closed'
 
-export interface AccordionContext {
+export interface AccordionContext extends RovingFocus<HTMLButtonElement> {
   type: AccordionType
   collapsible: boolean
   disabled: boolean
@@ -32,13 +37,6 @@ export interface AccordionContext {
   getHeaderId: (itemValue: string) => string
   getContentId: (itemValue: string) => string
   /** Focus the n-th enabled trigger (wraps around at both ends). */
-  focusTrigger: (index: number) => void
-  /** Position of this item among the enabled ones, or -1. */
-  getEnabledIndex: (itemValue: string) => number
-  getEnabledValues: () => string[]
-  /** Items announce their disabled flag; no element is involved. */
-  registerItem: (itemValue: string, itemDisabled: boolean) => void
-  isItemDisabled: (itemValue: string) => boolean
 }
 
 export interface AccordionItemContext {
@@ -152,20 +150,14 @@ export function createAccordionRoot(): (
         ? normalizeValue(props?.value ?? (type === 'multiple' ? [] : ''), type)
         : rt.unref(internal)
 
-    const triggerRefs = new Map<string, ElementRef<HTMLButtonElement>>()
-    const disabledItems = new Map<string, boolean>()
+    const roving = createRovingFocus<HTMLButtonElement>({
+      rt,
+      isGroupDisabled: () => disabled,
+      loop: true
+    })
     const triggerIds = new Map<string, string>()
     const headerIds = new Map<string, string>()
     const contentIds = new Map<string, string>()
-
-    const triggerRef = (itemValue: string): ElementRef<HTMLButtonElement> => {
-      let ref = triggerRefs.get(itemValue)
-      if (!ref) {
-        ref = createElementRef<HTMLButtonElement>(rt)
-        triggerRefs.set(itemValue, ref)
-      }
-      return ref
-    }
 
     const getTriggerId = (itemValue: string): string => {
       if (!triggerIds.has(itemValue)) {
@@ -188,9 +180,6 @@ export function createAccordionRoot(): (
       return contentIds.get(itemValue)!
     }
 
-    const isItemDisabled = (itemValue: string): boolean =>
-      disabled || (disabledItems.get(itemValue) ?? false)
-
     const isOpen = (itemValue: string): boolean => {
       const value = current()
       if (type === 'single') {
@@ -209,7 +198,7 @@ export function createAccordionRoot(): (
     }
 
     const toggleItem = (itemValue: string): void => {
-      if (isItemDisabled(itemValue)) return
+      if (roving.isItemDisabled(itemValue)) return
 
       const value = current()
       if (type === 'single') {
@@ -233,22 +222,6 @@ export function createAccordionRoot(): (
      * cell (`isConnected`), so an unmounted trigger drops out on its own —
      * no unregister bookkeeping and no DOM queries.
      */
-    const getEnabledValues = (): string[] =>
-      Array.from(triggerRefs.keys()).filter((itemValue) => {
-        if (isItemDisabled(itemValue)) return false
-        return triggerRefs.get(itemValue)?.value?.isConnected ?? false
-      })
-
-    const getEnabledIndex = (itemValue: string): number =>
-      getEnabledValues().indexOf(itemValue)
-
-    const focusTrigger = (index: number): void => {
-      const values = getEnabledValues()
-      if (values.length === 0) return
-      const target = ((index % values.length) + values.length) % values.length
-      triggerRefs.get(values[target]!)?.value?.focus()
-    }
-
     const context: AccordionContext = {
       type,
       collapsible,
@@ -258,17 +231,12 @@ export function createAccordionRoot(): (
       setValue,
       isOpen,
       toggleItem,
-      registerItem: (itemValue, itemDisabled) => {
-        disabledItems.set(itemValue, itemDisabled)
-      },
-      triggerRef,
+      ...roving,
+      // Accordion names the cell after what it drives (a trigger's button).
+      triggerRef: roving.itemRef,
       getTriggerId,
       getHeaderId,
-      getContentId,
-      focusTrigger,
-      getEnabledValues,
-      getEnabledIndex,
-      isItemDisabled
+      getContentId
     }
     const getContext = (): AccordionContext => context
 
@@ -312,12 +280,13 @@ export function createAccordionItem(): (
       headerId
     }
 
-    return div({
-      'data-state': () => (ctx?.isOpen(props.value) ? 'open' : 'closed'),
-      'data-disabled': itemDisabled ? '' : undefined,
-      'aria-disabled': itemDisabled ? 'true' : undefined,
-      class: props?.class,
-      style: props?.style,
+    return withCleanup(
+      div({
+        'data-state': () => (ctx?.isOpen(props.value) ? 'open' : 'closed'),
+        'data-disabled': itemDisabled ? '' : undefined,
+        'aria-disabled': itemDisabled ? 'true' : undefined,
+        class: props?.class,
+        style: props?.style,
       // The item context is pushed for parts that are not handed it
       // explicitly (the parts below thread it themselves).
       children: [
@@ -332,9 +301,11 @@ export function createAccordionItem(): (
             popItemContext()
             unmount?.()
           }
-        }
-      ]
-    })
+          }
+        ]
+      }),
+      () => ctx?.unregisterItem(props.value)
+    )
   }
   return com(component)
 }
@@ -411,34 +382,16 @@ export function createAccordionTrigger(): (
       onKeyDown: (e: Event) => {
         const ke = e as KeyboardEvent
         if (!ctx || !itemCtx) return
-        const currentIndex = ctx.getEnabledIndex(itemCtx.value)
-        if (currentIndex === -1) return
 
-        const prevKey = ctx.orientation === 'vertical' ? 'ArrowUp' : 'ArrowLeft'
-        const nextKey = ctx.orientation === 'vertical' ? 'ArrowDown' : 'ArrowRight'
+        // Arrows / Home / End move between triggers (and skip disabled ones);
+        // the shared helper owns that behaviour.
+        if (ctx.handleArrows(ke, itemCtx.value, ctx.orientation)) return
 
-        switch (ke.key) {
-          case nextKey:
-          case prevKey: {
-            ke.preventDefault()
-            ctx.focusTrigger(currentIndex + (ke.key === nextKey ? 1 : -1))
-            break
+        if (ke.key === 'Enter' || ke.key === ' ') {
+          ke.preventDefault()
+          if (!ctx.isItemDisabled(itemCtx.value)) {
+            ctx.toggleItem(itemCtx.value)
           }
-          case 'Home':
-            ke.preventDefault()
-            ctx.focusTrigger(0)
-            break
-          case 'End':
-            ke.preventDefault()
-            ctx.focusTrigger(ctx.getEnabledValues().length - 1)
-            break
-          case 'Enter':
-          case ' ':
-            ke.preventDefault()
-            if (itemCtx && !ctx.isItemDisabled(itemCtx.value)) {
-              ctx.toggleItem(itemCtx.value)
-            }
-            break
         }
       }
     })
