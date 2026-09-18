@@ -36,6 +36,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createRoot } from '../../index'
+import { getRenderContext } from '../../renderer/gl/index'
 import { createMockWebGLContext } from '../../test-utils'
 import { spine } from '../../components/spine'
 import { ref, useReactiveRuntime } from '@rasenjs/reactive-vue'
@@ -132,11 +133,14 @@ describe('spine clipped path buffer ownership', () => {
 
     // Observe the arrays handed to the batch, in submission order.
     const submitted: Float32Array[] = []
-    const node = root as unknown as {
+    // Observe what reaches the BATCH, not which node forwarded it: components
+    // submit through their own element node (which delegates to the same
+    // renderer as the root), so the renderer is the stable observation point.
+    const rc = getRenderContext(gl) as unknown as {
       addShape: (...args: unknown[]) => void
     }
-    const original = node.addShape
-    node.addShape = function (this: unknown, ...args: unknown[]): void {
+    const original = rc.addShape
+    rc.addShape = function (this: unknown, ...args: unknown[]): void {
       if (typeof args[0] === 'string') submitted.push(args[1] as Float32Array)
       else submitted.push(args[0] as Float32Array)
       return original.apply(this, args)
@@ -186,9 +190,11 @@ describe('spine clipped path buffer ownership', () => {
 
     const frames: Float32Array[][] = []
     let current: Float32Array[] = []
-    const node = root as unknown as { addShape: (...args: unknown[]) => void }
-    const original = node.addShape
-    node.addShape = function (this: unknown, ...args: unknown[]): void {
+    const rc = getRenderContext(gl) as unknown as {
+      addShape: (...args: unknown[]) => void
+    }
+    const original = rc.addShape
+    rc.addShape = function (this: unknown, ...args: unknown[]): void {
       current.push((typeof args[0] === 'string' ? args[1] : args[0]) as Float32Array)
       return original.apply(this, args)
     }

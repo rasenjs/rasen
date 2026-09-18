@@ -6,7 +6,10 @@
 import puppeteer from 'puppeteer'
 import fs from 'node:fs'
 
-const N = 200
+/** Instance count. Overridable so a run can be pushed past the rAF ceiling:
+ * at N<=200 both backends sit near vsync and the absolute frame times stop
+ * being comparable to the official page's. */
+const N = Number(process.env.N || process.argv[2] || 200)
 const PAGES = [
   ['Official webgl', 'official-webgl.html'],
   ['Rasen webgl', 'rasen-webgl.html'],
@@ -63,5 +66,6 @@ try {
   await browser.close()
   server?.kill()
 }
-fs.writeFileSync('reports/compare-200.json', JSON.stringify({ N, out }, null, 2))
-console.log('saved reports/compare-200.json')
+const outFile = `reports/compare-${N}.json`
+fs.writeFileSync(outFile, JSON.stringify({ N, out }, null, 2))
+console.log(`saved ${outFile}`)

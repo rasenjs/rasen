@@ -46,8 +46,26 @@ import {
 } from './shaders'
 
 /** position(3) + color(4) + uv(2) + normal(3) + texIndex(1) floats per vertex. */
-const FLOATS_PER_VERTEX = 13
-const STRIDE = FLOATS_PER_VERTEX * 4
+/**
+ * Per-attribute strides (bytes). The vertex stream is SPLIT into one buffer
+ * per attribute, exactly like the GL backend's separated attributes — that is
+ * what lets a staging slice upload with NO per-vertex conversion.
+ *
+ * The previous single interleaved buffer cost 2.7 ms/frame of pure JS
+ * (SoA→AOS: 9 scalar writes + 4 divisions per vertex) plus 1.4 ms/frame of
+ * upload, and moved 36 B/vertex; the split stream moves 24 B/vertex and
+ * copies straight from the staging arrays.
+ *
+ * Colors are RGBA8 (`unorm8x4`) whenever the group opted into the packed
+ * stream — same 4 B/vertex the GL path uploads — and only float-color groups
+ * pay 16 B.
+ */
+const POS_STRIDE = 12
+const COL_PACKED_STRIDE = 4
+const COL_FLOAT_STRIDE = 16
+const UV_STRIDE = 8
+const NORMAL_STRIDE = 12
+const TEXINDEX_STRIDE = 4
 
 const BLEND: Record<BlendMode, { src: GPUBlendFactor; dst: GPUBlendFactor; srcA: GPUBlendFactor; dstA: GPUBlendFactor }> = {
   normal: { src: 'src-alpha', dst: 'one-minus-src-alpha', srcA: 'one', dstA: 'one-minus-src-alpha' },
@@ -157,10 +175,21 @@ export class WebGPURenderer extends Renderer {
   private layout: GPUBindGroupLayout | null = null
   private white: GPUTexture | null = null
 
-  // GPU buffers, grown on demand via the base's capacity hooks. The SoA→AOS
-  // interleaving happens at upload time.
-  private vertexBuffer: GPUBuffer | null = null
-  private vertexBufferBytes = 0
+  // GPU buffers, grown on demand via the base's capacity hooks. One buffer
+  // per attribute (see the stride note above): uploads are staging slices.
+  private posBuffer: GPUBuffer | null = null
+  private colBufferPacked: GPUBuffer | null = null
+  private colBufferFloat: GPUBuffer | null = null
+  private uvBuffer: GPUBuffer | null = null
+  private normalBuffer: GPUBuffer | null = null
+  private texIndexBuffer: GPUBuffer | null = null
+  /** All-zero texIndex stream, bound by producers that do not stage
+   *  texIndices (the sealed fast lane). A dedicated zero buffer removes the
+   *  GL-side "re-zero once after a multi-texture group" staleness dance. */
+  private zeroTexIndexBuffer: GPUBuffer | null = null
+  /** Capacity of every per-vertex buffer above, in BYTES (they all cover the
+   *  same vertex count, so one watermark keeps them in step). */
+  private vertexCapacityBytes = 0
   private indexBuffer: GPUBuffer | null = null
   private indexBufferBytes = 0
 
@@ -176,13 +205,18 @@ export class WebGPURenderer extends Renderer {
    * whole, so an oversized scratch would upload trailing bytes that belong to
    * the previous draw. Exact-size reuse therefore allocates only when the mesh
    * size actually changes — which for a looping animation is never. */
-  private interleaveScratch: Float32Array | null = null
   private indexScratch: Uint32Array | null = null
   /** Stable identity for cache keys: GPUTexture has no intrinsic id, and
    * every texture falling back to the same key made the bind-group cache
    * return the FIRST model's atlas forever ("vertices update, texture
    * doesn't" on model switch). */
   private textureIds = new WeakMap<GPUTexture, number>()
+  /** The same dedup the GL helper performs (utils.ts caches per context +
+   *  source + options). Without it every component instance re-created the
+   *  atlas page and re-uploaded it: 200 NIKKE instances meant 200 × 2048²
+   *  textures ≈ 3.2 GB VRAM and 200 full-atlas copies — that is what made
+   *  instance creation take ~7 s and the steady frame 13 ms slower than GL. */
+  private textureCache = new Map<object, Map<string, GPUTexture>>()
   private nextTextureId = 1
 
   /** Per-frame write cursor into the vertex/index buffers, in vertices /
@@ -301,6 +335,20 @@ export class WebGPURenderer extends Renderer {
    * rendering difference, not a naming one.
    */
   createTexture(source: HTMLImageElement | HTMLCanvasElement | ImageBitmap | RawPixelSource | CompressedTextureSource, options?: { minFilter?: number; magFilter?: number; wrapS?: number; wrapT?: number }): GPUTexture {
+    // Cache key = source (by reference) + sampling options, exactly like the
+    // GL helper: one shared atlas must upload ONCE regardless of how many
+    // components (or instances) ask for it.
+    const optionKey = options
+      ? `${options.wrapS ?? 'c'}|${options.wrapT ?? 'c'}|${options.minFilter ?? 'n'}|${options.magFilter ?? 'n'}`
+      : 'default'
+    let byOptions = this.textureCache.get(source as object)
+    if (!byOptions) {
+      byOptions = new Map<string, GPUTexture>()
+      this.textureCache.set(source as object, byOptions)
+    }
+    const cachedTexture = byOptions.get(optionKey)
+    if (cachedTexture) return cachedTexture
+
     // Compressed blocks: the bytes are already in GPU block format — upload
     // level by level at the format the host declares. No CPU decode ever.
     if (isCompressedTextureSource(source)) {
@@ -322,6 +370,7 @@ export class WebGPURenderer extends Renderer {
         )
       }
       ;(texture as unknown as { __filter: 'nearest' | 'linear' }).__filter = 'linear'
+      byOptions.set(optionKey, texture)
       return texture
     }
     // Raw pixels carry their own size; platform bitmaps are measured.
@@ -362,28 +411,47 @@ export class WebGPURenderer extends Renderer {
     // so mirror that rather than WebGPU's linear default.
     const nearest = options?.magFilter === undefined || options.magFilter === 0x2600
     ;(texture as unknown as { __filter: 'nearest' | 'linear' }).__filter = nearest ? 'nearest' : 'linear'
+    byOptions.set(optionKey, texture)
     return texture
   }
 
   deleteTexture(texture: GPUTexture): void {
+    // Drop cache entries that point at the texture being destroyed, so a later
+    // createTexture for the same source cannot hand back a destroyed handle.
+    for (const [source, byOptions] of this.textureCache) {
+      for (const [key, tex] of byOptions) {
+        if (tex === texture) byOptions.delete(key)
+      }
+      if (byOptions.size === 0) this.textureCache.delete(source)
+    }
     texture.destroy()
   }
 
   // -- backend contract ------------------------------------------------------
 
-  /** Allocate GPU vertex storage to hold cursor + count vertices
-   * (interleaved stream). Also the base's capacity hook — the base calls it
-   * with the staging capacity, which only ever over-allocates. */
+  /** Allocate the per-attribute vertex buffers to hold cursor + count
+   * vertices. Also the base's capacity hook — the base calls it with the
+   * staging capacity, which only ever over-allocates. */
   protected ensureBufferCapacity(totalVertices: number): void {
-    const bytes = (this.writeCursor + totalVertices) * STRIDE
-    if (this.vertexBuffer && this.vertexBufferBytes >= bytes) return
-    const cap = Math.max(bytes, Math.ceil(this.vertexBufferBytes * 1.5))
-    if (this.vertexBuffer) this.pendingDestroy.push(this.vertexBuffer)
-    this.vertexBuffer = this.device.createBuffer({
-      size: cap,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    })
-    this.vertexBufferBytes = cap
+    const needBytes = (this.writeCursor + totalVertices) * POS_STRIDE
+    if (this.posBuffer && this.vertexCapacityBytes >= needBytes) return
+    const bytes = Math.max(needBytes, Math.ceil(this.vertexCapacityBytes * 1.5))
+    const verts = Math.ceil(bytes / POS_STRIDE)
+    const usage = GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    const alloc = (b: GPUBuffer | null, size: number): GPUBuffer => {
+      if (b) this.pendingDestroy.push(b)
+      return this.device.createBuffer({ size: Math.max(4, size), usage })
+    }
+    this.posBuffer = alloc(this.posBuffer, verts * POS_STRIDE)
+    this.colBufferPacked = alloc(this.colBufferPacked, verts * COL_PACKED_STRIDE)
+    this.colBufferFloat = alloc(this.colBufferFloat, verts * COL_FLOAT_STRIDE)
+    this.uvBuffer = alloc(this.uvBuffer, verts * UV_STRIDE)
+    this.normalBuffer = alloc(this.normalBuffer, verts * NORMAL_STRIDE)
+    this.texIndexBuffer = alloc(this.texIndexBuffer, verts * TEXINDEX_STRIDE)
+    // Freshly created GPU buffers read as zeros, and nothing ever writes this
+    // one — so it stays a valid all-zero stream at any capacity.
+    this.zeroTexIndexBuffer = alloc(this.zeroTexIndexBuffer, verts * TEXINDEX_STRIDE)
+    this.vertexCapacityBytes = verts * POS_STRIDE
   }
 
   /** The GPU index buffer follows the base's indexCapacity watermark AND
@@ -401,13 +469,22 @@ export class WebGPURenderer extends Renderer {
     this.indexBufferBytes = cap
   }
 
-  /** Interleave scratch holding exactly `floats` floats. See the field note for
-   *  why the size is exact. */
-  private scratchFloats(floats: number): Float32Array {
-    if (!this.interleaveScratch || this.interleaveScratch.length !== floats) {
-      this.interleaveScratch = new Float32Array(floats)
-    }
-    return this.interleaveScratch
+  /**
+   * Bind this frame's per-attribute vertex streams for a draw.
+   *
+   * `packed` picks the RGBA8 color stream (unorm8x4, what the packed path
+   * uploads) over the float one; `texIndices` false binds the shared all-zero
+   * stream, which is what a single-texture fast-lane run needs — its
+   * producers never stage texIndices. Every stream is grown together (one
+   * capacity watermark) so all of them cover the draw's vertex range.
+   */
+  private bindVertexStreams(packed: boolean, texIndices: boolean): void {
+    const p = this.pass()
+    p.setVertexBuffer(0, this.posBuffer!)
+    p.setVertexBuffer(1, packed ? this.colBufferPacked! : this.colBufferFloat!)
+    p.setVertexBuffer(2, this.uvBuffer!)
+    p.setVertexBuffer(3, this.normalBuffer!)
+    p.setVertexBuffer(4, texIndices ? this.texIndexBuffer! : this.zeroTexIndexBuffer!)
   }
 
   /** Index-rebase scratch holding exactly `count` indices. */
@@ -442,9 +519,9 @@ export class WebGPURenderer extends Renderer {
     const b = BLEND[first.blendMode]
 
     const { firstIndex, baseVertex } = this.uploadStaging(vBase, vCount, iBase, iCount)
-    this.pass().setPipeline(this.pipeline(b, first.premultiplied, false))
+    this.pass().setPipeline(this.pipeline(b, first.premultiplied, false, true))
     this.pass().setBindGroup(0, this.bindGroup(textures, first.skipTonemap))
-    this.pass().setVertexBuffer(0, this.vertexBuffer!)
+    this.bindVertexStreams(true, false)
     this.pass().setIndexBuffer(this.indexBuffer!, 'uint32')
     this.pass().drawIndexed(iCount, 1, firstIndex, baseVertex)
   }
@@ -460,9 +537,9 @@ export class WebGPURenderer extends Renderer {
     const skipTonemap = items.every((it) => it.skipTonemap === true)
 
     const { firstIndex, baseVertex } = this.uploadStreams(s)
-    this.pass().setPipeline(this.pipeline(b, premultiplied, s.hasNormals))
+    this.pass().setPipeline(this.pipeline(b, premultiplied, s.hasNormals, s.allPackedColor))
     this.pass().setBindGroup(0, this.bindGroup(textures as (GPUTexture | null)[], skipTonemap))
-    this.pass().setVertexBuffer(0, this.vertexBuffer!)
+    this.bindVertexStreams(s.allPackedColor, true)
     this.pass().setIndexBuffer(this.indexBuffer!, 'uint32')
     // Indexed groups draw their joined index list; the fallback (index-
     // expanded) path draws the trivial 0..n-1 list uploadStreams generated —
@@ -659,7 +736,13 @@ export class WebGPURenderer extends Renderer {
     }
     this.children.length = 0
     this.transforms.reset()
-    this.vertexBuffer?.destroy()
+    this.posBuffer?.destroy()
+    this.colBufferPacked?.destroy()
+    this.colBufferFloat?.destroy()
+    this.uvBuffer?.destroy()
+    this.normalBuffer?.destroy()
+    this.texIndexBuffer?.destroy()
+    this.zeroTexIndexBuffer?.destroy()
     this.indexBuffer?.destroy()
     this.uniforms.destroy()
     this.uniformsSkipTonemap.destroy()
@@ -732,26 +815,21 @@ export class WebGPURenderer extends Renderer {
     this.ensureBufferCapacity(vCount)
     const base = this.writeCursor
     this.writeCursor += vCount
-    const scratch = this.scratchFloats(vCount * FLOATS_PER_VERTEX)
-    const pos = st.positions!
-    const col = st.packedColors!
-    const uv = st.uvs!
-    for (let v = 0; v < vCount; v++) {
-      const o = v * FLOATS_PER_VERTEX
-      const s = vBase + v
-      scratch[o] = pos[s * 3]
-      scratch[o + 1] = pos[s * 3 + 1]
-      scratch[o + 2] = pos[s * 3 + 2]
-      scratch[o + 3] = col[s * 4] / 255
-      scratch[o + 4] = col[s * 4 + 1] / 255
-      scratch[o + 5] = col[s * 4 + 2] / 255
-      scratch[o + 6] = col[s * 4 + 3] / 255
-      scratch[o + 7] = uv[s * 2]
-      scratch[o + 8] = uv[s * 2 + 1]
-      // normals stay 0: fast-lane producers don't carry them
-      // texIndex stays 0: single-texture lane, see the class doc
-    }
-    this.device.queue.writeBuffer(this.vertexBuffer!, base * STRIDE, scratch.buffer as ArrayBuffer)
+    // Straight staging slices — no per-vertex loop. writeBuffer copies the
+    // bytes at call time, so the shared staging arrays can be rewritten by the
+    // next producer without disturbing this upload.
+    const q = this.device.queue
+    const vEnd = vBase + vCount
+    q.writeBuffer(this.posBuffer!, base * POS_STRIDE, st.positions!.subarray(vBase * 3, vEnd * 3) as unknown as GPUAllowSharedBufferSource)
+    q.writeBuffer(
+      this.colBufferPacked!,
+      base * COL_PACKED_STRIDE,
+      st.packedColors!.subarray(vBase * 4, vEnd * 4) as unknown as GPUAllowSharedBufferSource
+    )
+    q.writeBuffer(this.uvBuffer!, base * UV_STRIDE, st.uvs!.subarray(vBase * 2, vEnd * 2) as unknown as GPUAllowSharedBufferSource)
+    // Normals are absent by contract (fast-lane producers carry none) and
+    // texIndex is 0 for a single-texture run — both stay in the buffers'
+    // zero-initialized state via the shared zero stream bound at draw time.
 
     const indices = st.indices!
     const firstIndex = this.indexWriteCursor
@@ -769,32 +847,23 @@ export class WebGPURenderer extends Renderer {
     this.ensureBufferCapacity(vCount)
     const base = this.writeCursor
     this.writeCursor += vCount
-    const scratch = this.scratchFloats(vCount * FLOATS_PER_VERTEX)
     const packed = s.allPackedColor
-    for (let v = 0; v < vCount; v++) {
-      const o = v * FLOATS_PER_VERTEX
-      scratch[o] = s.positions[v * 3]
-      scratch[o + 1] = s.positions[v * 3 + 1]
-      scratch[o + 2] = s.positions[v * 3 + 2]
-      if (packed) {
-        scratch[o + 3] = s.packedColors[v * 4] / 255
-        scratch[o + 4] = s.packedColors[v * 4 + 1] / 255
-        scratch[o + 5] = s.packedColors[v * 4 + 2] / 255
-        scratch[o + 6] = s.packedColors[v * 4 + 3] / 255
-      } else {
-        scratch[o + 3] = s.colors[v * 4]
-        scratch[o + 4] = s.colors[v * 4 + 1]
-        scratch[o + 5] = s.colors[v * 4 + 2]
-        scratch[o + 6] = s.colors[v * 4 + 3]
-      }
-      scratch[o + 7] = s.uvs[v * 2]
-      scratch[o + 8] = s.uvs[v * 2 + 1]
-      scratch[o + 9] = s.normals[v * 3]
-      scratch[o + 10] = s.normals[v * 3 + 1]
-      scratch[o + 11] = s.normals[v * 3 + 2]
-      scratch[o + 12] = s.texIndices[v]
+    const q = this.device.queue
+    q.writeBuffer(this.posBuffer!, base * POS_STRIDE, s.positions.subarray(0, vCount * 3) as unknown as GPUAllowSharedBufferSource)
+    if (packed) {
+      q.writeBuffer(
+        this.colBufferPacked!,
+        base * COL_PACKED_STRIDE,
+        s.packedColors.subarray(0, vCount * 4) as unknown as GPUAllowSharedBufferSource
+      )
+    } else {
+      q.writeBuffer(this.colBufferFloat!, base * COL_FLOAT_STRIDE, s.colors.subarray(0, vCount * 4) as unknown as GPUAllowSharedBufferSource)
     }
-    this.device.queue.writeBuffer(this.vertexBuffer!, base * STRIDE, scratch.buffer as ArrayBuffer)
+    q.writeBuffer(this.uvBuffer!, base * UV_STRIDE, s.uvs.subarray(0, vCount * 2) as unknown as GPUAllowSharedBufferSource)
+    if (s.hasNormals) {
+      q.writeBuffer(this.normalBuffer!, base * NORMAL_STRIDE, s.normals.subarray(0, vCount * 3) as unknown as GPUAllowSharedBufferSource)
+    }
+    q.writeBuffer(this.texIndexBuffer!, base * TEXINDEX_STRIDE, s.texIndices.subarray(0, vCount) as unknown as GPUAllowSharedBufferSource)
 
     // Index list: the base joined per-item index lists (allIndexed, values
     // relative to the group start) — rebase them onto `base`. Non-indexed
@@ -853,10 +922,15 @@ export class WebGPURenderer extends Renderer {
   private pipeline(
     b: { src: GPUBlendFactor; dst: GPUBlendFactor; srcA: GPUBlendFactor; dstA: GPUBlendFactor },
     premultiplied: boolean,
-    hasNormals: boolean
+    hasNormals: boolean,
+    packedColor: boolean
   ): GPURenderPipeline {
     const src = premultiplied ? 'one' : b.src
-    const key = `${src}|${b.dst}|${b.srcA}|${b.dstA}|${hasNormals}`
+    // The color stream's FORMAT is pipeline state in WebGPU (unlike GL's
+    // per-VAO attribute pointer), so packed and float-color groups need
+    // distinct pipelines — the same split the GL backend expresses with its
+    // (normals, texture, packedColor) VAO variants.
+    const key = `${src}|${b.dst}|${b.srcA}|${b.dstA}|${hasNormals}|${packedColor}`
     let p = this.pipelines.get(key)
     if (!p) {
       p = this.device.createRenderPipeline({
@@ -867,16 +941,37 @@ export class WebGPURenderer extends Renderer {
         vertex: {
           module: this.device.createShaderModule({ code: DEFAULT_VERTEX_WGSL }),
           entryPoint: 'vs_main',
+          // One buffer per attribute, each tightly packed (stride =
+          // attribute size): the uploads are staging slices with no
+          // interleaving pass. Order and shader locations match the WGSL in
+          // shaders.ts; the entry index is the vertex-buffer SLOT that
+          // bindVertexStreams fills.
           buffers: [
             {
-              arrayStride: STRIDE,
+              arrayStride: POS_STRIDE,
+              attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
+            },
+            {
+              arrayStride: packedColor ? COL_PACKED_STRIDE : COL_FLOAT_STRIDE,
               attributes: [
-                { shaderLocation: 0, offset: 0, format: 'float32x3' },
-                { shaderLocation: 1, offset: 12, format: 'float32x4' },
-                { shaderLocation: 2, offset: 28, format: 'float32x2' },
-                { shaderLocation: 3, offset: 36, format: 'float32x3' },
-                { shaderLocation: 4, offset: 48, format: 'float32' },
+                {
+                  shaderLocation: 1,
+                  offset: 0,
+                  format: packedColor ? 'unorm8x4' : 'float32x4',
+                },
               ],
+            },
+            {
+              arrayStride: UV_STRIDE,
+              attributes: [{ shaderLocation: 2, offset: 0, format: 'float32x2' }],
+            },
+            {
+              arrayStride: NORMAL_STRIDE,
+              attributes: [{ shaderLocation: 3, offset: 0, format: 'float32x3' }],
+            },
+            {
+              arrayStride: TEXINDEX_STRIDE,
+              attributes: [{ shaderLocation: 4, offset: 0, format: 'float32' }],
             },
           ],
         },

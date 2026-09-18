@@ -36,7 +36,16 @@ export const element = com(
   (props: ElementProps): Mountable<GfxNode> => {
     return (parentNode: GfxNode) => {
       const node = createNode(parentNode, {
-        draw: () => props.draw(parentNode),
+        // Submit through the element's OWN node, not the mount host.
+        //
+        // The host is only a placement target: under a bounded mount (each
+        // with a boundary, i.e. insertion in the middle of a list) it is a
+        // Proxy whose `get` trap re-binds every method it hands out. Passing
+        // it here put that Proxy on the per-frame path — every
+        // beginMesh/endMesh the component issues went through the trap and
+        // allocated a bound function, ~1.3 ms/frame at 200 spine instances.
+        // Both nodes share the renderer, so submissions are identical.
+        draw: () => props.draw(node),
         bounds: props.getBounds,
         deps: props.deps
       })

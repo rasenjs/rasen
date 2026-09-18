@@ -237,7 +237,12 @@ describe('WebGPURenderer deferred-queue semantics', () => {
     expect(drawCalls[1]).toContain('drawIndexed(4,1,4,4)')
 
     // The two index uploads must not overlap: offsets 0*4 and 4*4.
-    const indexWrites = device.queue.writes.filter((w) => w.size === 16)
+    // Filter by the INDEX usage flag — several attribute streams (texIndex,
+    // and a 4-vertex float color) also upload 16-byte slices, so size alone
+    // cannot identify the index upload.
+    const indexWrites = device.queue.writes.filter(
+      (w) => (w.buffer.desc.usage & GPUBufferUsage.INDEX) !== 0
+    )
     expect(indexWrites.length).toBe(2)
     expect(indexWrites[0].offset).toBe(0)
     expect(indexWrites[1].offset).toBe(16)
@@ -309,14 +314,28 @@ describe('WebGPURenderer deferred-queue semantics', () => {
     void findLargestBuffer(device, 'index')
   })
 
-  it('vertex buffer grows to cover the per-frame cursor', () => {
+  it('vertex buffers grow to cover the per-frame cursor', () => {
     hooks.beginFrame()
     const tex = device.createTexture({ size: { width: 1, height: 1 }, format: 'rgba8unorm', usage: 0 })
-    // Two groups of 4 vertices each: cursor reaches 8 → buffer ≥ 8*52 bytes.
+    // Two groups of 4 vertices each: the cursor reaches 8, so EVERY
+    // per-attribute stream must cover 8 vertices. The streams are separate
+    // buffers now (position 12 B/vertex, color 4 or 16, uv 8, normal 12,
+    // texIndex 4), so assert the invariant rather than a stride total: each
+    // stream's upload must fit inside a buffer that exists.
     hooks.drawGroup([legacyQuadItem()], [tex])
     hooks.drawGroup([legacyQuadItem()], [tex])
-    const vbuf = device.buffers.find((b) => b.size >= 8 * 52)
-    expect(vbuf).toBeTruthy()
+    const vertexWrites = device.queue.writes.filter(
+      (w) => (w.buffer.desc.usage & GPUBufferUsage.VERTEX) !== 0
+    )
+    expect(vertexWrites.length).toBeGreaterThan(0)
+    // The largest stream is position (8 vertices × 12 B = 96 B). Every
+    // stream's write must land inside a buffer that actually exists and is
+    // big enough, i.e. capacity grew to cover the cursor on all attributes.
+    for (const w of vertexWrites) {
+      expect(w.buffer.size).toBeGreaterThanOrEqual(w.offset + w.size)
+    }
+    const biggest = Math.max(...vertexWrites.map((w) => w.offset + w.size))
+    expect(biggest).toBeGreaterThanOrEqual(8 * 12)
   })
 })
 

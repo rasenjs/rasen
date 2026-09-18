@@ -15,6 +15,8 @@
 import { spawn } from 'child_process'
 import http from 'http'
 import process from 'process'
+import fs from 'fs'
+import path from 'path'
 
 const PORT = process.env.PORT
 const SIGNAL = process.env.BENCH_READY_SIGNAL || 'Benchmark Ready'
@@ -45,18 +47,76 @@ function poll(url, timeoutMs) {
   })
 }
 
-const child = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
-  cwd,
-  env: process.env,
-  stdio: ['ignore', 'pipe', 'pipe']
-})
+/**
+ * Spawn vite's own entry point, NOT `npx vite`.
+ *
+ * `npx` is an extra process in the middle: killing it leaves vite orphaned and
+ * still holding the port, which is how a finished run used to poison the next
+ * one. Running node on vite's bin makes this process the parent of the server
+ * itself, so a single kill is enough. (Resolved through the .bin symlink
+ * because vite's package `exports` does not expose `./bin/vite.js`.)
+ */
+function viteBin() {
+  const link = path.join(cwd, 'node_modules', '.bin', 'vite')
+  try {
+    return fs.realpathSync(link)
+  } catch {
+    // Workspaces hoist to the repo root; fall back to walking up.
+    let dir = cwd
+    for (let i = 0; i < 4; i++) {
+      dir = path.dirname(dir)
+      try {
+        return fs.realpathSync(path.join(dir, 'node_modules', '.bin', 'vite'))
+      } catch {}
+    }
+    throw new Error('start-server: cannot locate the vite binary')
+  }
+}
+
+const child = spawn(
+  process.execPath,
+  [viteBin(), 'preview', '--port', String(PORT), '--strictPort'],
+  {
+    cwd,
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe']
+  }
+)
 
 child.stdout.on('data', (d) => process.stdout.write(d))
 child.stderr.on('data', (d) => process.stderr.write(d))
-child.on('exit', (code) => process.exit(code ?? 0))
+
+// The harness kills THIS process, not the vite grandchild, and `npx` sits in
+// between. Without killing the child on the way out, the vite server outlives
+// the run and keeps holding the port — the next run then polls the STALE
+// server, sees it answer, and reports "ready" right before the new vite dies
+// with "Port is already in use". So die with the child.
+let childGone = false
+function shutdown(signal) {
+  if (!childGone) child.kill('SIGKILL')
+  process.exit(signal === 'SIGINT' ? 130 : 143)
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGHUP', () => shutdown('SIGHUP'))
+process.on('exit', () => {
+  if (!childGone) child.kill('SIGKILL')
+})
+
+child.on('exit', (code) => {
+  childGone = true
+  process.exit(code ?? 0)
+})
 
 poll(`http://localhost:${PORT}/`, 30000)
   .then(() => {
+    // A port that answers is not proof that OUR server is the one answering:
+    // a leftover from a previous run would answer too. If our child has since
+    // exited (the "port in use" case), this is not a success.
+    if (childGone) {
+      console.error(`start-server: port ${PORT} answered, but our vite already exited`)
+      process.exit(1)
+    }
     // Signal readiness to the harness.
     console.log(SIGNAL)
   })
