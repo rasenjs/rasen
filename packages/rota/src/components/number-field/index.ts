@@ -1,13 +1,17 @@
 /**
- * NumberField - 数字字段组件
+ * NumberField - numeric input with steppers, formatting and range limits.
  *
- * 数字输入字段，支持步进器、格式化和范围限制。
- * 采用 Root + Input + Increment + Decrement 组合模式，与 Reka/Radix API 一致。
+ * Root + Input + Increment + Decrement composition, Reka/Radix-style API.
+ * Composed on @rasenjs/dom element factories: the value is a runtime ref and
+ * the input/steppers bind to it reactively.
  */
 import type { Mountable } from '@rasenjs/core'
+import { com, getReactiveRuntime } from '@rasenjs/core'
+import { div, button, input as inputEl } from '@rasenjs/dom'
 
 export interface NumberFieldContext {
-  value: number | null
+  /** Reactive value snapshot. */
+  value: () => number | null
   min: number
   max: number
   step: number
@@ -52,389 +56,256 @@ export interface NumberFieldDecrementProps {
 }
 
 /**
- * 创建 NumberField Root 组件
+ * Create the NumberField Root component.
  */
 export function createNumberFieldRoot(): (
   props?: NumberFieldRootProps
 ) => Mountable<HTMLElement> {
-  return (props?: NumberFieldRootProps) => {
-    return (host: HTMLElement) => {
-      const root = document.createElement('div')
-      root.role = 'group'
+  const component = (props?: NumberFieldRootProps) => {
+    const rt = getReactiveRuntime()
 
-      // Default values
-      const min = props?.min ?? 0
-      const max = props?.max ?? 100
-      const step = props?.step ?? 1
-      const disabled = props?.disabled ?? false
+    const min = props?.min ?? 0
+    const max = props?.max ?? 100
+    const step = props?.step ?? 1
+    const disabled = props?.disabled ?? false
 
-      // Set up initial value
-      const isControlled = props?.value !== undefined
-      let internalValue: number | null =
-        props?.value ?? props?.defaultValue ?? 0
+    const isControlled = props?.value !== undefined
+    const internal = rt.ref<number | null>(
+      props?.value ?? props?.defaultValue ?? 0
+    )
+    const current = (): number | null =>
+      isControlled ? (props?.value ?? null) : rt.unref(internal)
 
-      // Update value function
-      const updateValue = (newValue: number | null) => {
-        if (!isControlled) {
-          internalValue = newValue
-        }
-        props?.onValueChange?.(newValue)
+    const updateValue = (newValue: number | null): void => {
+      if (!isControlled) {
+        rt.setValue(internal, newValue)
       }
-
-      // Context to share state with child components
-      const context: NumberFieldContext = {
-        get value() {
-          return isControlled ? (props?.value ?? null) : internalValue
-        },
-        get min() {
-          return min
-        },
-        get max() {
-          return max
-        },
-        get step() {
-          return step
-        },
-        get disabled() {
-          return disabled
-        },
-        updateValue
-      }
-
-      const getContext = (): NumberFieldContext | undefined => context
-
-      // Apply classes and styles
-      if (props?.class) root.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(root.style, props.style)
-        }
-      }
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children(getContext)(root, undefined)
-      }
-
-      host.appendChild(root)
-
-      return () => {
-        childUnmount?.()
-        root.remove()
-      }
+      props?.onValueChange?.(newValue)
     }
+
+    const context: NumberFieldContext = {
+      value: current,
+      min,
+      max,
+      step,
+      disabled,
+      updateValue
+    }
+    const getContext = (): NumberFieldContext => context
+
+    return div({
+      role: 'group',
+      'data-disabled': disabled ? '' : undefined,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children(getContext)] : undefined
+    })
   }
+  return com(component)
 }
 
 /**
- * 创建 NumberField Input 组件
+ * Create the NumberField Input component.
  */
 export function createNumberFieldInput(): (
   props?: NumberFieldInputProps,
   getContext?: () => NumberFieldContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: NumberFieldInputProps,
     getContext?: () => NumberFieldContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const input = document.createElement('input')
-      input.type = 'text' // Use text to support formatting
-      input.inputMode = 'decimal' // Better mobile keyboard for decimals
+    const ctx = getContext?.()
 
-      const ctx = getContext?.()
-      if (ctx) {
-        // Initialize with current value from context
-        const currentValue = ctx.value
-        input.value = currentValue !== null ? currentValue.toString() : ''
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLInputElement
+      const current = getContext?.()
+      if (!current) return
+
+      if (target.value === '') {
+        current.updateValue(null)
+        return
       }
 
-      // Apply classes and styles
-      if (props?.class) input.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(input.style, props.style)
-        }
-      }
-
-      // Handle input change
-      const handleInput = (e: Event) => {
-        const target = e.target as HTMLInputElement
-        const ctx = getContext?.()
-        if (!ctx) return
-
-        if (target.value === '') {
-          ctx.updateValue(null)
-          return
-        }
-
-        const parsedValue = parseFloat(target.value)
-        if (!isNaN(parsedValue)) {
-          // Clamp to range
-          const clampedValue = Math.min(ctx.max, Math.max(ctx.min, parsedValue))
-          ctx.updateValue(clampedValue)
-        }
-      }
-
-      input.addEventListener('input', handleInput)
-
-      // Handle blur to format the value
-      const handleBlur = () => {
-        const ctx = getContext?.()
-        if (!ctx) return
-
-        const formattedValue = ctx.value !== null ? ctx.value.toString() : ''
-        input.value = formattedValue
-      }
-
-      input.addEventListener('blur', handleBlur)
-
-      // Disable if context is disabled
-      if (ctx?.disabled) {
-        input.disabled = true
-        input.setAttribute('data-disabled', '')
-      }
-
-      host.appendChild(input)
-
-      return () => {
-        input.removeEventListener('input', handleInput)
-        input.removeEventListener('blur', handleBlur)
-        input.remove()
+      const parsed = parseFloat(target.value)
+      if (!Number.isNaN(parsed)) {
+        const clamped = Math.min(current.max, Math.max(current.min, parsed))
+        current.updateValue(clamped)
       }
     }
+
+    const handleBlur = (e: Event) => {
+      const target = e.target as HTMLInputElement
+      const current = getContext?.()
+      if (!current) return
+      const value = current.value()
+      target.value = value !== null ? value.toString() : ''
+    }
+
+    return inputEl({
+      type: 'text',
+      inputMode: 'decimal',
+      // `value` is a DOM property on inputs (see the binding layer's
+      // property/attribute classification), so this stays in sync without
+      // clobbering what the user is typing between updates.
+      value: () => {
+        const value = ctx?.value() ?? null
+        return value !== null ? value.toString() : ''
+      },
+      'data-disabled': () => (ctx?.disabled ? '' : undefined),
+      disabled: () => ctx?.disabled ?? false,
+      class: props?.class,
+      style: props?.style,
+      onInput: handleInput,
+      onBlur: handleBlur
+    })
   }
+  return com(component)
 }
 
 /**
- * 创建 NumberField Increment 组件
+ * Create the NumberField Increment component.
  */
 export function createNumberFieldIncrement(): (
   props?: NumberFieldIncrementProps,
   getContext?: () => NumberFieldContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: NumberFieldIncrementProps,
     getContext?: () => NumberFieldContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const button = document.createElement('button')
-      button.type = 'button'
+    const ctx = getContext?.()
 
-      // Set default text content if not provided
-      if (props?.children) {
-        button.textContent = props.children
-      } else {
-        button.textContent = '+'
-      }
-
-      // Apply classes and styles
-      if (props?.class) button.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(button.style, props.style)
+    return button({
+      type: 'button',
+      'data-disabled': () => (ctx?.disabled ? '' : undefined),
+      'aria-disabled': () => String(ctx?.disabled ?? false),
+      class: props?.class,
+      style: props?.style,
+      children: [
+        (el: HTMLElement) => {
+          el.textContent = props?.children ?? '+'
+          return undefined
         }
+      ],
+      onClick: () => {
+        const current = getContext?.()
+        if (!current || current.disabled) return
+        const value = current.value()
+        const next = value === null ? current.min : value + current.step
+        current.updateValue(Math.min(current.max, next))
       }
-
-      const handleClick = () => {
-        const ctx = getContext?.()
-        if (!ctx || ctx.disabled) return
-
-        let currentValue = ctx.value
-        if (currentValue === null) {
-          currentValue = ctx.min
-        } else {
-          currentValue += ctx.step
-        }
-
-        // Clamp to max
-        const newValue = Math.min(ctx.max, currentValue)
-        ctx.updateValue(newValue)
-      }
-
-      button.addEventListener('click', handleClick)
-
-      // Disable if context is disabled
-      if (getContext?.()?.disabled) {
-        button.disabled = true
-        button.setAttribute('data-disabled', '')
-      }
-
-      host.appendChild(button)
-
-      return () => {
-        button.removeEventListener('click', handleClick)
-        button.remove()
-      }
-    }
+    })
   }
+  return com(component)
 }
 
 /**
- * 创建 NumberField Decrement 组件
+ * Create the NumberField Decrement component.
  */
 export function createNumberFieldDecrement(): (
   props?: NumberFieldDecrementProps,
   getContext?: () => NumberFieldContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: NumberFieldDecrementProps,
     getContext?: () => NumberFieldContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const button = document.createElement('button')
-      button.type = 'button'
+    const ctx = getContext?.()
 
-      // Set default text content if not provided
-      if (props?.children) {
-        button.textContent = props.children
-      } else {
-        button.textContent = '-'
-      }
-
-      // Apply classes and styles
-      if (props?.class) button.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(button.style, props.style)
+    return button({
+      type: 'button',
+      'data-disabled': () => (ctx?.disabled ? '' : undefined),
+      'aria-disabled': () => String(ctx?.disabled ?? false),
+      class: props?.class,
+      style: props?.style,
+      children: [
+        (el: HTMLElement) => {
+          el.textContent = props?.children ?? '-'
+          return undefined
         }
+      ],
+      onClick: () => {
+        const current = getContext?.()
+        if (!current || current.disabled) return
+        const value = current.value()
+        const next = value === null ? current.min : value - current.step
+        current.updateValue(Math.max(current.min, next))
       }
-
-      const handleClick = () => {
-        const ctx = getContext?.()
-        if (!ctx || ctx.disabled) return
-
-        let currentValue = ctx.value
-        if (currentValue === null) {
-          currentValue = ctx.min
-        } else {
-          currentValue -= ctx.step
-        }
-
-        // Clamp to min
-        const newValue = Math.max(ctx.min, currentValue)
-        ctx.updateValue(newValue)
-      }
-
-      button.addEventListener('click', handleClick)
-
-      // Disable if context is disabled
-      if (getContext?.()?.disabled) {
-        button.disabled = true
-        button.setAttribute('data-disabled', '')
-      }
-
-      host.appendChild(button)
-
-      return () => {
-        button.removeEventListener('click', handleClick)
-        button.remove()
-      }
-    }
+    })
   }
+  return com(component)
 }
 
 /**
- * NumberField 组合组件
+ * NumberField preset props: root props plus per-part class hooks.
+ */
+export type NumberFieldProps = NumberFieldRootProps & {
+  inputClass?: string
+  inputStyle?: Record<string, string | number> | string
+  incrementClass?: string
+  incrementStyle?: Record<string, string | number> | string
+  decrementClass?: string
+  decrementStyle?: Record<string, string | number> | string
+  incrementChildren?: string
+  decrementChildren?: string
+}
+
+/**
+ * NumberField preset: root + input + steppers wired to one context.
  */
 export function createNumberField(): (
-  props?: NumberFieldRootProps & {
-    inputClass?: string
-    inputStyle?: Record<string, string | number> | string
-    incrementClass?: string
-    incrementStyle?: Record<string, string | number> | string
-    decrementClass?: string
-    decrementStyle?: Record<string, string | number> | string
-    incrementChildren?: string
-    decrementChildren?: string
-  }
+  props?: NumberFieldProps
 ) => Mountable<HTMLElement> {
   const Root = createNumberFieldRoot()
   const Input = createNumberFieldInput()
   const Increment = createNumberFieldIncrement()
   const Decrement = createNumberFieldDecrement()
 
-  return (
-    props?: NumberFieldRootProps & {
-      inputClass?: string
-      inputStyle?: Record<string, string | number> | string
-      incrementClass?: string
-      incrementStyle?: Record<string, string | number> | string
-      decrementClass?: string
-      decrementStyle?: Record<string, string | number> | string
-      incrementChildren?: string
-      decrementChildren?: string
-    }
-  ) => {
-    return (host: HTMLElement) => {
-      return Root({
-        value: props?.value,
-        defaultValue: props?.defaultValue,
-        min: props?.min,
-        max: props?.max,
-        step: props?.step,
-        formatOptions: props?.formatOptions,
-        locale: props?.locale,
-        disabled: props?.disabled,
-        required: props?.required,
-        name: props?.name,
-        onValueChange: props?.onValueChange,
-        class: props?.class,
-        style: props?.style,
-        children: (getContext) => (host: HTMLElement) => {
-          // Create an input wrapper div to properly contain the input and buttons
-          const wrapper = document.createElement('div')
-          wrapper.style.display = 'flex'
+  const component = (props?: NumberFieldProps) =>
+    Root({
+      value: props?.value,
+      defaultValue: props?.defaultValue,
+      min: props?.min,
+      max: props?.max,
+      step: props?.step,
+      formatOptions: props?.formatOptions,
+      locale: props?.locale,
+      disabled: props?.disabled,
+      required: props?.required,
+      name: props?.name,
+      onValueChange: props?.onValueChange,
+      class: props?.class,
+      style: props?.style,
+      children: (getContext) =>
+        div({
+          style: { display: 'flex' },
+          children: [
+            Input(
+              { class: props?.inputClass, style: props?.inputStyle },
+              getContext
+            ),
+            Decrement(
+              {
+                class: props?.decrementClass,
+                style: props?.decrementStyle,
+                children: props?.decrementChildren
+              },
+              getContext
+            ),
+            Increment(
+              {
+                class: props?.incrementClass,
+                style: props?.incrementStyle,
+                children: props?.incrementChildren
+              },
+              getContext
+            )
+          ]
+        })
+    })
 
-          // Create input element
-          const inputHost = document.createElement('div')
-          const inputUnmount = Input(
-            {
-              class: props?.inputClass,
-              style: props?.inputStyle
-            },
-            getContext
-          )(inputHost, undefined)
-
-          // Create decrement button
-          const decrementHost = document.createElement('div')
-          const decrementUnmount = Decrement(
-            {
-              class: props?.decrementClass,
-              style: props?.decrementStyle,
-              children: props?.decrementChildren
-            },
-            getContext
-          )(decrementHost, undefined)
-
-          // Create increment button
-          const incrementHost = document.createElement('div')
-          const incrementUnmount = Increment(
-            {
-              class: props?.incrementClass,
-              style: props?.incrementStyle,
-              children: props?.incrementChildren
-            },
-            getContext
-          )(incrementHost, undefined)
-
-          // Append all elements in the right order
-          wrapper.appendChild(inputHost)
-          wrapper.appendChild(decrementHost)
-          wrapper.appendChild(incrementHost)
-
-          host.appendChild(wrapper)
-
-          return () => {
-            inputUnmount?.()
-            incrementUnmount?.()
-            decrementUnmount?.()
-            wrapper.remove()
-          }
-        }
-      })(host, undefined)
-    }
-  }
+  return com(component)
 }
 
 export const numberField = createNumberField()

@@ -1,12 +1,17 @@
 /**
- * TagsInput - 标签输入组件
+ * TagsInput - multi-tag input.
  *
- * 多标签输入组件，支持添加、删除和编辑标签。
- * 采用 Root + Input + Item + ItemText + ItemDelete 组合模式。
+ * Root + Input + Item + ItemText + ItemDelete composition. Composed on
+ * @rasenjs/dom element factories: value and focus are runtime refs exposed
+ * through getter-backed context properties, so items update reactively
+ * instead of being patched attribute-by-attribute after every change.
  */
 import type { Mountable } from '@rasenjs/core'
+import { com, getReactiveRuntime } from '@rasenjs/core'
+import { div, span, button, input as inputEl } from '@rasenjs/dom'
 
 export interface TagsInputContext {
+  /** Reactive reads (property getters; read them inside bindings). */
   value: string[]
   disabled: boolean
   max: number | undefined
@@ -66,445 +71,348 @@ export interface TagsInputItemDeleteProps {
 }
 
 /**
- * 创建 TagsInput Root 组件
+ * Create the TagsInput Root component.
  */
 export function createTagsInputRoot(): (
   props?: TagsInputRootProps
 ) => Mountable<HTMLElement> {
-  return (props?: TagsInputRootProps) => {
-    return (host: HTMLElement) => {
-      const root = document.createElement('div')
-      root.setAttribute('role', 'listbox')
-      root.setAttribute('aria-label', 'Tags')
-      root.setAttribute('aria-multiselectable', 'true')
-      root.tabIndex = 0
+  const component = (props?: TagsInputRootProps) => {
+    const rt = getReactiveRuntime()
 
-      const disabled = props?.disabled ?? false
-      const max = props?.max
-      const delimiter = props?.delimiter ?? 'Enter'
-      const addOnPaste = props?.addOnPaste ?? false
-      const addOnBlur = props?.addOnBlur ?? false
-      const allowCustomValue = props?.allowCustomValue ?? true
+    const disabled = props?.disabled ?? false
+    const max = props?.max
+    const delimiter = props?.delimiter ?? 'Enter'
+    const addOnPaste = props?.addOnPaste ?? false
+    const addOnBlur = props?.addOnBlur ?? false
+    const allowCustomValue = props?.allowCustomValue ?? true
 
-      const isControlled = props?.value !== undefined
-      let internalValue: string[] = props?.value ?? props?.defaultValue ?? []
-      let focusedIndex: number | null = null
+    const isControlled = props?.value !== undefined
+    const internalValue = rt.ref<string[]>(
+      props?.value ?? props?.defaultValue ?? []
+    )
+    const focused = rt.ref<number | null>(null)
 
-      const updateValue = (newValue: string[]) => {
-        if (!isControlled) {
-          internalValue = newValue
+    const currentValue = (): string[] =>
+      isControlled ? (props?.value ?? []) : rt.unref(internalValue)
+
+    const updateValue = (newValue: string[]): void => {
+      if (!isControlled) {
+        rt.setValue(internalValue, newValue)
+      }
+      props?.onValueChange?.(newValue)
+    }
+
+    const addTag = (tag: string): void => {
+      const trimmed = tag.trim()
+      if (!trimmed || disabled) return
+      const value = currentValue()
+      if (max !== undefined && value.length >= max) return
+      if (!allowCustomValue) return
+      updateValue([...value, trimmed])
+    }
+
+    const removeTag = (index: number): void => {
+      if (disabled) return
+      const value = currentValue()
+      if (index < 0 || index >= value.length) return
+      const next = [...value]
+      next.splice(index, 1)
+      updateValue(next)
+
+      const focusedIndex = rt.unref(focused)
+      if (focusedIndex !== null) {
+        if (index < focusedIndex) {
+          rt.setValue(focused, focusedIndex - 1)
+        } else if (index === focusedIndex) {
+          rt.setValue(focused, next.length === 0 ? null : Math.max(0, next.length - 1))
         }
-        props?.onValueChange?.(newValue)
-      }
-
-      const setFocusedIndex = (index: number | null) => {
-        focusedIndex = index
-      }
-
-      const addTag = (tag: string) => {
-        const trimmedTag = tag.trim()
-        if (!trimmedTag) return
-        if (disabled) return
-        const currentValue = isControlled ? (props?.value ?? []) : internalValue
-        if (max !== undefined && currentValue.length >= max) return
-        if (!allowCustomValue && !currentValue.includes(trimmedTag)) return
-
-        const newValue = [...currentValue, trimmedTag]
-        if (!isControlled) {
-          internalValue = newValue
-        }
-        props?.onValueChange?.(newValue)
-      }
-
-      const removeTag = (index: number) => {
-        if (disabled) return
-        const currentValue = isControlled ? (props?.value ?? []) : internalValue
-        const newValue = [...currentValue]
-        newValue.splice(index, 1)
-        if (!isControlled) {
-          internalValue = newValue
-        }
-        props?.onValueChange?.(newValue)
-
-        if (focusedIndex !== null) {
-          if (index < focusedIndex) {
-            focusedIndex--
-          } else if (index === focusedIndex) {
-            focusedIndex = Math.max(0, newValue.length - 1)
-            if (newValue.length === 0) {
-              focusedIndex = null
-            }
-          }
-        }
-      }
-
-      const context: TagsInputContext = {
-        get value() {
-          return isControlled ? (props?.value ?? []) : internalValue
-        },
-        get disabled() {
-          return disabled
-        },
-        get max() {
-          return max
-        },
-        get delimiter() {
-          return delimiter
-        },
-        get addOnPaste() {
-          return addOnPaste
-        },
-        get addOnBlur() {
-          return addOnBlur
-        },
-        get allowCustomValue() {
-          return allowCustomValue
-        },
-        get focusedIndex() {
-          return focusedIndex
-        },
-        updateValue,
-        setFocusedIndex,
-        addTag,
-        removeTag
-      }
-
-      const getContext = (): TagsInputContext | undefined => context
-
-      if (props?.class) root.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(root.style, props.style)
-        }
-      }
-
-      if (disabled) {
-        root.setAttribute('aria-disabled', 'true')
-        root.setAttribute('data-disabled', '')
-      }
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children(getContext)(root, undefined)
-      }
-
-      host.appendChild(root)
-
-      return () => {
-        childUnmount?.()
-        root.remove()
       }
     }
+
+    const context: TagsInputContext = {
+      get value() {
+        return currentValue()
+      },
+      get disabled() {
+        return disabled
+      },
+      get max() {
+        return max
+      },
+      get delimiter() {
+        return delimiter
+      },
+      get addOnPaste() {
+        return addOnPaste
+      },
+      get addOnBlur() {
+        return addOnBlur
+      },
+      get allowCustomValue() {
+        return allowCustomValue
+      },
+      get focusedIndex() {
+        return rt.unref(focused)
+      },
+      updateValue,
+      setFocusedIndex: (index) => rt.setValue(focused, index),
+      addTag,
+      removeTag
+    }
+    const getContext = (): TagsInputContext => context
+
+    return div({
+      role: 'listbox',
+      'aria-label': 'Tags',
+      'aria-multiselectable': 'true',
+      'aria-disabled': disabled ? 'true' : undefined,
+      'data-disabled': disabled ? '' : undefined,
+      tabIndex: 0,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children(getContext)] : undefined
+    })
   }
+  return com(component)
 }
 
 /**
- * 创建 TagsInput Input 组件
+ * Create the TagsInput Input component.
  */
 export function createTagsInputInput(): (
   props?: TagsInputInputProps,
   getContext?: () => TagsInputContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: TagsInputInputProps,
     getContext?: () => TagsInputContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const input = document.createElement('input')
-      input.type = 'text'
-      if (props?.placeholder) {
-        input.placeholder = props.placeholder
-      }
-
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLInputElement
       const ctx = getContext?.()
+      if (!ctx) return
 
-      if (props?.class) input.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(input.style, props.style)
-        }
-      }
-
-      if (ctx?.disabled) {
-        input.disabled = true
-        input.setAttribute('data-disabled', '')
-      }
-
-      const handleInput = (e: Event) => {
-        const target = e.target as HTMLInputElement
-        const context = getContext?.()
-        if (!context) return
-
-        const inputValue = target.value
-        const delim = context.delimiter
-
-        if (delim && delim !== 'Enter') {
-          const parts = inputValue.split(delim)
-          if (parts.length > 1) {
-            for (const part of parts) {
-              const trimmed = part.trim()
-              if (trimmed) {
-                context.addTag(trimmed)
-              }
-            }
-            target.value = ''
+      const delim = ctx.delimiter
+      if (delim && delim !== 'Enter') {
+        const parts = target.value.split(delim)
+        if (parts.length > 1) {
+          for (const part of parts) {
+            const trimmed = part.trim()
+            if (trimmed) ctx.addTag(trimmed)
           }
+          target.value = ''
         }
-      }
-
-      const handleKeyDown = (e: KeyboardEvent) => {
-        const context = getContext?.()
-        if (!context) return
-
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          const inputValue = input.value.trim()
-          if (inputValue) {
-            context.addTag(inputValue)
-            input.value = ''
-          }
-          return
-        }
-
-        if (e.key === 'Backspace') {
-          const inputValue = input.value
-          if (inputValue === '' && context.value.length > 0) {
-            e.preventDefault()
-            context.setFocusedIndex(context.value.length - 1)
-            const rootEl = input.closest('[role="listbox"]')
-            if (rootEl) {
-              ;(rootEl as HTMLElement).focus()
-            }
-          }
-          return
-        }
-      }
-
-      const handlePaste = (e: ClipboardEvent) => {
-        const context = getContext?.()
-        if (!context) return
-
-        if (context.addOnPaste) {
-          e.preventDefault()
-          const pastedText = e.clipboardData?.getData('text') ?? ''
-          const tags = pastedText.split(/[\s,;]+/).filter((t) => t.trim())
-          for (const tag of tags) {
-            context.addTag(tag.trim())
-          }
-          input.value = ''
-        }
-      }
-
-      const handleBlur = (e: FocusEvent) => {
-        const context = getContext?.()
-        if (!context) return
-
-        const relatedTarget = e.relatedTarget as HTMLElement | null
-        const rootEl = input.closest('[role="listbox"]')
-        if (relatedTarget && rootEl && rootEl.contains(relatedTarget)) {
-          return
-        }
-
-        if (context.addOnBlur) {
-          const inputValue = input.value.trim()
-          if (inputValue) {
-            context.addTag(inputValue)
-            input.value = ''
-          }
-        }
-      }
-
-      input.addEventListener('input', handleInput)
-      input.addEventListener('keydown', handleKeyDown)
-      input.addEventListener('paste', handlePaste)
-      input.addEventListener('blur', handleBlur)
-
-      host.appendChild(input)
-
-      return () => {
-        input.removeEventListener('input', handleInput)
-        input.removeEventListener('keydown', handleKeyDown)
-        input.removeEventListener('paste', handlePaste)
-        input.removeEventListener('blur', handleBlur)
-        input.remove()
       }
     }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const ctx = getContext?.()
+      if (!ctx) return
+
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        const inputValue = (e.target as HTMLInputElement).value.trim()
+        if (inputValue) {
+          ctx.addTag(inputValue)
+          ;(e.target as HTMLInputElement).value = ''
+        }
+        return
+      }
+
+      if (e.key === 'Backspace') {
+        const inputValue = (e.target as HTMLInputElement).value
+        if (inputValue === '' && ctx.value.length > 0) {
+          e.preventDefault()
+          ctx.setFocusedIndex(ctx.value.length - 1)
+          const rootEl = (e.target as HTMLElement).closest('[role="listbox"]')
+          if (rootEl) (rootEl as HTMLElement).focus()
+        }
+      }
+    }
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const ctx = getContext?.()
+      if (!ctx) return
+      if (!ctx.addOnPaste) return
+
+      e.preventDefault()
+      const pasted = e.clipboardData?.getData('text') ?? ''
+      for (const tag of pasted.split(/[\s,;]+/)) {
+        const trimmed = tag.trim()
+        if (trimmed) ctx.addTag(trimmed)
+      }
+      ;(e.target as HTMLInputElement).value = ''
+    }
+
+    const handleBlur = (e: FocusEvent) => {
+      const ctx = getContext?.()
+      if (!ctx) return
+
+      const target = e.target as HTMLInputElement
+      const related = e.relatedTarget as HTMLElement | null
+      const rootEl = target.closest('[role="listbox"]')
+      if (related && rootEl && rootEl.contains(related)) return
+
+      if (ctx.addOnBlur) {
+        const inputValue = target.value.trim()
+        if (inputValue) {
+          ctx.addTag(inputValue)
+          target.value = ''
+        }
+      }
+    }
+
+    return inputEl({
+      type: 'text',
+      placeholder: props?.placeholder,
+      disabled: () => getContext?.()?.disabled ?? false,
+      'data-disabled': () => (getContext?.()?.disabled ? '' : undefined),
+      class: props?.class,
+      style: props?.style,
+      onInput: handleInput,
+      onKeyDown: handleKeyDown,
+      onPaste: handlePaste,
+      onBlur: handleBlur
+    })
   }
+  return com(component)
 }
 
 /**
- * 创建 TagsInput Item 组件
+ * Create the TagsInput Item component.
  */
 export function createTagsInputItem(): (
   props?: TagsInputItemProps,
   getContext?: () => TagsInputContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: TagsInputItemProps,
     getContext?: () => TagsInputContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      if (!props?.value) {
-        return () => {}
-      }
-
-      const item = document.createElement('span')
-      item.setAttribute('role', 'option')
-      item.setAttribute('data-value', props.value)
-      item.setAttribute('data-index', String(props.index))
-      item.tabIndex = -1
-
-      if (props?.class) item.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(item.style, props.style)
-        }
-      }
-
-      const updateState = () => {
-        const context = getContext?.()
-        const isSelected = context?.focusedIndex === props.index
-        item.setAttribute('data-state', isSelected ? 'selected' : 'unselected')
-        item.setAttribute('aria-selected', String(isSelected))
-        if (isSelected) {
-          item.focus()
-        }
-      }
-
-      updateState()
-
-      const handleClick = () => {
-        const context = getContext?.()
-        if (!context) return
-        context.setFocusedIndex(props.index)
-      }
-
-      item.addEventListener('click', handleClick)
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children && getContext) {
-        childUnmount = props.children(getContext)(item, undefined)
-      }
-
-      host.appendChild(item)
-
-      return () => {
-        item.removeEventListener('click', handleClick)
-        childUnmount?.()
-        item.remove()
-      }
+    if (!props?.value) {
+      return () => undefined
     }
+
+    const ctx = getContext?.()
+    const isSelected = (): boolean => ctx?.focusedIndex === props.index
+
+    return span({
+      role: 'option',
+      'data-value': props.value,
+      'data-index': String(props.index),
+      'aria-selected': () => String(isSelected()),
+      'data-state': () => (isSelected() ? 'selected' : 'unselected'),
+      tabIndex: -1,
+      class: props?.class,
+      style: props?.style,
+      children: [
+        (el: HTMLElement) => {
+          // Moving focus is an element-level effect: focus the item while it
+          // is the selected one.
+          const stop = ctx
+            ? getReactiveRuntime().subscribe(
+                () => ctx.focusedIndex,
+                () => {
+                  if (isSelected()) el.focus()
+                }
+              )
+            : undefined
+          if (isSelected()) el.focus()
+
+          const unmount = props.children
+            ? props.children(getContext ?? (() => undefined))(el, undefined)
+            : undefined
+          return () => {
+            stop?.()
+            unmount?.()
+          }
+        }
+      ],
+      onClick: () => ctx?.setFocusedIndex(props.index)
+    })
   }
+  return com(component)
 }
 
 /**
- * 创建 TagsInput ItemText 组件
+ * Create the TagsInput ItemText component.
  */
 export function createTagsInputItemText(): (
   props?: TagsInputItemTextProps,
   getContext?: () => TagsInputContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
-    props?: TagsInputItemTextProps,
-    _getContext?: () => TagsInputContext | undefined
-  ) => {
-    return (host: HTMLElement) => {
-      const text = document.createElement('span')
-
-      if (props?.class) text.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(text.style, props.style)
-        }
-      }
-
-      host.appendChild(text)
-
-      return () => {
-        text.remove()
-      }
-    }
-  }
+  const component = (props?: TagsInputItemTextProps) =>
+    span({
+      class: props?.class,
+      style: props?.style
+    })
+  return com(component)
 }
 
 /**
- * 创建 TagsInput ItemDelete 组件
+ * Create the TagsInput ItemDelete component.
  */
 export function createTagsInputItemDelete(): (
   props?: TagsInputItemDeleteProps,
   getContext?: () => TagsInputContext | undefined
-) => Mountable<HTMLButtonElement> {
-  return (
+) => Mountable<HTMLElement> {
+  const component = (
     props?: TagsInputItemDeleteProps,
     getContext?: () => TagsInputContext | undefined
   ) => {
-    return (host: HTMLButtonElement) => {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.setAttribute('aria-label', 'Remove tag')
-      button.tabIndex = -1
+    const ctx = getContext?.()
 
-      if (props?.children) {
-        button.textContent = props.children
-      } else {
-        button.textContent = '×'
-      }
-
-      if (props?.class) button.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(button.style, props.style)
+    return button({
+      type: 'button',
+      'aria-label': 'Remove tag',
+      tabIndex: -1,
+      disabled: () => ctx?.disabled ?? false,
+      'data-disabled': () => (ctx?.disabled ? '' : undefined),
+      class: props?.class,
+      style: props?.style,
+      children: [
+        (el: HTMLElement) => {
+          el.textContent = props?.children ?? '×'
+          return undefined
         }
-      }
-
-      const ctx = getContext?.()
-      if (ctx?.disabled) {
-        button.disabled = true
-        button.setAttribute('data-disabled', '')
-      }
-
-      const handleClick = (e: Event) => {
+      ],
+      onClick: (e: Event) => {
         e.stopPropagation()
-        const context = getContext?.()
-        if (!context) return
-
-        const item = button.closest('[data-index]')
-        if (item) {
-          const index = parseInt(item.getAttribute('data-index') ?? '-1', 10)
-          if (index >= 0) {
-            context.removeTag(index)
-          }
-        }
+        const current = getContext?.()
+        if (!current) return
+        const item = (e.target as HTMLElement).closest('[data-index]')
+        if (!item) return
+        const index = parseInt(item.getAttribute('data-index') ?? '-1', 10)
+        if (index >= 0) current.removeTag(index)
       }
-
-      button.addEventListener('click', handleClick)
-
-      host.appendChild(button)
-
-      return () => {
-        button.removeEventListener('click', handleClick)
-        button.remove()
-      }
-    }
+    })
   }
+  return com(component)
+}
+
+export type TagsInputProps = TagsInputRootProps & {
+  inputClass?: string
+  inputStyle?: Record<string, string | number> | string
+  inputPlaceholder?: string
+  itemClass?: string
+  itemStyle?: Record<string, string | number> | string
+  itemTextClass?: string
+  itemTextStyle?: Record<string, string | number> | string
+  itemDeleteClass?: string
+  itemDeleteStyle?: Record<string, string | number> | string
+  itemDeleteChildren?: string
 }
 
 /**
- * TagsInput 组合组件
+ * TagsInput preset: root + input + items from the current value.
+ *
+ * Items are rendered from the value at mount; the input's own add/remove
+ * path updates the value and the focused index, and `each`-style
+ * reconciliation is intentionally left out for now (the parts above are
+ * reactive, the preset's list is not).
  */
 export function createTagsInput(): (
-  props?: TagsInputRootProps & {
-    inputClass?: string
-    inputStyle?: Record<string, string | number> | string
-    inputPlaceholder?: string
-    itemClass?: string
-    itemStyle?: Record<string, string | number> | string
-    itemTextClass?: string
-    itemTextStyle?: Record<string, string | number> | string
-    itemDeleteClass?: string
-    itemDeleteStyle?: Record<string, string | number> | string
-    itemDeleteChildren?: string
-  }
+  props?: TagsInputProps
 ) => Mountable<HTMLElement> {
   const Root = createTagsInputRoot()
   const Input = createTagsInputInput()
@@ -512,186 +420,127 @@ export function createTagsInput(): (
   const ItemText = createTagsInputItemText()
   const ItemDelete = createTagsInputItemDelete()
 
-  return (props) => {
-    return (host: HTMLElement) => {
-      return Root({
-        value: props?.value,
-        defaultValue: props?.defaultValue,
-        onValueChange: props?.onValueChange,
-        max: props?.max,
-        delimiter: props?.delimiter,
-        addOnPaste: props?.addOnPaste,
-        addOnBlur: props?.addOnBlur,
-        allowCustomValue: props?.allowCustomValue,
-        disabled: props?.disabled,
-        class: props?.class,
-        style: props?.style,
-        children: (getContext) => (root: HTMLElement) => {
-          const unmounts: (() => void)[] = []
-          const context = getContext()
-          if (!context) {
-            return () => {}
-          }
+  const component = (props?: TagsInputProps) =>
+    Root({
+      value: props?.value,
+      defaultValue: props?.defaultValue,
+      onValueChange: props?.onValueChange,
+      max: props?.max,
+      delimiter: props?.delimiter,
+      addOnPaste: props?.addOnPaste,
+      addOnBlur: props?.addOnBlur,
+      allowCustomValue: props?.allowCustomValue,
+      disabled: props?.disabled,
+      class: props?.class,
+      style: props?.style,
+      children: (getContext) => (root: HTMLElement) => {
+        const ctx = getContext()
+        if (!ctx) return () => undefined
 
-          const items = context.value
-          for (let i = 0; i < items.length; i++) {
-            const itemHost = document.createElement('span')
-            const itemUnmount = Item(
-              {
-                value: items[i],
-                index: i,
-                class: props?.itemClass,
-                style: props?.itemStyle,
-                children: (getCtx) => (item: HTMLElement) => {
-                  const innerUnmounts: (() => void)[] = []
+        const unmounts: (() => void)[] = []
 
-                  const textHost = document.createElement('span')
-                  const textUnmount = ItemText(
-                    {
-                      class: props?.itemTextClass,
-                      style: props?.itemTextStyle
-                    },
-                    getCtx
-                  )(textHost, undefined)
-                  textHost.textContent = items[i]
-                  item.appendChild(textHost)
-                  if (textUnmount) innerUnmounts.push(textUnmount)
-
-                  const deleteHost = document.createElement('button')
-                  const deleteUnmount = ItemDelete(
-                    {
-                      class: props?.itemDeleteClass,
-                      style: props?.itemDeleteStyle,
-                      children: props?.itemDeleteChildren
-                    },
-                    getCtx
-                  )(deleteHost, undefined)
-                  item.appendChild(deleteHost)
-                  if (deleteUnmount) innerUnmounts.push(deleteUnmount)
-
-                  return () => {
-                    for (const unmount of innerUnmounts) {
-                      unmount()
-                    }
-                  }
-                }
-              },
-              getContext
-            )(itemHost, undefined)
-            root.appendChild(itemHost)
-            if (itemUnmount) unmounts.push(itemUnmount)
-          }
-
-          const updateItemStates = () => {
-            const focusedIdx = context.focusedIndex
-            const itemEls = root.querySelectorAll('[role="option"]')
-            itemEls.forEach((el, idx) => {
-              const isSelected = idx === focusedIdx
-              el.setAttribute(
-                'data-state',
-                isSelected ? 'selected' : 'unselected'
-              )
-              el.setAttribute('aria-selected', String(isSelected))
-              if (isSelected) {
-                ;(el as HTMLElement).focus()
-              }
-            })
-          }
-
-          const inputHost = document.createElement('div')
-          const inputUnmount = Input(
+        ctx.value.forEach((tag, index) => {
+          const itemHost = document.createElement('span')
+          const itemUnmount = Item(
             {
-              class: props?.inputClass,
-              style: props?.inputStyle,
-              placeholder: props?.inputPlaceholder
+              value: tag,
+              index,
+              class: props?.itemClass,
+              style: props?.itemStyle,
+              children: (getCtx) => (item: HTMLElement) => {
+                const textEl = ItemText(
+                  {
+                    class: props?.itemTextClass,
+                    style: props?.itemTextStyle
+                  },
+                  getCtx
+                )(item, undefined)
+                if (typeof textEl === 'function') unmounts.push(textEl)
+
+                const deleteEl = ItemDelete(
+                  {
+                    class: props?.itemDeleteClass,
+                    style: props?.itemDeleteStyle,
+                    children: props?.itemDeleteChildren
+                  },
+                  getCtx
+                )(item, undefined)
+                if (typeof deleteEl === 'function') unmounts.push(deleteEl)
+
+                return undefined
+              }
             },
             getContext
-          )(inputHost, undefined)
-          root.appendChild(inputHost)
-          if (inputUnmount) unmounts.push(inputUnmount)
+          )(itemHost, undefined)
+          if (typeof itemUnmount === 'function') unmounts.push(itemUnmount)
+          root.appendChild(itemHost)
+        })
 
-          const originalSetFocusedIndex = context.setFocusedIndex
-          context.setFocusedIndex = (index: number | null) => {
-            originalSetFocusedIndex(index)
-            updateItemStates()
-          }
+        const inputElHost = document.createElement('span')
+        const inputUnmount = Input(
+          {
+            class: props?.inputClass,
+            style: props?.inputStyle,
+            placeholder: props?.inputPlaceholder
+          },
+          getContext
+        )(inputElHost, undefined)
+        if (typeof inputUnmount === 'function') unmounts.push(inputUnmount)
+        root.appendChild(inputElHost)
 
-          const originalRemoveTag = context.removeTag
-          context.removeTag = (index: number) => {
-            originalRemoveTag(index)
-            // Remove the item element from DOM
-            const itemEls = root.querySelectorAll('[role="option"]')
-            const itemEl = itemEls[index]
-            if (itemEl) {
-              itemEl.closest('[data-index]')?.remove()
+        const handleKeyDown = (e: KeyboardEvent): void => {
+          const current = getContext()
+          if (!current) return
+
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault()
+            if (current.focusedIndex === null) {
+              current.setFocusedIndex(current.value.length - 1)
+            } else if (current.focusedIndex > 0) {
+              current.setFocusedIndex(current.focusedIndex - 1)
             }
-            // Update remaining item states
-            updateItemStates()
+            return
           }
 
-          const handleKeyDown = (e: KeyboardEvent) => {
-            const ctx = getContext()
-            if (!ctx) return
-
-            if (e.key === 'ArrowLeft') {
-              e.preventDefault()
-              if (ctx.focusedIndex === null) {
-                ctx.setFocusedIndex(ctx.value.length - 1)
-              } else if (ctx.focusedIndex > 0) {
-                ctx.setFocusedIndex(ctx.focusedIndex - 1)
+          if (e.key === 'ArrowRight') {
+            e.preventDefault()
+            if (current.focusedIndex !== null) {
+              if (current.focusedIndex < current.value.length - 1) {
+                current.setFocusedIndex(current.focusedIndex + 1)
+              } else {
+                current.setFocusedIndex(null)
+                root.querySelector('input')?.focus()
               }
-              return
             }
-
-            if (e.key === 'ArrowRight') {
-              e.preventDefault()
-              if (ctx.focusedIndex !== null) {
-                if (ctx.focusedIndex < ctx.value.length - 1) {
-                  ctx.setFocusedIndex(ctx.focusedIndex + 1)
-                } else {
-                  ctx.setFocusedIndex(null)
-                  const input = root.querySelector('input')
-                  input?.focus()
-                }
-              }
-              return
-            }
-
-            if (e.key === 'Delete' && ctx.focusedIndex !== null) {
-              e.preventDefault()
-              ctx.removeTag(ctx.focusedIndex)
-              return
-            }
-
-            if (e.key === 'Backspace' && ctx.focusedIndex !== null) {
-              e.preventDefault()
-              ctx.removeTag(ctx.focusedIndex)
-              return
-            }
-
-            if (e.key === 'Escape') {
-              e.preventDefault()
-              ctx.setFocusedIndex(null)
-              const input = root.querySelector('input')
-              input?.focus()
-              return
-            }
+            return
           }
 
-          root.addEventListener('keydown', handleKeyDown)
-          unmounts.push(() =>
-            root.removeEventListener('keydown', handleKeyDown)
-          )
+          if (
+            (e.key === 'Delete' || e.key === 'Backspace') &&
+            current.focusedIndex !== null
+          ) {
+            e.preventDefault()
+            current.removeTag(current.focusedIndex)
+            return
+          }
 
-          return () => {
-            for (const unmount of unmounts) {
-              unmount()
-            }
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            current.setFocusedIndex(null)
+            root.querySelector('input')?.focus()
           }
         }
-      })(host, undefined)
-    }
-  }
+
+        root.addEventListener('keydown', handleKeyDown)
+        unmounts.push(() => root.removeEventListener('keydown', handleKeyDown))
+
+        return () => {
+          for (const unmount of unmounts) unmount()
+        }
+      }
+    })
+
+  return com(component)
 }
 
 export const tagsInput = createTagsInput()

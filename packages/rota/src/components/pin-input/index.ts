@@ -1,10 +1,14 @@
 /**
- * PinInput - PIN/验证码输入组件
+ * PinInput - one-time-code / PIN input.
  *
- * 一次性密码输入组件，常用于验证码输入。
- * 支持键盘导航、粘贴、OTP 自动填充。
+ * Keyboard navigation, paste distribution and OTP autofill. Composed on
+ * @rasenjs/dom element factories: value and focus index are runtime refs
+ * exposed through getter-backed context properties, so each cell's value and
+ * selection update reactively.
  */
 import type { Mountable } from '@rasenjs/core'
+import { com, getReactiveRuntime } from '@rasenjs/core'
+import { div, input as inputEl } from '@rasenjs/dom'
 
 export type PinInputType = 'numeric' | 'alphanumeric' | 'text'
 
@@ -43,332 +47,233 @@ export interface PinInputInputProps {
 }
 
 /**
- * 验证字符是否符合类型要求
+ * Check whether a character is allowed for the given input type.
  */
 function isValidChar(char: string, type: PinInputType): boolean {
   if (type === 'numeric') return /^\d$/.test(char)
   if (type === 'alphanumeric') return /^[a-zA-Z0-9]$/.test(char)
-  return true // text 允许任何单字符
+  return true
 }
 
 /**
- * 创建 PinInput Root 组件
+ * Create the PinInput Root component.
  */
 export function createPinInputRoot(): (
   props?: PinInputRootProps
 ) => Mountable<HTMLElement> {
-  return (props?: PinInputRootProps) => {
-    return (host: HTMLElement) => {
-      const root = document.createElement('div')
-      root.role = 'group'
+  const component = (props?: PinInputRootProps) => {
+    const rt = getReactiveRuntime()
 
-      const length = props?.length ?? 4
-      const type = props?.type ?? 'numeric'
-      const disabled = props?.disabled ?? false
+    const length = props?.length ?? 4
+    const type = props?.type ?? 'numeric'
+    const disabled = props?.disabled ?? false
 
-      // 状态管理
-      const isControlled = props?.value !== undefined
-      let internalValue = props?.value ?? props?.defaultValue ?? ''
-      let internalFocusedIndex = 0
+    const isControlled = props?.value !== undefined
+    const internalValue = rt.ref(props?.value ?? props?.defaultValue ?? '')
+    const focused = rt.ref(0)
 
-      // 确保 value 长度正确
-      const normalizeValue = (val: string): string => {
-        return val.slice(0, length).padEnd(length, '')
+    const normalizeValue = (val: string): string => val.slice(0, length)
+
+    const currentValue = (): string =>
+      normalizeValue(isControlled ? (props?.value ?? '') : rt.unref(internalValue))
+
+    const setValue = (newValue: string): void => {
+      const normalized = normalizeValue(newValue)
+      if (!isControlled) {
+        rt.setValue(internalValue, normalized)
       }
-
-      // 更新值
-      const setValue = (newValue: string) => {
-        const normalized = normalizeValue(newValue)
-
-        if (!isControlled) {
-          internalValue = normalized
-        }
-
-        props?.onValueChange?.(normalized)
-
-        // 检查是否完成
-        if (normalized.length === length && !normalized.includes('')) {
-          props?.onComplete?.(normalized)
-        }
-      }
-
-      // 设置焦点索引
-      const setFocusedIndex = (index: number) => {
-        internalFocusedIndex = Math.max(0, Math.min(length - 1, index))
-      }
-
-      // Context
-      const context: PinInputContext = {
-        get value() {
-          return isControlled ? (props?.value ?? '') : internalValue
-        },
-        get length() {
-          return length
-        },
-        get type() {
-          return type
-        },
-        get disabled() {
-          return disabled
-        },
-        get focusedIndex() {
-          return internalFocusedIndex
-        },
-        setValue,
-        setFocusedIndex
-      }
-
-      const getContext = (): PinInputContext | undefined => context
-
-      // 应用样式
-      if (props?.class) root.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(root.style, props.style)
-        }
-      }
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children(getContext)(root, undefined)
-      }
-
-      host.appendChild(root)
-
-      return () => {
-        childUnmount?.()
-        root.remove()
+      props?.onValueChange?.(normalized)
+      if (normalized.length === length) {
+        props?.onComplete?.(normalized)
       }
     }
+
+    const context: PinInputContext = {
+      get value() {
+        return currentValue()
+      },
+      get length() {
+        return length
+      },
+      get type() {
+        return type
+      },
+      get disabled() {
+        return disabled
+      },
+      get otp() {
+        return props?.otp
+      },
+      get focusedIndex() {
+        return rt.unref(focused)
+      },
+      setValue,
+      setFocusedIndex: (index) =>
+        rt.setValue(focused, Math.max(0, Math.min(length - 1, index)))
+    }
+    const getContext = (): PinInputContext => context
+
+    return div({
+      role: 'group',
+      'data-disabled': disabled ? '' : undefined,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children(getContext)] : undefined
+    })
   }
+  return com(component)
 }
 
 /**
- * 创建 PinInput Input 组件
+ * Create the PinInput Input component (one cell).
  */
 export function createPinInputInput(): (
   props?: PinInputInputProps,
   getContext?: () => PinInputContext | undefined
-) => Mountable<HTMLInputElement> {
-  return (
+) => Mountable<HTMLElement> {
+  const component = (
     props?: PinInputInputProps,
     getContext?: () => PinInputContext | undefined
   ) => {
-    return (host: HTMLInputElement) => {
-      const input = document.createElement('input')
-      input.type = 'text'
-      input.maxLength = 1
-      input.inputMode = getContext?.()?.type === 'numeric' ? 'numeric' : 'text'
+    const index = props?.index ?? 0
+    const ctx = getContext?.()
 
-      const index = props?.index ?? 0
-      const ctx = getContext?.()
+    /**
+     * Cells are siblings of the root, so navigation resolves the cell list
+     * from the enclosing group at event time.
+     */
+    const cellAt = (el: HTMLElement, at: number): HTMLInputElement | null => {
+      const root = el.closest('[role="group"]') ?? el.parentElement
+      return (
+        (root?.querySelectorAll('input')[at] as HTMLInputElement | undefined) ??
+        null
+      )
+    }
 
-      // 设置初始值
-      if (ctx) {
-        const value = ctx.value
-        if (value[index]) {
-          input.value = value[index]
-        }
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLInputElement
+      const current = getContext?.()
+      if (!current) return
+
+      const char = target.value
+      if (!char) return
+      if (!isValidChar(char, current.type)) {
+        target.value = ''
+        return
       }
 
-      // 设置占位符
-      if (ctx?.type === 'numeric') {
-        input.placeholder = '•'
-      } else {
-        input.placeholder = '_'
-      }
+      const value = current.value
+      const next =
+        value.slice(0, index) + char + value.slice(index + 1)
+      current.setValue(next)
 
-      // 设置 aria-label
-      input.setAttribute('aria-label', `Digit ${index + 1}`)
-
-      // OTP 支持
-      if (ctx?.otp && index === 0) {
-        input.setAttribute('autocomplete', 'one-time-code')
-      }
-
-      // 应用样式
-      if (props?.class) input.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(input.style, props.style)
-        }
-      }
-
-      // 禁用状态
-      if (ctx?.disabled) {
-        input.disabled = true
-        input.setAttribute('data-disabled', '')
-      }
-
-      // 输入处理
-      const handleInput = (e: Event) => {
-        const target = e.target as HTMLInputElement
-        const ctx = getContext?.()
-        if (!ctx) return
-
-        const char = target.value
-        if (!char) return
-
-        // 验证字符
-        if (!isValidChar(char, ctx.type)) {
-          target.value = ''
-          return
-        }
-
-        // 更新值
-        const currentValue = ctx.value
-        const newValue =
-          currentValue.slice(0, index) + char + currentValue.slice(index + 1)
-        ctx.setValue(newValue)
-
-        // 移到下一个输入框
-        if (index < ctx.length - 1) {
-          ctx.setFocusedIndex(index + 1)
-          const nextInput = host.parentElement?.querySelectorAll('input')[
-            index + 1
-          ] as HTMLInputElement
-          nextInput?.focus()
-        }
-      }
-
-      // 键盘处理
-      const handleKeyDown = (e: KeyboardEvent) => {
-        const ctx = getContext?.()
-        if (!ctx) return
-
-        switch (e.key) {
-          case 'Backspace':
-            e.preventDefault()
-            const currentValue = ctx.value
-            if (currentValue[index]) {
-              // 删除当前字符
-              const newValue =
-                currentValue.slice(0, index) + currentValue.slice(index + 1)
-              ctx.setValue(newValue)
-            } else if (index > 0) {
-              // 移到上一个并删除
-              ctx.setFocusedIndex(index - 1)
-              const prevInput = host.parentElement?.querySelectorAll('input')[
-                index - 1
-              ] as HTMLInputElement
-              prevInput?.focus()
-
-              const newValue =
-                currentValue.slice(0, index - 1) + currentValue.slice(index)
-              ctx.setValue(newValue)
-            }
-            break
-
-          case 'Delete':
-            e.preventDefault()
-            if (ctx.value[index]) {
-              const newValue =
-                ctx.value.slice(0, index) + ctx.value.slice(index + 1)
-              ctx.setValue(newValue)
-            }
-            break
-
-          case 'ArrowLeft':
-            e.preventDefault()
-            if (index > 0) {
-              ctx.setFocusedIndex(index - 1)
-              const prevInput = host.parentElement?.querySelectorAll('input')[
-                index - 1
-              ] as HTMLInputElement
-              prevInput?.focus()
-            }
-            break
-
-          case 'ArrowRight':
-            e.preventDefault()
-            if (index < ctx.length - 1) {
-              ctx.setFocusedIndex(index + 1)
-              const nextInput = host.parentElement?.querySelectorAll('input')[
-                index + 1
-              ] as HTMLInputElement
-              nextInput?.focus()
-            }
-            break
-
-          case 'Tab':
-            // 允许默认 Tab 行为
-            break
-
-          default:
-            // 其他字符由 input 事件处理
-            break
-        }
-      }
-
-      // 粘贴处理
-      const handlePaste = (e: ClipboardEvent) => {
-        e.preventDefault()
-        const ctx = getContext?.()
-        if (!ctx) return
-
-        const pastedData = e.clipboardData?.getData('text') ?? ''
-        const chars = pastedData
-          .split('')
-          .filter((c) => isValidChar(c, ctx.type))
-
-        if (chars.length === 0) return
-
-        // 从当前索引开始填充
-        const currentValue = ctx.value
-        let newValue = currentValue.slice(0, index)
-
-        for (let i = 0; i < chars.length && index + i < ctx.length; i++) {
-          newValue += chars[i]
-        }
-
-        // 填充剩余部分
-        newValue = newValue.padEnd(ctx.length, '')
-        ctx.setValue(newValue)
-
-        // 焦点移到最后一个填充的位置
-        const lastIndex = Math.min(index + chars.length - 1, ctx.length - 1)
-        ctx.setFocusedIndex(lastIndex)
-        const lastInput = host.parentElement?.querySelectorAll('input')[
-          lastIndex
-        ] as HTMLInputElement
-        lastInput?.focus()
-      }
-
-      // 焦点处理
-      const handleFocus = () => {
-        const ctx = getContext?.()
-        if (ctx) {
-          ctx.setFocusedIndex(index)
-        }
-      }
-
-      // 选择文本
-      const handleSelect = () => {
-        input.select()
-      }
-
-      input.addEventListener('input', handleInput)
-      input.addEventListener('keydown', handleKeyDown)
-      input.addEventListener('paste', handlePaste)
-      input.addEventListener('focus', handleFocus)
-      input.addEventListener('click', handleSelect)
-
-      host.appendChild(input)
-
-      return () => {
-        input.removeEventListener('input', handleInput)
-        input.removeEventListener('keydown', handleKeyDown)
-        input.removeEventListener('paste', handlePaste)
-        input.removeEventListener('focus', handleFocus)
-        input.removeEventListener('click', handleSelect)
-        input.remove()
+      if (index < current.length - 1) {
+        current.setFocusedIndex(index + 1)
+        cellAt(target, index + 1)?.focus()
       }
     }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const current = getContext?.()
+      if (!current) return
+      const target = e.target as HTMLInputElement
+      const value = current.value
+
+      switch (e.key) {
+        case 'Backspace': {
+          e.preventDefault()
+          if (value[index]) {
+            current.setValue(
+              value.slice(0, index) + value.slice(index + 1)
+            )
+          } else if (index > 0) {
+            current.setFocusedIndex(index - 1)
+            cellAt(target, index - 1)?.focus()
+            current.setValue(
+              value.slice(0, index - 1) + value.slice(index)
+            )
+          }
+          break
+        }
+
+        case 'Delete':
+          e.preventDefault()
+          if (value[index]) {
+            current.setValue(
+              value.slice(0, index) + value.slice(index + 1)
+            )
+          }
+          break
+
+        case 'ArrowLeft':
+          e.preventDefault()
+          if (index > 0) {
+            current.setFocusedIndex(index - 1)
+            cellAt(target, index - 1)?.focus()
+          }
+          break
+
+        case 'ArrowRight':
+          e.preventDefault()
+          if (index < current.length - 1) {
+            current.setFocusedIndex(index + 1)
+            cellAt(target, index + 1)?.focus()
+          }
+          break
+
+        default:
+          break
+      }
+    }
+
+    const handlePaste = (e: ClipboardEvent) => {
+      e.preventDefault()
+      const current = getContext?.()
+      if (!current) return
+
+      const pasted = e.clipboardData?.getData('text') ?? ''
+      const chars = pasted.split('').filter((c) => isValidChar(c, current.type))
+      if (chars.length === 0) return
+
+      const value = current.value
+      let next = value.slice(0, index)
+      for (let i = 0; i < chars.length && index + i < current.length; i++) {
+        next += chars[i]
+      }
+      next = next.slice(0, current.length)
+
+      current.setValue(next)
+
+      const lastIndex = Math.min(index + chars.length - 1, current.length - 1)
+      current.setFocusedIndex(lastIndex)
+      cellAt(e.target as HTMLElement, lastIndex)?.focus()
+    }
+
+    return inputEl({
+      type: 'text',
+      maxLength: 1,
+      inputMode: ctx?.type === 'numeric' ? 'numeric' : 'text',
+      placeholder: ctx?.type === 'numeric' ? '•' : '_',
+      value: () => {
+        const value = getContext?.()?.value ?? ''
+        return value[index] ?? ''
+      },
+      disabled: () => getContext?.()?.disabled ?? false,
+      'data-disabled': () => (getContext?.()?.disabled ? '' : undefined),
+      class: props?.class,
+      style: props?.style,
+      onInput: handleInput,
+      onKeyDown: handleKeyDown,
+      onPaste: handlePaste,
+      onFocus: () => getContext?.()?.setFocusedIndex(index),
+      onClick: (e: Event) => (e.target as HTMLInputElement).select()
+    })
   }
+  return com(component)
 }
 
 /**
- * PinInput 组合组件
+ * PinInput preset: root + one cell per position.
  */
 export function createPinInput(): (
   props?: PinInputRootProps & {
@@ -379,51 +284,43 @@ export function createPinInput(): (
   const Root = createPinInputRoot()
   const Input = createPinInputInput()
 
-  return (
+  const component = (
     props?: PinInputRootProps & {
       inputClass?: string
       inputStyle?: Record<string, string | number> | string
     }
   ) => {
-    return (host: HTMLElement) => {
-      const length = props?.length ?? 4
+    const length = props?.length ?? 4
 
-      return Root({
-        value: props?.value,
-        defaultValue: props?.defaultValue,
-        length: length,
-        type: props?.type,
-        otp: props?.otp,
-        disabled: props?.disabled,
-        placeholder: props?.placeholder,
-        onValueChange: props?.onValueChange,
-        onComplete: props?.onComplete,
-        class: props?.class,
-        style: props?.style,
-        children: (getContext) => (host: HTMLElement) => {
-          const inputs: (() => void)[] = []
-
-          for (let i = 0; i < length; i++) {
-            const inputHost = document.createElement('input')
-            const unmount = Input(
+    return Root({
+      value: props?.value,
+      defaultValue: props?.defaultValue,
+      length,
+      type: props?.type,
+      otp: props?.otp,
+      disabled: props?.disabled,
+      placeholder: props?.placeholder,
+      onValueChange: props?.onValueChange,
+      onComplete: props?.onComplete,
+      class: props?.class,
+      style: props?.style,
+      children: (getContext) =>
+        div({
+          style: { display: 'flex' },
+          children: Array.from({ length }, (_, i) =>
+            Input(
               {
                 index: i,
                 class: props?.inputClass,
                 style: props?.inputStyle
               },
               getContext
-            )(inputHost, undefined)
-            if (unmount) inputs.push(unmount)
-            host.appendChild(inputHost)
-          }
-
-          return () => {
-            inputs.forEach((unmount) => unmount())
-          }
-        }
-      })(host, undefined)
-    }
+            )
+          )
+        })
+    })
   }
+  return com(component)
 }
 
 export const pinInput = createPinInput()
