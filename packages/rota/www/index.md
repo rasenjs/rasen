@@ -33,8 +33,8 @@ features:
     title: Runs on the framework
     details: Parts are built with @rasenjs/dom element factories and com — no hand-rolled DOM, no second rendering model.
   - icon: 📦
-    title: Thirteen components
-    details: Accordion, AlertDialog, AspectRatio, Avatar, Checkbox, Collapsible, NumberField, PinInput, Progress, Separator, Switch, Tabs, TagsInput.
+    title: Eighteen components
+    details: Accordion, AlertDialog, AspectRatio, Avatar, Checkbox, Collapsible, Label, NumberField, PinInput, Progress, RadioGroup, Separator, Slider, Switch, Tabs, TagsInput, Toggle, ToggleGroup.
 ---
 
 ## A component, unstyled
@@ -50,6 +50,12 @@ that targets `data-*` attributes — the same rules are in the
 <RotaDemo name="switch" />
 <RotaDemo name="checkbox" />
 <RotaDemo name="collapsible" />
+
+## Choosing: RadioGroup, ToggleGroup, Slider
+
+<RotaDemo name="radio-group" />
+<RotaDemo name="toggle-group" />
+<RotaDemo name="slider" />
 
 ## Tabs and Accordion
 

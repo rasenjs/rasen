@@ -16,7 +16,12 @@ parts carry the wiring so it cannot be forgotten.
 | Switch | `switch` with `aria-checked` |
 | Tabs | `tablist` / `tab` / `tabpanel` with `aria-selected` |
 | TagsInput | `listbox` with `option` children and `aria-selected` |
+| Label | `<label>`, wired to the control's id |
 | NumberField | `group` |
+| RadioGroup | `radiogroup` with `radio` items and `aria-checked` |
+| Slider | `group` with `slider` thumbs carrying `aria-valuemin` / `aria-valuemax` / `aria-valuenow` |
+| Toggle | `button` with `aria-pressed` |
+| ToggleGroup | `radiogroup` + `radio` (single), `group` + `aria-pressed` buttons (multiple) |
 
 ## Keyboard maps
 
@@ -26,7 +31,10 @@ behaviour is there first. On top of that:
 | Component | Keys |
 | --- | --- |
 | Accordion | `Enter` / `Space` toggle; `ArrowUp` / `ArrowDown` (or left/right when horizontal) move between triggers; `Home` / `End` jump to the ends |
-| Collapsible, Switch, Checkbox | `Enter` / `Space` toggle |
+| Collapsible, Switch, Checkbox, Toggle | `Enter` / `Space` toggle |
+| RadioGroup | arrows move **and select**; `Home` / `End` jump to the ends |
+| ToggleGroup | arrows move focus, `Enter` / `Space` press |
+| Slider | arrows step, `Page Up` / `Page Down` ten steps, `Home` / `End` to the ends |
 | Tabs | `Enter` / `Space` activate the focused tab |
 | PinInput | typing advances, `Backspace` / `Delete` clear or step back, arrows move, paste fills from the current cell |
 | TagsInput | `Enter` commits, `Backspace` on an empty input focuses the last tag, arrows move between tags, `Backspace` / `Delete` remove the focused tag, `Escape` returns to the input |
@@ -42,7 +50,9 @@ refs:
 | Component | Behaviour |
 | --- | --- |
 | AlertDialog | Focus moves to the action button (then cancel, then the content box) when the dialog opens; the previously focused element is remembered |
-| Accordion | `focusTrigger(index)` moves focus between enabled triggers, skipping disabled ones |
+| Accordion | enabled triggers are the navigation order; disabled ones are skipped |
+| RadioGroup / ToggleGroup | one tab stop per group, focus moved through element cells |
+| Slider | the thumb is focusable and drag also focuses it |
 | PinInput | Each cell keeps its own ref; navigation never searches the DOM |
 | TagsInput | Selecting a tag focuses it, and the input is reached through `inputRef` |
 

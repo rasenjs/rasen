@@ -70,13 +70,18 @@ export default defineConfig({
             { text: 'Avatar', link: '/components/avatar' },
             { text: 'Checkbox', link: '/components/checkbox' },
             { text: 'Collapsible', link: '/components/collapsible' },
+            { text: 'Label', link: '/components/label' },
             { text: 'NumberField', link: '/components/number-field' },
             { text: 'PinInput', link: '/components/pin-input' },
             { text: 'Progress', link: '/components/progress' },
+            { text: 'RadioGroup', link: '/components/radio-group' },
             { text: 'Separator', link: '/components/separator' },
+            { text: 'Slider', link: '/components/slider' },
             { text: 'Switch', link: '/components/switch' },
             { text: 'Tabs', link: '/components/tabs' },
-            { text: 'TagsInput', link: '/components/tags-input' }
+            { text: 'TagsInput', link: '/components/tags-input' },
+            { text: 'Toggle', link: '/components/toggle' },
+            { text: 'ToggleGroup', link: '/components/toggle-group' }
           ]
         }
       ]

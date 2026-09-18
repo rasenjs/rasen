@@ -17,13 +17,18 @@ import {
   aspectRatio,
   avatar,
   checkbox,
+  label,
   numberField,
   pinInput,
   progress,
+  radioGroup,
   separator,
+  slider,
   switchControl,
   tabs,
   tagsInput,
+  toggle,
+  toggleGroup,
   createCollapsibleRoot,
   createCollapsibleTrigger,
   createCollapsibleContent
@@ -351,6 +356,116 @@ vseparator({ decorative: true })`,
           div({ class: 'ar__inner', children: ['1 : 1'] })
         )
       ])
+  },
+
+
+  label: {
+    title: 'Label',
+    description: 'A real `<label>` — clicking it focuses the control it names.',
+    code: `label({ htmlFor: 'seat', children: () => text({ content: 'Seats' }) })`,
+    build: () =>
+      div({
+        class: 'stack',
+        children: [
+          label({ htmlFor: 'demo-seat', children: () => text({ content: 'Seats' }) }),
+          input({ id: 'demo-seat', class: 'text-input', placeholder: 'Focuses when the label is clicked' })
+        ]
+      })
+  },
+
+  toggle: {
+    title: 'Toggle',
+    description: 'A two-state button: `aria-pressed`, not a checkbox.',
+    code: `toggle({ defaultPressed: true, children: () => text({ content: 'Bold' }) })`,
+    build: () =>
+      row([
+        toggle({ defaultPressed: true, class: 'toggle', children: () => text({ content: 'Bold' }) }),
+        toggle({ class: 'toggle', children: () => text({ content: 'Italic' }) }),
+        toggle({ disabled: true, class: 'toggle', children: () => text({ content: 'Disabled' }) })
+      ])
+  },
+
+  'toggle-group': {
+    title: 'ToggleGroup',
+    description:
+      '`single` acts as a radio group, `multiple` keeps independent toggles. Arrows move focus.',
+    code: `toggleGroup({ type: 'multiple', items: [{ value: 'b', label: 'Bold' }] })`,
+    build: () =>
+      div({
+        class: 'stack',
+        children: [
+          toggleGroup({
+            type: 'single',
+            defaultValue: ['left'],
+            class: 'group',
+            itemClass: 'toggle',
+            items: [
+              { value: 'left', label: 'Left' },
+              { value: 'center', label: 'Center' },
+              { value: 'right', label: 'Right' }
+            ]
+          }),
+          toggleGroup({
+            type: 'multiple',
+            defaultValue: ['bold', 'underline'],
+            class: 'group',
+            itemClass: 'toggle',
+            items: [
+              { value: 'bold', label: 'Bold' },
+              { value: 'italic', label: 'Italic' },
+              { value: 'underline', label: 'Underline' }
+            ]
+          })
+        ]
+      })
+  },
+
+  'radio-group': {
+    title: 'RadioGroup',
+    description:
+      'Exactly one option; selection follows focus, so arrows both move and choose.',
+    code: `radioGroup({ defaultValue: 'pro', items: [{ value: 'pro', label: 'Pro' }] })`,
+    build: () =>
+      radioGroup({
+        defaultValue: 'pro',
+        name: 'demo-plan',
+        class: 'radio-group',
+        itemClass: 'radio-item',
+        indicatorClass: 'radio-dot',
+        items: [
+          { value: 'free', label: 'Free — one project' },
+          { value: 'pro', label: 'Pro — unlimited projects' },
+          { value: 'team', label: 'Team — sharing', disabled: true }
+        ]
+      })
+  },
+
+  slider: {
+    title: 'Slider',
+    description:
+      'Arrow keys step, Page Up/Down move ten steps, Home/End jump, and the thumb drags.',
+    code: `slider({ defaultValue: [30], min: 0, max: 100, step: 5 })`,
+    build: () =>
+      div({
+        class: 'stack',
+        children: [
+          slider({
+            defaultValue: [30],
+            step: 5,
+            class: 'slider',
+            trackClass: 'slider__track',
+            rangeClass: 'slider__range',
+            thumbClass: 'slider__thumb'
+          }),
+          slider({
+            defaultValue: [25, 70],
+            class: 'slider',
+            trackClass: 'slider__track',
+            rangeClass: 'slider__range',
+            thumbClass: 'slider__thumb'
+          })
+        ]
+      })
   },
 
   /** Composed example: parts of several components in one form. */

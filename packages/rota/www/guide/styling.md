@@ -23,7 +23,9 @@ loses a specificity fight with an inline default.
 | `data-state` | `selected` / `unselected` | TagsInput items |
 | `data-state` | `loading` / `loaded` / `error`, `visible` / `hidden` | Avatar |
 | `data-state` | `loading` / `complete` / `indeterminate` | Progress |
-| `data-orientation` | `vertical` / `horizontal` | Accordion, Separator, Tabs |
+| `data-state` | `on` / `off` | Toggle, ToggleGroup |
+| `data-state` | `checked` / `unchecked` | RadioGroup |
+| `data-orientation` | `vertical` / `horizontal` | Accordion, Separator, Tabs, Slider, ToggleGroup |
 | `data-disabled` | present when disabled | Most components |
 | `data-value` / `data-max` | numbers | Progress, TagsInput items |
 | `data-ratio` | number | AspectRatio |
