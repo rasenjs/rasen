@@ -75,6 +75,8 @@ export interface TagsInputItemProps {
 export interface TagsInputItemTextProps {
   class?: string
   style?: Record<string, string | number> | string
+  /** Label content — usually `() => text({ content: tag })`. */
+  children?: () => Mountable<HTMLElement>
 }
 
 export interface TagsInputItemDeleteProps {
@@ -371,7 +373,8 @@ export function createTagsInputItemText(): (
   const component = (props?: TagsInputItemTextProps) =>
     span({
       class: props?.class,
-      style: props?.style
+      style: props?.style,
+      children: props?.children ? [props.children()] : undefined
     })
   return com(component)
 }
@@ -511,7 +514,8 @@ export function createTagsInput(): (
                     ItemText(
                       {
                         class: props?.itemTextClass,
-                        style: props?.itemTextStyle
+                        style: props?.itemTextStyle,
+                        children: () => text({ content: tag })
                       },
                       getCtx
                     ),

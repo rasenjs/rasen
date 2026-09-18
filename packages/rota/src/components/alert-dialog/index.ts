@@ -379,22 +379,22 @@ export function createAlertDialogAction(): (
     getContext?: () => AlertDialogContext | undefined
   ) => {
     const ctx = getContext?.()
+    const rt = getReactiveRuntime()
+    const actionRef = createElementRef<HTMLButtonElement>(rt)
+
+    // The element is handed to the context as soon as the ref receives it;
+    // that is what initial focus is resolved against.
+    rt.subscribe(() => actionRef.value, (el) => {
+      if (el) ctx?.setActionElement(el)
+    })
 
     return button({
       type: 'button',
       'data-action': '',
+      ref: actionRef,
       class: props?.class,
       style: props?.style,
-      children: [
-        (el: HTMLElement) => {
-          ctx?.setActionElement(el)
-          const unmount = props?.children ? props.children()(el, undefined) : undefined
-          return () => {
-            if (ctx?.actionElement === el) ctx.setActionElement(null)
-            unmount?.()
-          }
-        }
-      ],
+      children: props?.children ? [props.children()] : undefined,
       onClick: () => ctx?.setOpen(false)
     })
   }
@@ -413,22 +413,20 @@ export function createAlertDialogCancel(): (
     getContext?: () => AlertDialogContext | undefined
   ) => {
     const ctx = getContext?.()
+    const rt = getReactiveRuntime()
+    const cancelRef = createElementRef<HTMLButtonElement>(rt)
+
+    rt.subscribe(() => cancelRef.value, (el) => {
+      if (el) ctx?.setCancelElement(el)
+    })
 
     return button({
       type: 'button',
       'data-cancel': '',
+      ref: cancelRef,
       class: props?.class,
       style: props?.style,
-      children: [
-        (el: HTMLElement) => {
-          ctx?.setCancelElement(el)
-          const unmount = props?.children ? props.children()(el, undefined) : undefined
-          return () => {
-            if (ctx?.cancelElement === el) ctx.setCancelElement(null)
-            unmount?.()
-          }
-        }
-      ],
+      children: props?.children ? [props.children()] : undefined,
       onClick: () => ctx?.setOpen(false)
     })
   }

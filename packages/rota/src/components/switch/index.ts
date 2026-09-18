@@ -159,4 +159,5 @@ export function createSwitch(): (
 
 export const switchRoot = createSwitchRoot()
 export const switchThumb = createSwitchThumb()
-export const sw = createSwitch()
+/** Preset: a root with a thumb already wired to the root context. */
+export const switchControl = createSwitch()
