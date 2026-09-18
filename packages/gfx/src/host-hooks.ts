@@ -27,7 +27,7 @@ import { createNode, type GfxNode } from './node'
  */
 function createMarker(parent: GfxNode, kind: string): GfxNode {
   void kind
-  return createNode(parent, { draw: () => {} })
+  return createNode(parent, { marker: true, draw: () => {} })
 }
 
 /**

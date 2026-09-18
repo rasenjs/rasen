@@ -164,6 +164,10 @@ export interface GfxNodeOptions {
    * 叶子组件忽略该参数。
    */
   draw: (drawChildren: () => void) => void
+  /** 结构标记（each/when/match 的边界）：无几何、无子节点，**不参与渲染遍历**。
+   * 它留在 children 里只为排序（insert/nextSibling 靠它定位），渲染器前序遍历
+   * 会在调用 draw() 之前跳过它——200 行列表 = 200 次/帧的空调用，实测 1.9ms/帧。 */
+  marker?: boolean
   /** 可选包围盒（世界坐标；3D 组件返回 null 表示全量重绘） */
   bounds?: () => Bounds | null
   /** 可选响应式依赖：任一变化 → 标脏触发重绘 */
@@ -229,7 +233,11 @@ function attachNode(
       // Container semantics: drawSelf decides WHERE the subtree renders
       // (between its own transform push/pop). Leaves simply ignore it.
       drawSelf(() => {
-        for (const c of children) c.draw()
+        for (let i = 0; i < children.length; i++) {
+          const c = children[i]
+          // 结构标记只提供位置，不画任何东西：跳过它，连 draw() 调用都不发。
+          if (!markerNodes.has(c)) c.draw()
+        }
       })
     },
     remove() {
@@ -258,6 +266,8 @@ function attachNode(
   if (opts?.deps) {
     stop = getReactiveRuntime().subscribe(opts.deps, () => renderer.markDirty())
   }
+
+  if (opts?.marker === true) markerNodes.add(node)
 
   return node
 }
@@ -305,6 +315,11 @@ export function createRootNode(
  *               顶层组件的宿主是渲染根（createRoot 物化的 GL 根，
  *               或 WebGPURoot 自身）。
  */
+/** 结构标记节点（见 GfxNodeOptions.marker）。用 WeakSet 而不是节点上的字段：
+ *  标记节点的形状与普通节点完全一致，child walk 的 `c.draw()` 调用点因此保持
+ *  单态——给标记加一个自有属性会让 children 数组元素形状分叉（多态 IC）。 */
+const markerNodes = new WeakSet<object>()
+
 export function createNode(parent: GfxNode, opts: GfxNodeOptions): GfxNode {
   return attachNode(parent.renderer, parent.ctx, parent.rcOptions, parent, opts)
 }
