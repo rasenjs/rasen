@@ -1,9 +1,13 @@
 /**
- * Avatar - 头像组件
+ * Avatar - user avatar with image/fallback switching.
  *
- * 用于显示用户头像，支持图片加载失败时显示备用内容。
+ * Shows the image when it loads; falls back to the fallback content on
+ * error or while loading. Composed on @rasenjs/dom element factories;
+ * load status is a runtime ref so the fallback reacts without polling.
  */
 import type { Mountable } from '@rasenjs/core'
+import { getReactiveRuntime } from '@rasenjs/core'
+import { span, img } from '@rasenjs/dom'
 
 export type ImageLoadingStatus = 'loading' | 'loaded' | 'error'
 export type FallbackVisibility = 'visible' | 'hidden'
@@ -11,7 +15,7 @@ export type FallbackVisibility = 'visible' | 'hidden'
 export interface AvatarRootProps {
   class?: string
   style?: Record<string, string | number> | string
-  children?: () => Mountable<HTMLElement>
+  children?: (getContext: () => AvatarContext | undefined) => Mountable<HTMLElement>
 }
 
 export interface AvatarImageProps {
@@ -33,12 +37,13 @@ export interface AvatarFallbackProps {
 }
 
 export interface AvatarContext {
-  status: ImageLoadingStatus
+  /** Reactive load status; parts bind to it. */
+  status: () => ImageLoadingStatus
   setStatus: (status: ImageLoadingStatus) => void
 }
 
 /**
- * 创建 Avatar Root 组件
+ * Create the Avatar Root component.
  */
 export function createAvatarRoot(): (
   props?: AvatarRootProps
@@ -46,43 +51,43 @@ export function createAvatarRoot(): (
   const contextMap = new WeakMap<HTMLElement, AvatarContext>()
 
   return (props?: AvatarRootProps) => {
-    return (host: HTMLElement) => {
-      const root = document.createElement('span')
-      root.style.display = 'inline-block'
-      root.style.position = 'relative'
-      root.style.overflow = 'hidden'
-      root.style.width = '100%'
-      root.style.height = '100%'
+    const rt = getReactiveRuntime()
+    const statusRef = rt.ref<ImageLoadingStatus>('loading')
 
-      if (props?.class) {
-        root.className = props.class
-      }
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(root.style, props.style)
-        }
-      }
-
-      const context: AvatarContext = {
-        status: 'loading',
-        setStatus: (status: ImageLoadingStatus) => {
-          context.status = status
-        }
-      }
-      contextMap.set(root, context)
-
-      host.appendChild(root)
-
-      return () => {
-        contextMap.delete(root)
-        root.remove()
-      }
-    }
+    return span({
+      class: props?.class,
+      // Positioning/overflow are functional: image and fallback stack
+      // inside this box via absolute positioning.
+      style: {
+        display: 'inline-block',
+        position: 'relative',
+        overflow: 'hidden',
+        width: '100%',
+        height: '100%',
+        ...(typeof props?.style === 'object' ? props.style : {})
+      },
+      children: props?.children
+        ? [
+            (el: HTMLElement) => {
+              const getContext = (): AvatarContext => ({
+                status: () => rt.unref(statusRef),
+                setStatus: (s) => rt.setValue(statusRef, s)
+              })
+              contextMap.set(el, getContext())
+              const unmount = props.children!(getContext)(el)
+              return () => {
+                contextMap.delete(el)
+                unmount?.()
+              }
+            }
+          ]
+        : undefined
+    })
   }
 }
 
 /**
- * 创建 Avatar Image 组件
+ * Create the Avatar Image component.
  */
 export function createAvatarImage(): (
   props?: AvatarImageProps,
@@ -92,50 +97,39 @@ export function createAvatarImage(): (
     props?: AvatarImageProps,
     getContext?: () => AvatarContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const img = document.createElement('img')
-
-      img.style.position = 'absolute'
-      img.style.top = '0'
-      img.style.right = '0'
-      img.style.bottom = '0'
-      img.style.left = '0'
-      img.style.width = '100%'
-      img.style.height = '100%'
-      img.style.objectFit = 'cover'
-
-      if (props?.src) img.src = props.src
-      if (props?.srcSet) img.srcset = props.srcSet
-      if (props?.sizes) img.sizes = props.sizes
-      if (props?.alt !== undefined) img.alt = props.alt
-      if (props?.loading) img.loading = props.loading
-      if (props?.class) img.className = props.class
-
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(img.style, props.style)
-        }
-      }
-
-      const setStatus = (status: ImageLoadingStatus) => {
-        img.dataset.state = status
-        const ctx = getContext?.()
-        if (ctx) ctx.setStatus(status)
-        props?.onLoadingStatusChange?.(status)
-      }
-
-      img.onload = () => setStatus('loaded')
-      img.onerror = () => setStatus('error')
-
-      host.appendChild(img)
-
-      return () => img.remove()
+    const setStatus = (status: ImageLoadingStatus) => {
+      getContext?.().setStatus(status)
+      props?.onLoadingStatusChange?.(status)
     }
+
+    return img({
+      src: props?.src,
+      srcSet: props?.srcSet,
+      sizes: props?.sizes,
+      alt: props?.alt,
+      loading: props?.loading,
+      dataState: 'loading',
+      class: props?.class,
+      // Fill the root box over the fallback — functional positioning.
+      style: {
+        position: 'absolute',
+        top: '0',
+        right: '0',
+        bottom: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        ...(typeof props?.style === 'object' ? props.style : {})
+      },
+      onLoad: () => setStatus('loaded'),
+      onError: () => setStatus('error')
+    })
   }
 }
 
 /**
- * 创建 Avatar Fallback 组件
+ * Create the Avatar Fallback component.
  */
 export function createAvatarFallback(): (
   props?: AvatarFallbackProps,
@@ -145,90 +139,47 @@ export function createAvatarFallback(): (
     props?: AvatarFallbackProps,
     getContext?: () => AvatarContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const fallback = document.createElement('span')
+    const rt = getReactiveRuntime()
+    const delayMs = props?.delayMs ?? 0
+    const delayedVisible = rt.ref(delayMs === 0)
+    let timer: ReturnType<typeof setTimeout> | null = null
 
-      fallback.style.position = 'absolute'
-      fallback.style.top = '0'
-      fallback.style.right = '0'
-      fallback.style.bottom = '0'
-      fallback.style.left = '0'
-      fallback.style.display = 'flex'
-      fallback.style.alignItems = 'center'
-      fallback.style.justifyContent = 'center'
-
-      if (props?.class) fallback.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(fallback.style, props.style)
-        }
-      }
-
-      const delayMs = props?.delayMs ?? 0
-      let timer: number | null = null
-      let visible = delayMs === 0
-
-      if (visible) {
-        fallback.style.opacity = '1'
-        fallback.dataset.state = 'visible'
-      } else {
-        fallback.style.opacity = '0'
-        fallback.dataset.state = 'hidden'
-      }
-
-      const updateVisibility = () => {
-        const ctx = getContext?.()
-        const status = ctx?.status ?? 'loading'
-
-        if (status === 'error' || status === 'loading') {
-          if (!visible) {
-            if (delayMs > 0) {
-              timer = window.setTimeout(() => {
-                visible = true
-                fallback.style.opacity = '1'
-                fallback.dataset.state = 'visible'
-              }, delayMs)
-            } else {
-              visible = true
-              fallback.style.opacity = '1'
-              fallback.dataset.state = 'visible'
-            }
-          }
-        } else {
-          visible = false
-          fallback.style.opacity = '0'
-          fallback.dataset.state = 'hidden'
-          if (timer) {
-            clearTimeout(timer)
-            timer = null
-          }
-        }
-      }
-
-      // 初始检查
-      updateVisibility()
-
-      // 监听状态变化
-      const interval = setInterval(() => {
-        const ctx = getContext?.()
-        if (ctx) {
-          updateVisibility()
-        }
-      }, 50) as unknown as number
-
-      host.appendChild(fallback)
-
-      return () => {
-        if (timer) clearTimeout(timer)
-        clearInterval(interval)
-        fallback.remove()
-      }
+    // Show after delayMs while the image is not loaded; hide once loaded.
+    // The delay timer starts on mount and flips the visibility ref.
+    if (delayMs > 0) {
+      timer = setTimeout(() => rt.setValue(delayedVisible, true), delayMs)
     }
+
+    const shouldShow = () => {
+      const status = getContext?.().status() ?? 'loading'
+      return (
+        status !== 'loaded' &&
+        (delayMs === 0 || rt.unref(delayedVisible))
+      )
+    }
+
+    return span({
+      dataState: () => (shouldShow() ? 'visible' : 'hidden'),
+      // Opacity (not hidden) so consumers can transition the swap in CSS.
+      style: {
+        opacity: () => (shouldShow() ? '1' : '0'),
+        position: 'absolute',
+        top: '0',
+        right: '0',
+        bottom: '0',
+        left: '0',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...(typeof props?.style === 'object' ? props.style : {})
+      },
+      children: props?.children ? [props.children()] : undefined
+    })
   }
 }
 
 /**
- * Avatar 预设（组合版）
+ * Avatar preset: root + image + fallback wired to one context.
  */
 export function createAvatar(): (props?: {
   src?: string
@@ -241,61 +192,18 @@ export function createAvatar(): (props?: {
   const Image = createAvatarImage()
   const Fallback = createAvatarFallback()
 
-  return (props) => {
-    return (host: HTMLElement) => {
-      const contextMap = new WeakMap<HTMLElement, AvatarContext>()
-
-      const getContext = (): AvatarContext | undefined => {
-        return contextMap.get(host)
-      }
-
-      const setContext = (ctx: AvatarContext) => {
-        contextMap.set(host, ctx)
-      }
-
-      // Root
-      const rootMount = Root({
-        class: props?.class,
-        style: props?.style,
-        children: () => (container: HTMLElement) => {
-          const ctx: AvatarContext = {
-            status: 'loading',
-            setStatus: (status) => {
-              ctx.status = status
-            }
-          }
-          setContext(ctx)
-
-          const unmounts: (() => void)[] = []
-
-          // Image
-          if (props?.src) {
-            const imgMount = Image(
-              { src: props.src, alt: props.alt },
-              getContext
-            )(container, undefined)
-            if (typeof imgMount === 'function') unmounts.push(imgMount)
-          }
-
-          // Fallback
-          if (props?.fallback) {
-            const fallbackMount = Fallback(
-              { delayMs: 0 },
-              getContext
-            )(container, undefined)
-            if (typeof fallbackMount === 'function')
-              unmounts.push(fallbackMount)
-          }
-
-          return () => {
-            unmounts.forEach((u) => u())
-          }
-        }
-      })(host, undefined)
-
-      return rootMount
-    }
-  }
+  return (props) =>
+    Root({
+      class: props?.class,
+      style: props?.style,
+      children: (getContext) =>
+        span({
+          children: [
+            Image({ src: props?.src, alt: props?.alt }, getContext),
+            Fallback({ delayMs: 0, children: props?.fallback }, getContext)
+          ]
+        })
+    })
 }
 
 export const avatar = createAvatar()

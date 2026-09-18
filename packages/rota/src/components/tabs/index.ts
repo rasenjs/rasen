@@ -1,15 +1,19 @@
 /**
- * Tabs - 标签页组件
+ * Tabs - layered content panels, one visible at a time.
  *
- * 一组分层的内容区域，一次只显示一个标签面板。
- * 支持受控和非受控模式，水平和垂直方向。
+ * Controlled and uncontrolled modes, horizontal or vertical orientation.
+ * Composed on @rasenjs/dom element factories: the active tab is a runtime
+ * ref, so triggers and contents update through reactive attribute bindings.
  */
 import type { Mountable } from '@rasenjs/core'
+import { getReactiveRuntime, type Ref } from '@rasenjs/core'
+import { div, button } from '@rasenjs/dom'
 
 export type TabsOrientation = 'horizontal' | 'vertical'
 
 export interface TabsContext {
-  value: string
+  /** Reactive current value; reads inside bindings track it. */
+  value: () => string
   setValue: (value: string) => void
   orientation: TabsOrientation
   registerTrigger: (el: HTMLElement, value: string) => void
@@ -54,143 +58,56 @@ export interface TabsContentProps {
   children?: () => Mountable<HTMLElement>
 }
 
-function updateTriggerState(
-  el: HTMLElement,
-  triggerValue: string,
-  currentValue: string,
-  disabled: boolean,
-  orientation: TabsOrientation
-): void {
-  const isActive = currentValue === triggerValue
-  el.setAttribute('aria-selected', String(isActive))
-  el.setAttribute('data-state', isActive ? 'active' : 'inactive')
-  el.setAttribute('data-orientation', orientation)
-  if (disabled) {
-    el.setAttribute('aria-disabled', 'true')
-    el.setAttribute('data-disabled', '')
-  } else {
-    el.removeAttribute('aria-disabled')
-    el.removeAttribute('data-disabled')
-  }
-}
-
-function updateContentState(
-  el: HTMLElement,
-  contentValue: string,
-  currentValue: string
-): void {
-  const isActive = currentValue === contentValue
-  el.setAttribute('data-state', isActive ? 'active' : 'hidden')
-  if (isActive) {
-    el.removeAttribute('hidden')
-  } else {
-    el.setAttribute('hidden', '')
-  }
-}
-
 /**
- * 创建 Tabs Root 组件
+ * Create the Tabs Root component.
  */
 export function createTabsRoot(): (
   props?: TabsRootProps
 ) => Mountable<HTMLElement> {
   return (props?: TabsRootProps) => {
-    return (host: HTMLElement) => {
-      const root = document.createElement('div')
-      const orientation = props?.orientation ?? 'horizontal'
+    const rt = getReactiveRuntime()
+    const orientation = props?.orientation ?? 'horizontal'
 
-      if (props?.class) root.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(root.style, props.style)
-        }
+    const isControlled = props?.value !== undefined
+    const internal = rt.ref(props?.value ?? props?.defaultValue ?? '')
+    const current = (): string =>
+      isControlled ? (props?.value ?? '') : rt.unref(internal)
+
+    const setValue = (value: string): void => {
+      if (value === current()) return
+      if (!isControlled) {
+        rt.setValue(internal, value)
       }
-      root.setAttribute('data-orientation', orientation)
-
-      const isControlled = props?.value !== undefined
-      let currentValue = props?.value ?? props?.defaultValue ?? ''
-
-      const triggerElements = new Map<HTMLElement, string>()
-      const contentElements = new Map<HTMLElement, string>()
-
-      const updateAllStates = (): void => {
-        triggerElements.forEach((triggerValue, el) => {
-          const disabled = el.hasAttribute('data-disabled')
-          updateTriggerState(
-            el,
-            triggerValue,
-            currentValue,
-            disabled,
-            orientation
-          )
-        })
-        contentElements.forEach((contentValue, el) => {
-          updateContentState(el, contentValue, currentValue)
-        })
-      }
-
-      const setValue = (value: string): void => {
-        if (value === currentValue) return
-        currentValue = value
-        if (!isControlled) {
-          updateAllStates()
-        }
-        props?.onValueChange?.(value)
-      }
-
-      const registerTrigger = (el: HTMLElement, value: string): void => {
-        triggerElements.set(el, value)
-        updateTriggerState(
-          el,
-          value,
-          currentValue,
-          el.hasAttribute('data-disabled'),
-          orientation
-        )
-      }
-
-      const unregisterTrigger = (el: HTMLElement): void => {
-        triggerElements.delete(el)
-      }
-
-      const registerContent = (el: HTMLElement, value: string): void => {
-        contentElements.set(el, value)
-        updateContentState(el, value, currentValue)
-      }
-
-      const unregisterContent = (el: HTMLElement): void => {
-        contentElements.delete(el)
-      }
-
-      const context: TabsContext = {
-        value: currentValue,
-        setValue,
-        orientation,
-        registerTrigger,
-        unregisterTrigger,
-        registerContent,
-        unregisterContent
-      }
-
-      const getContext = (): TabsContext | undefined => context
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children(getContext)(root, undefined)
-      }
-
-      host.appendChild(root)
-
-      return () => {
-        childUnmount?.()
-        root.remove()
-      }
+      props?.onValueChange?.(value)
     }
+
+    // Registries kept for the context contract (and future keyboard nav);
+    // attribute state itself flows through reactive bindings below.
+    const triggerElements = new Map<HTMLElement, string>()
+    const contentElements = new Map<HTMLElement, string>()
+
+    const context: TabsContext = {
+      value: current,
+      setValue,
+      orientation,
+      registerTrigger: (el, value) => void triggerElements.set(el, value),
+      unregisterTrigger: (el) => void triggerElements.delete(el),
+      registerContent: (el, value) => void contentElements.set(el, value),
+      unregisterContent: (el) => void contentElements.delete(el)
+    }
+    const getContext = (): TabsContext => context
+
+    return div({
+      dataOrientation: orientation,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children(getContext)] : undefined
+    })
   }
 }
 
 /**
- * 创建 Tabs List 组件
+ * Create the Tabs List component.
  */
 export function createTabsList(): (
   props?: TabsListProps,
@@ -200,41 +117,24 @@ export function createTabsList(): (
     props?: TabsListProps,
     getContext?: () => TabsContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const list = document.createElement('div')
-      list.setAttribute('role', 'tablist')
+    const ctx = getContext?.()
+    const orientation = ctx?.orientation ?? 'horizontal'
 
-      const ctx = getContext?.()
-      if (ctx) {
-        list.setAttribute('aria-orientation', ctx.orientation)
-        list.setAttribute('data-orientation', ctx.orientation)
-      }
-
-      if (props?.class) list.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(list.style, props.style)
-        }
-      }
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        const getCtx = getContext ?? (() => undefined)
-        childUnmount = props.children(getCtx)(list, undefined)
-      }
-
-      host.appendChild(list)
-
-      return () => {
-        childUnmount?.()
-        list.remove()
-      }
-    }
+    return div({
+      role: 'tablist',
+      ariaOrientation: orientation,
+      dataOrientation: orientation,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children
+        ? [props.children(getContext ?? (() => undefined))]
+        : undefined
+    })
   }
 }
 
 /**
- * 创建 Tabs Trigger 组件
+ * Create the Tabs Trigger component.
  */
 export function createTabsTrigger(): (
   props?: TabsTriggerProps,
@@ -244,60 +144,34 @@ export function createTabsTrigger(): (
     props?: TabsTriggerProps,
     getContext?: () => TabsContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      if (!props?.value) {
-        throw new Error('TabsTrigger: "value" prop is required')
-      }
-
-      const trigger = document.createElement('button')
-      trigger.type = 'button'
-      trigger.setAttribute('role', 'tab')
-      trigger.setAttribute('tabindex', '-1')
-
-      const disabled = props?.disabled ?? false
-      if (disabled) {
-        trigger.setAttribute('aria-disabled', 'true')
-        trigger.setAttribute('data-disabled', '')
-      }
-
-      if (props?.class) trigger.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(trigger.style, props.style)
-        }
-      }
-
-      const ctx = getContext?.()
-      if (ctx) {
-        ctx.registerTrigger(trigger, props.value)
-
-        trigger.addEventListener('click', () => {
-          if (disabled) return
-          ctx.setValue(props.value)
-        })
-      }
-
-      // Render children
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children()(trigger, undefined)
-      }
-
-      host.appendChild(trigger)
-
-      return () => {
-        if (ctx) {
-          ctx.unregisterTrigger(trigger)
-        }
-        childUnmount?.()
-        trigger.remove()
-      }
+    if (!props?.value) {
+      throw new Error('TabsTrigger: "value" prop is required')
     }
+
+    const disabled = props?.disabled ?? false
+    const ctx = getContext?.()
+
+    return button({
+      type: 'button',
+      role: 'tab',
+      tabIndex: -1,
+      ariaSelected: () => String(ctx?.value() === props.value),
+      dataState: () => (ctx?.value() === props.value ? 'active' : 'inactive'),
+      dataOrientation: ctx?.orientation,
+      ariaDisabled: disabled ? 'true' : undefined,
+      dataDisabled: disabled ? '' : undefined,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children()] : undefined,
+      onClick: () => {
+        if (!disabled) ctx?.setValue(props.value)
+      }
+    })
   }
 }
 
 /**
- * 创建 Tabs Content 组件
+ * Create the Tabs Content component.
  */
 export function createTabsContent(): (
   props?: TabsContentProps,
@@ -307,70 +181,27 @@ export function createTabsContent(): (
     props?: TabsContentProps,
     getContext?: () => TabsContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      if (!props?.value) {
-        throw new Error('TabsContent: "value" prop is required')
-      }
-
-      const content = document.createElement('div')
-      content.setAttribute('role', 'tabpanel')
-
-      const forceMount = props?.forceMount ?? false
-
-      if (props?.class) content.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(content.style, props.style)
-        }
-      }
-
-      const ctx = getContext?.()
-      if (ctx) {
-        ctx.registerContent(content, props.value)
-      }
-
-      if (!forceMount && ctx) {
-        const isActive = ctx.value === props.value
-        if (!isActive) {
-          content.setAttribute('hidden', '')
-          content.setAttribute('data-state', 'hidden')
-        } else {
-          content.setAttribute('data-state', 'active')
-        }
-      } else if (forceMount) {
-        content.setAttribute(
-          'data-state',
-          ctx && ctx.value === props.value ? 'active' : 'hidden'
-        )
-      } else {
-        content.setAttribute('data-state', 'hidden')
-        content.setAttribute('hidden', '')
-      }
-
-      // Render children
-      let childUnmount: (() => void) | undefined
-      if (props?.children || forceMount) {
-        const shouldRender = !ctx || ctx.value === props.value || forceMount
-        if (shouldRender && props?.children) {
-          childUnmount = props.children()(content, undefined)
-        }
-      }
-
-      host.appendChild(content)
-
-      return () => {
-        if (ctx) {
-          ctx.unregisterContent(content)
-        }
-        childUnmount?.()
-        content.remove()
-      }
+    if (!props?.value) {
+      throw new Error('TabsContent: "value" prop is required')
     }
+
+    const forceMount = props?.forceMount ?? false
+    const ctx = getContext?.()
+
+    return div({
+      role: 'tabpanel',
+      dataState: () =>
+        ctx?.value() === props.value ? 'active' : 'hidden',
+      hidden: () => (forceMount || ctx?.value() === props.value ? false : true),
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children()] : undefined
+    })
   }
 }
 
 /**
- * Tabs 组合组件
+ * Tabs preset: root + list + triggers/contents from a data array.
  */
 export interface TabItem {
   value: string
@@ -380,7 +211,7 @@ export interface TabItem {
 }
 
 export function createTabs(): (
-  props?: TabsRootProps & {
+  props?: Omit<TabsRootProps, 'children'> & {
     listClass?: string
     listStyle?: Record<string, string | number> | string
     triggerClass?: string
@@ -393,90 +224,52 @@ export function createTabs(): (
   const Trigger = createTabsTrigger()
   const Content = createTabsContent()
 
-  return (
-    props?: TabsRootProps & {
-      listClass?: string
-      triggerClass?: string
-      contentClass?: string
-      tabs?: TabItem[]
-    }
-  ) => {
-    return (host: HTMLElement) => {
-      return Root({
-        defaultValue: props?.defaultValue,
-        value: props?.value,
-        onValueChange: props?.onValueChange,
-        orientation: props?.orientation,
-        class: props?.class,
-        style: props?.style,
-        children: (getContext) => (root: HTMLElement) => {
-          const unmounts: (() => void)[] = []
-
-          // Create list
-          const listHost = document.createElement('div')
-          const listUnmount = List(
-            {
-              class: props?.listClass,
-              children: (getCtx) => (list: HTMLElement) => {
-                const triggerUnmounts: (() => void)[] = []
-                const contentUnmounts: (() => void)[] = []
-
-                // Create triggers and contents from tabs array
-                if (props?.tabs) {
-                  props.tabs.forEach((tab) => {
-                    // Create trigger
-                    const triggerHost = document.createElement('div')
-                    const triggerUnmount = Trigger(
-                      {
-                        value: tab.value,
-                        disabled: tab.disabled,
-                        class: props?.triggerClass,
-                        children: () => (trigger: HTMLElement) => {
-                          trigger.textContent = tab.label
-                          return () => {}
-                        }
-                      },
-                      getCtx
-                    )(triggerHost, undefined)
-                    if (triggerUnmount) triggerUnmounts.push(triggerUnmount)
-                    list.appendChild(triggerHost)
-
-                    // Create content
-                    const contentHost = document.createElement('div')
-                    const contentUnmount = Content(
-                      {
-                        value: tab.value,
-                        class: props?.contentClass,
-                        children: () => (content: HTMLElement) => {
-                          content.innerHTML = `<p>${tab.content}</p>`
-                          return () => {}
-                        }
-                      },
-                      getCtx
-                    )(contentHost, undefined)
-                    if (contentUnmount) contentUnmounts.push(contentUnmount)
-                    root.appendChild(contentHost)
-                  })
-                }
-
-                return () => {
-                  triggerUnmounts.forEach((u) => u())
-                  contentUnmounts.forEach((u) => u())
-                }
-              }
-            },
-            getContext
-          )(listHost, undefined)
-          if (listUnmount) unmounts.push(listUnmount)
-          root.appendChild(listHost)
-
-          return () => {
-            unmounts.forEach((u) => u())
-          }
-        }
-      })(host, undefined)
-    }
-  }
+  return (props) =>
+    Root({
+      defaultValue: props?.defaultValue,
+      value: props?.value,
+      onValueChange: props?.onValueChange,
+      orientation: props?.orientation,
+      class: props?.class,
+      style: props?.style,
+      children: (getContext) =>
+        div({
+          children: [
+            List(
+              {
+                class: props?.listClass,
+                children: (getCtx) =>
+                  div({
+                    children: (props?.tabs ?? []).map((tab) =>
+                      Trigger(
+                        {
+                          value: tab.value,
+                          disabled: tab.disabled,
+                          class: props?.triggerClass,
+                          children: () => (el: HTMLElement) => {
+                            el.textContent = tab.label
+                          }
+                        },
+                        getCtx
+                      )
+                    )
+                  }),
+                },
+                getContext
+              ),
+              ...(props?.tabs ?? []).map((tab) =>
+                Content(
+                  {
+                    value: tab.value,
+                    class: props?.contentClass,
+                    children: () => tab.content
+                  },
+                  getContext
+                )
+              )
+          ]
+        })
+    })
 }
 
 export const tabs = createTabs()

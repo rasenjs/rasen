@@ -1,10 +1,13 @@
 /**
- * Checkbox - 复选框组件
+ * Checkbox - tri-state checkbox control.
  *
- * 允许用户在选中和未选中状态之间切换的控件，支持不确定状态。
- * 采用 Root + Indicator 组合模式，与 Reka/Radix API 一致。
+ * Supports checked / unchecked / indeterminate, controlled and uncontrolled
+ * modes. Root + Indicator composition, Reka/Radix-style API.
+ * Composed on @rasenjs/dom element factories.
  */
 import type { Mountable } from '@rasenjs/core'
+import { getReactiveRuntime } from '@rasenjs/core'
+import { button, span } from '@rasenjs/dom'
 
 export type CheckboxCheckedState = boolean | 'indeterminate'
 
@@ -52,111 +55,82 @@ function getCheckedState(state: CheckboxCheckedState): {
 }
 
 /**
- * 创建 Checkbox Root 组件
+ * Create the Checkbox Root component.
  */
 export function createCheckboxRoot(): (
   props?: CheckboxRootProps
 ) => Mountable<HTMLElement> {
   return (props?: CheckboxRootProps) => {
-    return (host: HTMLElement) => {
-      const disabled = props?.disabled ?? false
-      const required = props?.required ?? false
+    const disabled = props?.disabled ?? false
 
-      const btn = document.createElement('button')
-      btn.type = 'button'
-      btn.setAttribute('role', 'checkbox')
-      btn.setAttribute('tabindex', disabled ? '-1' : '0')
+    const isControlled = props?.checked !== undefined
+    const rt = getReactiveRuntime()
+    const internal = rt.ref<CheckboxCheckedState>(
+      props?.checked ?? props?.defaultChecked ?? false
+    )
+    const current = (): CheckboxCheckedState =>
+      isControlled ? (props?.checked ?? false) : rt.unref(internal)
 
-      if (props?.class) btn.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(btn.style, props.style)
-        }
+    const toggle = (): void => {
+      if (disabled) return
+
+      const cur = current()
+      let newValue: CheckboxCheckedState
+      if (cur === false) {
+        newValue = true
+      } else if (cur === true) {
+        newValue = 'indeterminate'
+      } else {
+        newValue = false
       }
 
-      if (disabled) {
-        btn.setAttribute('aria-disabled', 'true')
-        btn.setAttribute('data-disabled', '')
+      if (!isControlled) {
+        rt.setValue(internal, newValue)
       }
+      props?.onCheckedChange?.(newValue)
+    }
 
-      if (required) {
-        btn.setAttribute('aria-required', 'true')
+    const state = () => getCheckedState(current())
+    const getContext = (): CheckboxContext => ({
+      get isChecked() {
+        return state().isChecked
+      },
+      get isIndeterminate() {
+        return state().isIndeterminate
       }
+    })
 
-      const isControlled = props?.checked !== undefined
-      let currentValue: CheckboxCheckedState =
-        props?.checked ?? props?.defaultChecked ?? false
-
-      const updateState = (): void => {
-        const state = getCheckedState(currentValue)
-        btn.setAttribute('aria-checked', state.ariaChecked)
-        btn.setAttribute('data-state', state.dataState)
-      }
-
-      updateState()
-
-      const toggle = (): void => {
-        if (disabled) return
-
-        let newValue: CheckboxCheckedState
-        if (currentValue === false) {
-          newValue = true
-        } else if (currentValue === true) {
-          newValue = 'indeterminate'
-        } else {
-          newValue = false
-        }
-
-        if (!isControlled) {
-          currentValue = newValue
-          updateState()
-        }
-        props?.onCheckedChange?.(newValue)
-      }
-
-      btn.addEventListener('click', toggle)
-
-      btn.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault()
+    return button({
+      type: 'button',
+      role: 'checkbox',
+      tabIndex: disabled ? -1 : 0,
+      ariaChecked: () => state().ariaChecked,
+      dataState: () => state().dataState,
+      ariaDisabled: disabled ? 'true' : undefined,
+      dataDisabled: disabled ? '' : undefined,
+      ariaRequired: props?.required ? 'true' : undefined,
+      name: props?.name,
+      value: props?.value,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children(getContext)] : undefined,
+      onClick: toggle,
+      onKeydown: (e: Event) => {
+        const ke = e as KeyboardEvent
+        if (ke.key === ' ' || ke.key === 'Enter') {
+          ke.preventDefault()
           toggle()
         }
-      })
-
-      const context: CheckboxContext = {
-        get isChecked() {
-          const state = getCheckedState(
-            isControlled ? (props?.checked ?? false) : currentValue
-          )
-          return state.isChecked
-        },
-        get isIndeterminate() {
-          const state = getCheckedState(
-            isControlled ? (props?.checked ?? false) : currentValue
-          )
-          return state.isIndeterminate
-        }
       }
-
-      const getContext = (): CheckboxContext | undefined => context
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children(getContext)(btn, undefined)
-      }
-
-      host.appendChild(btn)
-
-      return () => {
-        childUnmount?.()
-        btn.remove()
-      }
-    }
+    })
   }
 }
 
 /**
- * 创建 Checkbox Indicator 组件
+ * Create the Checkbox Indicator component.
+ *
+ * Renders nothing while unchecked unless `forceMount` is set; the
+ * presence binding is reactive on the root context.
  */
 export function createCheckboxIndicator(): (
   props?: CheckboxIndicatorProps,
@@ -166,47 +140,38 @@ export function createCheckboxIndicator(): (
     props?: CheckboxIndicatorProps,
     getContext?: () => CheckboxContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const forceMount = props?.forceMount ?? false
-      const ctx = getContext?.()
+    const forceMount = props?.forceMount ?? false
 
-      const shouldRender = forceMount || ctx?.isChecked || ctx?.isIndeterminate
+    const isVisible = () =>
+      forceMount ||
+      (getContext?.().isChecked ?? false) ||
+      (getContext?.().isIndeterminate ?? false)
 
-      if (!shouldRender) {
-        return () => {}
-      }
-
-      const indicator = document.createElement('span')
-
-      if (props?.class) indicator.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(indicator.style, props.style)
-        }
-      }
-
-      if (ctx) {
-        const dataState = ctx.isIndeterminate
-          ? 'indeterminate'
-          : ctx.isChecked
-            ? 'checked'
-            : 'unchecked'
-        indicator.setAttribute('data-state', dataState)
-      } else {
-        indicator.setAttribute('data-state', 'unchecked')
-      }
-
-      host.appendChild(indicator)
-      return () => indicator.remove()
+    // Mount-time render decision (same semantics as before the factory
+    // migration): unchecked without forceMount renders nothing at all.
+    if (!isVisible()) {
+      return () => {}
     }
+
+    return span({
+      dataState: () =>
+        getContext?.().isIndeterminate
+          ? 'indeterminate'
+          : getContext?.().isChecked
+            ? 'checked'
+            : 'unchecked',
+      hidden: () => !isVisible(),
+      class: props?.class,
+      style: props?.style
+    })
   }
 }
 
 /**
- * Checkbox 组合组件
+ * Checkbox preset: root + indicator wired to one context.
  */
 export function createCheckbox(): (
-  props?: CheckboxRootProps & {
+  props?: Omit<CheckboxRootProps, 'children'> & {
     indicatorClass?: string
     indicatorStyle?: Record<string, string | number> | string
     forceMount?: boolean
@@ -215,37 +180,27 @@ export function createCheckbox(): (
   const Root = createCheckboxRoot()
   const Indicator = createCheckboxIndicator()
 
-  return (
-    props?: CheckboxRootProps & {
-      indicatorClass?: string
-      indicatorStyle?: Record<string, string | number> | string
-      forceMount?: boolean
-    }
-  ) => {
-    return (host: HTMLElement) => {
-      return Root({
-        checked: props?.checked,
-        defaultChecked: props?.defaultChecked,
-        disabled: props?.disabled,
-        required: props?.required,
-        name: props?.name,
-        value: props?.value,
-        onCheckedChange: props?.onCheckedChange,
-        class: props?.class,
-        style: props?.style,
-        children: (getContext) => (btn: HTMLElement) => {
-          return Indicator(
-            {
-              class: props?.indicatorClass,
-              style: props?.indicatorStyle,
-              forceMount: props?.forceMount
-            },
-            getContext
-          )(btn, undefined)
-        }
-      })(host, undefined)
-    }
-  }
+  return (props) =>
+    Root({
+      checked: props?.checked,
+      defaultChecked: props?.defaultChecked,
+      disabled: props?.disabled,
+      required: props?.required,
+      name: props?.name,
+      value: props?.value,
+      onCheckedChange: props?.onCheckedChange,
+      class: props?.class,
+      style: props?.style,
+      children: (getContext) =>
+        Indicator(
+          {
+            forceMount: props?.forceMount,
+            class: props?.indicatorClass,
+            style: props?.indicatorStyle
+          },
+          getContext
+        )
+    })
 }
 
 export const checkbox = createCheckbox()

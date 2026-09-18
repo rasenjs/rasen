@@ -98,7 +98,9 @@ describe('@rasenjs/rota - Avatar', () => {
       Image({ src: 'test.jpg', loading: 'lazy' })(container)
 
       const el = container.querySelector('img')
-      expect(el?.loading).toBe('lazy')
+      // jsdom does not reflect the loading IDL property; the attribute is
+      // the source of truth.
+      expect(el?.getAttribute('loading')).toBe('lazy')
     })
   })
 
