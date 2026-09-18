@@ -1,16 +1,48 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
+import { setReactiveRuntime, getReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import {
   createPinInputRoot,
   createPinInputInput,
   createPinInput,
-  pinInput
+  pinInput,
+  type PinInputContext,
+  type PinInputType
 } from '@rasenjs/rota/components/pin-input'
 
 beforeEach(() => {
   setReactiveRuntime(createReactiveRuntime())
 })
+
+/**
+ * Build a complete context. Parts read `cellRef` for focus moves, so a
+ * hand-written partial object is not a valid stand-in for the real context.
+ */
+function makeContext(
+  overrides: Partial<{
+    value: string
+    length: number
+    type: PinInputType
+    disabled: boolean
+  }> = {}
+): () => PinInputContext {
+  const rt = getReactiveRuntime()
+  const cells = Array.from({ length: overrides.length ?? 4 }, () => ({
+    value: null as HTMLInputElement | null
+  }))
+  const context: PinInputContext = {
+    value: overrides.value ?? '',
+    length: overrides.length ?? 4,
+    type: overrides.type ?? 'numeric',
+    disabled: overrides.disabled ?? false,
+    focusedIndex: 0,
+    cellRef: (index) => cells[index] ?? { value: null },
+    setValue: () => {},
+    setFocusedIndex: () => {}
+  }
+  void rt
+  return () => context
+}
 
 describe('@rasenjs/rota - PinInput', () => {
   describe('createPinInputRoot', () => {
@@ -162,10 +194,9 @@ describe('@rasenjs/rota - PinInput', () => {
 
     it('should use a numeric inputMode and bullet placeholder for numeric pins', () => {
       const container = document.createElement('div')
-      createPinInputInput()(
-        { index: 0 },
-        () => ({ type: 'numeric' }) as never
-      )(container)
+      createPinInputInput()({ index: 0 }, makeContext({ type: 'numeric' }))(
+        container
+      )
 
       const el = container.querySelector('input') as HTMLInputElement
       expect(el.getAttribute('inputmode')).toBe('numeric')
@@ -176,7 +207,7 @@ describe('@rasenjs/rota - PinInput', () => {
       const container = document.createElement('div')
       createPinInputInput()(
         { index: 1 },
-        () => ({ value: 'ab', type: 'text' }) as never
+        makeContext({ value: 'ab', type: 'text' })
       )(container)
 
       expect((container.querySelector('input') as HTMLInputElement).value).toBe(

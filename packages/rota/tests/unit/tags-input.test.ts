@@ -588,16 +588,14 @@ describe('@rasenjs/rota - TagsInput', () => {
       expect(el?.className).toContain('my-delete')
     })
 
-    it('should remove tag on click', () => {
+    it('should remove the tag at its own index on click', () => {
       const container = document.createElement('div')
       const removeTagMock = vi.fn()
       const ItemDelete = createTagsInputItemDelete()
 
-      const item = document.createElement('span')
-      item.setAttribute('data-index', '1')
-      container.appendChild(item)
-
-      ItemDelete({}, () => ({
+      // The part is told which tag it belongs to; it does not search the DOM
+      // for a `[data-index]` ancestor.
+      ItemDelete({ index: 1 }, () => ({
         value: ['tag1', 'tag2'],
         disabled: false,
         max: undefined,
@@ -610,12 +608,37 @@ describe('@rasenjs/rota - TagsInput', () => {
         setFocusedIndex: () => {},
         addTag: () => {},
         removeTag: removeTagMock
-      }))(item)
+      }))(container)
 
-      const btn = item.querySelector('button')
+      const btn = container.querySelector('button')
       btn?.click()
 
       expect(removeTagMock).toHaveBeenCalledWith(1)
+    })
+
+    it('should do nothing without an index', () => {
+      const container = document.createElement('div')
+      const removeTagMock = vi.fn()
+      const ItemDelete = createTagsInputItemDelete()
+
+      ItemDelete({}, () => ({
+        value: ['tag1'],
+        disabled: false,
+        max: undefined,
+        delimiter: 'Enter',
+        addOnPaste: false,
+        addOnBlur: false,
+        allowCustomValue: true,
+        focusedIndex: null,
+        updateValue: () => {},
+        setFocusedIndex: () => {},
+        addTag: () => {},
+        removeTag: removeTagMock
+      }))(container)
+
+      container.querySelector('button')?.click()
+
+      expect(removeTagMock).not.toHaveBeenCalled()
     })
 
     it('should be disabled when context is disabled', () => {
