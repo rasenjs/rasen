@@ -1,10 +1,15 @@
 /**
- * Accordion - 手风琴组件
+ * Accordion - vertically stacked set of expandable panels.
  *
- * 垂直堆叠的交互式标题集合，每个标题都可以展开或折叠关联的内容区域。
- * 支持 single/multiple 模式，受控/非受控模式，键盘导航。
+ * single/multiple modes, collapsible, controlled/uncontrolled, keyboard
+ * navigation. Composed on @rasenjs/dom element factories: the open value
+ * lives in a runtime ref and parts bind to it through reactive getters,
+ * while the element registries that keyboard navigation needs stay here
+ * (they hold live elements, not reactive state).
  */
 import type { Mountable } from '@rasenjs/core'
+import { getReactiveRuntime } from '@rasenjs/core'
+import { div, button, h3 } from '@rasenjs/dom'
 
 export type AccordionType = 'single' | 'multiple'
 export type AccordionOrientation = 'vertical' | 'horizontal'
@@ -15,7 +20,8 @@ export interface AccordionContext {
   collapsible: boolean
   disabled: boolean
   orientation: AccordionOrientation
-  value: string | string[]
+  /** Reactive open value snapshot. */
+  value: () => string | string[]
   setValue: (value: string | string[]) => void
   isOpen: (itemValue: string) => boolean
   toggleItem: (itemValue: string) => void
@@ -33,11 +39,7 @@ export interface AccordionContext {
   focusTrigger: (index: number) => void
   getEnabledTriggers: () => HTMLElement[]
   getTriggerIndex: (el: HTMLElement) => number
-  registerItem: (
-    el: HTMLElement,
-    itemValue: string,
-    itemDisabled: boolean
-  ) => void
+  registerItem: (el: HTMLElement, itemValue: string, itemDisabled: boolean) => void
   unregisterItem: (el: HTMLElement) => void
   isItemDisabled: (itemValue: string) => boolean
 }
@@ -112,7 +114,7 @@ function normalizeValue(
   return Array.isArray(value) ? value : value ? [value] : []
 }
 
-// Module-level stack for item context passing
+// Module-level stack for item context passing.
 const itemContextStack: AccordionItemContext[] = []
 
 function pushItemContext(ctx: AccordionItemContext): void {
@@ -127,299 +129,195 @@ function getCurrentItemContext(): AccordionItemContext | undefined {
   return itemContextStack[itemContextStack.length - 1]
 }
 
-function updateTriggerState(
-  el: HTMLElement,
-  _triggerValue: string,
-  isOpen: boolean,
-  disabled: boolean,
-  orientation: AccordionOrientation
-): void {
-  el.setAttribute('aria-expanded', String(isOpen))
-  el.setAttribute('data-state', isOpen ? 'open' : 'closed')
-  el.setAttribute('data-orientation', orientation)
-  if (disabled) {
-    el.setAttribute('aria-disabled', 'true')
-    el.setAttribute('data-disabled', '')
-  } else {
-    el.removeAttribute('aria-disabled')
-    el.removeAttribute('data-disabled')
-  }
-}
-
-function updateContentState(
-  el: HTMLElement,
-  _contentValue: string,
-  isOpen: boolean,
-  headerId: string,
-  disabled: boolean,
-  orientation: AccordionOrientation
-): void {
-  el.setAttribute('role', 'region')
-  el.setAttribute('aria-labelledby', headerId)
-  el.setAttribute('data-state', isOpen ? 'open' : 'closed')
-  el.setAttribute('data-orientation', orientation)
-  if (disabled) {
-    el.setAttribute('data-disabled', '')
-  } else {
-    el.removeAttribute('data-disabled')
-  }
-  if (isOpen) {
-    el.removeAttribute('hidden')
-  } else {
-    el.setAttribute('hidden', '')
-  }
-}
-
 /**
- * 创建 Accordion Root 组件
+ * Create the Accordion Root component.
  */
 export function createAccordionRoot(): (
   props?: AccordionRootProps
 ) => Mountable<HTMLElement> {
   return (props?: AccordionRootProps) => {
-    return (host: HTMLElement) => {
-      const root = document.createElement('div')
+    const rt = getReactiveRuntime()
 
-      const type = props?.type ?? 'single'
-      const collapsible = props?.collapsible ?? false
-      const disabled = props?.disabled ?? false
-      const orientation = props?.orientation ?? 'vertical'
+    const type = props?.type ?? 'single'
+    const collapsible = props?.collapsible ?? false
+    const disabled = props?.disabled ?? false
+    const orientation = props?.orientation ?? 'vertical'
 
-      root.setAttribute('data-orientation', orientation)
-      if (props?.class) root.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(root.style, props.style)
-        }
-      }
-
-      const isControlled = props?.value !== undefined
-      let currentValue: string | string[] = normalizeValue(
+    const isControlled = props?.value !== undefined
+    const internal = rt.ref<string | string[]>(
+      normalizeValue(
         props?.value ?? props?.defaultValue ?? (type === 'multiple' ? [] : ''),
         type
       )
+    )
+    const current = (): string | string[] =>
+      isControlled
+        ? normalizeValue(props?.value ?? (type === 'multiple' ? [] : ''), type)
+        : rt.unref(internal)
 
-      const triggerElements = new Map<HTMLElement, string>()
-      const contentElements = new Map<
-        HTMLElement,
-        { value: string; headerId: string }
-      >()
-      const itemElements = new Map<
-        HTMLElement,
-        { value: string; disabled: boolean }
-      >()
-      const triggerIds = new Map<string, string>()
-      const headerIds = new Map<string, string>()
-      const contentIds = new Map<string, string>()
+    const triggerElements = new Map<HTMLElement, string>()
+    const contentElements = new Map<
+      HTMLElement,
+      { value: string; headerId: string }
+    >()
+    const itemElements = new Map<HTMLElement, { value: string; disabled: boolean }>()
+    const triggerIds = new Map<string, string>()
+    const headerIds = new Map<string, string>()
+    const contentIds = new Map<string, string>()
 
-      const getTriggerId = (itemValue: string): string => {
-        if (!triggerIds.has(itemValue)) {
-          triggerIds.set(itemValue, generateId('accordion-trigger'))
-        }
-        return triggerIds.get(itemValue)!
+    const getTriggerId = (itemValue: string): string => {
+      if (!triggerIds.has(itemValue)) {
+        triggerIds.set(itemValue, generateId('accordion-trigger'))
       }
+      return triggerIds.get(itemValue)!
+    }
 
-      const getHeaderId = (itemValue: string): string => {
-        if (!headerIds.has(itemValue)) {
-          headerIds.set(itemValue, generateId('accordion-header'))
-        }
-        return headerIds.get(itemValue)!
+    const getHeaderId = (itemValue: string): string => {
+      if (!headerIds.has(itemValue)) {
+        headerIds.set(itemValue, generateId('accordion-header'))
       }
+      return headerIds.get(itemValue)!
+    }
 
-      const getContentId = (itemValue: string): string => {
-        if (!contentIds.has(itemValue)) {
-          contentIds.set(itemValue, generateId('accordion-content'))
-        }
-        return contentIds.get(itemValue)!
+    const getContentId = (itemValue: string): string => {
+      if (!contentIds.has(itemValue)) {
+        contentIds.set(itemValue, generateId('accordion-content'))
       }
+      return contentIds.get(itemValue)!
+    }
 
-      const isOpen = (itemValue: string): boolean => {
-        if (type === 'single') {
-          return currentValue === itemValue
-        }
-        return Array.isArray(currentValue) && currentValue.includes(itemValue)
+    const isItemDisabled = (itemValue: string): boolean => {
+      if (disabled) return true
+      for (const [, item] of itemElements) {
+        if (item.value === itemValue && item.disabled) return true
       }
+      return false
+    }
 
-      const updateAllStates = (): void => {
-        triggerElements.forEach((triggerValue, el) => {
-          const itemDisabled = isItemDisabled(triggerValue)
-          updateTriggerState(
-            el,
-            triggerValue,
-            isOpen(triggerValue),
-            itemDisabled,
-            orientation
-          )
-        })
-        contentElements.forEach(({ value: contentValue, headerId }, el) => {
-          const itemDisabled = isItemDisabled(contentValue)
-          updateContentState(
-            el,
-            contentValue,
-            isOpen(contentValue),
-            headerId,
-            itemDisabled,
-            orientation
-          )
-        })
+    const isOpen = (itemValue: string): boolean => {
+      const value = current()
+      if (type === 'single') {
+        return value === itemValue
       }
+      return Array.isArray(value) && value.includes(itemValue)
+    }
 
-      const setValue = (newValue: string | string[]): void => {
-        const normalized = normalizeValue(newValue, type)
-        if (JSON.stringify(normalized) === JSON.stringify(currentValue)) return
-        currentValue = normalized
-        if (!isControlled) {
-          updateAllStates()
-        }
-        props?.onValueChange?.(normalized)
+    const setValue = (newValue: string | string[]): void => {
+      const normalized = normalizeValue(newValue, type)
+      if (JSON.stringify(normalized) === JSON.stringify(current())) return
+      if (!isControlled) {
+        rt.setValue(internal, normalized)
       }
+      props?.onValueChange?.(normalized)
+    }
 
-      const toggleItem = (itemValue: string): void => {
-        const itemDisabled = isItemDisabled(itemValue)
-        if (itemDisabled) return
+    const toggleItem = (itemValue: string): void => {
+      if (isItemDisabled(itemValue)) return
 
-        if (type === 'single') {
-          if (currentValue === itemValue) {
-            if (collapsible) {
-              setValue('')
-            }
-          } else {
-            setValue(itemValue)
-          }
+      const value = current()
+      if (type === 'single') {
+        if (value === itemValue) {
+          if (collapsible) setValue('')
         } else {
-          const currentArr = Array.isArray(currentValue) ? currentValue : []
-          if (currentArr.includes(itemValue)) {
-            setValue(currentArr.filter((v) => v !== itemValue))
-          } else {
-            setValue([...currentArr, itemValue])
-          }
+          setValue(itemValue)
         }
-      }
-
-      const registerTrigger = (el: HTMLElement, itemValue: string): void => {
-        triggerElements.set(el, itemValue)
-        const triggerId = getTriggerId(itemValue)
-        const contentId = getContentId(itemValue)
-        el.id = triggerId
-        el.setAttribute('role', 'button')
-        el.setAttribute('aria-controls', contentId)
-        el.setAttribute('tabindex', '-1')
-        updateTriggerState(
-          el,
-          itemValue,
-          isOpen(itemValue),
-          isItemDisabled(itemValue),
-          orientation
-        )
-      }
-
-      const unregisterTrigger = (el: HTMLElement): void => {
-        triggerElements.delete(el)
-      }
-
-      const registerContent = (
-        el: HTMLElement,
-        itemValue: string,
-        headerId: string
-      ): void => {
-        contentElements.set(el, { value: itemValue, headerId })
-        el.id = getContentId(itemValue)
-        updateContentState(
-          el,
-          itemValue,
-          isOpen(itemValue),
-          headerId,
-          isItemDisabled(itemValue),
-          orientation
-        )
-      }
-
-      const unregisterContent = (el: HTMLElement): void => {
-        contentElements.delete(el)
-      }
-
-      const registerItem = (
-        el: HTMLElement,
-        itemValue: string,
-        itemDisabled: boolean
-      ): void => {
-        itemElements.set(el, { value: itemValue, disabled: itemDisabled })
-      }
-
-      const unregisterItem = (el: HTMLElement): void => {
-        itemElements.delete(el)
-      }
-
-      const isItemDisabled = (itemValue: string): boolean => {
-        if (disabled) return true
-        for (const [, item] of itemElements) {
-          if (item.value === itemValue && item.disabled) return true
+      } else {
+        const currentArr = Array.isArray(value) ? value : []
+        if (currentArr.includes(itemValue)) {
+          setValue(currentArr.filter((v) => v !== itemValue))
+        } else {
+          setValue([...currentArr, itemValue])
         }
-        return false
-      }
-
-      const getEnabledTriggers = (): HTMLElement[] => {
-        return Array.from(triggerElements.keys()).filter(
-          (el) => !isItemDisabled(triggerElements.get(el)!)
-        )
-      }
-
-      const getTriggerIndex = (el: HTMLElement): number => {
-        const enabled = getEnabledTriggers()
-        return enabled.indexOf(el)
-      }
-
-      const focusTrigger = (index: number): void => {
-        const enabled = getEnabledTriggers()
-        if (enabled.length === 0) return
-        const targetIndex =
-          ((index % enabled.length) + enabled.length) % enabled.length
-        enabled[targetIndex]?.focus()
-      }
-
-      const context: AccordionContext = {
-        type,
-        collapsible,
-        disabled,
-        orientation,
-        value: currentValue,
-        setValue,
-        isOpen,
-        toggleItem,
-        registerTrigger,
-        unregisterTrigger,
-        registerContent,
-        unregisterContent,
-        getTriggerId,
-        getHeaderId,
-        getContentId,
-        focusTrigger,
-        getEnabledTriggers,
-        getTriggerIndex,
-        registerItem,
-        unregisterItem,
-        isItemDisabled
-      }
-
-      const getContext = (): AccordionContext | undefined => context
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children(getContext)(root, undefined)
-      }
-
-      host.appendChild(root)
-
-      return () => {
-        childUnmount?.()
-        root.remove()
       }
     }
+
+    const registerTrigger = (el: HTMLElement, itemValue: string): void => {
+      triggerElements.set(el, itemValue)
+      el.id = getTriggerId(itemValue)
+      el.setAttribute('aria-controls', getContentId(itemValue))
+    }
+
+    const unregisterTrigger = (el: HTMLElement): void => {
+      triggerElements.delete(el)
+    }
+
+    const registerContent = (
+      el: HTMLElement,
+      itemValue: string,
+      _headerId: string
+    ): void => {
+      contentElements.set(el, { value: itemValue, headerId: _headerId })
+      el.id = getContentId(itemValue)
+    }
+
+    const unregisterContent = (el: HTMLElement): void => {
+      contentElements.delete(el)
+    }
+
+    const registerItem = (
+      el: HTMLElement,
+      itemValue: string,
+      itemDisabled: boolean
+    ): void => {
+      itemElements.set(el, { value: itemValue, disabled: itemDisabled })
+    }
+
+    const unregisterItem = (el: HTMLElement): void => {
+      itemElements.delete(el)
+    }
+
+    const getEnabledTriggers = (): HTMLElement[] =>
+      Array.from(triggerElements.keys()).filter(
+        (el) => !isItemDisabled(triggerElements.get(el)!)
+      )
+
+    const getTriggerIndex = (el: HTMLElement): number =>
+      getEnabledTriggers().indexOf(el)
+
+    const focusTrigger = (index: number): void => {
+      const enabled = getEnabledTriggers()
+      if (enabled.length === 0) return
+      const targetIndex = ((index % enabled.length) + enabled.length) % enabled.length
+      enabled[targetIndex]?.focus()
+    }
+
+    const context: AccordionContext = {
+      type,
+      collapsible,
+      disabled,
+      orientation,
+      value: current,
+      setValue,
+      isOpen,
+      toggleItem,
+      registerTrigger,
+      unregisterTrigger,
+      registerContent,
+      unregisterContent,
+      getTriggerId,
+      getHeaderId,
+      getContentId,
+      focusTrigger,
+      getEnabledTriggers,
+      getTriggerIndex,
+      registerItem,
+      unregisterItem,
+      isItemDisabled
+    }
+    const getContext = (): AccordionContext => context
+
+    return div({
+      dataOrientation: orientation,
+      dataDisabled: disabled ? '' : undefined,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children ? [props.children(getContext)] : undefined
+    })
   }
 }
 
 /**
- * 创建 Accordion Item 组件
+ * Create the Accordion Item component.
  */
 export function createAccordionItem(): (
   props?: AccordionItemProps,
@@ -429,59 +327,52 @@ export function createAccordionItem(): (
     props?: AccordionItemProps,
     getContext?: () => AccordionContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      if (!props?.value) {
-        throw new Error('AccordionItem: "value" prop is required')
-      }
-
-      const item = document.createElement('div')
-      if (props?.class) item.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(item.style, props.style)
-        }
-      }
-
-      const ctx = getContext?.()
-      if (ctx) {
-        ctx.registerItem(item, props.value, props?.disabled ?? false)
-      }
-
-      const itemDisabled = props?.disabled ?? false
-      const headerId =
-        ctx?.getHeaderId(props.value) ?? generateId('accordion-header')
-
-      const itemContext: AccordionItemContext = {
-        value: props.value,
-        disabled: itemDisabled,
-        headerId
-      }
-
-      pushItemContext(itemContext)
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        const getCtx = getContext ?? (() => undefined)
-        const getItemCtx = () => itemContext
-        childUnmount = props.children(getCtx, getItemCtx)(item, undefined)
-      }
-
-      host.appendChild(item)
-
-      return () => {
-        if (ctx) {
-          ctx.unregisterItem(item)
-        }
-        popItemContext()
-        childUnmount?.()
-        item.remove()
-      }
+    if (!props?.value) {
+      throw new Error('AccordionItem: "value" prop is required')
     }
+
+    const ctx = getContext?.()
+    const itemDisabled = props.disabled ?? false
+    const headerId =
+      ctx?.getHeaderId(props.value) ?? generateId('accordion-header')
+
+    const itemContext: AccordionItemContext = {
+      value: props.value,
+      disabled: itemDisabled,
+      headerId
+    }
+
+    return div({
+      dataState: () => (ctx?.isOpen(props.value) ? 'open' : 'closed'),
+      dataDisabled: itemDisabled ? '' : undefined,
+      ariaDisabled: itemDisabled ? 'true' : undefined,
+      class: props?.class,
+      style: props?.style,
+      // Element registries are set up before children mount so the parts
+      // can resolve the item context synchronously. Always injected — the
+      // item context stack must be balanced even without children.
+      children: [
+        (el: HTMLElement) => {
+          if (ctx) ctx.registerItem(el, props.value, itemDisabled)
+          pushItemContext(itemContext)
+          const getCtx = getContext ?? (() => undefined)
+          const getItemCtx = () => itemContext
+          const unmount = props.children
+            ? props.children(getCtx, getItemCtx)(el)
+            : undefined
+          return () => {
+            popItemContext()
+            if (ctx) ctx.unregisterItem(el)
+            unmount?.()
+          }
+        }
+      ]
+    })
   }
 }
 
 /**
- * 创建 Accordion Header 组件
+ * Create the Accordion Header component.
  */
 export function createAccordionHeader(): (
   props?: AccordionHeaderProps,
@@ -493,42 +384,23 @@ export function createAccordionHeader(): (
     getContext?: () => AccordionContext | undefined,
     getItemContext?: () => AccordionItemContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const header = document.createElement('h3')
-      header.setAttribute('role', 'heading')
-      header.setAttribute('aria-level', '3')
+    const itemCtx = getItemContext?.() ?? getCurrentItemContext()
 
-      const itemCtx = getItemContext?.()
-      if (itemCtx) {
-        header.id = itemCtx.headerId
-      }
-
-      if (props?.class) header.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(header.style, props.style)
-        }
-      }
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        const getCtx = getContext ?? (() => undefined)
-        const getItemCtx = getItemContext ?? (() => getCurrentItemContext())
-        childUnmount = props.children(getCtx, getItemCtx)(header, undefined)
-      }
-
-      host.appendChild(header)
-
-      return () => {
-        childUnmount?.()
-        header.remove()
-      }
-    }
+    return h3({
+      role: 'heading',
+      ariaLevel: 3,
+      id: itemCtx?.headerId,
+      class: props?.class,
+      style: props?.style,
+      children: props?.children
+        ? [props.children(getContext ?? (() => undefined), () => itemCtx)]
+        : undefined
+    })
   }
 }
 
 /**
- * 创建 Accordion Trigger 组件
+ * Create the Accordion Trigger component.
  */
 export function createAccordionTrigger(): (
   props?: AccordionTriggerProps,
@@ -540,87 +412,79 @@ export function createAccordionTrigger(): (
     getContext?: () => AccordionContext | undefined,
     getItemContext?: () => AccordionItemContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const trigger = document.createElement('button')
-      trigger.type = 'button'
-      trigger.setAttribute('tabindex', '-1')
+    const ctx = getContext?.()
+    const itemCtx = getItemContext?.() ?? getCurrentItemContext()
 
-      if (props?.class) trigger.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(trigger.style, props.style)
-        }
-      }
+    const itemValue = itemCtx?.value ?? ''
 
-      const ctx = getContext?.()
-      const itemCtx = getItemContext?.() ?? getCurrentItemContext()
-
-      if (ctx && itemCtx) {
-        ctx.registerTrigger(trigger, itemCtx.value)
-
-        trigger.addEventListener('click', () => {
-          if (ctx.isItemDisabled(itemCtx.value)) return
-          ctx.toggleItem(itemCtx.value)
-        })
-
-        trigger.addEventListener('keydown', (e: KeyboardEvent) => {
-          const enabledTriggers = ctx.getEnabledTriggers()
-          const currentIndex = ctx.getTriggerIndex(trigger)
-          if (currentIndex === -1) return
-
-          const orientation = ctx.orientation
-          const prevKey = orientation === 'vertical' ? 'ArrowUp' : 'ArrowLeft'
-          const nextKey =
-            orientation === 'vertical' ? 'ArrowDown' : 'ArrowRight'
-
-          switch (e.key) {
-            case nextKey:
-            case prevKey: {
-              e.preventDefault()
-              const direction = e.key === nextKey ? 1 : -1
-              const newIndex = currentIndex + direction
-              ctx.focusTrigger(newIndex)
-              break
-            }
-            case 'Home':
-              e.preventDefault()
-              ctx.focusTrigger(0)
-              break
-            case 'End':
-              e.preventDefault()
-              ctx.focusTrigger(enabledTriggers.length - 1)
-              break
-            case 'Enter':
-            case ' ':
-              e.preventDefault()
-              if (!ctx.isItemDisabled(itemCtx.value)) {
-                ctx.toggleItem(itemCtx.value)
-              }
-              break
+    return button({
+      type: 'button',
+      role: 'button',
+      tabIndex: -1,
+      ariaExpanded: () => String(ctx?.isOpen(itemValue) ?? false),
+      ariaDisabled: () => String(ctx?.isItemDisabled(itemValue) ?? false),
+      dataState: () => (ctx?.isOpen(itemValue) ? 'open' : 'closed'),
+      dataOrientation: ctx?.orientation,
+      dataDisabled: () => (ctx?.isItemDisabled(itemValue) ? '' : undefined),
+      class: props?.class,
+      style: props?.style,
+      // Trigger ids / aria-controls are written by the registry, which
+      // needs the live element — so this wrapper is always injected.
+      children: [
+        (el: HTMLElement) => {
+          if (ctx && itemCtx) ctx.registerTrigger(el, itemCtx.value)
+          const unmount = props?.children ? props.children()(el) : undefined
+          return () => {
+            if (ctx) ctx.unregisterTrigger(el)
+            unmount?.()
           }
-        })
-      }
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        childUnmount = props.children()(trigger, undefined)
-      }
-
-      host.appendChild(trigger)
-
-      return () => {
-        if (ctx) {
-          ctx.unregisterTrigger(trigger)
         }
-        childUnmount?.()
-        trigger.remove()
+      ],
+      onClick: () => {
+        if (!ctx || !itemCtx) return
+        if (ctx.isItemDisabled(itemCtx.value)) return
+        ctx.toggleItem(itemCtx.value)
+      },
+      onKeydown: (e: Event) => {
+        const ke = e as KeyboardEvent
+        if (!ctx) return
+        const enabledTriggers = ctx.getEnabledTriggers()
+        const currentIndex = ctx.getTriggerIndex(ke.target as HTMLElement)
+        if (currentIndex === -1) return
+
+        const prevKey = ctx.orientation === 'vertical' ? 'ArrowUp' : 'ArrowLeft'
+        const nextKey = ctx.orientation === 'vertical' ? 'ArrowDown' : 'ArrowRight'
+
+        switch (ke.key) {
+          case nextKey:
+          case prevKey: {
+            ke.preventDefault()
+            ctx.focusTrigger(currentIndex + (ke.key === nextKey ? 1 : -1))
+            break
+          }
+          case 'Home':
+            ke.preventDefault()
+            ctx.focusTrigger(0)
+            break
+          case 'End':
+            ke.preventDefault()
+            ctx.focusTrigger(enabledTriggers.length - 1)
+            break
+          case 'Enter':
+          case ' ':
+            ke.preventDefault()
+            if (itemCtx && !ctx.isItemDisabled(itemCtx.value)) {
+              ctx.toggleItem(itemCtx.value)
+            }
+            break
+        }
       }
-    }
+    })
   }
 }
 
 /**
- * 创建 Accordion Content 组件
+ * Create the Accordion Content component.
  */
 export function createAccordionContent(): (
   props?: AccordionContentProps,
@@ -632,66 +496,39 @@ export function createAccordionContent(): (
     getContext?: () => AccordionContext | undefined,
     getItemContext?: () => AccordionItemContext | undefined
   ) => {
-    return (host: HTMLElement) => {
-      const content = document.createElement('div')
-      const forceMount = props?.forceMount ?? false
+    const ctx = getContext?.()
+    const itemCtx = getItemContext?.() ?? getCurrentItemContext()
+    const forceMount = props?.forceMount ?? false
+    const itemValue = itemCtx?.value ?? ''
 
-      if (props?.class) content.className = props.class
-      if (props?.style) {
-        if (typeof props.style === 'object') {
-          Object.assign(content.style, props.style)
+    return div({
+      role: 'region',
+      ariaLabelledby: itemCtx?.headerId,
+      dataState: () => (ctx?.isOpen(itemValue) ? 'open' : 'closed'),
+      dataOrientation: ctx?.orientation,
+      dataDisabled: () => (ctx?.isItemDisabled(itemValue) ? '' : undefined),
+      hidden: () => (forceMount || ctx?.isOpen(itemValue) ? false : true),
+      class: props?.class,
+      style: props?.style,
+      // Same as the trigger: the registry needs the live element.
+      children: [
+        (el: HTMLElement) => {
+          if (ctx && itemCtx) {
+            ctx.registerContent(el, itemCtx.value, itemCtx.headerId)
+          }
+          const unmount = props?.children ? props.children()(el) : undefined
+          return () => {
+            if (ctx) ctx.unregisterContent(el)
+            unmount?.()
+          }
         }
-      }
-
-      const ctx = getContext?.()
-      const itemCtx = getItemContext?.() ?? getCurrentItemContext()
-
-      if (ctx && itemCtx) {
-        ctx.registerContent(content, itemCtx.value, itemCtx.headerId)
-      }
-
-      if (!forceMount && ctx && itemCtx) {
-        const isOpenState = ctx.isOpen(itemCtx.value)
-        if (!isOpenState) {
-          content.setAttribute('hidden', '')
-          content.setAttribute('data-state', 'closed')
-        } else {
-          content.setAttribute('data-state', 'open')
-        }
-      } else if (forceMount) {
-        content.setAttribute(
-          'data-state',
-          ctx && itemCtx && ctx.isOpen(itemCtx.value) ? 'open' : 'closed'
-        )
-      } else {
-        content.setAttribute('data-state', 'closed')
-        content.setAttribute('hidden', '')
-      }
-
-      let childUnmount: (() => void) | undefined
-      if (props?.children) {
-        const shouldRender =
-          !ctx || !itemCtx || ctx.isOpen(itemCtx.value) || forceMount
-        if (shouldRender) {
-          childUnmount = props.children()(content, undefined)
-        }
-      }
-
-      host.appendChild(content)
-
-      return () => {
-        if (ctx) {
-          ctx.unregisterContent(content)
-        }
-        childUnmount?.()
-        content.remove()
-      }
-    }
+      ]
+    })
   }
 }
 
 /**
- * Accordion 组合组件
+ * Accordion preset built from a data array.
  */
 export interface AccordionItemData {
   value: string
@@ -715,107 +552,65 @@ export function createAccordion(): (
   const Trigger = createAccordionTrigger()
   const Content = createAccordionContent()
 
-  return (
-    props?: Omit<AccordionRootProps, 'children'> & {
-      itemClass?: string
-      headerClass?: string
-      triggerClass?: string
-      contentClass?: string
-      items?: AccordionItemData[]
-    }
-  ) => {
-    return (host: HTMLElement) => {
-      return Root({
-        type: props?.type ?? 'single',
-        collapsible: props?.collapsible,
-        defaultValue: props?.defaultValue,
-        value: props?.value,
-        onValueChange: props?.onValueChange,
-        disabled: props?.disabled,
-        orientation: props?.orientation,
-        class: props?.class,
-        style: props?.style,
-        children: (getContext) => (root: HTMLElement) => {
-          const unmounts: (() => void)[] = []
-
-          if (props?.items) {
-            props.items.forEach((item) => {
-              const itemHost = document.createElement('div')
-              const itemUnmount = Item(
-                {
-                  value: item.value,
-                  disabled: item.disabled,
-                  class: props?.itemClass,
-                  children: (getCtx, getItemCtx) => (itemEl: HTMLElement) => {
-                    const headerHost = document.createElement('div')
-                    const headerUnmount = Header(
-                      {
-                        class: props?.headerClass,
-                        children:
-                          (getCtx2, getItemCtx2) => (headerEl: HTMLElement) => {
-                            const triggerHost = document.createElement('div')
-                            const triggerUnmount = Trigger(
-                              {
-                                class: props?.triggerClass,
-                                children: () => (trigger: HTMLElement) => {
-                                  trigger.textContent = item.label
-                                  return () => {}
-                                }
-                              },
-                              getCtx2,
-                              getItemCtx2
-                            )(triggerHost, undefined)
-                            if (triggerUnmount)
-                              headerEl.appendChild(triggerHost)
-                            return () => {
-                              triggerUnmount?.()
-                              triggerHost.remove()
+  return (props) =>
+    Root({
+      type: props?.type ?? 'single',
+      collapsible: props?.collapsible,
+      defaultValue: props?.defaultValue,
+      value: props?.value,
+      onValueChange: props?.onValueChange,
+      disabled: props?.disabled,
+      orientation: props?.orientation,
+      class: props?.class,
+      style: props?.style,
+      children: (getContext) =>
+        div({
+          children: (props?.items ?? []).map((item) =>
+            Item(
+              {
+                value: item.value,
+                disabled: item.disabled,
+                class: props?.itemClass,
+                children: (getCtx, getItemCtx) => (itemEl: HTMLElement) => {
+                  const headerUnmount = Header(
+                    {
+                      class: props?.headerClass,
+                      children: (getCtx2, getItemCtx2) =>
+                        Trigger(
+                          {
+                            class: props?.triggerClass,
+                            children: () => (triggerEl: HTMLElement) => {
+                              triggerEl.textContent = item.label
                             }
-                          }
-                      },
-                      getCtx,
-                      getItemCtx
-                    )(headerHost, undefined)
-                    if (headerUnmount) itemEl.appendChild(headerHost)
-
-                    const contentHost = document.createElement('div')
-                    const contentUnmount = Content(
-                      {
-                        class: props?.contentClass,
-                        children: () => (content: HTMLElement) => {
-                          content.innerHTML = `<p>${item.content}</p>`
-                          return () => {}
-                        }
-                      },
-                      getCtx,
-                      getItemCtx
-                    )(contentHost, undefined)
-                    if (contentUnmount) itemEl.appendChild(contentHost)
-
-                    return () => {
-                      headerUnmount?.()
-                      contentUnmount?.()
-                      headerHost.remove()
-                      contentHost.remove()
-                    }
+                          },
+                          getCtx2,
+                          getItemCtx2
+                        )
+                    },
+                    getCtx,
+                    getItemCtx
+                  )(itemEl)
+                  const contentUnmount = Content(
+                    {
+                      class: props?.contentClass,
+                      children: () => (contentEl: HTMLElement) => {
+                        contentEl.textContent = item.content
+                      }
+                    },
+                    getCtx,
+                    getItemCtx
+                  )(itemEl)
+                  return () => {
+                    headerUnmount?.()
+                    contentUnmount?.()
                   }
-                },
-                getContext
-              )(itemHost, undefined)
-              if (itemUnmount) {
-                unmounts.push(itemUnmount)
-                root.appendChild(itemHost)
-              }
-            })
-          }
-
-          return () => {
-            unmounts.forEach((u) => u())
-          }
-        }
-      })(host, undefined)
-    }
-  }
+                }
+              },
+              getContext
+            )
+          )
+        })
+    })
 }
 
 export const accordion = createAccordion()
