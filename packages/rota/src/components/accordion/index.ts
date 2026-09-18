@@ -9,7 +9,8 @@
  */
 import type { Mountable } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, button, h3 } from '@rasenjs/dom'
+import { div, button, h3, text } from '@rasenjs/dom'
+import { createElementRef, type ElementRef } from '../../internal/element-ref'
 
 export type AccordionType = 'single' | 'multiple'
 export type AccordionOrientation = 'vertical' | 'horizontal'
@@ -25,22 +26,18 @@ export interface AccordionContext {
   setValue: (value: string | string[]) => void
   isOpen: (itemValue: string) => boolean
   toggleItem: (itemValue: string) => void
-  registerTrigger: (el: HTMLElement, itemValue: string) => void
-  unregisterTrigger: (el: HTMLElement) => void
-  registerContent: (
-    el: HTMLElement,
-    itemValue: string,
-    headerId: string
-  ) => void
-  unregisterContent: (el: HTMLElement) => void
+  /** Element cell of an item's trigger — keyboard navigation focuses these. */
+  triggerRef: (itemValue: string) => ElementRef<HTMLButtonElement>
   getTriggerId: (itemValue: string) => string
   getHeaderId: (itemValue: string) => string
   getContentId: (itemValue: string) => string
+  /** Focus the n-th enabled trigger (wraps around at both ends). */
   focusTrigger: (index: number) => void
-  getEnabledTriggers: () => HTMLElement[]
-  getTriggerIndex: (el: HTMLElement) => number
-  registerItem: (el: HTMLElement, itemValue: string, itemDisabled: boolean) => void
-  unregisterItem: (el: HTMLElement) => void
+  /** Position of this item among the enabled ones, or -1. */
+  getEnabledIndex: (itemValue: string) => number
+  getEnabledValues: () => string[]
+  /** Items announce their disabled flag; no element is involved. */
+  registerItem: (itemValue: string, itemDisabled: boolean) => void
   isItemDisabled: (itemValue: string) => boolean
 }
 
@@ -155,15 +152,20 @@ export function createAccordionRoot(): (
         ? normalizeValue(props?.value ?? (type === 'multiple' ? [] : ''), type)
         : rt.unref(internal)
 
-    const triggerElements = new Map<HTMLElement, string>()
-    const contentElements = new Map<
-      HTMLElement,
-      { value: string; headerId: string }
-    >()
-    const itemElements = new Map<HTMLElement, { value: string; disabled: boolean }>()
+    const triggerRefs = new Map<string, ElementRef<HTMLButtonElement>>()
+    const disabledItems = new Map<string, boolean>()
     const triggerIds = new Map<string, string>()
     const headerIds = new Map<string, string>()
     const contentIds = new Map<string, string>()
+
+    const triggerRef = (itemValue: string): ElementRef<HTMLButtonElement> => {
+      let ref = triggerRefs.get(itemValue)
+      if (!ref) {
+        ref = createElementRef<HTMLButtonElement>(rt)
+        triggerRefs.set(itemValue, ref)
+      }
+      return ref
+    }
 
     const getTriggerId = (itemValue: string): string => {
       if (!triggerIds.has(itemValue)) {
@@ -186,13 +188,8 @@ export function createAccordionRoot(): (
       return contentIds.get(itemValue)!
     }
 
-    const isItemDisabled = (itemValue: string): boolean => {
-      if (disabled) return true
-      for (const [, item] of itemElements) {
-        if (item.value === itemValue && item.disabled) return true
-      }
-      return false
-    }
+    const isItemDisabled = (itemValue: string): boolean =>
+      disabled || (disabledItems.get(itemValue) ?? false)
 
     const isOpen = (itemValue: string): boolean => {
       const value = current()
@@ -231,54 +228,25 @@ export function createAccordionRoot(): (
       }
     }
 
-    const registerTrigger = (el: HTMLElement, itemValue: string): void => {
-      triggerElements.set(el, itemValue)
-      el.id = getTriggerId(itemValue)
-      el.setAttribute('aria-controls', getContentId(itemValue))
-    }
+    /**
+     * Enabled item values in mount order. Liveness is judged through the ref
+     * cell (`isConnected`), so an unmounted trigger drops out on its own —
+     * no unregister bookkeeping and no DOM queries.
+     */
+    const getEnabledValues = (): string[] =>
+      Array.from(triggerRefs.keys()).filter((itemValue) => {
+        if (isItemDisabled(itemValue)) return false
+        return triggerRefs.get(itemValue)?.value?.isConnected ?? false
+      })
 
-    const unregisterTrigger = (el: HTMLElement): void => {
-      triggerElements.delete(el)
-    }
-
-    const registerContent = (
-      el: HTMLElement,
-      itemValue: string,
-      _headerId: string
-    ): void => {
-      contentElements.set(el, { value: itemValue, headerId: _headerId })
-      el.id = getContentId(itemValue)
-    }
-
-    const unregisterContent = (el: HTMLElement): void => {
-      contentElements.delete(el)
-    }
-
-    const registerItem = (
-      el: HTMLElement,
-      itemValue: string,
-      itemDisabled: boolean
-    ): void => {
-      itemElements.set(el, { value: itemValue, disabled: itemDisabled })
-    }
-
-    const unregisterItem = (el: HTMLElement): void => {
-      itemElements.delete(el)
-    }
-
-    const getEnabledTriggers = (): HTMLElement[] =>
-      Array.from(triggerElements.keys()).filter(
-        (el) => !isItemDisabled(triggerElements.get(el)!)
-      )
-
-    const getTriggerIndex = (el: HTMLElement): number =>
-      getEnabledTriggers().indexOf(el)
+    const getEnabledIndex = (itemValue: string): number =>
+      getEnabledValues().indexOf(itemValue)
 
     const focusTrigger = (index: number): void => {
-      const enabled = getEnabledTriggers()
-      if (enabled.length === 0) return
-      const targetIndex = ((index % enabled.length) + enabled.length) % enabled.length
-      enabled[targetIndex]?.focus()
+      const values = getEnabledValues()
+      if (values.length === 0) return
+      const target = ((index % values.length) + values.length) % values.length
+      triggerRefs.get(values[target]!)?.value?.focus()
     }
 
     const context: AccordionContext = {
@@ -290,18 +258,16 @@ export function createAccordionRoot(): (
       setValue,
       isOpen,
       toggleItem,
-      registerTrigger,
-      unregisterTrigger,
-      registerContent,
-      unregisterContent,
+      registerItem: (itemValue, itemDisabled) => {
+        disabledItems.set(itemValue, itemDisabled)
+      },
+      triggerRef,
       getTriggerId,
       getHeaderId,
       getContentId,
       focusTrigger,
-      getEnabledTriggers,
-      getTriggerIndex,
-      registerItem,
-      unregisterItem,
+      getEnabledValues,
+      getEnabledIndex,
       isItemDisabled
     }
     const getContext = (): AccordionContext => context
@@ -337,6 +303,9 @@ export function createAccordionItem(): (
     const headerId =
       ctx?.getHeaderId(props.value) ?? generateId('accordion-header')
 
+    // Items announce themselves (value + disabled flag); no element needed.
+    ctx?.registerItem(props.value, itemDisabled)
+
     const itemContext: AccordionItemContext = {
       value: props.value,
       disabled: itemDisabled,
@@ -349,12 +318,10 @@ export function createAccordionItem(): (
       'aria-disabled': itemDisabled ? 'true' : undefined,
       class: props?.class,
       style: props?.style,
-      // Element registries are set up before children mount so the parts
-      // can resolve the item context synchronously. Always injected — the
-      // item context stack must be balanced even without children.
+      // The item context is pushed for parts that are not handed it
+      // explicitly (the parts below thread it themselves).
       children: [
         (el: HTMLElement) => {
-          if (ctx) ctx.registerItem(el, props.value, itemDisabled)
           pushItemContext(itemContext)
           const getCtx = getContext ?? (() => undefined)
           const getItemCtx = () => itemContext
@@ -363,7 +330,6 @@ export function createAccordionItem(): (
             : undefined
           return () => {
             popItemContext()
-            if (ctx) ctx.unregisterItem(el)
             unmount?.()
           }
         }
@@ -424,6 +390,11 @@ export function createAccordionTrigger(): (
       type: 'button',
       role: 'button',
       tabIndex: -1,
+      // Ids and aria-controls are computed from the item value, so no
+      // element registration is involved.
+      id: itemCtx ? ctx?.getTriggerId(itemCtx.value) : undefined,
+      'aria-controls': itemCtx ? ctx?.getContentId(itemCtx.value) : undefined,
+      ref: itemCtx ? ctx?.triggerRef(itemCtx.value) : undefined,
       'aria-expanded': () => String(ctx?.isOpen(itemValue) ?? false),
       'aria-disabled': () => String(ctx?.isItemDisabled(itemValue) ?? false),
       'data-state': () => (ctx?.isOpen(itemValue) ? 'open' : 'closed'),
@@ -431,18 +402,7 @@ export function createAccordionTrigger(): (
       'data-disabled': () => (ctx?.isItemDisabled(itemValue) ? '' : undefined),
       class: props?.class,
       style: props?.style,
-      // Trigger ids / aria-controls are written by the registry, which
-      // needs the live element — so this wrapper is always injected.
-      children: [
-        (el: HTMLElement) => {
-          if (ctx && itemCtx) ctx.registerTrigger(el, itemCtx.value)
-          const unmount = props?.children ? props.children()(el, undefined) : undefined
-          return () => {
-            if (ctx) ctx.unregisterTrigger(el)
-            unmount?.()
-          }
-        }
-      ],
+      children: props?.children ? [props.children()] : undefined,
       onClick: () => {
         if (!ctx || !itemCtx) return
         if (ctx.isItemDisabled(itemCtx.value)) return
@@ -450,9 +410,8 @@ export function createAccordionTrigger(): (
       },
       onKeyDown: (e: Event) => {
         const ke = e as KeyboardEvent
-        if (!ctx) return
-        const enabledTriggers = ctx.getEnabledTriggers()
-        const currentIndex = ctx.getTriggerIndex(ke.target as HTMLElement)
+        if (!ctx || !itemCtx) return
+        const currentIndex = ctx.getEnabledIndex(itemCtx.value)
         if (currentIndex === -1) return
 
         const prevKey = ctx.orientation === 'vertical' ? 'ArrowUp' : 'ArrowLeft'
@@ -471,7 +430,7 @@ export function createAccordionTrigger(): (
             break
           case 'End':
             ke.preventDefault()
-            ctx.focusTrigger(enabledTriggers.length - 1)
+            ctx.focusTrigger(ctx.getEnabledValues().length - 1)
             break
           case 'Enter':
           case ' ':
@@ -512,21 +471,11 @@ export function createAccordionContent(): (
       'data-orientation': ctx?.orientation,
       'data-disabled': () => (ctx?.isItemDisabled(itemValue) ? '' : undefined),
       hidden: () => (forceMount || ctx?.isOpen(itemValue) ? false : true),
+      // Both ids come from the item value; nothing is registered.
+      id: itemCtx ? ctx?.getContentId(itemCtx.value) : undefined,
       class: props?.class,
       style: props?.style,
-      // Same as the trigger: the registry needs the live element.
-      children: [
-        (el: HTMLElement) => {
-          if (ctx && itemCtx) {
-            ctx.registerContent(el, itemCtx.value, itemCtx.headerId)
-          }
-          const unmount = props?.children ? props.children()(el, undefined) : undefined
-          return () => {
-            if (ctx) ctx.unregisterContent(el)
-            unmount?.()
-          }
-        }
-      ]
+      children: props?.children ? [props.children()] : undefined
     })
   }
   return com(component)
@@ -584,10 +533,7 @@ export function createAccordion(): (
                         Trigger(
                           {
                             class: props?.triggerClass,
-                            children: () => (triggerEl: HTMLElement) => {
-                              triggerEl.textContent = item.label
-                              return undefined
-                            }
+                            children: () => text({ content: item.label })
                           },
                           getCtx2,
                           getItemCtx2
@@ -599,10 +545,7 @@ export function createAccordion(): (
                   const contentUnmount = Content(
                     {
                       class: props?.contentClass,
-                      children: () => (contentEl: HTMLElement) => {
-                        contentEl.textContent = item.content
-                        return undefined
-                      }
+                      children: () => text({ content: item.content })
                     },
                     getCtx,
                     getItemCtx

@@ -2,13 +2,18 @@
  * TagsInput - multi-tag input.
  *
  * Root + Input + Item + ItemText + ItemDelete composition. Composed on
- * @rasenjs/dom element factories: value and focus are runtime refs exposed
- * through getter-backed context properties, so items update reactively
- * instead of being patched attribute-by-attribute after every change.
+ * @rasenjs/dom element factories and `com`, with no direct DOM work:
+ *
+ * - element access goes through `ref` cells exposed by the context
+ *   (rootRef / inputRef), never through querySelector/closest
+ * - each part carries its own index; the delete button is told which tag it
+ *   belongs to instead of walking up the DOM looking for `[data-index]`
+ * - events are bound as props (onKeyDown/onPaste/onBlur/onClick)
  */
 import type { Mountable } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, span, button, input as inputEl } from '@rasenjs/dom'
+import { div, span, button, input as inputEl, text } from '@rasenjs/dom'
+import { createElementRef, type ElementRef } from '../../internal/element-ref'
 
 export interface TagsInputContext {
   /** Reactive reads (property getters; read them inside bindings). */
@@ -20,6 +25,9 @@ export interface TagsInputContext {
   addOnBlur: boolean
   allowCustomValue: boolean
   focusedIndex: number | null
+  /** Element cells for parts that need to move or test focus. */
+  rootRef: ElementRef<HTMLDivElement>
+  inputRef: ElementRef<HTMLInputElement>
   updateValue: (value: string[]) => void
   setFocusedIndex: (index: number | null) => void
   addTag: (tag: string) => void
@@ -38,9 +46,12 @@ export interface TagsInputRootProps {
   disabled?: boolean
   class?: string
   style?: Record<string, string | number> | string
+  /** Keyboard handling for the listbox (escape, arrows, delete). */
+  onKeyDown?: (event: KeyboardEvent) => void
+  /** May return several parts: they become siblings inside the listbox. */
   children?: (
     getContext: () => TagsInputContext | undefined
-  ) => Mountable<HTMLElement>
+  ) => Mountable<HTMLElement> | Mountable<HTMLElement>[]
 }
 
 export interface TagsInputInputProps {
@@ -54,8 +65,10 @@ export interface TagsInputItemProps {
   index: number
   class?: string
   style?: Record<string, string | number> | string
+  /** Receives the context and this item's index. */
   children?: (
-    getContext: () => TagsInputContext | undefined
+    getContext: () => TagsInputContext | undefined,
+    index: number
   ) => Mountable<HTMLElement>
 }
 
@@ -65,6 +78,8 @@ export interface TagsInputItemTextProps {
 }
 
 export interface TagsInputItemDeleteProps {
+  /** Index of the tag this button removes. */
+  index?: number
   class?: string
   style?: Record<string, string | number> | string
   children?: string
@@ -91,6 +106,8 @@ export function createTagsInputRoot(): (
       props?.value ?? props?.defaultValue ?? []
     )
     const focused = rt.ref<number | null>(null)
+    const rootRef = createElementRef<HTMLDivElement>(rt)
+    const inputRef = createElementRef<HTMLInputElement>(rt)
 
     const currentValue = (): string[] =>
       isControlled ? (props?.value ?? []) : rt.unref(internalValue)
@@ -124,7 +141,10 @@ export function createTagsInputRoot(): (
         if (index < focusedIndex) {
           rt.setValue(focused, focusedIndex - 1)
         } else if (index === focusedIndex) {
-          rt.setValue(focused, next.length === 0 ? null : Math.max(0, next.length - 1))
+          rt.setValue(
+            focused,
+            next.length === 0 ? null : Math.max(0, next.length - 1)
+          )
         }
       }
     }
@@ -154,6 +174,8 @@ export function createTagsInputRoot(): (
       get focusedIndex() {
         return rt.unref(focused)
       },
+      rootRef,
+      inputRef,
       updateValue,
       setFocusedIndex: (index) => rt.setValue(focused, index),
       addTag,
@@ -168,12 +190,23 @@ export function createTagsInputRoot(): (
       'aria-disabled': disabled ? 'true' : undefined,
       'data-disabled': disabled ? '' : undefined,
       tabIndex: 0,
+      ref: rootRef,
       class: props?.class,
       style: props?.style,
-      children: props?.children ? [props.children(getContext)] : undefined
+      onKeyDown: (e: Event) => props?.onKeyDown?.(e as KeyboardEvent),
+      children: props?.children
+        ? toArray(props.children(getContext))
+        : undefined
     })
   }
   return com(component)
+}
+
+/** Normalize a children result into an array of mountables. */
+function toArray(
+  value: Mountable<HTMLElement> | Mountable<HTMLElement>[]
+): Mountable<HTMLElement>[] {
+  return Array.isArray(value) ? value : [value]
 }
 
 /**
@@ -187,18 +220,20 @@ export function createTagsInputInput(): (
     props?: TagsInputInputProps,
     getContext?: () => TagsInputContext | undefined
   ) => {
+    const ctx = getContext?.()
+
     const handleInput = (e: Event) => {
       const target = e.target as HTMLInputElement
-      const ctx = getContext?.()
-      if (!ctx) return
+      const current = getContext?.()
+      if (!current) return
 
-      const delim = ctx.delimiter
+      const delim = current.delimiter
       if (delim && delim !== 'Enter') {
         const parts = target.value.split(delim)
         if (parts.length > 1) {
           for (const part of parts) {
             const trimmed = part.trim()
-            if (trimmed) ctx.addTag(trimmed)
+            if (trimmed) current.addTag(trimmed)
           }
           target.value = ''
         }
@@ -206,57 +241,56 @@ export function createTagsInputInput(): (
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const ctx = getContext?.()
-      if (!ctx) return
+      const current = getContext?.()
+      if (!current) return
+      const target = e.target as HTMLInputElement
 
       if (e.key === 'Enter') {
         e.preventDefault()
-        const inputValue = (e.target as HTMLInputElement).value.trim()
+        const inputValue = target.value.trim()
         if (inputValue) {
-          ctx.addTag(inputValue)
-          ;(e.target as HTMLInputElement).value = ''
+          current.addTag(inputValue)
+          target.value = ''
         }
         return
       }
 
-      if (e.key === 'Backspace') {
-        const inputValue = (e.target as HTMLInputElement).value
-        if (inputValue === '' && ctx.value.length > 0) {
-          e.preventDefault()
-          ctx.setFocusedIndex(ctx.value.length - 1)
-          const rootEl = (e.target as HTMLElement).closest('[role="listbox"]')
-          if (rootEl) (rootEl as HTMLElement).focus()
-        }
+      if (e.key === 'Backspace' && target.value === '' && current.value.length > 0) {
+        e.preventDefault()
+        current.setFocusedIndex(current.value.length - 1)
+        // Move focus to the listbox through the ref the root exposed.
+        current.rootRef?.value?.focus()
       }
     }
 
     const handlePaste = (e: ClipboardEvent) => {
-      const ctx = getContext?.()
-      if (!ctx) return
-      if (!ctx.addOnPaste) return
+      const current = getContext?.()
+      if (!current) return
+      if (!current.addOnPaste) return
 
       e.preventDefault()
       const pasted = e.clipboardData?.getData('text') ?? ''
       for (const tag of pasted.split(/[\s,;]+/)) {
         const trimmed = tag.trim()
-        if (trimmed) ctx.addTag(trimmed)
+        if (trimmed) current.addTag(trimmed)
       }
       ;(e.target as HTMLInputElement).value = ''
     }
 
     const handleBlur = (e: FocusEvent) => {
-      const ctx = getContext?.()
-      if (!ctx) return
-
+      const current = getContext?.()
+      if (!current) return
       const target = e.target as HTMLInputElement
       const related = e.relatedTarget as HTMLElement | null
-      const rootEl = target.closest('[role="listbox"]')
-      if (related && rootEl && rootEl.contains(related)) return
 
-      if (ctx.addOnBlur) {
+      // Focus moving inside the component (e.g. onto a delete button) must
+      // not commit the pending tag — the root ref answers that question.
+      if (related && current.rootRef?.value?.contains(related)) return
+
+      if (current.addOnBlur) {
         const inputValue = target.value.trim()
         if (inputValue) {
-          ctx.addTag(inputValue)
+          current.addTag(inputValue)
           target.value = ''
         }
       }
@@ -265,6 +299,7 @@ export function createTagsInputInput(): (
     return inputEl({
       type: 'text',
       placeholder: props?.placeholder,
+      ref: ctx?.inputRef,
       disabled: () => getContext?.()?.disabled ?? false,
       'data-disabled': () => (getContext?.()?.disabled ? '' : undefined),
       class: props?.class,
@@ -293,42 +328,34 @@ export function createTagsInputItem(): (
       return () => undefined
     }
 
+    const rt = getReactiveRuntime()
     const ctx = getContext?.()
-    const isSelected = (): boolean => ctx?.focusedIndex === props.index
+    const itemRef = createElementRef<HTMLSpanElement>(rt)
+    const index = props.index
+    const isSelected = (): boolean => ctx?.focusedIndex === index
+
+    // Focus follows selection. The effect reacts to both the index and the
+    // element arriving through the ref, so it needs no DOM lookup.
+    const focusIfSelected = (): void => {
+      if (isSelected()) itemRef.value?.focus()
+    }
+    rt.subscribe(() => ctx?.focusedIndex ?? null, focusIfSelected)
+    rt.subscribe(() => itemRef.value, focusIfSelected)
 
     return span({
       role: 'option',
+      ref: itemRef,
       'data-value': props.value,
-      'data-index': String(props.index),
+      'data-index': String(index),
       'aria-selected': () => String(isSelected()),
       'data-state': () => (isSelected() ? 'selected' : 'unselected'),
       tabIndex: -1,
       class: props?.class,
       style: props?.style,
-      children: [
-        (el: HTMLElement) => {
-          // Moving focus is an element-level effect: focus the item while it
-          // is the selected one.
-          const stop = ctx
-            ? getReactiveRuntime().subscribe(
-                () => ctx.focusedIndex,
-                () => {
-                  if (isSelected()) el.focus()
-                }
-              )
-            : undefined
-          if (isSelected()) el.focus()
-
-          const unmount = props.children
-            ? props.children(getContext ?? (() => undefined))(el, undefined)
-            : undefined
-          return () => {
-            stop?.()
-            unmount?.()
-          }
-        }
-      ],
-      onClick: () => ctx?.setFocusedIndex(props.index)
+      children: props?.children
+        ? [props.children(getContext ?? (() => undefined), index)]
+        : undefined,
+      onClick: () => ctx?.setFocusedIndex(index)
     })
   }
   return com(component)
@@ -370,20 +397,11 @@ export function createTagsInputItemDelete(): (
       'data-disabled': () => (ctx?.disabled ? '' : undefined),
       class: props?.class,
       style: props?.style,
-      children: [
-        (el: HTMLElement) => {
-          el.textContent = props?.children ?? '×'
-          return undefined
-        }
-      ],
+      children: [text({ content: props?.children ?? '×' })],
       onClick: (e: Event) => {
         e.stopPropagation()
-        const current = getContext?.()
-        if (!current) return
-        const item = (e.target as HTMLElement).closest('[data-index]')
-        if (!item) return
-        const index = parseInt(item.getAttribute('data-index') ?? '-1', 10)
-        if (index >= 0) current.removeTag(index)
+        if (props?.index === undefined) return
+        getContext?.()?.removeTag(props.index)
       }
     })
   }
@@ -404,12 +422,7 @@ export type TagsInputProps = TagsInputRootProps & {
 }
 
 /**
- * TagsInput preset: root + input + items from the current value.
- *
- * Items are rendered from the value at mount; the input's own add/remove
- * path updates the value and the focused index, and `each`-style
- * reconciliation is intentionally left out for now (the parts above are
- * reactive, the preset's list is not).
+ * TagsInput preset: root + input + one item per tag.
  */
 export function createTagsInput(): (
   props?: TagsInputProps
@@ -420,8 +433,12 @@ export function createTagsInput(): (
   const ItemText = createTagsInputItemText()
   const ItemDelete = createTagsInputItemDelete()
 
-  const component = (props?: TagsInputProps) =>
-    Root({
+  const component = (props?: TagsInputProps) => {
+    // The context only exists once Root mounts; the keyboard handler and the
+    // item list both read it through this closure.
+    let ctx: TagsInputContext | undefined
+
+    return Root({
       value: props?.value,
       defaultValue: props?.defaultValue,
       onValueChange: props?.onValueChange,
@@ -433,112 +450,100 @@ export function createTagsInput(): (
       disabled: props?.disabled,
       class: props?.class,
       style: props?.style,
-      children: (getContext) => (root: HTMLElement) => {
-        const ctx = getContext()
-        if (!ctx) return () => undefined
+      onKeyDown: (e) => {
+        props?.onKeyDown?.(e)
+        const current = ctx
+        if (!current) return
 
-        const unmounts: (() => void)[] = []
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          if (current.focusedIndex === null) {
+            current.setFocusedIndex(current.value.length - 1)
+          } else if (current.focusedIndex > 0) {
+            current.setFocusedIndex(current.focusedIndex - 1)
+          }
+          return
+        }
 
-        ctx.value.forEach((tag, index) => {
-          const itemHost = document.createElement('span')
-          const itemUnmount = Item(
+        if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          if (current.focusedIndex !== null) {
+            if (current.focusedIndex < current.value.length - 1) {
+              current.setFocusedIndex(current.focusedIndex + 1)
+            } else {
+              current.setFocusedIndex(null)
+              current.inputRef?.value?.focus()
+            }
+          }
+          return
+        }
+
+        if (
+          (e.key === 'Delete' || e.key === 'Backspace') &&
+          current.focusedIndex !== null
+        ) {
+          e.preventDefault()
+          current.removeTag(current.focusedIndex)
+          return
+        }
+
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          current.setFocusedIndex(null)
+          current.inputRef?.value?.focus()
+        }
+      },
+      // Items and input are siblings inside the listbox: the children result
+      // is an array of mountables, so nothing is created or appended here.
+      children: (getContext) => {
+        const context = getContext()
+        ctx = context
+        const items = (context?.value ?? []).map((tag, index) =>
+          Item(
             {
               value: tag,
               index,
               class: props?.itemClass,
               style: props?.itemStyle,
-              children: (getCtx) => (item: HTMLElement) => {
-                const textEl = ItemText(
-                  {
-                    class: props?.itemTextClass,
-                    style: props?.itemTextStyle
-                  },
-                  getCtx
-                )(item, undefined)
-                if (typeof textEl === 'function') unmounts.push(textEl)
-
-                const deleteEl = ItemDelete(
-                  {
-                    class: props?.itemDeleteClass,
-                    style: props?.itemDeleteStyle,
-                    children: props?.itemDeleteChildren
-                  },
-                  getCtx
-                )(item, undefined)
-                if (typeof deleteEl === 'function') unmounts.push(deleteEl)
-
-                return undefined
-              }
+              children: (getCtx, itemIndex) =>
+                span({
+                  children: [
+                    ItemText(
+                      {
+                        class: props?.itemTextClass,
+                        style: props?.itemTextStyle
+                      },
+                      getCtx
+                    ),
+                    ItemDelete(
+                      {
+                        index: itemIndex,
+                        class: props?.itemDeleteClass,
+                        style: props?.itemDeleteStyle,
+                        children: props?.itemDeleteChildren
+                      },
+                      getCtx
+                    )
+                  ]
+                })
             },
             getContext
-          )(itemHost, undefined)
-          if (typeof itemUnmount === 'function') unmounts.push(itemUnmount)
-          root.appendChild(itemHost)
-        })
+          )
+        )
 
-        const inputElHost = document.createElement('span')
-        const inputUnmount = Input(
+        const input = Input(
           {
             class: props?.inputClass,
             style: props?.inputStyle,
             placeholder: props?.inputPlaceholder
           },
           getContext
-        )(inputElHost, undefined)
-        if (typeof inputUnmount === 'function') unmounts.push(inputUnmount)
-        root.appendChild(inputElHost)
+        )
 
-        const handleKeyDown = (e: KeyboardEvent): void => {
-          const current = getContext()
-          if (!current) return
-
-          if (e.key === 'ArrowLeft') {
-            e.preventDefault()
-            if (current.focusedIndex === null) {
-              current.setFocusedIndex(current.value.length - 1)
-            } else if (current.focusedIndex > 0) {
-              current.setFocusedIndex(current.focusedIndex - 1)
-            }
-            return
-          }
-
-          if (e.key === 'ArrowRight') {
-            e.preventDefault()
-            if (current.focusedIndex !== null) {
-              if (current.focusedIndex < current.value.length - 1) {
-                current.setFocusedIndex(current.focusedIndex + 1)
-              } else {
-                current.setFocusedIndex(null)
-                root.querySelector('input')?.focus()
-              }
-            }
-            return
-          }
-
-          if (
-            (e.key === 'Delete' || e.key === 'Backspace') &&
-            current.focusedIndex !== null
-          ) {
-            e.preventDefault()
-            current.removeTag(current.focusedIndex)
-            return
-          }
-
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            current.setFocusedIndex(null)
-            root.querySelector('input')?.focus()
-          }
-        }
-
-        root.addEventListener('keydown', handleKeyDown)
-        unmounts.push(() => root.removeEventListener('keydown', handleKeyDown))
-
-        return () => {
-          for (const unmount of unmounts) unmount()
-        }
+        return [...items, input]
       }
     })
+  }
 
   return com(component)
 }

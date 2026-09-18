@@ -9,6 +9,7 @@
 import type { Mountable } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, input as inputEl } from '@rasenjs/dom'
+import { createElementRef, type ElementRef } from '../../internal/element-ref'
 
 export type PinInputType = 'numeric' | 'alphanumeric' | 'text'
 
@@ -19,6 +20,8 @@ export interface PinInputContext {
   disabled: boolean
   otp?: boolean
   focusedIndex: number
+  /** Element cell of one position — used to move focus without DOM lookups. */
+  cellRef: (index: number) => ElementRef<HTMLInputElement>
   setValue: (value: string) => void
   setFocusedIndex: (index: number) => void
 }
@@ -72,6 +75,15 @@ export function createPinInputRoot(): (
     const internalValue = rt.ref(props?.value ?? props?.defaultValue ?? '')
     const focused = rt.ref(0)
 
+    // One element cell per position: parts move focus through these refs
+    // instead of querying the DOM for sibling inputs.
+    const cells: ElementRef<HTMLInputElement>[] = Array.from(
+      { length },
+      () => createElementRef<HTMLInputElement>(rt)
+    )
+    const cellRef = (index: number): ElementRef<HTMLInputElement> =>
+      cells[Math.max(0, Math.min(length - 1, index))]!
+
     const normalizeValue = (val: string): string => val.slice(0, length)
 
     const currentValue = (): string =>
@@ -107,6 +119,7 @@ export function createPinInputRoot(): (
       get focusedIndex() {
         return rt.unref(focused)
       },
+      cellRef,
       setValue,
       setFocusedIndex: (index) =>
         rt.setValue(focused, Math.max(0, Math.min(length - 1, index)))
@@ -138,27 +151,20 @@ export function createPinInputInput(): (
     const index = props?.index ?? 0
     const ctx = getContext?.()
 
-    /**
-     * Cells are siblings of the root, so navigation resolves the cell list
-     * from the enclosing group at event time.
-     */
-    const cellAt = (el: HTMLElement, at: number): HTMLInputElement | null => {
-      const root = el.closest('[role="group"]') ?? el.parentElement
-      return (
-        (root?.querySelectorAll('input')[at] as HTMLInputElement | undefined) ??
-        null
-      )
+    /** Focus a sibling cell through the context's ref cells. */
+    const focusCell = (at: number): void => {
+      getContext?.()?.cellRef?.(at)?.value?.focus()
     }
 
     const handleInput = (e: Event) => {
-      const target = e.target as HTMLInputElement
       const current = getContext?.()
       if (!current) return
+      const cell = e.target as HTMLInputElement
 
-      const char = target.value
+      const char = cell.value
       if (!char) return
       if (!isValidChar(char, current.type)) {
-        target.value = ''
+        cell.value = ''
         return
       }
 
@@ -169,14 +175,13 @@ export function createPinInputInput(): (
 
       if (index < current.length - 1) {
         current.setFocusedIndex(index + 1)
-        cellAt(target, index + 1)?.focus()
+        focusCell(index + 1)
       }
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const current = getContext?.()
       if (!current) return
-      const target = e.target as HTMLInputElement
       const value = current.value
 
       switch (e.key) {
@@ -188,7 +193,7 @@ export function createPinInputInput(): (
             )
           } else if (index > 0) {
             current.setFocusedIndex(index - 1)
-            cellAt(target, index - 1)?.focus()
+            focusCell(index - 1)
             current.setValue(
               value.slice(0, index - 1) + value.slice(index)
             )
@@ -209,7 +214,7 @@ export function createPinInputInput(): (
           e.preventDefault()
           if (index > 0) {
             current.setFocusedIndex(index - 1)
-            cellAt(target, index - 1)?.focus()
+            focusCell(index - 1)
           }
           break
 
@@ -217,7 +222,7 @@ export function createPinInputInput(): (
           e.preventDefault()
           if (index < current.length - 1) {
             current.setFocusedIndex(index + 1)
-            cellAt(target, index + 1)?.focus()
+            focusCell(index + 1)
           }
           break
 
@@ -246,7 +251,7 @@ export function createPinInputInput(): (
 
       const lastIndex = Math.min(index + chars.length - 1, current.length - 1)
       current.setFocusedIndex(lastIndex)
-      cellAt(e.target as HTMLElement, lastIndex)?.focus()
+      focusCell(lastIndex)
     }
 
     return inputEl({
@@ -254,6 +259,7 @@ export function createPinInputInput(): (
       maxLength: 1,
       inputMode: ctx?.type === 'numeric' ? 'numeric' : 'text',
       placeholder: ctx?.type === 'numeric' ? '•' : '_',
+      ref: getContext?.()?.cellRef(index),
       value: () => {
         const value = getContext?.()?.value ?? ''
         return value[index] ?? ''

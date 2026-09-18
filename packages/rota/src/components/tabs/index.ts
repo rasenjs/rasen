@@ -7,7 +7,7 @@
  */
 import type { Mountable } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, button } from '@rasenjs/dom'
+import { div, button, text } from '@rasenjs/dom'
 
 export type TabsOrientation = 'horizontal' | 'vertical'
 
@@ -250,10 +250,7 @@ export function createTabs(): (
                           value: tab.value,
                           disabled: tab.disabled,
                           class: props?.triggerClass,
-                          children: () => (el: HTMLElement) => {
-                            el.textContent = tab.label
-                            return undefined
-                          }
+                          children: () => text({ content: tab.label })
                         },
                         getCtx
                       )
@@ -267,10 +264,7 @@ export function createTabs(): (
                   {
                     value: tab.value,
                     class: props?.contentClass,
-                    children: () => (el: HTMLElement) => {
-                      el.textContent = tab.content
-                      return undefined
-                    }
+                    children: () => text({ content: tab.content })
                   },
                   getContext
                 )

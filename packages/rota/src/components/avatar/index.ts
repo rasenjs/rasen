@@ -8,6 +8,7 @@
 import type { Mountable } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { span, img } from '@rasenjs/dom'
+import { createElementRef } from '../../internal/element-ref'
 
 export type ImageLoadingStatus = 'loading' | 'loaded' | 'error'
 export type FallbackVisibility = 'visible' | 'hidden'
@@ -144,6 +145,7 @@ export function createAvatarFallback(): (
     const rt = getReactiveRuntime()
     const delayMs = props?.delayMs ?? 0
     const delayedVisible = rt.ref(delayMs === 0)
+    const fallbackRef = createElementRef<HTMLSpanElement>(rt)
 
     const shouldShow = () => {
       const status = getContext?.()?.status() ?? 'loading'
@@ -153,7 +155,21 @@ export function createAvatarFallback(): (
       )
     }
 
+    // The delay timer starts once the element is in the DOM (the ref is
+    // written during mount). It flips a component-local ref, so a fire after
+    // unmount is harmless; the element lifetime owns the start, not the stop.
+    if (delayMs > 0) {
+      rt.subscribe(
+        () => fallbackRef.value,
+        (el) => {
+          if (!el) return
+          setTimeout(() => rt.setValue(delayedVisible, true), delayMs)
+        }
+      )
+    }
+
     return span({
+      ref: fallbackRef,
       'data-state': () => (shouldShow() ? 'visible' : 'hidden'),
       // Opacity (not hidden) so consumers can transition the swap in CSS.
       style: {
@@ -168,24 +184,7 @@ export function createAvatarFallback(): (
         justifyContent: 'center',
         ...(typeof props?.style === 'object' ? props.style : {})
       },
-      // The delay timer belongs to the element lifetime: started at mount,
-      // cleared on unmount. The wrapper is always injected so that the timer
-      // is scheduled even when the consumer passes no children.
-      children: [
-        (el: HTMLElement) => {
-          const timer =
-            delayMs > 0
-              ? setTimeout(() => rt.setValue(delayedVisible, true), delayMs)
-              : null
-          const unmount = props?.children
-            ? props.children()(el, undefined)
-            : undefined
-          return () => {
-            if (timer !== null) clearTimeout(timer)
-            unmount?.()
-          }
-        }
-      ]
+      children: props?.children ? [props.children()] : undefined
     })
   }
   return com(component)

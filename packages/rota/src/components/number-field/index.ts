@@ -7,7 +7,7 @@
  */
 import type { Mountable } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, button, input as inputEl } from '@rasenjs/dom'
+import { div, button, input as inputEl, text } from '@rasenjs/dom'
 
 export interface NumberFieldContext {
   /** Reactive value snapshot. */
@@ -182,12 +182,7 @@ export function createNumberFieldIncrement(): (
       'aria-disabled': () => String(ctx?.disabled ?? false),
       class: props?.class,
       style: props?.style,
-      children: [
-        (el: HTMLElement) => {
-          el.textContent = props?.children ?? '+'
-          return undefined
-        }
-      ],
+      children: [text({ content: props?.children ?? '+' })],
       onClick: () => {
         const current = getContext?.()
         if (!current || current.disabled) return
@@ -219,12 +214,7 @@ export function createNumberFieldDecrement(): (
       'aria-disabled': () => String(ctx?.disabled ?? false),
       class: props?.class,
       style: props?.style,
-      children: [
-        (el: HTMLElement) => {
-          el.textContent = props?.children ?? '-'
-          return undefined
-        }
-      ],
+      children: [text({ content: props?.children ?? '-' })],
       onClick: () => {
         const current = getContext?.()
         if (!current || current.disabled) return

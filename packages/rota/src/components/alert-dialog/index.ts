@@ -9,6 +9,7 @@
 import type { Mountable } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, h2, p } from '@rasenjs/dom'
+import { createElementRef } from '../../internal/element-ref'
 
 export interface AlertDialogContext {
   /** Reactive open state (property getter; wrap to read reactively). */
@@ -237,11 +238,15 @@ export function createAlertDialogContent(): (
   ) => {
     const rt = getReactiveRuntime()
     const ctx = getContext?.()
+    const contentRef = createElementRef<HTMLDivElement>(rt)
 
     const focusAction = (content: HTMLElement): void => {
       if (!ctx) return
 
-      if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      if (
+        typeof document !== 'undefined' &&
+        document.activeElement instanceof HTMLElement
+      ) {
         ctx.previousFocusElement = document.activeElement
       }
 
@@ -264,53 +269,49 @@ export function createAlertDialogContent(): (
       })
     }
 
+    // The dialog moves focus when it opens. The content element arrives
+    // through the ref, so the effect is driven by that ref becoming set —
+    // and re-runs whenever `open` flips.
+    if (ctx) {
+      const runFocus = () => {
+        const content = contentRef.value
+        if (content && ctx.open) focusAction(content)
+      }
+      const stops = [
+        rt.subscribe(() => contentRef.value, runFocus),
+        rt.subscribe(() => ctx.open, runFocus)
+      ]
+      // The subscriptions above only fire on change; a dialog that mounts
+      // already open must focus too.
+      runFocus()
+      // Cleanup is owned by the enclosing com scope.
+      void stops
+    }
+
     return div({
       role: 'alertdialog',
       'aria-modal': 'true',
       tabIndex: -1,
+      ref: contentRef,
       'data-state': () => (ctx?.open ? 'open' : 'closed'),
       hidden: () => !ctx?.open,
       'aria-labelledby': () => ctx?.titleId ?? undefined,
       'aria-describedby': () => ctx?.descriptionId ?? undefined,
       class: props?.class,
       style: props?.style,
-      // The content element itself is needed for focus management, so this
-      // wrapper is always injected; user children mount inside it.
-      children: [
-        (el: HTMLElement) => {
-          // Escape does not close an AlertDialog unless the consumer opts in.
-          const handleKeyDown = (event: KeyboardEvent): void => {
-            if (event.key !== 'Escape') return
-            if (props?.onEscapeKeyDown) {
-              props.onEscapeKeyDown(event)
-            } else {
-              event.preventDefault()
-            }
-          }
-          el.addEventListener('keydown', handleKeyDown)
-
-          // Move focus when the dialog opens (and on mount if already open).
-          const stop = ctx
-            ? rt.subscribe(
-                () => ctx.open,
-                (open) => {
-                  if (open) focusAction(el)
-                }
-              )
-            : undefined
-          if (ctx?.open) focusAction(el)
-
-          const unmount = props?.children
-            ? props.children(getContext ?? (() => undefined))(el, undefined)
-            : undefined
-
-          return () => {
-            el.removeEventListener('keydown', handleKeyDown)
-            stop?.()
-            unmount?.()
-          }
+      onKeyDown: (e: Event) => {
+        const event = e as KeyboardEvent
+        // Escape does not close an AlertDialog unless the consumer opts in.
+        if (event.key !== 'Escape') return
+        if (props?.onEscapeKeyDown) {
+          props.onEscapeKeyDown(event)
+        } else {
+          event.preventDefault()
         }
-      ]
+      },
+      children: props?.children
+        ? [props.children(getContext ?? (() => undefined))]
+        : undefined
     })
   }
   return com(component)
