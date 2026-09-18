@@ -94,8 +94,11 @@ checkbox({ defaultChecked: 'indeterminate' })`,
                   Content(
                     {
                       class: 'panel',
-                      children: () => () =>
-                        span({ class: 'panel__inner', children: ['Hidden while closed.'] })
+                      children: () =>
+                        span({
+                          class: 'panel__inner',
+                          children: ['Hidden while closed.']
+                        })
                     },
                     getContext
                   )

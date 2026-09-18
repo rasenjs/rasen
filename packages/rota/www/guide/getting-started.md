@@ -55,7 +55,7 @@ const App = Root({
     div({
       children: [
         Trigger({ children: () => 'Toggle' }, getContext),
-        Content({ children: () => () => text({ content: 'Hidden while closed.' }) }, getContext)
+        Content({ children: () => text({ content: 'Hidden while closed.' }) }, getContext)
       ]
     })
 })
