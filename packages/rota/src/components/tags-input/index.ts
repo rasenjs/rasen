@@ -14,6 +14,7 @@ import type { Mountable } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, span, button, input as inputEl, text } from '@rasenjs/dom'
 import { createElementRef, type ElementRef } from '../../internal/element-ref'
+import { rekeyedList } from '../../internal/rekeyed-list'
 
 export interface TagsInputContext {
   /** Reactive reads (property getters; read them inside bindings). */
@@ -501,38 +502,43 @@ export function createTagsInput(): (
       children: (getContext) => {
         const context = getContext()
         ctx = context
-        const items = (context?.value ?? []).map((tag, index) =>
-          Item(
-            {
-              value: tag,
-              index,
-              class: props?.itemClass,
-              style: props?.itemStyle,
-              children: (getCtx, itemIndex) =>
-                span({
-                  children: [
-                    ItemText(
-                      {
-                        class: props?.itemTextClass,
-                        style: props?.itemTextStyle,
-                        children: () => text({ content: tag })
-                      },
-                      getCtx
-                    ),
-                    ItemDelete(
-                      {
-                        index: itemIndex,
-                        class: props?.itemDeleteClass,
-                        style: props?.itemDeleteStyle,
-                        children: props?.itemDeleteChildren
-                      },
-                      getCtx
-                    )
-                  ]
-                })
-            },
-            getContext
-          )
+
+        // The item list is re-mounted whenever the tags change, so each item's
+        // index always matches the current array (see rekeyedList).
+        const items = rekeyedList(
+          () => context?.value ?? [],
+          (tag, index) =>
+            Item(
+              {
+                value: tag,
+                index,
+                class: props?.itemClass,
+                style: props?.itemStyle,
+                children: (getCtx, itemIndex) =>
+                  span({
+                    children: [
+                      ItemText(
+                        {
+                          class: props?.itemTextClass,
+                          style: props?.itemTextStyle,
+                          children: () => text({ content: tag })
+                        },
+                        getCtx
+                      ),
+                      ItemDelete(
+                        {
+                          index: itemIndex,
+                          class: props?.itemDeleteClass,
+                          style: props?.itemDeleteStyle,
+                          children: props?.itemDeleteChildren
+                        },
+                        getCtx
+                      )
+                    ]
+                  })
+              },
+              getContext
+            )
         )
 
         const input = Input(
@@ -544,7 +550,7 @@ export function createTagsInput(): (
           getContext
         )
 
-        return [...items, input]
+        return [items, input]
       }
     })
   }

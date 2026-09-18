@@ -666,6 +666,41 @@ describe('@rasenjs/rota - TagsInput', () => {
   })
 
   describe('createTagsInput (composed)', () => {
+    it('should add a tag to the rendered list when the value grows', () => {
+      const container = document.createElement('div')
+      const TagsInput = createTagsInput()
+      TagsInput({ defaultValue: ['tag1'] })(container)
+
+      const inputEl = container.querySelector('input') as HTMLInputElement
+      expect(container.querySelectorAll('[role="option"]').length).toBe(1)
+
+      inputEl.value = 'tag2'
+      inputEl.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+      )
+
+      const options = Array.from(container.querySelectorAll('[role="option"]'))
+      expect(options.map((el) => el.textContent)).toEqual(['tag1×', 'tag2×'])
+    })
+
+    it('should keep item indices correct after a removal', () => {
+      const container = document.createElement('div')
+      const TagsInput = createTagsInput()
+      TagsInput({ defaultValue: ['a', 'b', 'c'] })(container)
+
+      // Remove the middle tag through its own delete button.
+      const deletes = container.querySelectorAll('[role="option"] button')
+      ;(deletes[1] as HTMLButtonElement).click()
+
+      const options = Array.from(container.querySelectorAll('[role="option"]'))
+      expect(options.map((el) => el.textContent)).toEqual(['a×', 'c×'])
+      // data-index must match the new positions, not the old ones.
+      expect(options.map((el) => el.getAttribute('data-index'))).toEqual([
+        '0',
+        '1'
+      ])
+    })
+
     it('should render root with input', () => {
       const container = document.createElement('div')
       const TagsInput = createTagsInput()
