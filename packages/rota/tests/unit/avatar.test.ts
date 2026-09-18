@@ -268,4 +268,80 @@ describe('@rasenjs/rota - Avatar / load status', () => {
 
     expect(seen).toEqual(['loaded', 'error'])
   })
+
+  describe('createAvatar preset options', () => {
+    it('should pass onLoadingStatusChange through to the image', () => {
+      const container = document.createElement('div')
+      const seen: string[] = []
+      avatar({
+        src: 'x.png',
+        onLoadingStatusChange: (status) => seen.push(status),
+        fallback: () => text({ content: 'AB' })
+      })(container)
+
+      container.querySelector('img')!.dispatchEvent(new Event('load'))
+
+      expect(seen).toEqual(['loaded'])
+    })
+
+    it('should pass delayMs through to the fallback', () => {
+      const delayed = document.createElement('div')
+      avatar({
+        src: 'x.png',
+        delayMs: 100,
+        fallback: () => text({ content: 'AB' })
+      })(delayed)
+
+      // The delay has not elapsed, so the fallback is still hidden even though
+      // the image has not loaded either.
+      const delayedFallback = delayed.querySelector('span span')!
+      expect(delayedFallback.getAttribute('data-state')).toBe('hidden')
+      expect(delayedFallback.style.opacity).toBe('0')
+
+      // Without a delay the fallback is visible from the start.
+      const immediate = document.createElement('div')
+      avatar({
+        src: 'x.png',
+        fallback: () => text({ content: 'AB' })
+      })(immediate)
+      expect(immediate.querySelector('span span')!.getAttribute('data-state')).toBe(
+        'visible'
+      )
+    })
+  })
+
+  describe('per-instance state', () => {
+    it('should keep load status per instance, not per component', () => {
+      // Both avatars come from the same preset: one component definition,
+      // mounted twice. Per-instance state must not be shared.
+      const mountInto = (parent: HTMLElement, src: string) => {
+        const host = document.createElement('div')
+        parent.append(host)
+        avatar({ src, fallback: () => text({ content: 'AB' }) })(host)
+        return host
+      }
+
+      const page = document.createElement('div')
+      const first = mountInto(page, 'broken.png')
+      const second = mountInto(page, 'ok.png')
+
+      const firstImg = first.querySelector('img')!
+      const secondImg = second.querySelector('img')!
+
+      firstImg.dispatchEvent(new Event('error'))
+
+      expect(firstImg.getAttribute('data-state')).toBe('error')
+      expect(first.querySelector('span span')!.style.opacity).toBe('1')
+      // One broken image must not blank a working one.
+      expect(secondImg.getAttribute('data-state')).toBe('loading')
+
+      secondImg.dispatchEvent(new Event('load'))
+
+      expect(secondImg.getAttribute('data-state')).toBe('loaded')
+      expect(second.querySelector('span span')!.style.opacity).toBe('0')
+      // ...and the first keeps its own failure.
+      expect(firstImg.getAttribute('data-state')).toBe('error')
+      expect(first.querySelector('span span')!.style.opacity).toBe('1')
+    })
+  })
 })

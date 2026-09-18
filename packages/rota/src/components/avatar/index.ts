@@ -54,8 +54,6 @@ export interface AvatarContext {
 export function createAvatarRoot(): (
   props?: AvatarRootProps
 ) => Mountable<HTMLElement> {
-  const contextMap = new WeakMap<HTMLElement, AvatarContext>()
-
   const component = (props?: AvatarRootProps) => {
     const rt = getReactiveRuntime()
     const statusRef = rt.ref<ImageLoadingStatus>('loading')
@@ -79,12 +77,10 @@ export function createAvatarRoot(): (
                 status: () => rt.unref(statusRef),
                 setStatus: (s) => rt.setValue(statusRef, s)
               })
-              contextMap.set(el, getContext())
               const produced = props.children!(getContext)
               const parts = toMountables(produced) ?? []
               const unmounts = parts.map((part) => part(el, undefined))
               return () => {
-                contextMap.delete(el)
                 for (const unmount of unmounts) {
                   if (typeof unmount === 'function') unmount()
                 }
@@ -207,9 +203,12 @@ export function createAvatarFallback(): (
  * Avatar preset: root + image + fallback wired to one context.
  */
 export function createAvatar(): (props?: {
-  src?: string
-  alt?: string
+  src?: PropValue<string>
+  alt?: PropValue<string>
   fallback?: () => Mountable<HTMLElement>
+  /** Milliseconds to wait before the fallback appears (0 = immediately). */
+  delayMs?: PropValue<number>
+  onLoadingStatusChange?: (status: ImageLoadingStatus) => void
   class?: string
   style?: Record<string, string | number> | string
 }) => Mountable<HTMLElement> {
@@ -222,8 +221,18 @@ export function createAvatar(): (props?: {
       class: props?.class,
       style: props?.style,
       children: (getContext) => [
-        Image({ src: props?.src, alt: props?.alt }, getContext),
-        Fallback({ children: props?.fallback }, getContext)
+        Image(
+          {
+            src: props?.src,
+            alt: props?.alt,
+            onLoadingStatusChange: props?.onLoadingStatusChange
+          },
+          getContext
+        ),
+        Fallback(
+          { children: props?.fallback, delayMs: props?.delayMs },
+          getContext
+        )
       ]
     })
 }

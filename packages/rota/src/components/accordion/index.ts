@@ -110,19 +110,53 @@ function normalizeValue(
   return Array.isArray(value) ? value : value ? [value] : []
 }
 
-// Module-level stack for item context passing.
-const itemContextStack: AccordionItemContext[] = []
-
-function pushItemContext(ctx: AccordionItemContext): void {
-  itemContextStack.push(ctx)
+/**
+ * The item context of the subtree currently being mounted.
+ *
+ * Parts are usually handed their item context explicitly
+ * (`children: (getCtx, getItemCtx) => …`), but writing `Header({}, ctx)` inside
+ * an item is common enough to support without threading it through by hand.
+ *
+ * This is a **mount-scoped** value, not a stack: it is set while an item's
+ * subtree mounts and restored in `finally`, so it is only visible to the
+ * synchronous recursion beneath that item. A stack would instead hold the last
+ * item mounted *anywhere* — with two accordions on a page, the second
+ * accordion's parts would resolve the first accordion's item, and their ids
+ * and open state would be wrong. (Same contract as `com`'s host hooks:
+ * asynchronous mounting must pass the context explicitly.)
+ */
+interface AmbientScope {
+  accordion?: AccordionContext
+  item: AccordionItemContext
 }
 
-function popItemContext(): void {
-  itemContextStack.pop()
+let ambientScope: AmbientScope | undefined
+
+/**
+ * Run `fn` with `scope` visible to parts mounted beneath it.
+ *
+ * Parts normally receive their contexts explicitly
+ * (`children: (getCtx, getItemCtx) => …`) — which is what asynchronous
+ * mounting requires, since the scope below is gone by the time the deferred
+ * mount runs. When a part is created without them (the common shorthand
+ * `Header({ children: () => Trigger({}) })`), it resolves this scope.
+ */
+function withAmbientScope<T>(scope: AmbientScope, fn: () => T): T {
+  const previous = ambientScope
+  ambientScope = scope
+  try {
+    return fn()
+  } finally {
+    ambientScope = previous
+  }
 }
 
-function getCurrentItemContext(): AccordionItemContext | undefined {
-  return itemContextStack[itemContextStack.length - 1]
+function getAmbientAccordion(): AccordionContext | undefined {
+  return ambientScope?.accordion
+}
+
+function getAmbientItem(): AccordionItemContext | undefined {
+  return ambientScope?.item
 }
 
 /**
@@ -292,16 +326,13 @@ export function createAccordionItem(): (
       // explicitly (the parts below thread it themselves).
       children: [
         (el: HTMLElement) => {
-          pushItemContext(itemContext)
           const getCtx = getContext ?? (() => undefined)
           const getItemCtx = () => itemContext
-          const unmount = props.children
-            ? props.children(getCtx, getItemCtx)(el, undefined)
-            : undefined
-          return () => {
-            popItemContext()
-            unmount?.()
-          }
+          // The ambient scope is live only for this synchronous mount.
+          const unmount = withAmbientScope({ accordion: ctx, item: itemContext }, () =>
+            props.children ? props.children(getCtx, getItemCtx)(el, undefined) : undefined
+          )
+          return () => unmount?.()
           }
         ]
       }),
@@ -324,7 +355,7 @@ export function createAccordionHeader(): (
     getContext?: () => AccordionContext | undefined,
     getItemContext?: () => AccordionItemContext | undefined
   ) => {
-    const itemCtx = getItemContext?.() ?? getCurrentItemContext()
+    const itemCtx = getItemContext?.() ?? getAmbientItem()
 
     return h3({
       role: 'heading',
@@ -333,7 +364,7 @@ export function createAccordionHeader(): (
       class: props?.class,
       style: props?.style,
       children: props?.children
-        ? [props.children(getContext ?? (() => undefined), () => itemCtx)]
+        ? [props.children(getContext ?? getAmbientAccordion, () => itemCtx)]
         : undefined
     })
   }
@@ -353,8 +384,8 @@ export function createAccordionTrigger(): (
     getContext?: () => AccordionContext | undefined,
     getItemContext?: () => AccordionItemContext | undefined
   ) => {
-    const ctx = getContext?.()
-    const itemCtx = getItemContext?.() ?? getCurrentItemContext()
+    const ctx = getContext?.() ?? getAmbientAccordion()
+    const itemCtx = getItemContext?.() ?? getAmbientItem()
 
     const itemValue = itemCtx?.value ?? ''
 
@@ -413,8 +444,8 @@ export function createAccordionContent(): (
     getContext?: () => AccordionContext | undefined,
     getItemContext?: () => AccordionItemContext | undefined
   ) => {
-    const ctx = getContext?.()
-    const itemCtx = getItemContext?.() ?? getCurrentItemContext()
+    const ctx = getContext?.() ?? getAmbientAccordion()
+    const itemCtx = getItemContext?.() ?? getAmbientItem()
     const forceMount = props?.forceMount ?? false
     const itemValue = itemCtx?.value ?? ''
 

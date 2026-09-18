@@ -1239,3 +1239,119 @@ describe('@rasenjs/rota - Accordion', () => {
     })
   })
 })
+
+/**
+ * Two accordions on one page. A part that resolves its item context from
+ * module-level state ("the item that was mounted last") cannot tell which
+ * accordion it belongs to — so its ids and state come from the wrong one.
+ */
+describe('@rasenjs/rota - Accordion / two instances', () => {
+  type CtxGetter = Parameters<ReturnType<typeof createAccordionTrigger>>[1]
+
+  const buildAccordion = (
+    container: HTMLElement,
+    itemValue: string,
+    onContext?: (getContext: CtxGetter) => void
+  ) => {
+    const Root = createAccordionRoot()
+    const Item = createAccordionItem()
+    const Header = createAccordionHeader()
+    const Trigger = createAccordionTrigger()
+    const Content = createAccordionContent()
+
+    Root({
+      type: 'single',
+      children: (getContext) => (host: HTMLElement) => {
+        onContext?.(getContext)
+        const unmount = Item(
+          {
+            value: itemValue,
+            children: (getCtx, getItemCtx) => (itemEl: HTMLElement) => {
+              // Note: neither part is handed a context. They must still belong
+              // to their own item of their own accordion.
+              const parts = [Header({ children: () => Trigger({}) }), Content({})]
+              const unmounts = parts.map((part) => part(itemEl, undefined))
+              return () => {
+                for (const u of unmounts) {
+                  if (typeof u === 'function') u()
+                }
+              }
+            }
+          },
+          getContext
+        )(host, undefined)
+        return () => typeof unmount === 'function' && unmount()
+      }
+    })(container)
+  }
+
+  it('should give each trigger the id of its own accordion', () => {
+    const first = document.createElement('div')
+    const second = document.createElement('div')
+    document.body.append(first, second)
+
+    buildAccordion(first, 'one')
+    buildAccordion(second, 'two')
+
+    const triggerOf = (c: HTMLElement) =>
+      c.querySelector('button')?.getAttribute('aria-controls')
+
+    const firstControls = triggerOf(first)
+    const secondControls = triggerOf(second)
+
+    expect(firstControls).toBeTruthy()
+    expect(secondControls).toBeTruthy()
+    // Different items, so different content ids — and each trigger points at
+    // the content inside its own accordion.
+    expect(firstControls).not.toBe(secondControls)
+    expect(first.querySelector(`#${firstControls}`)).toBeTruthy()
+    expect(second.querySelector(`#${secondControls}`)).toBeTruthy()
+  })
+
+  it('should report the open state of its own item', () => {
+    const first = document.createElement('div')
+    const second = document.createElement('div')
+    document.body.append(first, second)
+
+    buildAccordion(first, 'one')
+    buildAccordion(second, 'two')
+
+    expect(first.querySelector('button')!.getAttribute('aria-expanded')).toBe('false')
+    expect(second.querySelector('button')!.getAttribute('aria-expanded')).toBe('false')
+
+    first.querySelector('button')!.click()
+
+    // Opening the first must not make the second claim to be open.
+    expect(first.querySelector('button')!.getAttribute('aria-expanded')).toBe('true')
+    expect(second.querySelector('button')!.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('should not hand a part created later another item\'s ids', () => {
+    const first = document.createElement('div')
+    const second = document.createElement('div')
+    document.body.append(first, second)
+
+    buildAccordion(first, 'one')
+    buildAccordion(second, 'two')
+
+    const secondControls = second
+      .querySelector('button')!
+      .getAttribute('aria-controls')
+
+    // A part created *after* both accordions mounted (a lazily rendered panel,
+    // a portal, deferred hydration) with no context handed to it. It is not
+    // inside any item's mount scope any more.
+    const Trigger = createAccordionTrigger()
+    const host = document.createElement('div')
+    Trigger({})(host, undefined)
+
+    const deferred = host.querySelector('button')!
+    // A module-level "current item" would still be the last item mounted, so
+    // this part would render the *second* accordion's item ids — and a click
+    // would toggle that item. The scope below only covers the synchronous
+    // mount, so a deferred part resolves nothing and must be handed its item
+    // context explicitly (the same contract as `com`'s host hooks).
+    expect(deferred.getAttribute('aria-controls')).not.toBe(secondControls)
+    expect(deferred.getAttribute('aria-controls')).toBeNull()
+  })
+})
