@@ -359,3 +359,98 @@ describe('BatchRenderer frustum culling (opt-in)', () => {
     br.destroy()
   })
 })
+
+// -- staticContent groups (opt-in transform skip) -----------------------------
+
+describe('BatchRenderer staticContent groups (opt-in transform skip)', () => {
+  let gl: GlContext
+  let rafCallbacks: Array<() => void>
+  let rafSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    if (typeof globalThis.requestAnimationFrame !== 'function') {
+      ;(globalThis as unknown as { requestAnimationFrame: (cb: FrameRequestCallback) => number }).requestAnimationFrame = () => 0
+    }
+    gl = createMockWebGLContext()
+    rafCallbacks = []
+    rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb as () => void)
+      return 0
+    })
+  })
+  afterEach(() => {
+    rafSpy.mockRestore()
+    if (hasRenderContext(gl)) (getRenderContext(gl) as unknown as { destroy?: () => void }).destroy?.()
+  })
+
+  const COLOR = { r: 1, g: 1, b: 1, a: 1 }
+
+  /** The packed positions upload for a flush: (byteOffset|0, Float32Array).
+   *  Reads both bufferData (legacy path — the base mock lacks
+   *  createVertexArray) and bufferSubData (WebGL2 path). */
+  function positionUploads(): Array<{ offset: number; data: Float32Array }> {
+    const sub = (gl as unknown as { bufferSubData?: ReturnType<typeof vi.fn> }).bufferSubData
+    const calls = [
+      ...(gl.bufferData as unknown as ReturnType<typeof vi.fn>).mock.calls,
+      ...(sub?.mock.calls ?? []),
+    ]
+    return calls
+      .filter((c) => c.find((a) => a instanceof Float32Array && (a as Float32Array).length % 3 === 0 && (a as Float32Array).length > 0))
+      .map((c) => {
+        const data = c.find((a) => a instanceof Float32Array) as Float32Array
+        const offsetIdx = c.indexOf(data)
+        return { offset: offsetIdx > 0 ? c[offsetIdx - 1] as number : 0, data }
+      })
+  }
+
+  it('re-submits the identical static item and renders identical positions', () => {
+    const br = new BatchRenderer(gl, { projectionMatrix: ortho(100) })
+    const verts = quad(10, 10, 8, 8)
+    br.addShape(verts, COLOR, Mat4x4f.identity(), undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true)
+    br.flush()
+    const first = positionUploads().map((u) => Array.from(u.data))
+    ;(gl.bufferData as unknown as ReturnType<typeof vi.fn>).mockClear()
+    // Frame 2: same arrays, same transform → cache hit → identical output.
+    br.addShape(verts, COLOR, Mat4x4f.identity(), undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true)
+    br.flush()
+    const second = positionUploads().map((u) => Array.from(u.data))
+    expect(second).toEqual(first)
+    expect(second[0]?.[0]).toBeCloseTo(10) // world-space x of the first vertex
+    br.destroy()
+  })
+
+  it('a transform change invalidates the cache (item moves)', () => {
+    const br = new BatchRenderer(gl, { projectionMatrix: ortho(100) })
+    const verts = quad(10, 10, 8, 8)
+    br.addShape(verts, COLOR, Mat4x4f.identity(), undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true)
+    br.flush()
+    ;(gl.bufferData as unknown as ReturnType<typeof vi.fn>).mockClear()
+    const moved = new Mat4x4f()
+    moved.source[12] = 30
+    br.addShape(verts, COLOR, moved, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true)
+    br.flush()
+    const uploads = positionUploads().filter((u) => Math.abs(u.data[0] - 40) < 1e-4 || Math.abs(u.data[0] - 10) < 1e-4)
+    expect(uploads.length).toBe(1)
+    expect(uploads[0].data[0]).toBeCloseTo(40) // 10 + 30: re-transformed
+    br.destroy()
+  })
+
+  it('non-static items never enter the cache (always re-transformed)', () => {
+    const br = new BatchRenderer(gl, { projectionMatrix: ortho(100) })
+    const verts = quad(10, 10, 8, 8)
+    br.addShape(verts, COLOR, Mat4x4f.identity())
+    br.flush()
+    ;(gl.bufferData as unknown as ReturnType<typeof vi.fn>).mockClear()
+    // Same arrays, same transform — but no staticContent flag → the item's
+    // vertices could have been mutated in place, so it must re-transform.
+    // The producer mutated nothing here, so positions are identical either
+    // way; the observable contract is that flush still works and produces
+    // the same output (no stale-cache path is even consulted).
+    br.addShape(verts, COLOR, Mat4x4f.identity())
+    br.flush()
+    const uploads = positionUploads().filter((u) => Math.abs(u.data[0] - 10) < 1e-4)
+    expect(uploads.length).toBe(1)
+    expect(uploads[0].data[0]).toBeCloseTo(10)
+    br.destroy()
+  })
+})

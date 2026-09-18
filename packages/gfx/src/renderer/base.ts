@@ -127,6 +127,12 @@ export interface BatchItem {
    *  submission time when culling is enabled. Items without bounds are
    *  always drawn (conservative). */
   bounds?: Float32Array
+  /** Producer guarantee: this item's vertices / uv / vertexColors / indices
+   *  array CONTENTS did not change since the previous submission of the
+   *  same arrays, and only the transform may differ. The transform loop
+   *  then skips re-transforming when the transform is unchanged too
+   *  (group-level cache). Opt-in — a wrong `true` renders stale geometry. */
+  staticContent?: boolean
 }
 
 /** Max textures merged into one draw call (sampler array size in the
@@ -506,6 +512,7 @@ export abstract class Renderer {
     indicesOrBlendMode?: Uint16Array | number[] | BlendMode,
     translationOnlyOrIndices?: boolean | Uint16Array | number[],
     packedColorOrTranslationOnly?: Uint8Array | Color | boolean,
+    staticContent?: boolean,
   ): void {
     if (typeof batchKeyOrVertices === 'string') {
       // component form: shift args by one
@@ -525,6 +532,7 @@ export abstract class Renderer {
         translationOnlyOrIndices as Uint16Array | number[] | undefined, // indices
         packedColorOrTranslationOnly as boolean | undefined,       // translationOnly
         arguments[15] as Uint8Array | Color | undefined,           // packedColor
+        arguments[16] as boolean | undefined,                      // staticContent
       )
       return
     }
@@ -544,6 +552,7 @@ export abstract class Renderer {
       indicesOrBlendMode as Uint16Array | number[] | undefined,
       translationOnlyOrIndices as boolean | undefined,
       packedColorOrTranslationOnly as Uint8Array | Color | undefined,
+      staticContent,
     )
   }
 
@@ -563,6 +572,7 @@ export abstract class Renderer {
     indices?: Uint16Array | number[],
     translationOnly?: boolean,
     packedColor?: Uint8Array | Color,
+    staticContent?: boolean,
   ) {
     const transformMatrix = transform instanceof Mat4x4f
       ? transform
@@ -602,6 +612,7 @@ export abstract class Renderer {
     } else if (item.bounds !== undefined) {
       item.bounds = undefined
     }
+    item.staticContent = staticContent === true
     this.batchItems.push(item)
     this._pendingVertexCount += vertices.length / 3
 
@@ -1134,6 +1145,127 @@ export abstract class Renderer {
    *   their index list inside the loop.
    */
   protected transformGroup(items: BatchItem[], textures: (TextureHandle | null)[], indexedCapable: boolean): GroupStreams {
+    // Static-content groups (every item opted in via staticContent): the
+    // transformed output depends only on the source arrays' identities, the
+    // transform values and the grouping flags. If the group signature is
+    // unchanged since the last build, reuse the cached streams and skip the
+    // whole transform pass. Uploads are NOT skipped here (legacy groups
+    // share the GPU buffers' low range, so a skip would be clobbered by the
+    // next group — see drawSealedRun's clean-stream mechanism for the
+    // persistent-range version of that idea).
+    if (items.length > 0 && items.every((it) => it.staticContent === true)) {
+      const cached = this.lookupStaticStreams(items, textures, indexedCapable)
+      if (cached) return cached
+    }
+    const streams = this.buildGroupStreams(items, textures, indexedCapable)
+    if (items.length > 0 && items.every((it) => it.staticContent === true)) {
+      this.storeStaticStreams(items, textures, indexedCapable, streams)
+    }
+    return streams
+  }
+
+  /** Reference-identity tokens for static-group signatures. WeakMap → a
+   *  dropped source array cannot leak a stale token collision. */
+  private staticTokens = new WeakMap<object, number>()
+  private staticTokenSeq = 0
+  private staticToken(obj: object): number {
+    let t = this.staticTokens.get(obj)
+    if (t === undefined) {
+      t = ++this.staticTokenSeq
+      this.staticTokens.set(obj, t)
+    }
+    return t
+  }
+
+  private staticCache = new Map<string, { streams: GroupStreams }>()
+  /** Signature scratch (reused per lookup). */
+  private staticSig: number[] = []
+
+  /** Build the group signature from identities + transform values + flags.
+   *  Appends into this.staticSig and returns it as the Map key. */
+  private staticSignature(items: BatchItem[], textures: (TextureHandle | null)[], indexedCapable: boolean): string {
+    const sig = this.staticSig
+    sig.length = 0
+    sig.push(indexedCapable ? 1 : 0, textures.length)
+    for (const t of textures) sig.push(t ? this.staticToken(t) : 0)
+    for (const it of items) {
+      sig.push(
+        this.staticToken(it.vertices),
+        it.vertices.length,
+        it.transform.source[0], it.transform.source[1], it.transform.source[2], it.transform.source[3],
+        it.transform.source[4], it.transform.source[5], it.transform.source[6], it.transform.source[7],
+        it.transform.source[8], it.transform.source[9], it.transform.source[10], it.transform.source[11],
+        it.transform.source[12], it.transform.source[13], it.transform.source[14], it.transform.source[15],
+        it.translationOnly === true ? 1 : 0,
+        mergedGroupKey(it),
+      )
+      if (it.uv) sig.push(this.staticToken(it.uv), it.uv.length)
+      if (it.vertexColors) sig.push(this.staticToken(it.vertexColors), it.vertexColors.length)
+      if (it.normals) sig.push(this.staticToken(it.normals), it.normals.length)
+      if (it.packedColor !== undefined) {
+        if (it.packedColor instanceof Uint8Array) sig.push(this.staticToken(it.packedColor), it.packedColor.length)
+        else sig.push(-1, (it.packedColor.r * 255) | 0, (it.packedColor.g * 255) | 0, (it.packedColor.b * 255) | 0, (it.packedColor.a * 255) | 0)
+      }
+      if (it.indices) sig.push(this.staticToken(it.indices as object), it.indices.length)
+    }
+    return sig.join('|')
+  }
+
+  private lookupStaticStreams(items: BatchItem[], textures: (TextureHandle | null)[], indexedCapable: boolean): GroupStreams | null {
+    const hit = this.staticCache.get(this.staticSignature(items, textures, indexedCapable))
+    return hit ? hit.streams : null
+  }
+
+  /** Copy the built streams into dedicated arrays and cache them. The cache
+   *  is bounded: overflowing just drops everything (rebuilds cost one
+   *  transform pass, correctness is unaffected). */
+  private storeStaticStreams(items: BatchItem[], textures: (TextureHandle | null)[], indexedCapable: boolean, streams: GroupStreams): void {
+    if (this.staticCache.size >= 256) this.staticCache.clear()
+    const copy = <T extends Float32Array | Uint8Array | Uint32Array>(a: T, n: number, Ctor: new (len: number) => T): T => {
+      const out = new Ctor(Math.max(n, 1))
+      out.set(a.subarray(0, n))
+      return out
+    }
+    const cached: GroupStreams = {
+      positions: copy(streams.positions, streams.totalVertices * 3, Float32Array),
+      colors: copy(streams.colors, streams.colorCount, Float32Array),
+      packedColors: copy(streams.packedColors, streams.packedColorCount, Uint8Array),
+      uvs: copy(streams.uvs, streams.uvCount, Float32Array),
+      normals: copy(streams.normals, streams.normalCount, Float32Array),
+      texIndices: copy(streams.texIndices, streams.totalVertices, Float32Array),
+      indices: copy(streams.indices, streams.totalIndices, Uint32Array),
+      totalVertices: streams.totalVertices,
+      totalIndices: streams.totalIndices,
+      allIndexed: streams.allIndexed,
+      hasNormals: streams.hasNormals,
+      allPackedColor: streams.allPackedColor,
+      hasTexture: streams.hasTexture,
+      colorCount: streams.colorCount,
+      packedColorCount: streams.packedColorCount,
+      uvCount: streams.uvCount,
+      normalCount: streams.normalCount,
+    }
+    this.staticCache.set(this.staticSignature(items, textures, indexedCapable), { streams: cached })
+  }
+
+  /**
+   * Build the vertex streams for a legacy group.
+   *
+   * Extracted from the GL implementation so the transform math exists once: a
+   * backend's drawGroup receives these streams and only uploads + draws them.
+   *
+   * Writes into DEDICATED scratch arrays — NOT the shared fast-lane staging.
+   * The staging arrays hold fast-lane producers' content written at submit
+   * time; a legacy transform writing [0..N) there would clobber sealed ranges
+   * that later runs in the same flush still upload (garbage positions/colors
+   * for every sealed run drawn after a legacy group — latent on any skeleton
+   * mixing clipped addShape meshes with fast-lane meshes).
+   *
+   * @param indexedCapable whether the backend can draw indexed (drawElements).
+   *   Backends that can't (and mixed groups) expand indexed items through
+   *   their index list inside the loop.
+   */
+  private buildGroupStreams(items: BatchItem[], textures: (TextureHandle | null)[], indexedCapable: boolean): GroupStreams {
     const allIndexed = indexedCapable && items.every((it) => it.indices !== undefined && it.indices.length > 0)
     // Staging/draw vertex count: unique vertices on the indexed path,
     // index-expanded vertices on the fallback path.
