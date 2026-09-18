@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest'
 import { createRoot, createNode } from './node'
 import { gfxHostHooks } from './host-hooks'
 import { createMockWebGLContext } from './test-utils'
-import { Mat4x4f } from '@rasenjs/math'
 
 /**
  * Gfx host hooks contract: structural markers exist for ORDERING only.
@@ -17,11 +16,11 @@ import { Mat4x4f } from '@rasenjs/math'
 describe('gfx host hooks — structural markers', () => {
   it('walks real children but never calls draw() on a marker', () => {
     const gl = createMockWebGLContext()
-    const root = createRoot(gl, Mat4x4f.identity())
+    const root = createRoot(gl)
 
-    // A container node (no own draw → the default is "draw the children"), so
-    // the walk below is the renderer's pre-order step.
-    const container = createNode(root, {})
+    // A container node: its own draw delegates to the children walk, which is
+    // exactly the renderer's pre-order step.
+    const container = createNode(root, { draw: (drawChildren) => drawChildren() })
     const realDraw = vi.fn()
     createNode(container, { draw: realDraw })
     const marker = gfxHostHooks.createMarker!(container, 'e')
@@ -45,7 +44,7 @@ describe('gfx host hooks — structural markers', () => {
 
   it('markers stay addressable through insert/nextSibling and detach', () => {
     const gl = createMockWebGLContext()
-    const root = createRoot(gl, Mat4x4f.identity())
+    const root = createRoot(gl)
     const a = createNode(root, { draw: () => {} })
     const b = createNode(root, { draw: () => {} })
 
