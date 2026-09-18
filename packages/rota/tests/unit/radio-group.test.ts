@@ -226,3 +226,103 @@ describe('@rasenjs/rota - RadioGroup', () => {
     expect(items(c)[0]!.getAttribute('aria-checked')).toBe('true')
   })
 })
+
+/**
+ * Orientation and wrap-around: the attributes the CSS keys off and the two
+ * ends of the arrow-key range.
+ */
+describe('@rasenjs/rota - RadioGroup / orientation and loop', () => {
+  it('should expose the orientation on the root and the items', () => {
+    const c = document.createElement('div')
+    radioGroup({
+      orientation: 'horizontal',
+      items: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' }
+      ]
+    })(c)
+
+    const root = c.querySelector('[role="radiogroup"]')!
+    expect(root.getAttribute('data-orientation')).toBe('horizontal')
+    expect(root.getAttribute('aria-orientation')).toBe('horizontal')
+  })
+
+  it('should move with left and right when horizontal', () => {
+    const c = document.createElement('div')
+    document.body.appendChild(c)
+    radioGroup({
+      orientation: 'horizontal',
+      defaultValue: 'a',
+      items: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' }
+      ]
+    })(c)
+
+    const list = items(c)
+    list[0]!.focus()
+    list[0]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    )
+
+    expect(document.activeElement).toBe(list[1])
+    expect(list[1]!.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('should wrap around at the ends by default', () => {
+    const c = document.createElement('div')
+    document.body.appendChild(c)
+    radioGroup({
+      defaultValue: 'a',
+      items: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+        { value: 'c', label: 'C' }
+      ]
+    })(c)
+
+    const list = items(c)
+    list[0]!.focus()
+    list[0]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })
+    )
+
+    expect(document.activeElement).toBe(list[2])
+    expect(list[2]!.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('should clamp at the ends when loop is off', () => {
+    const c = document.createElement('div')
+    document.body.appendChild(c)
+    radioGroup({
+      loop: false,
+      defaultValue: 'a',
+      items: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' }
+      ]
+    })(c)
+
+    const list = items(c)
+    list[0]!.focus()
+    list[0]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })
+    )
+
+    // Stays put instead of wrapping to the last option.
+    expect(document.activeElement).toBe(list[0])
+    expect(list[0]!.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('should mark required and pass the name to the hidden inputs', () => {
+    const c = document.createElement('div')
+    radioGroup({
+      name: 'plan',
+      required: true,
+      items: [{ value: 'a', label: 'A' }]
+    })(c)
+
+    expect(c.querySelector('[role="radiogroup"]')!.getAttribute('aria-required')).toBe('true')
+    expect((c.querySelector('input[type="radio"]') as HTMLInputElement).name).toBe('plan')
+  })
+})

@@ -246,3 +246,87 @@ describe('@rasenjs/rota - ToggleGroup', () => {
     expect(c.querySelectorAll('button').length).toBe(0)
   })
 })
+
+/**
+ * Single mode is a radio group: there is no "toggle off". Re-pressing the
+ * pressed option must not report a change — the option itself is the only way
+ * to observe that, so assert it there.
+ */
+describe('@rasenjs/rota - ToggleGroup / single mode cannot be emptied', () => {
+  it('should not report a change when the pressed option is pressed again', () => {
+    const seen: string[][] = []
+    const c = build(
+      {
+        type: 'single',
+        defaultValue: ['a'],
+        onValueChange: (next: string[]) => seen.push(next)
+      },
+      ['a', 'b']
+    )
+
+    items(c)[0]!.click()
+    items(c)[0]!.click()
+
+    expect(seen).toEqual([])
+    expect(items(c)[0]!.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('should never leave the group without a pressed option', () => {
+    const c = build({ type: 'single', defaultValue: ['a'] }, ['a', 'b'])
+
+    // Enter on the pressed item, then Space on it.
+    for (const key of ['Enter', ' ']) {
+      items(c)[0]!.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true })
+      )
+    }
+
+    expect(
+      items(c).filter((el) => el.getAttribute('aria-checked') === 'true').length
+    ).toBe(1)
+  })
+
+  it('should stop at the ends when loop is off', () => {
+    const c = build(
+      { type: 'single', defaultValue: ['a'], loop: false },
+      ['a', 'b', 'c']
+    )
+    document.body.appendChild(c)
+
+    // ArrowLeft at the first item stays put instead of wrapping to the last.
+    items(c)[0]!.focus()
+    items(c)[0]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })
+    )
+    expect(document.activeElement).toBe(items(c)[0])
+
+    // ArrowRight keeps moving while there is somewhere to go.
+    items(c)[0]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    )
+    expect(document.activeElement).toBe(items(c)[1])
+  })
+
+  it('should wrap around when loop is on (default)', () => {
+    const c = build({ type: 'single', defaultValue: ['a'] }, ['a', 'b', 'c'])
+    document.body.appendChild(c)
+
+    items(c)[0]!.focus()
+    items(c)[0]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })
+    )
+
+    expect(document.activeElement).toBe(items(c)[2])
+  })
+
+  it('should carry an orientation the arrows follow', () => {
+    const c = build(
+      { type: 'single', orientation: 'vertical', defaultValue: ['a'] },
+      ['a', 'b']
+    )
+
+    expect(c.querySelector('[role="radiogroup"]')!.getAttribute('data-orientation')).toBe(
+      'vertical'
+    )
+  })
+})

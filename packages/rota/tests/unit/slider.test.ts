@@ -284,3 +284,49 @@ describe('@rasenjs/rota - Slider / range thumbs', () => {
     expect(commits).toEqual([[11]])
   })
 })
+
+/**
+ * The thumb's offset *is* the visual, and nothing asserted it: the range was
+ * covered, the thumb — the thing the user drags — was not.
+ */
+describe('@rasenjs/rota - Slider / thumb geometry', () => {
+  it('should place the thumb at the percentage of the track', () => {
+    const c = mountSlider({ defaultValue: [30], min: 0, max: 100 })
+    const thumb = thumbs(c)[0]!
+
+    expect(thumb.style.left).toBe('30%')
+
+    press(thumb, 'ArrowRight')
+    expect(thumb.style.left).toBe('31%')
+  })
+
+  it('should place each thumb independently', () => {
+    const c = mountSlider({ defaultValue: [20, 80] })
+
+    expect(thumbs(c).map((el) => el.style.left)).toEqual(['20%', '80%'])
+  })
+
+  it('should honour min and max when converting to a percentage', () => {
+    const c = mountSlider({ defaultValue: [15], min: 10, max: 20 })
+
+    expect(thumbs(c)[0]!.style.left).toBe('50%')
+  })
+
+  it('should use bottom for a vertical slider', () => {
+    const c = mountSlider({ defaultValue: [25], orientation: 'vertical' })
+    const thumb = thumbs(c)[0]!
+
+    expect(thumb.style.bottom).toBe('25%')
+    expect(thumb.style.left).toBe('')
+  })
+
+  it('should report the value through aria-valuenow as it moves', () => {
+    const c = mountSlider({ defaultValue: [0], step: 25 })
+    const thumb = thumbs(c)[0]!
+
+    press(thumb, 'ArrowRight')
+    expect(thumb.getAttribute('aria-valuenow')).toBe('25')
+    expect(thumb.getAttribute('aria-valuemin')).toBe('0')
+    expect(thumb.getAttribute('aria-valuemax')).toBe('100')
+  })
+})

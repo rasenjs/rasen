@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { numberField } from '../../src/components/number-field'
+import {
+  numberField,
+  createNumberField
+} from '../../src/components/number-field'
 
 describe('@rasenjs/rota - NumberField', () => {
   beforeEach(() => {
@@ -782,5 +785,85 @@ describe('@rasenjs/rota - NumberField', () => {
 
       expect(el.querySelectorAll('button').length).toBe(0)
     })
+  })
+})
+
+/**
+ * The steppers are the component's reason to exist, so the clamps they apply
+ * are asserted here rather than assumed: nothing covered them.
+ */
+describe('@rasenjs/rota - NumberField / stepper clamps', () => {
+  const mount = (props: Parameters<ReturnType<typeof createNumberField>>[0] = {}) => {
+    const container = document.createElement('div')
+    createNumberField()(props)(container)
+    const buttons = Array.from(
+      container.querySelectorAll('button')
+    ) as HTMLButtonElement[]
+    return {
+      container,
+      input: container.querySelector('input') as HTMLInputElement,
+      // The preset renders decrement first, then increment.
+      decrement: buttons[0]!,
+      increment: buttons[1]!
+    }
+  }
+
+  it('should stop at max', () => {
+    const { increment, input } = mount({ defaultValue: 9, max: 10, step: 1 })
+
+    increment.click()
+    expect(input.value).toBe('10')
+
+    increment.click()
+    expect(input.value).toBe('10')
+  })
+
+  it('should stop at min', () => {
+    const { decrement, input } = mount({ defaultValue: 1, min: 0, step: 1 })
+
+    decrement.click()
+    expect(input.value).toBe('0')
+
+    decrement.click()
+    expect(input.value).toBe('0')
+  })
+
+  it('should respect a step larger than the remaining room', () => {
+    const { increment, input } = mount({ defaultValue: 8, max: 10, step: 5 })
+
+    increment.click()
+
+    // Clamped, not 13.
+    expect(input.value).toBe('10')
+  })
+
+  it('should read an empty field as null and step from min', () => {
+    const changes: Array<number | null> = []
+    const { increment, input } = mount({
+      defaultValue: 5,
+      min: 2,
+      step: 1,
+      onValueChange: (value) => changes.push(value)
+    })
+
+    input.value = ''
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(changes).toEqual([null])
+
+    increment.click()
+    expect(changes).toEqual([null, 2])
+  })
+
+  it('should not step while disabled', () => {
+    const { increment, decrement, input } = mount({
+      defaultValue: 5,
+      disabled: true
+    })
+
+    increment.click()
+    decrement.click()
+
+    expect(input.value).toBe('5')
+    expect(input.disabled).toBe(true)
   })
 })

@@ -399,3 +399,65 @@ describe('@rasenjs/rota - PinInput / input paths', () => {
     expect(container.querySelector('[role="group"]')!.getAttribute('data-disabled')).toBe('')
   })
 })
+
+/**
+ * Focus movement is the component's contract: after typing, the caret is
+ * expected in the next cell. Nothing asserted it, so it was free to regress.
+ */
+describe('@rasenjs/rota - PinInput / focus movement', () => {
+  const mount = (props = {}) => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    createPinInput()(props)(container)
+    return Array.from(container.querySelectorAll('input')) as HTMLInputElement[]
+  }
+
+  const type = (cell: HTMLInputElement, char: string) => {
+    cell.focus()
+    cell.value = char
+    cell.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  it('should move to the next cell after typing', () => {
+    const cells = mount({ length: 3 })
+
+    type(cells[0]!, '1')
+    expect(document.activeElement).toBe(cells[1])
+
+    type(cells[1]!, '2')
+    expect(document.activeElement).toBe(cells[2])
+  })
+
+  it('should stay in the last cell', () => {
+    const cells = mount({ length: 2 })
+
+    type(cells[0]!, '1')
+    type(cells[1]!, '2')
+
+    expect(document.activeElement).toBe(cells[1])
+  })
+
+  it('should step back and clear when Backspace is pressed in an empty cell', () => {
+    const cells = mount({ length: 3, defaultValue: '12' })
+    cells[2]!.focus()
+
+    cells[2]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true })
+    )
+
+    expect(document.activeElement).toBe(cells[1])
+    expect(cells.map((el) => el.value)).toEqual(['1', '', ''])
+  })
+
+  it('should move the caret on paste too', () => {
+    const cells = mount({ length: 4 })
+    const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & {
+      clipboardData: { getData: (type: string) => string }
+    }
+    event.clipboardData = { getData: () => '123' }
+
+    cells[0]!.dispatchEvent(event)
+
+    expect(document.activeElement).toBe(cells[2])
+  })
+})
