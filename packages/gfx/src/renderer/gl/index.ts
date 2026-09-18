@@ -61,6 +61,51 @@ export class WebGLRenderer extends Renderer {
    * uploads can be skipped again (stale indices would sample unbound
    * u_tex units → wrong colors). */
   private texIndexStale = false
+
+  // --- sealed-run clean-stream upload skip ---------------------------------
+  // A sealed mesh may declare a stream "unchanged" (producer did not restage
+  // it — see SealedMesh.unchangedUv). The GPU buffers are persistent across
+  // frames, so if THIS renderer knows the buffer still holds that stream's
+  // content for the mesh's exact range, the bufferSubData is a no-op and can
+  // be skipped. Validity is tracked per run range and invalidated by three
+  // events: a legacy group uploading over the low offsets of the same buffer,
+  // a buffer reallocation (orphaning bufferData wipes all content), and a
+  // range's geometry changing. Positions are never skipped (animated
+  // producers rewrite them every frame), so they double as the per-frame
+  // liveness proof that the range's record is still the current occupant.
+  /** Vertex-stream validity per vBase: did the uv / packed-color streams
+   *  reach the GPU buffers at the current buffer epoch? */
+  private sealedVertexStreams = new Map<number, { vCount: number; epoch: number; uvValid: boolean; colValid: boolean }>()
+  /** Index-stream validity per iBase. */
+  private sealedIndexStreams = new Map<number, { iCount: number; epoch: number }>()
+  /** Bumped whenever the vertex buffers are reallocated (bufferData
+   *  orphaning) — all previously uploaded content is gone. */
+  private vertexBufferEpoch = 0
+  /** Bumped whenever the element buffer is reallocated. */
+  private indexBufferEpoch = 0
+
+  /** A legacy group uploaded packed/float colors to colorBuffer over
+   *  [0, byteEnd): any sealed run whose color bytes start below byteEnd was
+   *  overwritten and must re-upload. */
+  private invalidateSealedColorsBelow(byteEnd: number): void {
+    for (const [vBase, rec] of this.sealedVertexStreams) {
+      if (vBase * 4 < byteEnd) rec.colValid = false
+    }
+  }
+
+  /** A legacy group uploaded uvs to texCoordBuffer over [0, byteEnd). */
+  private invalidateSealedUvsBelow(byteEnd: number): void {
+    for (const [vBase, rec] of this.sealedVertexStreams) {
+      if (vBase * 8 < byteEnd) rec.uvValid = false
+    }
+  }
+
+  /** A legacy group uploaded indices to the element buffer over [0, byteEnd). */
+  private invalidateSealedIndicesBelow(byteEnd: number): void {
+    for (const [iBase] of this.sealedIndexStreams) {
+      if (iBase * 4 < byteEnd) this.sealedIndexStreams.delete(iBase)
+    }
+  }
   private texIndexLoc: number = -1
   /** Location of the ES 3.00 sampler array u_tex[4] (null on WebGL1). */
   private textureArrayLoc: WebGLUniformLocation | null = null
@@ -269,6 +314,10 @@ export class WebGLRenderer extends Renderer {
     const gl = this.gl
     const next = Math.max(totalVertices, Math.ceil(this.bufferCapacity * 1.5))
     this.bufferCapacity = next
+    // Orphaning: new storage, zero old content — every sealed-run clean-stream
+    // record is stale until its range is uploaded again.
+    this.vertexBufferEpoch++
+    this.sealedVertexStreams.clear()
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, next * 3 * 4, gl.DYNAMIC_DRAW)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
@@ -290,6 +339,8 @@ export class WebGLRenderer extends Renderer {
     const gl = this.gl
     const next = Math.max(indexCapacity, Math.ceil(this.indexBufferCapacity * 1.5))
     this.indexBufferCapacity = next
+    this.indexBufferEpoch++
+    this.sealedIndexStreams.clear()
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, next * 4, gl.DYNAMIC_DRAW)
   }
@@ -591,12 +642,40 @@ export class WebGLRenderer extends Renderer {
     // Position stride = 12 bytes (3 floats); color = 4 bytes (RGBA8);
     // uv = 8 bytes (2 floats). The byte offsets differ per attribute.
     const staging = this.getStaging()
+
+    // Clean-stream skip bookkeeping (see the field docs above). The position
+    // upload below is unconditional, so a record whose epoch matches and
+    // whose vCount matches proves this exact range was drawn by this run
+    // shape at the current buffer generation — i.e. the uv/color bytes in
+    // the GPU buffers are this run's content unless something overwrote them
+    // since (legacy uploads, buffer growth), which the invalidation helpers
+    // handle by clearing the records.
+    let vrec = this.sealedVertexStreams.get(vBase)
+    const vertexKnown = vrec !== undefined && vrec.vCount === vCount && vrec.epoch === this.vertexBufferEpoch
+    const skipUv = first.unchangedUv === true && vertexKnown && vrec!.uvValid
+    const skipCol = first.unchangedColor === true && vertexKnown && vrec!.colValid
+    if (!vertexKnown) vrec = undefined
+
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
     gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 12, staging.positions!.subarray(vBase * 3, (vBase + vCount) * 3))
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
-    gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 4, staging.packedColors!.subarray(vBase * 4, (vBase + vCount) * 4))
+    if (!skipCol) {
+      gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 4, staging.packedColors!.subarray(vBase * 4, (vBase + vCount) * 4))
+    }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer)
-    gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 8, staging.uvs!.subarray(vBase * 2, (vBase + vCount) * 2))
+    if (skipUv) {
+      // unchanged — the GPU buffer still holds this run's uv bytes.
+    } else {
+      gl.bufferSubData(gl.ARRAY_BUFFER, vBase * 8, staging.uvs!.subarray(vBase * 2, (vBase + vCount) * 2))
+    }
+    // Record (or refresh) what the GPU buffers now hold for this range.
+    if (vrec === undefined) {
+      vrec = { vCount, epoch: this.vertexBufferEpoch, uvValid: !skipUv, colValid: !skipCol }
+      this.sealedVertexStreams.set(vBase, vrec)
+    } else {
+      vrec.uvValid = true
+      vrec.colValid = true
+    }
     // texIndex: fast-lane groups are single-texture (u_tex[0]) — same stale
     // policy as the legacy single-texture path. The re-zero upload must write
     // ZEROS, not the staging content: fast-lane producers never stage
@@ -618,7 +697,12 @@ export class WebGLRenderer extends Renderer {
     if (this.useTextureLoc) gl.uniform1i(this.useTextureLoc, 1)
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
-    gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, iBase * 4, staging.indices!.subarray(iBase, iBase + iCount))
+    const irec = this.sealedIndexStreams.get(iBase)
+    const indexKnown = irec !== undefined && irec.iCount === iCount && irec.epoch === this.indexBufferEpoch
+    if (!(first.unchangedIndices === true && indexKnown)) {
+      gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, iBase * 4, staging.indices!.subarray(iBase, iBase + iCount))
+      this.sealedIndexStreams.set(iBase, { iCount, epoch: this.indexBufferEpoch })
+    }
 
     if (first.skipTonemap) gl.depthMask(false)
     // Draw from the run's own element range: the indices were uploaded at
@@ -720,6 +804,7 @@ export class WebGLRenderer extends Renderer {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
         this.growIndexBuffer(totalIndices)
         gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, s.indices.subarray(0, totalIndices))
+        this.invalidateSealedIndicesBelow(totalIndices * 4)
       }
 
       gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
@@ -732,6 +817,9 @@ export class WebGLRenderer extends Renderer {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, colors.subarray(0, colorCount))
       }
+      // Legacy groups upload at offset 0 into the SAME buffers sealed runs
+      // use at vBase > 0 — the sealed runs' low-range records are stale now.
+      this.invalidateSealedColorsBelow(allPackedColor ? packedColorCount : colorCount * 4)
       if (hasNormals) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer)
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, normals.subarray(0, totalVertices * 3))
@@ -742,6 +830,7 @@ export class WebGLRenderer extends Renderer {
       if (hasTexture) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer)
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, uvs.subarray(0, totalVertices * 2))
+        this.invalidateSealedUvsBelow(totalVertices * 8)
         // a_texIndex is always enabled in the VAO, so the buffer must not
         // hold stale slot indices from a previous MULTI-texture group when a
         // SINGLE-texture group samples u_tex[0] only. Skip the upload only

@@ -618,10 +618,20 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
         const owned = prevSubs[seq] === sub && sub.stagedVBase === m.vBase
         prevSubs[seq] = sub
         seq++
+        // Clean-stream declarations for the batch renderer: a stream whose
+        // staging copy is skipped this frame holds exactly the bytes it held
+        // last frame, so the renderer may skip re-uploading it to the GPU
+        // buffer (its own range/epoch bookkeeping decides when that is safe —
+        // legacy groups uploading over the low offsets invalidate it there).
+        let unchangedUv = false
+        let unchangedIndices = false
+        let unchangedColor = false
         // uv: one memcpy from the layout's static atlas-space stream.
         if (!owned || layout.uvStagedVBase !== m.vBase) {
           m.uv.set(layout.uvs, m.vBase * 2)
           layout.uvStagedVBase = m.vBase
+        } else {
+          unchangedUv = true
         }
         // indices: vBase-offseted Uint32 per layout — rewritten only when the
         // staging base moved (steady state: identical every frame → skip).
@@ -637,6 +647,8 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
           m.idx.set(layout.idxU32!, m.iBase)
           layout.idxStagedVBase = m.vBase
           layout.idxStagedIBase = m.iBase
+        } else {
+          unchangedIndices = true
         }
         // color: per-slot packed RGBA8 stream. Steady state (same hex, same
         // premul, same base, owned range): skip BOTH the packedColorStream
@@ -653,7 +665,12 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
           sub.colPremul = premultiplied
           // Any staging write re-stamps the base: uv/index were staged alongside.
           sub.stagedVBase = m.vBase
+        } else {
+          unchangedColor = true
         }
+        m.unchangedUv = unchangedUv
+        m.unchangedIndices = unchangedIndices
+        m.unchangedColor = unchangedColor
 
       // Multi-page atlas texture + blend mode resolved above (sub-cache).
       // Spine blend mode (additive/multiply/screen effects — e.g. aura, foot

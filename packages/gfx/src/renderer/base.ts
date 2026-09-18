@@ -65,6 +65,17 @@ export interface SealedMesh {
   blendMode: BlendMode
   premultiplied: boolean
   skipTonemap: boolean
+  /** Producer guarantee: this mesh did NOT write its uv / packed-color /
+   *  index streams into the staging this frame, so the staging bytes at the
+   *  mesh's range are identical to what was there last frame. The backend
+   *  may then skip re-uploading those streams IF it knows the GPU buffer
+   *  still holds that content (its own range/epoch bookkeeping decides).
+   *  Positions are never covered — animated producers rewrite them every
+   *  frame. Defaults to false (always upload) — a wrong `true` skips a
+   *  needed upload and renders stale streams. */
+  unchangedUv?: boolean
+  unchangedColor?: boolean
+  unchangedIndices?: boolean
 }
 
 export interface BatchItem {
@@ -237,10 +248,14 @@ export abstract class Renderer {
   /** Recycled SealedMesh payloads (see endMesh / releaseItems). */
   private sealedPool: SealedMesh[] = []
 
-  /** Reusable span view handed out by beginMesh (one per batch, mutated). */
+  /** Reusable span view handed out by beginMesh (one per batch, mutated).
+   *  The `unchanged*` fields are the producer's clean-stream declaration read
+   *  by endMesh; beginMesh clears them so a span can never leak a previous
+   *  mesh's declaration. */
   private meshSpan: {
     vBase: number; iBase: number; vCap: number; iCap: number
     pos: Float32Array; col: Uint8Array; uv: Float32Array; idx: Uint32Array
+    unchangedUv?: boolean; unchangedColor?: boolean; unchangedIndices?: boolean
   } | null = null
   /** Staging vertices reserved this frame (legacy addShape items and fast
    *  lane reservations share one watermark so ranges never overlap). Reset
@@ -624,6 +639,7 @@ export abstract class Renderer {
   beginMesh(vertexCap: number, indexCap: number): {
     vBase: number; iBase: number
     pos: Float32Array; col: Uint8Array; uv: Float32Array; idx: Uint32Array
+    unchangedUv?: boolean; unchangedColor?: boolean; unchangedIndices?: boolean
   } {
     this.ensureStaging(this.vertexWatermark + vertexCap)
     if (this.indexCapacity < this.indexWatermark + indexCap) {
@@ -660,6 +676,12 @@ export abstract class Renderer {
     span.col = this.packedColorsArray!
     span.uv = this.uvsArray!
     span.idx = this.indicesArray!
+    // Clear any clean-stream declaration left by the previous mesh — the
+    // span is one recycled object, and a stale `true` here would make endMesh
+    // seal a mesh as "streams unchanged" when the producer never said so.
+    span.unchangedUv = false
+    span.unchangedColor = false
+    span.unchangedIndices = false
     return span
   }
 
@@ -670,7 +692,11 @@ export abstract class Renderer {
    * Indices in `idx` must already be offset by the span's vBase.
    */
   endMesh(
-    span: { vBase: number; iBase: number },
+    span: {
+      vBase: number; iBase: number
+      /** Producer clean-stream declarations (see SealedMesh.unchangedUv). */
+      unchangedUv?: boolean; unchangedColor?: boolean; unchangedIndices?: boolean
+    },
     vertexCount: number,
     indexCount: number,
     texture?: TextureHandle | null,
@@ -702,6 +728,11 @@ export abstract class Renderer {
       sealed.premultiplied = premultiplied ?? false
       sealed.skipTonemap = skipTonemap ?? false
       sealed.textures[0] = texture ?? null
+      // Clean-stream declarations are per-mesh, read fresh from the span.
+      // A recycled payload must not keep the previous mesh's flags.
+      sealed.unchangedUv = span.unchangedUv === true
+      sealed.unchangedColor = span.unchangedColor === true
+      sealed.unchangedIndices = span.unchangedIndices === true
       item.sealed = sealed
     } else {
       item.sealed = {
@@ -711,6 +742,9 @@ export abstract class Renderer {
         blendMode: blendMode ?? 'normal',
         premultiplied: premultiplied ?? false,
         skipTonemap: skipTonemap ?? false,
+        unchangedUv: span.unchangedUv === true,
+        unchangedColor: span.unchangedColor === true,
+        unchangedIndices: span.unchangedIndices === true,
       }
     }
     // Mirror the sealed flags onto the item-level fields mergedGroupKey

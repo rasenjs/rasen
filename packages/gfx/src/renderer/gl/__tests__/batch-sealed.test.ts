@@ -193,3 +193,131 @@ describe('BatchRenderer sealed runs (fast lane)', () => {
     expect(Array.from(texIndexUpload![2] as Float32Array)).toEqual([0, 0, 0, 0])
   })
 })
+
+/** ARRAY_BUFFER uploads grouped by the buffer they were issued on: the mock
+ * cannot distinguish buffer objects (bindBuffer is recorded separately), so
+ * tests pass a bindBuffer call index window and match upload byte offsets to
+ * strides instead: positions 12 B/vertex, color 4 B/vertex (packed), uv
+ * 8 B/vertex, texIndex 4 B/vertex (Float32Array content). */
+function arrayUploads(gl: Record<string, any>): Array<{ offset: number; data: Float32Array | Uint8Array }> {
+  return gl.bufferSubData.mock.calls
+    .filter((c: unknown[]) => c[0] === ARRAY_BUFFER)
+    .map((c: unknown[]) => ({ offset: c[1] as number, data: c[2] as Float32Array | Uint8Array }))
+}
+
+describe('BatchRenderer sealed clean-stream upload skip', () => {
+  it('skips uv/color/index uploads when the producer declares them unchanged (second frame)', () => {
+    const gl = makeMockGl2()
+    const r = new BatchRenderer(gl, IDENTITY)
+    const tex = {} as WebGLTexture
+
+    // Frame 1: everything uploads.
+    sealMesh(r, tex)
+    r.flush()
+    const frame1 = arrayUploads(gl).length
+    // positions(1) + color(1) + uv(1) = 3 vertex-stream uploads, none skipped
+    // (the index stream is an ELEMENT upload, counted separately below).
+    expect(frame1).toBe(3)
+    expect(elementUploads(gl).length).toBe(1)
+
+    // Frame 2: same producer, same range, streams untouched (the span's
+    // unchanged* flags set — what spine.ts does in steady state).
+    gl.bufferSubData.mockClear()
+    gl.drawElements.mockClear()
+    const m = r.beginMesh(4, 6)!
+    for (let v = 0; v < 4; v++) {
+      m.pos[m.vBase * 3 + v * 3] = m.vBase + v
+      m.pos[m.vBase * 3 + v * 3 + 1] = m.vBase + v
+      m.pos[m.vBase * 3 + v * 3 + 2] = 0
+    }
+    const tris = [0, 1, 2, 0, 2, 3]
+    for (let i = 0; i < 6; i++) m.idx[m.iBase + i] = tris[i] + m.vBase
+    m.unchangedUv = true
+    m.unchangedColor = true
+    m.unchangedIndices = true
+    r.endMesh(m, 4, 6, tex, 'normal', false, false)
+    r.flush()
+    // Only the position upload remains (positions are never covered by the
+    // clean-stream declaration — animated producers rewrite them).
+    const uploads = arrayUploads(gl)
+    expect(uploads.length).toBe(1)
+    expect(uploads[0].offset).toBe(0)
+    // The index upload is skipped too — element uploads are 0 this frame.
+    expect(elementUploads(gl).length).toBe(0)
+    // The draw still happens (skipping uploads must not skip the draw).
+    expect(elementDraws(gl).length).toBe(1)
+  })
+
+  it('re-uploads a clean stream after a legacy group overwrote the low range', () => {
+    const gl = makeMockGl2()
+    const r = new BatchRenderer(gl, IDENTITY)
+    const tex = {} as WebGLTexture
+
+    sealMesh(r, tex)
+    r.flush() // frame 1: uploads, records validity
+
+    // Frame 2: a legacy group uploads at offset 0 over the same low bytes,
+    // then the sealed mesh re-declares clean. The renderer must NOT trust
+    // the declaration — the GPU buffer no longer holds the stream.
+    gl.bufferSubData.mockClear()
+    const verts = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0])
+    r.addShape(verts, COLOR, IDENTITY, undefined, tex)
+    const m = r.beginMesh(4, 6)!
+    for (let v = 0; v < 4; v++) {
+      m.pos[m.vBase * 3 + v * 3] = m.vBase + v
+      m.pos[m.vBase * 3 + v * 3 + 1] = m.vBase + v
+      m.pos[m.vBase * 3 + v * 3 + 2] = 0
+    }
+    for (let i = 0; i < 6; i++) m.idx[m.iBase + i] = i + m.vBase
+    m.unchangedUv = true
+    m.unchangedColor = true
+    m.unchangedIndices = true
+    r.endMesh(m, 4, 6, tex, 'normal', false, false)
+    r.flush()
+    // Legacy group uploads its own pos+color+uv (3); the sealed run must
+    // re-upload all three streams (invalidated) + positions = 3 more.
+    const uploads = arrayUploads(gl)
+    expect(uploads.length).toBe(6)
+    // The legacy group has NO indices, so it never touches the element
+    // buffer — the sealed run's index record is still valid and the index
+    // upload stays skipped (unchangedIndices declared).
+    expect(elementUploads(gl).length).toBe(0)
+  })
+
+  it('re-uploads everything after a buffer reallocation (orphaning wipes content)', () => {
+    const gl = makeMockGl2()
+    const r = new BatchRenderer(gl, IDENTITY)
+    const tex = {} as WebGLTexture
+
+    sealMesh(r, tex)
+    r.flush()
+    // Force a vertex-buffer growth: stage a mesh big enough to exceed the
+    // 1.5× capacity, then re-declare clean streams at a NEW range (the old
+    // records are keyed by vBase, and the growth must invalidate them all).
+    gl.bufferSubData.mockClear()
+    sealMesh(r, tex) // capacity grow from 4 → 6 (ceil(4*1.5)) — not yet
+    r.flush()
+    // Grow past 6: 10 vertices.
+    gl.bufferSubData.mockClear()
+    const m = r.beginMesh(10, 18)!
+    m.unchangedUv = true
+    m.unchangedColor = true
+    m.unchangedIndices = true
+    for (let v = 0; v < 10; v++) {
+      m.pos[m.vBase * 3 + v * 3] = m.vBase + v
+      m.pos[m.vBase * 3 + v * 3 + 1] = m.vBase + v
+      m.pos[m.vBase * 3 + v * 3 + 2] = 0
+    }
+    for (let i = 0; i < 18; i++) m.idx[m.iBase + i] = (i % 10) + m.vBase
+    r.endMesh(m, 10, 18, tex, 'normal', false, false)
+    r.flush()
+    // Even with unchanged* declared, the growth wiped the buffers — every
+    // stream must upload. positions + color + uv + index = 4 (the 10-vert
+    // mesh), PLUS the earlier 4-vert run at its old range if it re-stages…
+    // it doesn't: only one sealed mesh this frame. The key assertion: the
+    // clean declarations did NOT produce skips (no "1 upload" frame).
+    const uploads = arrayUploads(gl)
+    expect(uploads.length).toBe(3) // pos + color + uv (index is ELEMENT)
+    expect(elementUploads(gl).length).toBe(1)
+  })
+})
