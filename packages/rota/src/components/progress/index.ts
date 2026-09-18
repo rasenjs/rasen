@@ -6,6 +6,7 @@
  * same as before the element-factory migration).
  */
 import type { Mountable } from '@rasenjs/core'
+import { com } from '@rasenjs/core'
 import { div } from '@rasenjs/dom'
 
 export type ProgressState = 'indeterminate' | 'loading' | 'complete'
@@ -39,7 +40,7 @@ export interface ProgressContext {
 export function createProgressRoot(): (
   props?: ProgressRootProps
 ) => Mountable<HTMLElement> {
-  return (props?: ProgressRootProps) => {
+  const component = (props?: ProgressRootProps) => {
     const max = props?.max ?? 100
     const value = props?.value ?? null
 
@@ -64,16 +65,15 @@ export function createProgressRoot(): (
       'aria-valuemax': max,
       'aria-valuenow': value !== null ? value : undefined,
       'aria-valuetext': valueLabel,
-      dataState: state,
-      dataMax: max,
-      dataValue: value !== null ? value : undefined,
+      'data-state': state,
+      'data-max': max,
+      'data-value': value !== null ? value : undefined,
       class: props?.class,
       style: props?.style,
-      children: props?.children
-        ? [(el) => props.children!(getContext)(el)]
-        : undefined
+      children: props?.children ? [props.children(getContext)] : undefined
     })
   }
+  return com(component)
 }
 
 /**
@@ -83,16 +83,16 @@ export function createProgressIndicator(): (
   props?: ProgressIndicatorProps,
   getContext?: () => ProgressContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: ProgressIndicatorProps,
     getContext?: () => ProgressContext | undefined
   ) => {
     const ctx = getContext?.()
 
     return div({
-      dataState: ctx?.state,
-      dataValue: ctx?.value !== null && ctx?.value !== undefined ? ctx.value : undefined,
-      dataMax: ctx?.max,
+      'data-state': ctx?.state,
+      'data-value': ctx?.value !== null && ctx?.value !== undefined ? ctx.value : undefined,
+      'data-max': ctx?.max,
       class: props?.class,
       style: {
         width: '100%',
@@ -104,6 +104,7 @@ export function createProgressIndicator(): (
       }
     })
   }
+  return com(component)
 }
 
 /**

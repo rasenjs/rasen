@@ -6,7 +6,7 @@
  * Composed on @rasenjs/dom element factories.
  */
 import type { Mountable } from '@rasenjs/core'
-import { getReactiveRuntime } from '@rasenjs/core'
+import { com, getReactiveRuntime } from '@rasenjs/core'
 import { button, span } from '@rasenjs/dom'
 
 export type CheckboxCheckedState = boolean | 'indeterminate'
@@ -60,7 +60,7 @@ function getCheckedState(state: CheckboxCheckedState): {
 export function createCheckboxRoot(): (
   props?: CheckboxRootProps
 ) => Mountable<HTMLElement> {
-  return (props?: CheckboxRootProps) => {
+  const component = (props?: CheckboxRootProps) => {
     const disabled = props?.disabled ?? false
 
     const isControlled = props?.checked !== undefined
@@ -104,18 +104,18 @@ export function createCheckboxRoot(): (
       type: 'button',
       role: 'checkbox',
       tabIndex: disabled ? -1 : 0,
-      ariaChecked: () => state().ariaChecked,
-      dataState: () => state().dataState,
-      ariaDisabled: disabled ? 'true' : undefined,
-      dataDisabled: disabled ? '' : undefined,
-      ariaRequired: props?.required ? 'true' : undefined,
+      'aria-checked': () => state().ariaChecked,
+      'data-state': () => state().dataState,
+      'aria-disabled': disabled ? 'true' : undefined,
+      'data-disabled': disabled ? '' : undefined,
+      'aria-required': props?.required ? 'true' : undefined,
       name: props?.name,
       value: props?.value,
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children(getContext)] : undefined,
       onClick: toggle,
-      onKeydown: (e: Event) => {
+      onKeyDown: (e: Event) => {
         const ke = e as KeyboardEvent
         if (ke.key === ' ' || ke.key === 'Enter') {
           ke.preventDefault()
@@ -124,6 +124,7 @@ export function createCheckboxRoot(): (
       }
     })
   }
+  return com(component)
 }
 
 /**
@@ -136,35 +137,38 @@ export function createCheckboxIndicator(): (
   props?: CheckboxIndicatorProps,
   getContext?: () => CheckboxContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: CheckboxIndicatorProps,
     getContext?: () => CheckboxContext | undefined
   ) => {
     const forceMount = props?.forceMount ?? false
 
-    const isVisible = () =>
+    const isVisible = (): boolean =>
       forceMount ||
-      (getContext?.().isChecked ?? false) ||
-      (getContext?.().isIndeterminate ?? false)
+      (getContext?.()?.isChecked ?? false) ||
+      (getContext?.()?.isIndeterminate ?? false)
 
     // Mount-time render decision (same semantics as before the factory
     // migration): unchecked without forceMount renders nothing at all.
     if (!isVisible()) {
-      return () => {}
+      return () => undefined
     }
 
     return span({
-      dataState: () =>
-        getContext?.().isIndeterminate
+      'data-state': () => {
+        const ctx = getContext?.()
+        return ctx?.isIndeterminate
           ? 'indeterminate'
-          : getContext?.().isChecked
+          : ctx?.isChecked
             ? 'checked'
-            : 'unchecked',
+            : 'unchecked'
+      },
       hidden: () => !isVisible(),
       class: props?.class,
       style: props?.style
     })
   }
+  return com(component)
 }
 
 /**

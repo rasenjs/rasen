@@ -44,12 +44,28 @@ interface BaseElementProps {
 }
 
 /**
+ * Arbitrary `data-*` attributes.
+ *
+ * The element factory writes any key through the shared binding layer, and
+ * headless component libraries (rota) address their styling entirely through
+ * `data-state`-style attributes — so these must be typable. They live here as
+ * an intersection rather than in HTMLAttributes because TypeScript does not
+ * inherit index signatures through `interface extends`.
+ */
+type DataAttributes = {
+  [key: `data-${string}`]: PropValue<
+    string | number | boolean | null | undefined
+  >
+}
+
+/**
  * 完整的元素 Props 类型
  * 使用 Preact 的 DOM 类型定义，提供完整的自动补全支持
  */
 type ElementProps<T extends HTMLTagName> = {
   tag: T
 } & BaseElementProps &
+  DataAttributes &
   Omit<HTMLTagAttributes<T>, 'children'> &
   ClassAttributes<TagToElement<T>>
 

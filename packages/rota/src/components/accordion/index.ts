@@ -8,7 +8,7 @@
  * (they hold live elements, not reactive state).
  */
 import type { Mountable } from '@rasenjs/core'
-import { getReactiveRuntime } from '@rasenjs/core'
+import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, h3 } from '@rasenjs/dom'
 
 export type AccordionType = 'single' | 'multiple'
@@ -135,7 +135,7 @@ function getCurrentItemContext(): AccordionItemContext | undefined {
 export function createAccordionRoot(): (
   props?: AccordionRootProps
 ) => Mountable<HTMLElement> {
-  return (props?: AccordionRootProps) => {
+  const component = (props?: AccordionRootProps) => {
     const rt = getReactiveRuntime()
 
     const type = props?.type ?? 'single'
@@ -307,13 +307,14 @@ export function createAccordionRoot(): (
     const getContext = (): AccordionContext => context
 
     return div({
-      dataOrientation: orientation,
-      dataDisabled: disabled ? '' : undefined,
+      'data-orientation': orientation,
+      'data-disabled': disabled ? '' : undefined,
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children(getContext)] : undefined
     })
   }
+  return com(component)
 }
 
 /**
@@ -323,7 +324,7 @@ export function createAccordionItem(): (
   props?: AccordionItemProps,
   getContext?: () => AccordionContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: AccordionItemProps,
     getContext?: () => AccordionContext | undefined
   ) => {
@@ -343,9 +344,9 @@ export function createAccordionItem(): (
     }
 
     return div({
-      dataState: () => (ctx?.isOpen(props.value) ? 'open' : 'closed'),
-      dataDisabled: itemDisabled ? '' : undefined,
-      ariaDisabled: itemDisabled ? 'true' : undefined,
+      'data-state': () => (ctx?.isOpen(props.value) ? 'open' : 'closed'),
+      'data-disabled': itemDisabled ? '' : undefined,
+      'aria-disabled': itemDisabled ? 'true' : undefined,
       class: props?.class,
       style: props?.style,
       // Element registries are set up before children mount so the parts
@@ -358,7 +359,7 @@ export function createAccordionItem(): (
           const getCtx = getContext ?? (() => undefined)
           const getItemCtx = () => itemContext
           const unmount = props.children
-            ? props.children(getCtx, getItemCtx)(el)
+            ? props.children(getCtx, getItemCtx)(el, undefined)
             : undefined
           return () => {
             popItemContext()
@@ -369,6 +370,7 @@ export function createAccordionItem(): (
       ]
     })
   }
+  return com(component)
 }
 
 /**
@@ -379,7 +381,7 @@ export function createAccordionHeader(): (
   getContext?: () => AccordionContext | undefined,
   getItemContext?: () => AccordionItemContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: AccordionHeaderProps,
     getContext?: () => AccordionContext | undefined,
     getItemContext?: () => AccordionItemContext | undefined
@@ -388,7 +390,7 @@ export function createAccordionHeader(): (
 
     return h3({
       role: 'heading',
-      ariaLevel: 3,
+      'aria-level': 3,
       id: itemCtx?.headerId,
       class: props?.class,
       style: props?.style,
@@ -397,6 +399,7 @@ export function createAccordionHeader(): (
         : undefined
     })
   }
+  return com(component)
 }
 
 /**
@@ -407,7 +410,7 @@ export function createAccordionTrigger(): (
   getContext?: () => AccordionContext | undefined,
   getItemContext?: () => AccordionItemContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: AccordionTriggerProps,
     getContext?: () => AccordionContext | undefined,
     getItemContext?: () => AccordionItemContext | undefined
@@ -421,11 +424,11 @@ export function createAccordionTrigger(): (
       type: 'button',
       role: 'button',
       tabIndex: -1,
-      ariaExpanded: () => String(ctx?.isOpen(itemValue) ?? false),
-      ariaDisabled: () => String(ctx?.isItemDisabled(itemValue) ?? false),
-      dataState: () => (ctx?.isOpen(itemValue) ? 'open' : 'closed'),
-      dataOrientation: ctx?.orientation,
-      dataDisabled: () => (ctx?.isItemDisabled(itemValue) ? '' : undefined),
+      'aria-expanded': () => String(ctx?.isOpen(itemValue) ?? false),
+      'aria-disabled': () => String(ctx?.isItemDisabled(itemValue) ?? false),
+      'data-state': () => (ctx?.isOpen(itemValue) ? 'open' : 'closed'),
+      'data-orientation': ctx?.orientation,
+      'data-disabled': () => (ctx?.isItemDisabled(itemValue) ? '' : undefined),
       class: props?.class,
       style: props?.style,
       // Trigger ids / aria-controls are written by the registry, which
@@ -433,7 +436,7 @@ export function createAccordionTrigger(): (
       children: [
         (el: HTMLElement) => {
           if (ctx && itemCtx) ctx.registerTrigger(el, itemCtx.value)
-          const unmount = props?.children ? props.children()(el) : undefined
+          const unmount = props?.children ? props.children()(el, undefined) : undefined
           return () => {
             if (ctx) ctx.unregisterTrigger(el)
             unmount?.()
@@ -445,7 +448,7 @@ export function createAccordionTrigger(): (
         if (ctx.isItemDisabled(itemCtx.value)) return
         ctx.toggleItem(itemCtx.value)
       },
-      onKeydown: (e: Event) => {
+      onKeyDown: (e: Event) => {
         const ke = e as KeyboardEvent
         if (!ctx) return
         const enabledTriggers = ctx.getEnabledTriggers()
@@ -481,6 +484,7 @@ export function createAccordionTrigger(): (
       }
     })
   }
+  return com(component)
 }
 
 /**
@@ -491,7 +495,7 @@ export function createAccordionContent(): (
   getContext?: () => AccordionContext | undefined,
   getItemContext?: () => AccordionItemContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: AccordionContentProps,
     getContext?: () => AccordionContext | undefined,
     getItemContext?: () => AccordionItemContext | undefined
@@ -503,10 +507,10 @@ export function createAccordionContent(): (
 
     return div({
       role: 'region',
-      ariaLabelledby: itemCtx?.headerId,
-      dataState: () => (ctx?.isOpen(itemValue) ? 'open' : 'closed'),
-      dataOrientation: ctx?.orientation,
-      dataDisabled: () => (ctx?.isItemDisabled(itemValue) ? '' : undefined),
+      'aria-labelledby': itemCtx?.headerId,
+      'data-state': () => (ctx?.isOpen(itemValue) ? 'open' : 'closed'),
+      'data-orientation': ctx?.orientation,
+      'data-disabled': () => (ctx?.isItemDisabled(itemValue) ? '' : undefined),
       hidden: () => (forceMount || ctx?.isOpen(itemValue) ? false : true),
       class: props?.class,
       style: props?.style,
@@ -516,7 +520,7 @@ export function createAccordionContent(): (
           if (ctx && itemCtx) {
             ctx.registerContent(el, itemCtx.value, itemCtx.headerId)
           }
-          const unmount = props?.children ? props.children()(el) : undefined
+          const unmount = props?.children ? props.children()(el, undefined) : undefined
           return () => {
             if (ctx) ctx.unregisterContent(el)
             unmount?.()
@@ -525,6 +529,7 @@ export function createAccordionContent(): (
       ]
     })
   }
+  return com(component)
 }
 
 /**
@@ -581,6 +586,7 @@ export function createAccordion(): (
                             class: props?.triggerClass,
                             children: () => (triggerEl: HTMLElement) => {
                               triggerEl.textContent = item.label
+                              return undefined
                             }
                           },
                           getCtx2,
@@ -589,17 +595,18 @@ export function createAccordion(): (
                     },
                     getCtx,
                     getItemCtx
-                  )(itemEl)
+                  )(itemEl, undefined)
                   const contentUnmount = Content(
                     {
                       class: props?.contentClass,
                       children: () => (contentEl: HTMLElement) => {
                         contentEl.textContent = item.content
+                        return undefined
                       }
                     },
                     getCtx,
                     getItemCtx
-                  )(itemEl)
+                  )(itemEl, undefined)
                   return () => {
                     headerUnmount?.()
                     contentUnmount?.()

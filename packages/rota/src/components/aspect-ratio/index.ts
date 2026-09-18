@@ -5,6 +5,7 @@
  * Composed on @rasenjs/dom element factories.
  */
 import type { Mountable } from '@rasenjs/core'
+import { com } from '@rasenjs/core'
 import { div } from '@rasenjs/dom'
 
 export interface AspectRatioProps {
@@ -20,14 +21,14 @@ export function createAspectRatio(): (
   props?: AspectRatioProps,
   children?: () => Mountable<HTMLElement>
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: AspectRatioProps,
     children?: () => Mountable<HTMLElement>
   ) => {
     const ratio = props?.ratio ?? 1
 
     return div({
-      dataRatio: String(ratio),
+      'data-ratio': String(ratio),
       class: props?.class,
       // The padding-bottom technique IS the ratio mechanism — these inline
       // styles are functional, not cosmetic, and remain user-overridable.
@@ -41,7 +42,7 @@ export function createAspectRatio(): (
       children: [
         // Content wrapper: fills the padding-established box.
         div({
-          dataAspectRatioContent: '',
+          'data-aspect-ratio-content': '',
           style: {
             position: 'absolute',
             top: '0',
@@ -54,6 +55,7 @@ export function createAspectRatio(): (
       ]
     })
   }
+  return com(component)
 }
 
 /**

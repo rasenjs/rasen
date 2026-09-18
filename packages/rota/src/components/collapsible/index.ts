@@ -6,7 +6,7 @@
  * bind to it reactively.
  */
 import type { Mountable, Ref } from '@rasenjs/core'
-import { getReactiveRuntime } from '@rasenjs/core'
+import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button } from '@rasenjs/dom'
 
 export type CollapsibleState = 'open' | 'closed'
@@ -49,7 +49,7 @@ export interface CollapsibleContext {
 export function createCollapsibleRoot(): (
   props?: CollapsibleRootProps
 ) => Mountable<HTMLElement> {
-  return (props?: CollapsibleRootProps) => {
+  const component = (props?: CollapsibleRootProps) => {
     const rt = getReactiveRuntime()
     const open = rt.ref(props?.defaultOpen ?? false)
 
@@ -67,15 +67,17 @@ export function createCollapsibleRoot(): (
     })
 
     return div({
-      dataState: () => (rt.unref(open) ? 'open' : 'closed'),
-      dataDisabled: () => (props?.disabled ? '' : undefined),
+      'data-state': () => (rt.unref(open) ? 'open' : 'closed'),
+      'data-disabled': () => (props?.disabled ? '' : undefined),
       class: props?.class,
       style: props?.style,
-      // rota children contract: invoke to get a Mountable, hand it to the
-      // element factory (a Mountable IS a (host) => cleanup function).
-      children: props?.children ? [props.children()] : undefined
+      // rota children contract: invoke with the context getter to get a
+      // Mountable; a Mountable IS a (host) => cleanup function, which is
+      // exactly what the element factory takes as a function child.
+      children: props?.children ? [props.children(getContext)] : undefined
     })
   }
+  return com(component)
 }
 
 /**
@@ -85,26 +87,28 @@ export function createCollapsibleTrigger(): (
   props?: CollapsibleTriggerProps,
   getContext?: () => CollapsibleContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: CollapsibleTriggerProps,
     getContext?: () => CollapsibleContext | undefined
   ) => {
     const rt = getReactiveRuntime()
+    const isOpen = (): boolean => rt.unref(getContext?.()?.open) ?? false
 
     return button({
       type: 'button',
-      ariaExpanded: () => String(rt.unref(getContext?.().open) ?? false),
-      dataState: () => (rt.unref(getContext?.().open) ? 'open' : 'closed'),
-      dataDisabled: () => (getContext?.().disabled ? '' : undefined),
+      'aria-expanded': () => String(isOpen()),
+      'data-state': () => (isOpen() ? 'open' : 'closed'),
+      'data-disabled': () => (getContext?.()?.disabled ? '' : undefined),
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children()] : undefined,
       onClick: () => {
         props?.onClick?.()
-        getContext?.().toggle()
+        getContext?.()?.toggle()
       }
     })
   }
+  return com(component)
 }
 
 /**
@@ -114,23 +118,25 @@ export function createCollapsibleContent(): (
   props?: CollapsibleContentProps,
   getContext?: () => CollapsibleContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: CollapsibleContentProps,
     getContext?: () => CollapsibleContext | undefined
   ) => {
     const rt = getReactiveRuntime()
     const forceMount = props?.forceMount ?? false
+    const isOpen = (): boolean => rt.unref(getContext?.()?.open) ?? false
 
     return div({
       id: 'collapsible-content',
       role: 'region',
-      dataState: () => (rt.unref(getContext?.().open) ? 'open' : 'closed'),
-      hidden: () => (forceMount || rt.unref(getContext?.().open) ? false : true),
+      'data-state': () => (isOpen() ? 'open' : 'closed'),
+      hidden: () => (forceMount || isOpen() ? false : true),
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children()] : undefined
     })
   }
+  return com(component)
 }
 
 /**

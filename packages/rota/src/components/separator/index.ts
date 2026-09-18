@@ -8,6 +8,7 @@
  * consumer (headless contract) — orientation is exposed via data attribute.
  */
 import type { Mountable } from '@rasenjs/core'
+import { com } from '@rasenjs/core'
 import { hr } from '@rasenjs/dom'
 
 export interface SeparatorProps {
@@ -23,14 +24,14 @@ export interface SeparatorProps {
 export function createSeparator(): (
   props?: SeparatorProps
 ) => Mountable<HTMLElement> {
-  return (props?: SeparatorProps) => {
+  const component = (props?: SeparatorProps) => {
     const orientation = props?.orientation ?? 'horizontal'
     const decorative = props?.decorative ?? false
 
     return hr({
       role: decorative ? undefined : 'separator',
-      ariaOrientation: decorative ? undefined : orientation,
-      dataOrientation: orientation,
+      'aria-orientation': decorative ? undefined : orientation,
+      'data-orientation': orientation,
       class: props?.class,
       // The 1px sizing IS the visible output of a separator — functional
       // defaults, still overridable via style/class.
@@ -44,6 +45,7 @@ export function createSeparator(): (
       }
     })
   }
+  return com(component)
 }
 
 /**

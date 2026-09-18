@@ -6,7 +6,7 @@
  * load status is a runtime ref so the fallback reacts without polling.
  */
 import type { Mountable } from '@rasenjs/core'
-import { getReactiveRuntime } from '@rasenjs/core'
+import { com, getReactiveRuntime } from '@rasenjs/core'
 import { span, img } from '@rasenjs/dom'
 
 export type ImageLoadingStatus = 'loading' | 'loaded' | 'error'
@@ -50,7 +50,7 @@ export function createAvatarRoot(): (
 ) => Mountable<HTMLElement> {
   const contextMap = new WeakMap<HTMLElement, AvatarContext>()
 
-  return (props?: AvatarRootProps) => {
+  const component = (props?: AvatarRootProps) => {
     const rt = getReactiveRuntime()
     const statusRef = rt.ref<ImageLoadingStatus>('loading')
 
@@ -74,7 +74,7 @@ export function createAvatarRoot(): (
                 setStatus: (s) => rt.setValue(statusRef, s)
               })
               contextMap.set(el, getContext())
-              const unmount = props.children!(getContext)(el)
+              const unmount = props.children!(getContext)(el, undefined)
               return () => {
                 contextMap.delete(el)
                 unmount?.()
@@ -84,6 +84,7 @@ export function createAvatarRoot(): (
         : undefined
     })
   }
+  return com(component)
 }
 
 /**
@@ -93,12 +94,12 @@ export function createAvatarImage(): (
   props?: AvatarImageProps,
   getContext?: () => AvatarContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: AvatarImageProps,
     getContext?: () => AvatarContext | undefined
   ) => {
     const setStatus = (status: ImageLoadingStatus) => {
-      getContext?.().setStatus(status)
+      getContext?.()?.setStatus(status)
       props?.onLoadingStatusChange?.(status)
     }
 
@@ -108,7 +109,7 @@ export function createAvatarImage(): (
       sizes: props?.sizes,
       alt: props?.alt,
       loading: props?.loading,
-      dataState: 'loading',
+      'data-state': 'loading',
       class: props?.class,
       // Fill the root box over the fallback — functional positioning.
       style: {
@@ -126,6 +127,7 @@ export function createAvatarImage(): (
       onError: () => setStatus('error')
     })
   }
+  return com(component)
 }
 
 /**
@@ -135,23 +137,16 @@ export function createAvatarFallback(): (
   props?: AvatarFallbackProps,
   getContext?: () => AvatarContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: AvatarFallbackProps,
     getContext?: () => AvatarContext | undefined
   ) => {
     const rt = getReactiveRuntime()
     const delayMs = props?.delayMs ?? 0
     const delayedVisible = rt.ref(delayMs === 0)
-    let timer: ReturnType<typeof setTimeout> | null = null
-
-    // Show after delayMs while the image is not loaded; hide once loaded.
-    // The delay timer starts on mount and flips the visibility ref.
-    if (delayMs > 0) {
-      timer = setTimeout(() => rt.setValue(delayedVisible, true), delayMs)
-    }
 
     const shouldShow = () => {
-      const status = getContext?.().status() ?? 'loading'
+      const status = getContext?.()?.status() ?? 'loading'
       return (
         status !== 'loaded' &&
         (delayMs === 0 || rt.unref(delayedVisible))
@@ -159,7 +154,7 @@ export function createAvatarFallback(): (
     }
 
     return span({
-      dataState: () => (shouldShow() ? 'visible' : 'hidden'),
+      'data-state': () => (shouldShow() ? 'visible' : 'hidden'),
       // Opacity (not hidden) so consumers can transition the swap in CSS.
       style: {
         opacity: () => (shouldShow() ? '1' : '0'),
@@ -173,9 +168,27 @@ export function createAvatarFallback(): (
         justifyContent: 'center',
         ...(typeof props?.style === 'object' ? props.style : {})
       },
-      children: props?.children ? [props.children()] : undefined
+      // The delay timer belongs to the element lifetime: started at mount,
+      // cleared on unmount. The wrapper is always injected so that the timer
+      // is scheduled even when the consumer passes no children.
+      children: [
+        (el: HTMLElement) => {
+          const timer =
+            delayMs > 0
+              ? setTimeout(() => rt.setValue(delayedVisible, true), delayMs)
+              : null
+          const unmount = props?.children
+            ? props.children()(el, undefined)
+            : undefined
+          return () => {
+            if (timer !== null) clearTimeout(timer)
+            unmount?.()
+          }
+        }
+      ]
     })
   }
+  return com(component)
 }
 
 /**

@@ -6,7 +6,7 @@
  * ref, so triggers and contents update through reactive attribute bindings.
  */
 import type { Mountable } from '@rasenjs/core'
-import { getReactiveRuntime, type Ref } from '@rasenjs/core'
+import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button } from '@rasenjs/dom'
 
 export type TabsOrientation = 'horizontal' | 'vertical'
@@ -64,7 +64,7 @@ export interface TabsContentProps {
 export function createTabsRoot(): (
   props?: TabsRootProps
 ) => Mountable<HTMLElement> {
-  return (props?: TabsRootProps) => {
+  const component = (props?: TabsRootProps) => {
     const rt = getReactiveRuntime()
     const orientation = props?.orientation ?? 'horizontal'
 
@@ -98,12 +98,13 @@ export function createTabsRoot(): (
     const getContext = (): TabsContext => context
 
     return div({
-      dataOrientation: orientation,
+      'data-orientation': orientation,
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children(getContext)] : undefined
     })
   }
+  return com(component)
 }
 
 /**
@@ -113,7 +114,7 @@ export function createTabsList(): (
   props?: TabsListProps,
   getContext?: () => TabsContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: TabsListProps,
     getContext?: () => TabsContext | undefined
   ) => {
@@ -122,8 +123,8 @@ export function createTabsList(): (
 
     return div({
       role: 'tablist',
-      ariaOrientation: orientation,
-      dataOrientation: orientation,
+      'aria-orientation': orientation,
+      'data-orientation': orientation,
       class: props?.class,
       style: props?.style,
       children: props?.children
@@ -131,6 +132,7 @@ export function createTabsList(): (
         : undefined
     })
   }
+  return com(component)
 }
 
 /**
@@ -140,7 +142,7 @@ export function createTabsTrigger(): (
   props?: TabsTriggerProps,
   getContext?: () => TabsContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: TabsTriggerProps,
     getContext?: () => TabsContext | undefined
   ) => {
@@ -155,11 +157,11 @@ export function createTabsTrigger(): (
       type: 'button',
       role: 'tab',
       tabIndex: -1,
-      ariaSelected: () => String(ctx?.value() === props.value),
-      dataState: () => (ctx?.value() === props.value ? 'active' : 'inactive'),
-      dataOrientation: ctx?.orientation,
-      ariaDisabled: disabled ? 'true' : undefined,
-      dataDisabled: disabled ? '' : undefined,
+      'aria-selected': () => String(ctx?.value() === props.value),
+      'data-state': () => (ctx?.value() === props.value ? 'active' : 'inactive'),
+      'data-orientation': ctx?.orientation,
+      'aria-disabled': disabled ? 'true' : undefined,
+      'data-disabled': disabled ? '' : undefined,
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children()] : undefined,
@@ -168,6 +170,7 @@ export function createTabsTrigger(): (
       }
     })
   }
+  return com(component)
 }
 
 /**
@@ -177,7 +180,7 @@ export function createTabsContent(): (
   props?: TabsContentProps,
   getContext?: () => TabsContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: TabsContentProps,
     getContext?: () => TabsContext | undefined
   ) => {
@@ -190,7 +193,7 @@ export function createTabsContent(): (
 
     return div({
       role: 'tabpanel',
-      dataState: () =>
+      'data-state': () =>
         ctx?.value() === props.value ? 'active' : 'hidden',
       hidden: () => (forceMount || ctx?.value() === props.value ? false : true),
       class: props?.class,
@@ -198,6 +201,7 @@ export function createTabsContent(): (
       children: props?.children ? [props.children()] : undefined
     })
   }
+  return com(component)
 }
 
 /**
@@ -248,6 +252,7 @@ export function createTabs(): (
                           class: props?.triggerClass,
                           children: () => (el: HTMLElement) => {
                             el.textContent = tab.label
+                            return undefined
                           }
                         },
                         getCtx
@@ -262,7 +267,10 @@ export function createTabs(): (
                   {
                     value: tab.value,
                     class: props?.contentClass,
-                    children: () => tab.content
+                    children: () => (el: HTMLElement) => {
+                      el.textContent = tab.content
+                      return undefined
+                    }
                   },
                   getContext
                 )

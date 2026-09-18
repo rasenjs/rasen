@@ -7,7 +7,7 @@
  * same component benefits from hydration-aware bindings for free.
  */
 import type { Mountable } from '@rasenjs/core'
-import { getReactiveRuntime } from '@rasenjs/core'
+import { com, getReactiveRuntime } from '@rasenjs/core'
 import { button, span } from '@rasenjs/dom'
 
 export interface SwitchRootProps {
@@ -46,7 +46,7 @@ export function createSwitchRoot(): (
   props?: SwitchRootProps,
   _getContext?: () => SwitchContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: SwitchRootProps,
     _getContext?: () => SwitchContext | undefined
   ) => {
@@ -78,20 +78,18 @@ export function createSwitchRoot(): (
     return button({
       type: 'button',
       role: 'switch',
-      ariaChecked: () => String(isChecked()),
-      ariaDisabled: () => String(isDisabled()),
-      ariaRequired: props?.required ? 'true' : undefined,
-      dataState: () => (isChecked() ? 'checked' : 'unchecked'),
-      dataDisabled: () => (isDisabled() ? '' : undefined),
+      'aria-checked': () => String(isChecked()),
+      'aria-disabled': () => String(isDisabled()),
+      'aria-required': props?.required ? 'true' : undefined,
+      'data-state': () => (isChecked() ? 'checked' : 'unchecked'),
+      'data-disabled': () => (isDisabled() ? '' : undefined),
       name: props?.name,
       value: props?.value,
       class: props?.class,
       style: props?.style,
-      children: props?.children
-        ? [(el) => props.children!(getContext)(el)]
-        : undefined,
+      children: props?.children ? [props.children(getContext)] : undefined,
       onClick: toggle,
-      onKeydown: (e: Event) => {
+      onKeyDown: (e: Event) => {
         const ke = e as KeyboardEvent
         if (ke.key === ' ' || ke.key === 'Enter') {
           ke.preventDefault()
@@ -100,6 +98,7 @@ export function createSwitchRoot(): (
       }
     })
   }
+  return com(component)
 }
 
 /**
@@ -112,16 +111,19 @@ export function createSwitchThumb(): (
   props?: SwitchThumbProps,
   getContext?: () => SwitchContext | undefined
 ) => Mountable<HTMLElement> {
-  return (
+  const component = (
     props?: SwitchThumbProps,
     getContext?: () => SwitchContext | undefined
   ) => {
+    const isChecked = (): boolean => getContext?.()?.checked ?? false
+
     return span({
-      dataState: () => (getContext?.().checked ? 'checked' : 'unchecked'),
+      'data-state': () => (isChecked() ? 'checked' : 'unchecked'),
       class: props?.class,
       style: props?.style
     })
   }
+  return com(component)
 }
 
 /**
