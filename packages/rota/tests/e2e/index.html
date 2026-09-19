@@ -285,6 +285,34 @@
       .alert-dialog-content[hidden] {
         display: none;
       }
+      /* Dialog */
+      .dialog-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 50;
+      }
+      .dialog-overlay[data-state='closed'] {
+        display: none;
+      }
+      .dialog-content {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        z-index: 51;
+        min-width: 300px;
+      }
+      .dialog-content[hidden] {
+        display: none;
+      }
+      .dialog-close {
+        margin-top: 16px;
+      }
+
       .alert-dialog-actions {
         display: flex;
         gap: 8px;
@@ -479,6 +507,12 @@
       <div id="alert-dialog"></div>
     </section>
 
+    <!-- Dialog -->
+    <section id="dialog-section">
+      <h2>Dialog</h2>
+      <div id="dialog"></div>
+    </section>
+
     <!-- NumberField -->
     <section id="numberfield-section">
       <h2>NumberField</h2>
@@ -521,6 +555,7 @@
         switchRoot,
         accordion,
         alertDialog,
+        dialog,
         numberField,
         tagsInput,
         pinInput
@@ -685,6 +720,59 @@
         cancelText: 'Cancel',
         confirmText: 'Confirm'
       })(document.getElementById('alert-dialog'))
+
+      // ==================== Dialog ====================
+      {
+        const { Root: DialogRoot, Trigger, Overlay, Content, Title, Description, Close } =
+          dialog
+        DialogRoot({
+          children: (getContext) =>
+            div({
+              children: [
+                Trigger(
+                  {
+                    class: 'dialog-trigger',
+                    id: 'dialog-trigger',
+                    children: () => text({ content: 'Open Dialog' })
+                  },
+                  getContext
+                ),
+                Overlay({ class: 'dialog-overlay', id: 'dialog-overlay' }, getContext),
+                Content(
+                  {
+                    class: 'dialog-content',
+                    id: 'dialog-content',
+                    children: (getCtx) =>
+                      div({
+                        children: [
+                          Title(
+                            { id: 'dialog-title', children: () => text({ content: 'Settings' }) },
+                            getCtx
+                          ),
+                          Description(
+                            {
+                              id: 'dialog-description',
+                              children: () => text({ content: 'Escape or a press outside closes this.' })
+                            },
+                            getCtx
+                          ),
+                          Close(
+                            {
+                              class: 'dialog-close',
+                              id: 'dialog-close',
+                              children: () => text({ content: 'Close' })
+                            },
+                            getCtx
+                          )
+                        ]
+                      })
+                  },
+                  getContext
+                )
+              ]
+            })
+        })(document.getElementById('dialog'))
+      }
 
       // ==================== NumberField ====================
       numberField({

@@ -46,6 +46,12 @@ because it is a decision that has to be answered.
 | While open | `Tab` and `Shift+Tab` wrap inside the panel; focus that escaped is pulled back | — |
 | Closing | focus returns where it came from | `onCloseAutoFocus` (preventDefault to place it yourself) |
 
+Focus is only handed back when it is still the dialog's to give: closing with
+the keyboard (Escape) returns it to whatever opened the dialog, while a press
+somewhere else on the page leaves focus where the user just put it — the same
+rule that lets a consumer move focus on purpose in `onCloseAutoFocus` and keep
+it.
+
 Both the trap and the dismissal listeners are torn down when the panel leaves
 the tree, so a dialog removed while open does not keep capturing keys.
 
