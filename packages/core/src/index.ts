@@ -22,4 +22,11 @@ export {
   renderText,
   stringifyStyleInline,
 } from './html-escape'
+export {
+  camelToKebab,
+  getAttrName,
+  isEventProp,
+  getEventName,
+  attrValue,
+} from './html-attributes'
 export { collectHtml } from './collect-html'

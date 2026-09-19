@@ -7,7 +7,9 @@
  * reactive runtime to unwrap a ref, which is itself host-agnostic.
  */
 
-import { getReactiveRuntime } from './reactive'
+import { getReactiveRuntime, toValue } from './reactive'
+import { camelToKebab } from './html-attributes'
+import type { PropValue } from './types'
 
 const HTML_ESCAPE_MAP: Record<string, string> = {
   '&': '&amp;',
@@ -49,12 +51,22 @@ export function renderText(value: unknown): string {
   return String(value)
 }
 
-/** Serialize a camelCase-keyed style object to an inline css string.
- *  Keys are converted to kebab-case; null/undefined values are skipped. */
+/** Serialize a style object to an inline css string.
+ *
+ *  Keys are camelCase and converted to kebab-case. Values go through the same
+ *  `PropValue` dispatch as any other prop: a style object may hold a ref or a
+ *  getter **per declaration**, which is how a component binds one CSS property
+ *  to a reactive value (`opacity: () => visible() ? '1' : '0'`). That is the
+ *  contract `bindStyle` implements for the DOM renderer, so a string renderer
+ *  that skipped it would emit the function source instead of a value.
+ *
+ *  Nullish values are omitted rather than serialized ("color: null"). */
 export function stringifyStyleInline(styles: Record<string, unknown>): string {
-  return Object.entries(styles)
-    .map(([k, v]) =>
-      k.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase() + ':' + v
-    )
-    .join(';')
+  const parts: string[] = []
+  for (const [key, value] of Object.entries(styles)) {
+    const resolved = toValue(value as PropValue<unknown>)
+    if (resolved === null || resolved === undefined) continue
+    parts.push(`${camelToKebab(key)}: ${String(resolved)}`)
+  }
+  return parts.join('; ')
 }

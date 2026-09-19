@@ -1,5 +1,11 @@
 import type { PropValue } from '@rasenjs/core'
-import { getReactiveRuntime, toValue, watchObjectProps as watchObjectPropsCore } from '@rasenjs/core'
+import {
+  getReactiveRuntime,
+  toValue,
+  watchObjectProps as watchObjectPropsCore,
+  attrValue,
+  camelToKebab
+} from '@rasenjs/core'
 
 /**
  * 解包 Ref 或 Getter
@@ -10,30 +16,22 @@ export function unref<T>(value: PropValue<T>): T {
 
 /**
  * 设置 DOM 属性
- * 对于 data-* 属性，布尔值转为 "true"/"false" 字符串
- * 对于其他属性，true 设为空字符串，false 移除属性
+ *
+ * Presence and value rules come from `attrValue` in @rasenjs/core, shared with
+ * the string renderer — the server and the client must agree on whether an
+ * attribute exists at all (data-* carries "true"/"false"; a boolean elsewhere
+ * is a flag: true present-and-empty, false absent).
  */
 export function setAttribute(
   element: HTMLElement,
   name: string,
   value: string | number | boolean | null | undefined
 ) {
-  if (value === null || value === undefined) {
+  const serialized = attrValue(name, value)
+  if (serialized === null) {
     element.removeAttribute(name)
-  } else if (typeof value === 'boolean') {
-    // data-* 属性使用 "true"/"false" 字符串
-    if (name.startsWith('data-')) {
-      element.setAttribute(name, String(value))
-    } else {
-      // 其他布尔属性：true 设为空字符串，false 移除
-      if (value) {
-        element.setAttribute(name, '')
-      } else {
-        element.removeAttribute(name)
-      }
-    }
   } else {
-    element.setAttribute(name, String(value))
+    element.setAttribute(name, serialized)
   }
 }
 
@@ -49,9 +47,9 @@ export function setStyle(
       element.style.removeProperty(key)
     } else {
       // setProperty only accepts kebab-case property names; camelCase keys
-      // (flexDirection, alignItems, …) must be converted first.
-      const cssKey = key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
-      element.style.setProperty(cssKey, String(value))
+      // (flexDirection, alignItems, …) must be converted first. The conversion
+      // is shared with the string renderer's style serializer.
+      element.style.setProperty(camelToKebab(key), String(value))
     }
   }
 }

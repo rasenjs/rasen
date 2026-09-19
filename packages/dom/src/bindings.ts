@@ -22,6 +22,13 @@
  */
 
 import { getReactiveRuntime, type PropValue } from '@rasenjs/core'
+// Attribute naming and event-key rules are shared with the string renderer
+// (@rasenjs/html): the same component tree is emitted server-side and written
+// onto elements in the browser, so a rule that lives in two places drifts. This
+// module re-exports the event helpers because it is the DOM renderer's import
+// source for them.
+import { getAttrName, isEventProp, getEventName } from '@rasenjs/core'
+export { isEventProp, getEventName }
 
 // Re-exported for the compiler's single import source
 // ('@rasenjs/dom/template' → bindings): generated SSR code references these.
@@ -66,33 +73,6 @@ function isDOMProperty(tag: string, key: string): boolean {
   const tagProps = TAG_SPECIFIC_PROPERTIES[lowerTag]
   if (tagProps?.has(key)) return true
   return COMMON_DOM_PROPERTIES.has(key)
-}
-
-function camelToKebab(key: string): string {
-  return key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
-}
-
-function needsKebabConversion(key: string): boolean {
-  return key.startsWith('data') || key.startsWith('aria')
-}
-
-function getDOMAttrName(key: string): string {
-  if (needsKebabConversion(key)) {
-    return camelToKebab(key)
-  }
-  return key
-}
-
-/** 判断是否是事件处理器：onClick、onMouseEnter 等 */
-export function isEventProp(key: string): boolean {
-  if (!key.startsWith('on') || key.length < 3) return false
-  const c = key.charCodeAt(2)
-  return c >= 65 && c <= 90 // 'A' - 'Z'
-}
-
-/** onClick -> click；onMouseEnter -> mouseenter */
-export function getEventName(key: string): string {
-  return key.slice(2).toLowerCase()
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +126,7 @@ function setStaticProp(
     return
   }
   if (!isHydrating()) {
-    setAttribute(el as HTMLElement, getDOMAttrName(key), value)
+    setAttribute(el as HTMLElement, getAttrName(key), value)
   }
 }
 
@@ -336,7 +316,7 @@ export function bindKey(
   const getter = toGetter(value as PropValue<unknown>)
   return isDOMProperty(tag, key)
     ? bindProp(el, key, getter)
-    : bindAttr(el, getDOMAttrName(key), getter)
+    : bindAttr(el, getAttrName(key), getter)
 }
 
 /** Register an event listener; returns its removal function.
