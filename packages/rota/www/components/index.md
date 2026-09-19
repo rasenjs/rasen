@@ -1,6 +1,6 @@
 # Components
 
-Eighteen headless components, each one a small set of parts that share a
+Nineteen headless components, each one a small set of parts that share a
 context. Behaviour, ARIA wiring and focus management come from the parts;
 appearance is entirely yours.
 
@@ -12,6 +12,7 @@ appearance is entirely yours.
 | [Avatar](/components/avatar) | Image with an automatic fallback |
 | [Checkbox](/components/checkbox) | Tri-state: checked / unchecked / indeterminate |
 | [Collapsible](/components/collapsible) | One expandable region |
+| [Dialog](/components/dialog) | Dismissible modal panel |
 | [Label](/components/label) | A real `<label>` for a control |
 | [NumberField](/components/number-field) | Numeric input with steppers and clamping |
 | [PinInput](/components/pin-input) | One-time-code entry with paste distribution |

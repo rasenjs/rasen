@@ -70,6 +70,7 @@ export default defineConfig({
             { text: 'Avatar', link: '/components/avatar' },
             { text: 'Checkbox', link: '/components/checkbox' },
             { text: 'Collapsible', link: '/components/collapsible' },
+            { text: 'Dialog', link: '/components/dialog' },
             { text: 'Label', link: '/components/label' },
             { text: 'NumberField', link: '/components/number-field' },
             { text: 'PinInput', link: '/components/pin-input' },

@@ -33,7 +33,8 @@ import {
   toggleGroup,
   createCollapsibleRoot,
   createCollapsibleTrigger,
-  createCollapsibleContent
+  createCollapsibleContent,
+  dialog
 } from '../../src/index'
 
 export interface Demo {
@@ -286,6 +287,74 @@ vseparator({ decorative: true })`,
                                 )
                               ]
                             })
+                          ]
+                        })
+                    },
+                    getContext
+                  )
+                ]
+              })
+          })
+        ]
+      })
+    }
+  },
+
+  dialog: {
+    title: 'Dialog',
+    description:
+      'A modal you can dismiss: Escape, a press outside, or the close button.',
+    code: `const { Root, Trigger, Overlay, Content, Title, Description, Close } = dialog`,
+    build: () => {
+      const { Root, Trigger, Overlay, Content, Title, Description, Close } =
+        dialog
+
+      return div({
+        children: [
+          Root({
+            defaultOpen: true,
+            class: 'dialog',
+            children: (getContext) =>
+              div({
+                children: [
+                  Trigger(
+                    {
+                      class: 'btn',
+                      children: () => text({ content: 'Open settings' })
+                    },
+                    getContext
+                  ),
+                  Overlay({ class: 'overlay' }, getContext),
+                  Content(
+                    {
+                      class: 'dialog__panel',
+                      children: (getCtx) =>
+                        div({
+                          children: [
+                            Title(
+                              {
+                                children: () =>
+                                  text({ content: 'Notification settings' })
+                              },
+                              getCtx
+                            ),
+                            Description(
+                              {
+                                children: () =>
+                                  text({
+                                    content:
+                                      'Escape, a press outside, or the close button all dismiss this panel.'
+                                  })
+                              },
+                              getCtx
+                            ),
+                            Close(
+                              {
+                                class: 'btn btn--ghost',
+                                children: () => text({ content: 'Close' })
+                              },
+                              getCtx
+                            )
                           ]
                         })
                     },
