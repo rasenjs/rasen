@@ -5,25 +5,52 @@
   "type": "module",
   "exports": {
     ".": {
-      "node": "./dist/html.js",
-      "browser": "./dist/dom.js",
-      "default": "./dist/dom.js"
+      "node": {
+        "types": "./dist/html.d.ts",
+        "default": "./dist/html.js"
+      },
+      "browser": {
+        "types": "./dist/dom.d.ts",
+        "default": "./dist/dom.js"
+      },
+      "default": {
+        "types": "./dist/dom.d.ts",
+        "default": "./dist/dom.js"
+      }
     },
     "./jsx-runtime": {
-      "types": "./dist/jsx-runtime.d.ts",
-      "browser": "./dist/jsx-runtime.js",
-      "node": "./dist/jsx-runtime-ssr.js",
-      "default": "./dist/jsx-runtime.js"
+      "node": {
+        "types": "./dist/jsx-runtime-ssr.d.ts",
+        "default": "./dist/jsx-runtime-ssr.js"
+      },
+      "browser": {
+        "types": "./dist/jsx-runtime.d.ts",
+        "default": "./dist/jsx-runtime.js"
+      },
+      "default": {
+        "types": "./dist/jsx-runtime.d.ts",
+        "default": "./dist/jsx-runtime.js"
+      }
     },
     "./jsx-dev-runtime": {
-      "types": "./dist/jsx-runtime.d.ts",
-      "browser": "./dist/jsx-runtime.js",
-      "node": "./dist/jsx-runtime-ssr.js",
-      "default": "./dist/jsx-runtime.js"
+      "node": {
+        "types": "./dist/jsx-runtime-ssr.d.ts",
+        "default": "./dist/jsx-runtime-ssr.js"
+      },
+      "browser": {
+        "types": "./dist/jsx-runtime.d.ts",
+        "default": "./dist/jsx-runtime.js"
+      },
+      "default": {
+        "types": "./dist/jsx-runtime.d.ts",
+        "default": "./dist/jsx-runtime.js"
+      }
     }
   },
   "scripts": {
-    "build": "tsup"
+    "build": "tsup",
+    "test": "../../node_modules/.bin/vitest --run",
+    "typecheck": "../../node_modules/.bin/tsc --noEmit"
   },
   "dependencies": {
     "@rasenjs/dom": "workspace:*",
