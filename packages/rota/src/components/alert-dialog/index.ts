@@ -32,6 +32,7 @@ export interface AlertDialogContext {
 }
 
 export interface AlertDialogRootProps {
+  id?: string
   defaultOpen?: PropValue<boolean>
   open?: PropValue<boolean>
   onOpenChange?: (open: boolean) => void
@@ -43,12 +44,14 @@ export interface AlertDialogRootProps {
 }
 
 export interface AlertDialogTriggerProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
 }
 
 export interface AlertDialogContentProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   onOpenAutoFocus?: (event: Event) => void
@@ -61,30 +64,35 @@ export interface AlertDialogContentProps {
 }
 
 export interface AlertDialogTitleProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
 }
 
 export interface AlertDialogDescriptionProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
 }
 
 export interface AlertDialogActionProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
 }
 
 export interface AlertDialogCancelProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
 }
 
 export interface AlertDialogOverlayProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
@@ -161,6 +169,7 @@ export function createAlertDialogRoot(): (
     const getContext = (): AlertDialogContext => context
 
     return div({
+      id: props?.id,
       'data-state': () => (currentOpen() ? 'open' : 'closed'),
       class: props?.class,
       style: props?.style,
@@ -185,6 +194,7 @@ export function createAlertDialogTrigger(): (
 
     return button({
       type: 'button',
+      id: props?.id,
       'data-state': () => (ctx?.open ? 'open' : 'closed'),
       class: props?.class,
       style: props?.style,
@@ -209,6 +219,7 @@ export function createAlertDialogOverlay(): (
     const ctx = getContext?.()
 
     return div({
+      id: props?.id,
       'data-state': () => (ctx?.open ? 'open' : 'closed'),
       hidden: () => !ctx?.open,
       class: props?.class,
@@ -273,11 +284,14 @@ export function createAlertDialogContent(): (
         // the enclosing mount has returned, so the panel is in the tree by
         // then. (A frame would also work and is what this used to do, but it
         // costs a paint and depends on one happening at all.)
-        queueMicrotask(() => {
+        const focusInitial = () => {
           // The AlertDialog convention: the decision button, then cancel, then
           // the panel itself (tabindex="-1" is there so it can hold focus).
           scope.focus(ctx.actionElement ?? ctx.cancelElement ?? null)
-        })
+        }
+
+        queueMicrotask(focusInitial)
+
       }
 
       const leave = () => {
@@ -307,6 +321,7 @@ export function createAlertDialogContent(): (
 
     const panel = div({
       role: 'alertdialog',
+      id: props?.id,
       'aria-modal': 'true',
       tabIndex: -1,
       ref: contentRef,
@@ -346,11 +361,14 @@ export function createAlertDialogTitle(): (
     getContext?: () => AlertDialogContext | undefined
   ) => {
     const ctx = getContext?.()
-    const titleId = generateTitleId()
+    // The consumer's id wins, and the context has to learn about it: it is what
+    // `aria-labelledby` points at, so a panel naming itself one id while the
+    // label points at another leaves the dialog unlabelled.
+    const titleId = props?.id ?? generateTitleId()
     ctx?.setTitleId(titleId)
 
     return h2({
-      id: titleId,
+      id: props?.id ?? titleId,
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children()] : undefined
@@ -371,11 +389,11 @@ export function createAlertDialogDescription(): (
     getContext?: () => AlertDialogContext | undefined
   ) => {
     const ctx = getContext?.()
-    const descriptionId = generateDescriptionId()
+    const descriptionId = props?.id ?? generateDescriptionId()
     ctx?.setDescriptionId(descriptionId)
 
     return p({
-      id: descriptionId,
+      id: props?.id ?? descriptionId,
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children()] : undefined
@@ -407,6 +425,7 @@ export function createAlertDialogAction(): (
 
     return button({
       type: 'button',
+      id: props?.id,
       'data-action': '',
       ref: actionRef,
       class: props?.class,
@@ -439,6 +458,7 @@ export function createAlertDialogCancel(): (
 
     return button({
       type: 'button',
+      id: props?.id,
       'data-cancel': '',
       ref: cancelRef,
       class: props?.class,

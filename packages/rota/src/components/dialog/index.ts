@@ -39,6 +39,7 @@ export interface DialogContext {
 }
 
 export interface DialogRootProps {
+  id?: string
   defaultOpen?: PropValue<boolean>
   open?: PropValue<boolean>
   onOpenChange?: (open: boolean) => void
@@ -50,12 +51,14 @@ export interface DialogRootProps {
 }
 
 export interface DialogTriggerProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
 }
 
 export interface DialogContentProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   /** Called before the dialog focuses anything; preventDefault to take over. */
@@ -80,24 +83,28 @@ export interface DialogContentProps {
 }
 
 export interface DialogTitleProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
 }
 
 export interface DialogDescriptionProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
 }
 
 export interface DialogCloseProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
 }
 
 export interface DialogOverlayProps {
+  id?: string
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
@@ -167,6 +174,7 @@ export function createDialogRoot(): (
     const getContext = (): DialogContext => context
 
     return div({
+      id: props?.id,
       'data-state': () => (currentOpen() ? 'open' : 'closed'),
       class: props?.class,
       style: props?.style,
@@ -191,6 +199,7 @@ export function createDialogTrigger(): (
 
     return button({
       type: 'button',
+      id: props?.id,
       'data-state': () => (ctx?.open ? 'open' : 'closed'),
       // A dialog opened from a button should announce the relationship.
       'aria-haspopup': 'dialog',
@@ -223,6 +232,7 @@ export function createDialogOverlay(): (
     const ctx = getContext?.()
 
     return div({
+      id: props?.id,
       'data-state': () => (ctx?.open ? 'open' : 'closed'),
       'data-overlay': '',
       hidden: () => !ctx?.open,
@@ -274,11 +284,12 @@ export function createDialogContent(): (
         props?.onOpenAutoFocus?.(event)
         if (event.defaultPrevented) return
         // No decision button to prefer here, so: the first focusable thing in
-        // the panel, or the panel itself. Deferred by a microtask because the
-        // ref is written before the element is inserted (see AlertDialog).
-        queueMicrotask(() => {
-          scope.focus(null)
-        })
+        // the panel, or the panel itself (tabindex="-1" is there so it can hold
+        // focus). Deferred by a microtask because a factory writes its `ref`
+        // before the element is inserted, and `focus()` on a detached element
+        // does nothing.
+        const focusInitial = () => scope.focus(null)
+        queueMicrotask(focusInitial)
       }
 
       const leave = () => {
@@ -304,6 +315,7 @@ export function createDialogContent(): (
 
     const panel = div({
       role: 'dialog',
+      id: props?.id,
       'aria-modal': 'true',
       tabIndex: -1,
       ref: contentRef,
@@ -338,11 +350,14 @@ export function createDialogTitle(): (
     getContext?: () => DialogContext | undefined
   ) => {
     const ctx = getContext?.()
-    const titleId = generateTitleId()
+    // The consumer's id wins, and the context has to learn about it: it is what
+    // `aria-labelledby` points at, so a panel naming itself one id while the
+    // label points at another leaves the dialog unlabelled.
+    const titleId = props?.id ?? generateTitleId()
     ctx?.setTitleId(titleId)
 
     return h2({
-      id: titleId,
+      id: props?.id ?? titleId,
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children()] : undefined
@@ -363,11 +378,11 @@ export function createDialogDescription(): (
     getContext?: () => DialogContext | undefined
   ) => {
     const ctx = getContext?.()
-    const descriptionId = generateDescriptionId()
+    const descriptionId = props?.id ?? generateDescriptionId()
     ctx?.setDescriptionId(descriptionId)
 
     return p({
-      id: descriptionId,
+      id: props?.id ?? descriptionId,
       class: props?.class,
       style: props?.style,
       children: props?.children ? [props.children()] : undefined
@@ -395,6 +410,7 @@ export function createDialogClose(): (
 
     return button({
       type: 'button',
+      id: props?.id,
       'data-close': '',
       'aria-label': 'Close',
       class: props?.class,

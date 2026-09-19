@@ -8,7 +8,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000/packages/rota/tests/e2e',
+    baseURL: 'http://127.0.0.1:3010/tests/e2e',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure'
   },
@@ -23,8 +23,10 @@ export default defineConfig({
     // workspace name and the library's own imports are bare specifiers, which
     // a browser cannot resolve on its own. Vite does, and the config aliases
     // them to sources so a spec runs against the code being edited.
-    command: 'npx vite --config vite.e2e.config.ts',
-    url: 'http://localhost:3000',
+    command: '../../node_modules/.bin/vite --config vite.e2e.config.ts',
+    // Probe the page, not the root: a bare '/' is not something this server
+    // serves, and a 404 there is easy to mistake for "not up yet".
+    url: 'http://127.0.0.1:3010/tests/e2e/index.html',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000
   }

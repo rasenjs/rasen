@@ -53,8 +53,12 @@ export default defineConfig({
     ]
   },
   server: {
-    port: 3000,
-    strictPort: false,
+    // Not 3000: this machine has a VS Code helper listening on 127.0.0.1:3000
+    // (it accepts and then never answers), and `localhost` resolves there
+    // first, so a server on ::1:3000 is unreachable by that name.
+    host: '127.0.0.1',
+    port: 3010,
+    strictPort: true,
     fs: { allow: [repo] }
   }
 })

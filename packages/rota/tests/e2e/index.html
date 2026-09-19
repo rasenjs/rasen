@@ -642,7 +642,7 @@
       } from '@rasenjs/rota'
       // Element factories come from the isomorphic entry, exactly as a
       // consumer would import them (aliased in vite.e2e.config.ts).
-      import { text } from '@rasenjs/web/elements'
+      import { div, text } from '@rasenjs/web/elements'
 
       // ==================== Separator ====================
       hseparator({ class: 'separator' })(document.getElementById('separator-h'))
@@ -792,27 +792,85 @@
       })(document.getElementById('accordion-multiple'))
 
       // ==================== AlertDialog ====================
-      alertDialog({
-        triggerText: 'Open Alert Dialog',
-        triggerClass: 'alert-dialog-trigger',
-        overlayClass: 'alert-dialog-overlay',
-        contentClass: 'alert-dialog-content',
-        titleClass: 'alert-dialog-title',
-        descriptionClass: 'alert-dialog-description',
-        actionsClass: 'alert-dialog-actions',
-        cancelClass: 'alert-dialog-cancel',
-        actionClass: 'alert-dialog-action',
-        title: 'Are you sure?',
-        description: 'This action cannot be undone.',
-        cancelText: 'Cancel',
-        confirmText: 'Confirm'
-      })(document.getElementById('alert-dialog'))
+      {
+        const { Root, Trigger, Overlay, Content, Title, Description, Action, Cancel } =
+          alertDialog
+        Root({
+          children: (getContext) =>
+            div({
+              children: [
+                Trigger(
+                  {
+                    class: 'alert-dialog-trigger',
+                    id: 'alert-dialog-trigger',
+                    children: () => text({ content: 'Open Alert Dialog' })
+                  },
+                  getContext
+                ),
+                Overlay(
+                  { class: 'alert-dialog-overlay', id: 'alert-dialog-overlay' },
+                  getContext
+                ),
+                Content(
+                  {
+                    class: 'alert-dialog-content',
+                    id: 'alert-dialog-content',
+                    children: (getCtx) =>
+                      div({
+                        children: [
+                          Title(
+                            {
+                              class: 'alert-dialog-title',
+                              id: 'alert-dialog-title',
+                              children: () => text({ content: 'Are you sure?' })
+                            },
+                            getCtx
+                          ),
+                          Description(
+                            {
+                              class: 'alert-dialog-description',
+                              id: 'alert-dialog-description',
+                              children: () =>
+                                text({ content: 'This action cannot be undone.' })
+                            },
+                            getCtx
+                          ),
+                          div({
+                            class: 'alert-dialog-actions',
+                            children: [
+                              Cancel(
+                                {
+                                  class: 'alert-dialog-cancel',
+                                  id: 'alert-dialog-cancel',
+                                  children: () => text({ content: 'Cancel' })
+                                },
+                                getCtx
+                              ),
+                              Action(
+                                {
+                                  class: 'alert-dialog-action',
+                                  id: 'alert-dialog-action',
+                                  children: () => text({ content: 'Confirm' })
+                                },
+                                getCtx
+                              )
+                            ]
+                          })
+                        ]
+                      })
+                  },
+                  getContext
+                )
+              ]
+            })
+        })(document.getElementById('alert-dialog'))
+      }
 
       // ==================== Dialog ====================
       {
-        const { Root: DialogRoot, Trigger, Overlay, Content, Title, Description, Close } =
+        const { Root, Trigger, Overlay, Content, Title, Description, Close } =
           dialog
-        DialogRoot({
+        Root({
           children: (getContext) =>
             div({
               children: [
@@ -833,13 +891,19 @@
                       div({
                         children: [
                           Title(
-                            { id: 'dialog-title', children: () => text({ content: 'Settings' }) },
+                            {
+                              class: 'dialog-title',
+                              id: 'dialog-title',
+                              children: () => text({ content: 'Settings' })
+                            },
                             getCtx
                           ),
                           Description(
                             {
+                              class: 'dialog-description',
                               id: 'dialog-description',
-                              children: () => text({ content: 'Escape or a press outside closes this.' })
+                              children: () =>
+                                text({ content: 'Escape or a press outside closes this.' })
                             },
                             getCtx
                           ),
