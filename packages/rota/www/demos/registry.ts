@@ -10,7 +10,9 @@
  * headless and only expose `data-*` contracts).
  */
 import type { Mountable } from '@rasenjs/core'
-import { div, span, text, input } from '@rasenjs/dom'
+// The isomorphic entry: DOM in the browser, string renderer under the node
+// condition — so this registry can also be rendered on the server (SSG).
+import { div, span, text, input } from '@rasenjs/web/elements'
 import {
   accordion,
   alertDialog,

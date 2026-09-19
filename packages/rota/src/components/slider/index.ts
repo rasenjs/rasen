@@ -12,7 +12,7 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, span } from '@rasenjs/dom'
+import { div, span } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
 import { toValue } from '@rasenjs/core'
 import { createElementRef, type ElementRef } from '../../internal/element-ref'

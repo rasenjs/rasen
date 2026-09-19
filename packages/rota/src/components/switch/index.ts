@@ -11,7 +11,7 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { button, span } from '@rasenjs/dom'
+import { button, span } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
 
 export interface SwitchRootProps {

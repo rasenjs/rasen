@@ -7,7 +7,7 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, button } from '@rasenjs/dom'
+import { div, button } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
 
 export type CollapsibleState = 'open' | 'closed'

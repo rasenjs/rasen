@@ -9,7 +9,7 @@
  */
 import type { Mountable } from '@rasenjs/core'
 import { com } from '@rasenjs/core'
-import { hr } from '@rasenjs/dom'
+import { hr } from '@rasenjs/web/elements'
 
 export interface SeparatorProps {
   orientation?: 'horizontal' | 'vertical'

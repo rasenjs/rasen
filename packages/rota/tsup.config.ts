@@ -2,9 +2,7 @@ import { defineConfig } from 'tsup'
 
 export default defineConfig({
   entry: {
-    index: 'src/index.ts',
-    dom: 'src/dom.ts',
-    html: 'src/html.ts'
+    index: 'src/index.ts'
   },
   format: ['esm', 'cjs'],
   dts: true,
@@ -13,8 +11,10 @@ export default defineConfig({
   clean: true,
   external: [
     '@rasenjs/core',
-    '@rasenjs/dom',
-    '@rasenjs/html',
+    // The element factories are resolved by the *consumer's* bundler:
+    // `@rasenjs/web/elements` is @rasenjs/dom in a browser and @rasenjs/html
+    // under the node condition. Bundling it here would freeze one target.
+    '@rasenjs/web',
     '@rasenjs/reactive-vue',
     '@rasenjs/reactive-signals'
   ]

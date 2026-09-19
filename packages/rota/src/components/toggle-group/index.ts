@@ -8,7 +8,7 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, button, text } from '@rasenjs/dom'
+import { div, button, text } from '@rasenjs/web/elements'
 import {
   createRovingFocus,
   type Orientation,

@@ -6,7 +6,7 @@
  */
 import type { Mountable } from '@rasenjs/core'
 import { com } from '@rasenjs/core'
-import { label as labelEl } from '@rasenjs/dom'
+import { label as labelEl } from '@rasenjs/web/elements'
 
 export interface LabelProps {
   /** Id of the labelled control (`for`). */

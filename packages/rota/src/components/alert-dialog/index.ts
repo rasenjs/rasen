@@ -8,7 +8,7 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, button, h2, p } from '@rasenjs/dom'
+import { div, button, h2, p } from '@rasenjs/web/elements'
 import { createElementRef } from '../../internal/element-ref'
 import { readProp } from '../../internal/props'
 

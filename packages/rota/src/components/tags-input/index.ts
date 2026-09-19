@@ -12,7 +12,7 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, span, button, input as inputEl, text } from '@rasenjs/dom'
+import { div, span, button, input as inputEl, text } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
 import { createElementRef, type ElementRef } from '../../internal/element-ref'
 import { rekeyedList } from '../../internal/rekeyed-list'

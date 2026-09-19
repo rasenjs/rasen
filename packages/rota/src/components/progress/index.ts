@@ -9,7 +9,7 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com } from '@rasenjs/core'
-import { div } from '@rasenjs/dom'
+import { div } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
 
 export type ProgressState = 'indeterminate' | 'loading' | 'complete'

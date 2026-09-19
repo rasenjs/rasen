@@ -7,7 +7,7 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { span, img } from '@rasenjs/dom'
+import { span, img } from '@rasenjs/web/elements'
 import { createElementRef } from '../../internal/element-ref'
 import { readProp } from '../../internal/props'
 import { toMountables } from '../../internal/children'

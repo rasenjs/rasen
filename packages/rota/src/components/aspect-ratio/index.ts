@@ -6,7 +6,7 @@
  */
 import type { Mountable } from '@rasenjs/core'
 import { com } from '@rasenjs/core'
-import { div } from '@rasenjs/dom'
+import { div } from '@rasenjs/web/elements'
 
 export interface AspectRatioProps {
   ratio?: number

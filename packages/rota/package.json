@@ -11,11 +11,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./html": {
-      "types": "./dist/html.d.ts",
-      "import": "./dist/html.js",
-      "require": "./dist/html.cjs"
     }
   },
   "files": [
@@ -25,6 +20,7 @@
     "dev": "../../node_modules/.bin/tsup --watch",
     "build": "yarn clean && ../../node_modules/.bin/tsup",
     "test": "../../node_modules/.bin/vitest --run",
+    "test:ssr": "../../node_modules/.bin/vitest --run --config vitest.ssr.config.ts",
     "test:watch": "../../node_modules/.bin/vitest",
     "test:coverage": "../../node_modules/.bin/vitest --run --coverage",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
@@ -61,11 +57,12 @@
   "license": "MIT",
   "peerDependencies": {
     "@rasenjs/core": "workspace:^",
-    "@rasenjs/dom": "workspace:^",
-    "@rasenjs/html": "workspace:^"
+    "@rasenjs/web": "workspace:^"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",
+    "@rasenjs/html": "workspace:^",
+    "@rasenjs/reactive-vue": "workspace:^",
     "@testing-library/dom": "^10.0.0",
     "@testing-library/jest-dom": "^6.4.0",
     "@testing-library/user-event": "^14.5.0",
