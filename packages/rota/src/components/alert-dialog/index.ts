@@ -11,6 +11,9 @@ import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, h2, p } from '@rasenjs/web/elements'
 import { createElementRef } from '../../internal/element-ref'
 import { readProp } from '../../internal/props'
+import { createFocusScope } from '../../internal/focus-scope'
+import { createDismissableLayer } from '../../internal/dismissable-layer'
+import { withCleanup } from '../../internal/with-cleanup'
 
 export interface AlertDialogContext {
   /** Reactive open state (property getter; wrap to read reactively). */
@@ -26,7 +29,6 @@ export interface AlertDialogContext {
   setActionElement: (el: HTMLElement | null) => void
   cancelElement: HTMLElement | null
   setCancelElement: (el: HTMLElement | null) => void
-  previousFocusElement: HTMLElement | null
 }
 
 export interface AlertDialogRootProps {
@@ -117,7 +119,6 @@ export function createAlertDialogRoot(): (
     let currentDescriptionId: string | null = null
     let currentActionElement: HTMLElement | null = null
     let currentCancelElement: HTMLElement | null = null
-    let previousFocusElement: HTMLElement | null = null
 
     const setOpen = (open: boolean): void => {
       if (open === currentOpen()) return
@@ -155,12 +156,6 @@ export function createAlertDialogRoot(): (
       },
       setCancelElement: (el) => {
         currentCancelElement = el
-      },
-      get previousFocusElement() {
-        return previousFocusElement
-      },
-      set previousFocusElement(el: HTMLElement | null) {
-        previousFocusElement = el
       }
     }
     const getContext = (): AlertDialogContext => context
@@ -241,55 +236,76 @@ export function createAlertDialogContent(): (
     const ctx = getContext?.()
     const contentRef = createElementRef<HTMLDivElement>(rt)
 
-    const focusAction = (content: HTMLElement): void => {
-      if (!ctx) return
+    // The two DOM-side primitives a modal needs: keep the keyboard inside, and
+    // report the gestures that ask to close. Both stay inert until activated,
+    // and activation is tied to (element present && open) — a string render
+    // never reaches either.
+    const scope = createFocusScope({ container: () => contentRef.value })
+    const layer = createDismissableLayer({
+      container: () => contentRef.value,
+      // An AlertDialog refuses both gestures: the consumer opts in through the
+      // callbacks, and then only the callback runs.
+      dismissOnEscape: false,
+      dismissOnPointerDownOutside: false,
+      onEscapeKeyDown: (event) => {
+        // Same contract as before, now reachable while focus is on the body:
+        // the consumer's handler decides, otherwise Escape is swallowed.
+        if (props?.onEscapeKeyDown) props.onEscapeKeyDown(event)
+        else event.preventDefault()
+      },
+      onPointerDownOutside: (event) => props?.onPointerDownOutside?.(event)
+    })
 
-      if (
-        typeof document !== 'undefined' &&
-        document.activeElement instanceof HTMLElement
-      ) {
-        ctx.previousFocusElement = document.activeElement
-      }
-
-      requestAnimationFrame(() => {
-        if (props?.onOpenAutoFocus) {
-          const event = new Event('focus', { cancelable: true })
-          props.onOpenAutoFocus(event)
-          if (event.defaultPrevented) return
-        }
-
-        const action = ctx.actionElement
-        const cancel = ctx.cancelElement
-        if (action) {
-          action.focus()
-        } else if (cancel) {
-          cancel.focus()
-        } else {
-          content.focus()
-        }
-      })
-    }
-
-    // The dialog moves focus when it opens. The content element arrives
-    // through the ref, so the effect is driven by that ref becoming set —
-    // and re-runs whenever `open` flips.
     if (ctx) {
-      const runFocus = () => {
-        const content = contentRef.value
-        if (content && ctx.open) focusAction(content)
+      let entered = false
+
+      const enter = () => {
+        // Remember where focus came from before anything moves it.
+        scope.activate()
+        layer.activate()
+
+        const event = new Event('focus', { cancelable: true })
+        props?.onOpenAutoFocus?.(event)
+        if (event.defaultPrevented) return
+        // Deferred by a microtask, and it has to be: an element factory writes
+        // its `ref` while binding — before the element is inserted — and
+        // `focus()` on a detached element does nothing. A microtask runs once
+        // the enclosing mount has returned, so the panel is in the tree by
+        // then. (A frame would also work and is what this used to do, but it
+        // costs a paint and depends on one happening at all.)
+        queueMicrotask(() => {
+          // The AlertDialog convention: the decision button, then cancel, then
+          // the panel itself (tabindex="-1" is there so it can hold focus).
+          scope.focus(ctx.actionElement ?? ctx.cancelElement ?? null)
+        })
       }
-      const stops = [
-        rt.subscribe(() => contentRef.value, runFocus),
-        rt.subscribe(() => ctx.open, runFocus)
-      ]
-      // The subscriptions above only fire on change; a dialog that mounts
-      // already open must focus too.
-      runFocus()
-      // Cleanup is owned by the enclosing com scope.
-      void stops
+
+      const leave = () => {
+        layer.deactivate()
+        const event = new Event('focus', { cancelable: true })
+        props?.onCloseAutoFocus?.(event)
+        // A prevented onCloseAutoFocus means "I will place focus myself".
+        scope.deactivate(!event.defaultPrevented)
+      }
+
+      // One subscription over both inputs: the panel mounting, and the open
+      // state. `entered` keeps the pair of transitions from firing twice (the
+      // initial call happens before the ref is written).
+      const sync = () => {
+        const on = !!contentRef.value && !!ctx.open
+        if (on && !entered) {
+          entered = true
+          enter()
+        } else if (!on && entered) {
+          entered = false
+          leave()
+        }
+      }
+      rt.subscribe(() => (contentRef.value ? ctx.open : false), sync)
+      sync()
     }
 
-    return div({
+    const panel = div({
       role: 'alertdialog',
       'aria-modal': 'true',
       tabIndex: -1,
@@ -300,19 +316,19 @@ export function createAlertDialogContent(): (
       'aria-describedby': () => ctx?.descriptionId ?? undefined,
       class: props?.class,
       style: props?.style,
-      onKeyDown: (e: Event) => {
-        const event = e as KeyboardEvent
-        // Escape does not close an AlertDialog unless the consumer opts in.
-        if (event.key !== 'Escape') return
-        if (props?.onEscapeKeyDown) {
-          props.onEscapeKeyDown(event)
-        } else {
-          event.preventDefault()
-        }
-      },
       children: props?.children
         ? [props.children(getContext ?? (() => undefined))]
         : undefined
+    })
+
+    // Leaving the tree has to stop both, because neither the open state nor
+    // anything else changes when an overlay is simply removed: the scope would
+    // keep trapping Tab and the layer would keep listening on the document for
+    // the life of the page. Focus is not moved here — the element is going away
+    // and nobody asked for it back.
+    return withCleanup(panel, () => {
+      layer.deactivate()
+      scope.deactivate(false)
     })
   }
   return com(component)

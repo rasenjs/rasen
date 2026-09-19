@@ -400,7 +400,10 @@ describe('@rasenjs/rota - AlertDialog', () => {
     })
 
     it('should prevent ESC key from closing by default', () => {
+      // Attached to the document: Escape is handled at document level now,
+      // because it has to work while focus sits outside the panel.
       const container = document.createElement('div')
+      document.body.append(container)
       const Content = createAlertDialogContent()
       const ctx = {
         open: true,
@@ -429,7 +432,10 @@ describe('@rasenjs/rota - AlertDialog', () => {
     })
 
     it('should call onEscapeKeyDown when ESC is pressed', () => {
+      // Attached to the document: Escape is handled at document level now,
+      // because it has to work while focus sits outside the panel.
       const container = document.createElement('div')
+      document.body.append(container)
       const Content = createAlertDialogContent()
       let escapeCalled = false
       const ctx = {
