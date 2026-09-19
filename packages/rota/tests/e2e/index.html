@@ -285,6 +285,49 @@
       .alert-dialog-content[hidden] {
         display: none;
       }
+      /* Label, Toggle, RadioGroup, ToggleGroup, Slider */
+      .toggle,
+      .radio-item,
+      .togglegroup-item {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        margin-right: 8px;
+      }
+      .radio,
+      .togglegroup {
+        display: flex;
+        gap: 8px;
+      }
+      .slider {
+        position: relative;
+        width: 240px;
+        height: 24px;
+      }
+      .slider-track {
+        position: absolute;
+        top: 10px;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: #ddd;
+      }
+      .slider-range {
+        position: absolute;
+        top: 10px;
+        height: 4px;
+        background: #333;
+      }
+      .slider-thumb {
+        position: absolute;
+        top: 4px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: white;
+        border: 2px solid #333;
+      }
+
       /* Dialog */
       .dialog-overlay {
         position: fixed;
@@ -513,6 +556,38 @@
       <div id="dialog"></div>
     </section>
 
+    <!-- Label -->
+    <section id="label-section">
+      <h2>Label</h2>
+      <div id="label-default"></div>
+    </section>
+
+    <!-- Toggle -->
+    <section id="toggle-section">
+      <h2>Toggle</h2>
+      <div id="toggle-default"></div>
+    </section>
+
+    <!-- RadioGroup -->
+    <section id="radiogroup-section">
+      <h2>RadioGroup</h2>
+      <div id="radiogroup-default"></div>
+    </section>
+
+    <!-- ToggleGroup -->
+    <section id="togglegroup-section">
+      <h2>ToggleGroup</h2>
+      <div id="togglegroup-single"></div>
+      <div id="togglegroup-multiple"></div>
+    </section>
+
+    <!-- Slider -->
+    <section id="slider-section">
+      <h2>Slider</h2>
+      <div id="slider-default"></div>
+      <div id="slider-range"></div>
+    </section>
+
     <!-- NumberField -->
     <section id="numberfield-section">
       <h2>NumberField</h2>
@@ -541,7 +616,7 @@
     </section>
 
     <script type="module">
-      // Import Rota components from the built dist
+      // Resolved by vite.e2e.config.ts to the library sources
       import {
         separator,
         hseparator,
@@ -556,10 +631,18 @@
         accordion,
         alertDialog,
         dialog,
+        label,
+        toggle,
+        radioGroup,
+        toggleGroup,
+        slider,
         numberField,
         tagsInput,
         pinInput
-      } from '/dist/index.js'
+      } from '@rasenjs/rota'
+      // Element factories come from the isomorphic entry, exactly as a
+      // consumer would import them (aliased in vite.e2e.config.ts).
+      import { text } from '@rasenjs/web/elements'
 
       // ==================== Separator ====================
       hseparator({ class: 'separator' })(document.getElementById('separator-h'))
@@ -581,7 +664,11 @@
       })(document.getElementById('avatar-with-image'))
 
       avatar({
-        fallback: 'AB',
+        // The fallback is a factory that returns a mountable, not a string:
+        // passing one used to work and stopped when the parts took the
+        // `() => Mountable` contract. Nothing caught it because this page could
+        // not load at all (see vite.e2e.config.ts).
+        fallback: () => text({ content: 'AB' }),
         class: 'avatar',
         fallbackClass: 'avatar-fallback'
       })(document.getElementById('avatar-with-fallback'))
@@ -773,6 +860,76 @@
             })
         })(document.getElementById('dialog'))
       }
+
+      // ==================== Label ====================
+      {
+        const host = document.getElementById('label-default')
+        const input = document.createElement('input')
+        input.id = 'label-input'
+        host.appendChild(input)
+        label({ htmlFor: 'label-input', children: () => text({ content: 'Seats' }) })(host)
+      }
+
+      // ==================== Toggle ====================
+      toggle({
+        defaultPressed: true,
+        class: 'toggle',
+        id: 'toggle-on',
+        children: () => text({ content: 'Bold' })
+      })(document.getElementById('toggle-default'))
+
+      // ==================== RadioGroup ====================
+      radioGroup({
+        defaultValue: 'pro',
+        class: 'radio',
+        itemClass: 'radio-item',
+        items: [
+          { value: 'free', label: 'Free' },
+          { value: 'pro', label: 'Pro' },
+          { value: 'team', label: 'Team', disabled: true }
+        ]
+      })(document.getElementById('radiogroup-default'))
+
+      // ==================== ToggleGroup ====================
+      toggleGroup({
+        type: 'single',
+        defaultValue: ['left'],
+        class: 'togglegroup',
+        itemClass: 'togglegroup-item',
+        items: [
+          { value: 'left', label: 'Left' },
+          { value: 'center', label: 'Center' },
+          { value: 'right', label: 'Right' }
+        ]
+      })(document.getElementById('togglegroup-single'))
+
+      toggleGroup({
+        type: 'multiple',
+        defaultValue: ['bold'],
+        class: 'togglegroup',
+        itemClass: 'togglegroup-item',
+        items: [
+          { value: 'bold', label: 'Bold' },
+          { value: 'italic', label: 'Italic' }
+        ]
+      })(document.getElementById('togglegroup-multiple'))
+
+      // ==================== Slider ====================
+      slider({
+        defaultValue: [30],
+        class: 'slider',
+        trackClass: 'slider-track',
+        rangeClass: 'slider-range',
+        thumbClass: 'slider-thumb'
+      })(document.getElementById('slider-default'))
+
+      slider({
+        defaultValue: [25, 75],
+        class: 'slider',
+        trackClass: 'slider-track',
+        rangeClass: 'slider-range',
+        thumbClass: 'slider-thumb'
+      })(document.getElementById('slider-range'))
 
       // ==================== NumberField ====================
       numberField({

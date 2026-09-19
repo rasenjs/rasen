@@ -8,7 +8,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000/tests/e2e',
+    baseURL: 'http://localhost:3000/packages/rota/tests/e2e',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure'
   },
@@ -19,7 +19,11 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: 'npx serve -p 3000 .',
+    // Vite, not a static file server: the page imports the library by its
+    // workspace name and the library's own imports are bare specifiers, which
+    // a browser cannot resolve on its own. Vite does, and the config aliases
+    // them to sources so a spec runs against the code being edited.
+    command: 'npx vite --config vite.e2e.config.ts',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000
