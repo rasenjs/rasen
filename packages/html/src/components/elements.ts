@@ -6,15 +6,35 @@ import { element } from './element'
 // Type definitions
 // ============================================================================
 
+/**
+ * Inline style.
+ *
+ * Each declaration is itself a `PropValue`, so a single CSS property can be
+ * bound to a reactive value (`opacity: () => open() ? '1' : '0'`) — the same
+ * contract the DOM renderer's `bindStyle` implements, and the shape components
+ * use when they follow state with one declaration.
+ */
+export type StyleRecord = Record<
+  string,
+  PropValue<string | number | null | undefined>
+>
+
 interface BaseProps {
   id?: PropValue<string>
   class?: PropValue<string>
   className?: PropValue<string>
-  style?: PropValue<Record<string, string | number>>
+  style?: PropValue<string | StyleRecord>
   attrs?: PropValue<Record<string, string | number | boolean>>
   /** Text content or child mount functions */
   children?: PropValue<string> | Array<string | (() => string | number) | Mountable<SSRNode>>
   // SSR does not support events - removed on, onClick, onInput, etc.
+  /**
+   * Any other attribute is passed through (`title`, `role`, `tabindex`,
+   * `aria-*`, `data-*`, …). The DOM renderer's factories accept arbitrary keys
+   * too, so keeping this open is what lets the same component be rendered by
+   * either target.
+   */
+  [key: string]: unknown
 }
 
 /** Child type - 响应式文本函数优先匹配 */

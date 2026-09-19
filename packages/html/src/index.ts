@@ -15,4 +15,5 @@ export {
 } from './utils'
 export { MARKERS, createMarker, MARKER_DEBUG_MAP } from './marker-constants'
 export { htmlHostHooks } from './host-hooks'
+export type { SSRNode } from './host-hooks'
 

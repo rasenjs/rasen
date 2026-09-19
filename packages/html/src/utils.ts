@@ -1,31 +1,15 @@
 /**
- * HTML 转义字符映射
+ * HTML 转义与属性序列化工具
+ *
+ * Escaping and style serialization are re-exported from @rasenjs/core: the DOM
+ * renderer writes the same markup through the same rules, so a second copy here
+ * would be a second thing to keep in sync (and escaping is security-relevant).
  */
-const HTML_ESCAPE_MAP: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;'
-}
+import { escapeHtml, escapeAttr, stringifyStyleInline } from '@rasenjs/core'
 
-/**
- * 转义 HTML 特殊字符，防止 XSS
- */
-export function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char] || char)
-}
+export { escapeHtml, escapeAttr }
 
-/**
- * 转义属性值
- */
-export function escapeAttr(value: string): string {
-  return value.replace(/[&<>"]/g, (char) => HTML_ESCAPE_MAP[char] || char)
-}
-
-/**
- * 将属性值转换为字符串
- */
+/** 将属性值转换为字符串 */
 export function stringifyAttr(
   name: string,
   value: string | number | boolean | null | undefined
@@ -39,21 +23,11 @@ export function stringifyAttr(
   return ` ${name}="${escapeAttr(String(value))}"`
 }
 
-/**
- * 将样式对象转换为 style 属性字符串
- */
+/** 将样式对象转换为 style 属性字符串 */
 export function stringifyStyle(
-  styles: Record<string, string | number | null | undefined>
+  styles: Record<string, unknown>
 ): string {
-  const parts: string[] = []
-  for (const [key, value] of Object.entries(styles)) {
-    if (value !== null && value !== undefined) {
-      // 将 camelCase 转换为 kebab-case
-      const kebabKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
-      parts.push(`${kebabKey}: ${value}`)
-    }
-  }
-  return parts.join('; ')
+  return stringifyStyleInline(styles)
 }
 
 /**
