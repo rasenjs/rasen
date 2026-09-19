@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { span, button, div, img, h3 } from './elements'
+import { span, button, div, img, h3, hr, br } from './elements'
 import { renderToString } from './string-context'
 
 describe('@rasenjs/html - element', () => {
@@ -23,6 +23,15 @@ describe('@rasenjs/html - element', () => {
     expect(renderToString(img({ src: 'a.png', alt: 'A' }))).toBe(
       '<img src="a.png" alt="A">'
     )
+  })
+
+  it('should apply props to a void element that carries no content', () => {
+    // `hr`/`br` were zero-argument wrappers, so a separator lost the
+    // attributes that carry its semantics (role, aria-orientation, class).
+    expect(renderToString(hr({ class: 'sep', role: 'separator' }))).toBe(
+      '<hr class="sep" role="separator">'
+    )
+    expect(renderToString(br({ class: 'gap' }))).toBe('<br class="gap">')
   })
 
   it('should escape text children', () => {
@@ -128,6 +137,50 @@ describe('@rasenjs/html - element', () => {
         div({ children: [h3({ id: 'h', children: 'Title' })] })
       )
       expect(html).toBe('<div><h3 id="h">Title</h3></div>')
+    })
+
+    it('should render a single non-array child', () => {
+      // Normalizing children means `children: part` renders like
+      // `children: [part]`; it used to be dropped silently.
+      expect(renderToString(div({ children: span({ id: 'one' }) }))).toBe(
+        '<div><span id="one"></span></div>'
+      )
+    })
+
+    it('should render text, numbers and reactive text together', () => {
+      const html = renderToString(
+        div({ children: ['a', 1, () => 'b'] })
+      )
+      expect(html).toBe('<div>a1b</div>')
+    })
+
+    it('should keep document order across nesting', () => {
+      // The renderer appends children straight into the parent's buffer, so
+      // append order has to be document order at every level.
+      const html = renderToString(
+        div({
+          children: [
+            span({ children: 'a' }),
+            span({ children: [span({ children: 'b' }), span({ children: 'c' })] }),
+            'd'
+          ]
+        })
+      )
+      expect(html).toBe(
+        '<div><span>a</span><span><span>b</span><span>c</span></span>d</div>'
+      )
+    })
+
+    it('should skip nullish children', () => {
+      expect(renderToString(div({ children: [null, undefined, 'a'] }))).toBe(
+        '<div>a</div>'
+      )
+    })
+
+    it('should mount a mountable child (the product of a factory)', () => {
+      expect(renderToString(div({ children: div({ children: 'x' }) }))).toBe(
+        '<div><div>x</div></div>'
+      )
     })
   })
 

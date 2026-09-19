@@ -25,8 +25,12 @@ interface BaseProps {
   className?: PropValue<string>
   style?: PropValue<string | StyleRecord>
   attrs?: PropValue<Record<string, string | number | boolean>>
-  /** Text content or child mount functions */
-  children?: PropValue<string> | Array<string | (() => string | number) | Mountable<SSRNode>>
+  /**
+   * Text content or child mountables. A single child is accepted as well as an
+   * array, and nullish entries are skipped — the renderer normalizes either
+   * shape, so the type says what actually renders.
+   */
+  children?: Child | Child[]
   // SSR does not support events - removed on, onClick, onInput, etc.
   /**
    * Any other attribute is passed through (`title`, `role`, `tabindex`,
@@ -37,8 +41,17 @@ interface BaseProps {
   [key: string]: unknown
 }
 
-/** Child type - 响应式文本函数优先匹配 */
-type Child = string | (() => string | number) | Mountable<SSRNode>
+/**
+ * A renderable child: text, a number, a reactive text getter (returns the
+ * text), a mountable (receives the host and appends itself), or nothing.
+ */
+export type Child =
+  | string
+  | number
+  | null
+  | undefined
+  | (() => string | number)
+  | Mountable<SSRNode>
 
 /**
  * Factory function to create HTML element components
@@ -150,8 +163,12 @@ export const sup = createElement('sup')
 export const svg = createElement('svg')
 
 // Self-closing elements
-export const br = () => element({ tag: 'br' })
-export const hr = () => element({ tag: 'hr' })
+// Void elements: no props at all were accepted here before, so `hr({ class,
+// role })` dropped its argument on the floor — a separator lost the attributes
+// that carry its semantics. They are ordinary factories now, like every other
+// tag; `element` handles the missing closing tag.
+export const br = createElement('br')
+export const hr = createElement('hr')
 
 // ============================================================================
 // Special elements with extended props
