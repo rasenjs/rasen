@@ -18,6 +18,20 @@
         "default": "./dist/dom.js"
       }
     },
+    "./elements": {
+      "node": {
+        "types": "./dist/elements-html.d.ts",
+        "default": "./dist/elements-html.js"
+      },
+      "browser": {
+        "types": "./dist/elements.d.ts",
+        "default": "./dist/elements.js"
+      },
+      "default": {
+        "types": "./dist/elements.d.ts",
+        "default": "./dist/elements.js"
+      }
+    },
     "./jsx-runtime": {
       "node": {
         "types": "./dist/jsx-runtime-ssr.d.ts",
