@@ -43,7 +43,7 @@ export * from '@rasenjs/router'
 // Import router types
 import type { Router, RouteMatch } from '@rasenjs/router'
 import type { Mountable } from '@rasenjs/core'
-import type { StringHost } from '@rasenjs/html'
+import type { SSRNode, StringHost } from '@rasenjs/html'
 
 // Import HTML elements
 import { a } from '@rasenjs/html'
@@ -98,7 +98,7 @@ export function createRouterLink<TRoutes extends Record<string, unknown>>(router
     [key: string]: any
   }
   
-  return createRouterLinkFactory<TRoutes, StringHost, AnchorProps>(router, a)
+  return createRouterLinkFactory<TRoutes, SSRNode, AnchorProps>(router, a)
 }
 
 /**
@@ -124,7 +124,8 @@ export function createLeaveGuard<TRoutes extends Record<string, unknown>>(
       // 直接挂载 children（如果有）
       if (props.children) {
         for (const child of props.children) {
-          child(host)
+          // Mountable requires the host hooks explicitly — SSR has none here.
+          child(host, undefined)
         }
       }
       return undefined
