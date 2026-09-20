@@ -74,12 +74,24 @@ test.describe('TagsInput', () => {
       const tags = page.locator('#tags-input-2 [role="option"]')
       await expect(tags).toHaveCount(2)
     })
+
+    test('should select a tag on click', async ({ page }) => {
+      const second = page.locator('#tags-input-2 [role="option"]').nth(1)
+      await second.click()
+
+      await expect(second).toHaveAttribute('data-state', 'selected')
+      await expect(second).toHaveAttribute('aria-selected', 'true')
+    })
   })
 
+  // These drive the listbox with keyboard events. They deliberately do not
+  // click first: `press()` focuses the element, and the assertions here are
+  // about the "nothing focused yet" starting state (ArrowLeft selects the
+  // last tag). Clicking the listbox would land on a tag and select it, which
+  // is a different starting point.
   test.describe('keyboard navigation', () => {
     test('should focus last tag on ArrowLeft', async ({ page }) => {
       const tagsInput = page.locator('#tags-input-2 [role="listbox"]')
-      await tagsInput.click()
       await tagsInput.press('ArrowLeft')
 
       const lastTag = page.locator('#tags-input-2 [role="option"]').last()
@@ -90,7 +102,6 @@ test.describe('TagsInput', () => {
       page
     }) => {
       const tagsInput = page.locator('#tags-input-2 [role="listbox"]')
-      await tagsInput.click()
 
       // Move to last tag
       await tagsInput.press('ArrowLeft')
@@ -109,7 +120,6 @@ test.describe('TagsInput', () => {
 
     test('should delete focused tag with Delete key', async ({ page }) => {
       const tagsInput = page.locator('#tags-input-2 [role="listbox"]')
-      await tagsInput.click()
       await tagsInput.press('ArrowLeft')
       await tagsInput.press('Delete')
 
@@ -119,7 +129,6 @@ test.describe('TagsInput', () => {
 
     test('should delete focused tag with Backspace key', async ({ page }) => {
       const tagsInput = page.locator('#tags-input-2 [role="listbox"]')
-      await tagsInput.click()
       await tagsInput.press('ArrowLeft')
       await tagsInput.press('Backspace')
 
@@ -153,7 +162,6 @@ test.describe('TagsInput', () => {
 
     test('should have aria-selected on tags', async ({ page }) => {
       const tagsInput = page.locator('#tags-input-2 [role="listbox"]')
-      await tagsInput.click()
       await tagsInput.press('ArrowLeft')
 
       const selectedTag = page.locator('#tags-input-2 [role="option"]').last()

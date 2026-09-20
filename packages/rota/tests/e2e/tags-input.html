@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rota E2E Test - TagsInput</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 20px;
+      }
+      .tags-input {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        padding: 4px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        max-width: 320px;
+      }
+      .tags-input[data-disabled] {
+        opacity: 0.5;
+      }
+      .tags-input-field {
+        border: none;
+        outline: none;
+        font: inherit;
+        flex: 1 1 60px;
+        min-width: 60px;
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #eee;
+      }
+      .tag[data-state='selected'] {
+        outline: 2px solid #4a90d9;
+      }
+      .tag-delete {
+        border: none;
+        background: none;
+        font: inherit;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 2px;
+      }
+      section {
+        margin-bottom: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>TagsInput Component Tests</h1>
+
+    <section>
+      <h2>Basic</h2>
+      <div id="tags-input-1"></div>
+    </section>
+
+    <section>
+      <h2>With default value</h2>
+      <div id="tags-input-2"></div>
+    </section>
+
+    <section>
+      <h2>Disabled</h2>
+      <div id="tags-input-3"></div>
+    </section>
+
+    <section>
+      <h2>Max reached</h2>
+      <div id="tags-input-4"></div>
+    </section>
+
+    <script type="module">
+      import { tagsInput } from '@rasenjs/rota'
+
+      /** Shared styling hooks; the specs address the parts by class. */
+      const base = {
+        class: 'tags-input',
+        inputClass: 'tags-input-field',
+        inputPlaceholder: 'Add a tag…',
+        itemClass: 'tag',
+        itemDeleteClass: 'tag-delete'
+      }
+
+      tagsInput({ ...base })(document.getElementById('tags-input-1'))
+
+      tagsInput({
+        ...base,
+        defaultValue: ['react', 'vue', 'svelte']
+      })(document.getElementById('tags-input-2'))
+
+      tagsInput({
+        ...base,
+        defaultValue: ['locked'],
+        disabled: true
+      })(document.getElementById('tags-input-3'))
+
+      // One value short of the cap, so the spec can add exactly one more and
+      // then prove the second add is refused.
+      tagsInput({
+        ...base,
+        defaultValue: ['tag1'],
+        max: 2
+      })(document.getElementById('tags-input-4'))
+    </script>
+  </body>
+</html>
