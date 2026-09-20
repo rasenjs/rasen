@@ -382,4 +382,38 @@ describe('@rasenjs/rota - Progress', () => {
       expect(container.querySelector('.cleanup-indicator')).toBeFalsy()
     })
   })
+
+  describe('ids', () => {
+    it('should put explicit ids on the progressbar and the indicator', () => {
+      const container = document.createElement('div')
+
+      createProgress()({
+        id: 'progress-50',
+        indicatorId: 'progress-indicator-50',
+        value: 50
+      })(container)
+
+      const bar = container.querySelector(
+        '[role="progressbar"]'
+      ) as HTMLElement
+      expect(bar.id).toBe('progress-50')
+      expect(container.querySelector('#progress-indicator-50')).toBeTruthy()
+    })
+
+    it('should not invent a shared id when none is given', () => {
+      const a = document.createElement('div')
+      const b = document.createElement('div')
+
+      createProgressRoot()({ value: 10 })(a)
+      createProgressRoot()({ value: 20 })(b)
+
+      // A hardcoded id would make two instances on one page collide.
+      expect(
+        a.querySelector('[role="progressbar"]')?.getAttribute('id')
+      ).toBeFalsy()
+      expect(
+        b.querySelector('[role="progressbar"]')?.getAttribute('id')
+      ).toBeFalsy()
+    })
+  })
 })

@@ -15,6 +15,8 @@ import { readProp } from '../../internal/props'
 export type ProgressState = 'indeterminate' | 'loading' | 'complete'
 
 export interface ProgressRootProps {
+  /** Id for the progressbar element. */
+  id?: string
   /** `null` (or omitted) is the indeterminate state. */
   value?: PropValue<number | null>
   max?: PropValue<number>
@@ -27,6 +29,7 @@ export interface ProgressRootProps {
 }
 
 export interface ProgressIndicatorProps {
+  id?: string
   class?: PropValue<string>
   style?: PropValue<string | Record<string, string | number>>
 }
@@ -77,6 +80,7 @@ export function createProgressRoot(): (
     const getContext = (): ProgressContext => context
 
     return div({
+      id: props?.id,
       role: 'progressbar',
       'aria-valuemin': 0,
       'aria-valuemax': () => max(),
@@ -111,6 +115,7 @@ export function createProgressIndicator(): (
     const percentage = (): number | null => getContext?.()?.percentage() ?? null
 
     return div({
+      id: props?.id,
       'data-state': () => getContext?.()?.state() ?? 'indeterminate',
       'data-value': () => getContext?.()?.value() ?? undefined,
       'data-max': () => getContext?.()?.max() ?? undefined,
@@ -134,6 +139,7 @@ export function createProgressIndicator(): (
 
 /** Progress preset props: root props plus the indicator's styling hooks. */
 export type ProgressProps = ProgressRootProps & {
+  indicatorId?: string
   indicatorClass?: PropValue<string>
   indicatorStyle?: PropValue<string | Record<string, string | number>>
 }
@@ -149,6 +155,7 @@ export function createProgress(): (
 
   const component = (props?: ProgressProps) =>
     Root({
+      id: props?.id,
       value: props?.value,
       max: props?.max,
       getValueLabel: props?.getValueLabel,
@@ -157,6 +164,7 @@ export function createProgress(): (
       children: (getContext) =>
         Indicator(
           {
+            id: props?.indicatorId,
             class: props?.indicatorClass,
             style: props?.indicatorStyle
           },

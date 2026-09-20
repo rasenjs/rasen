@@ -497,8 +497,8 @@
     <!-- Progress -->
     <section id="progress-section">
       <h2>Progress</h2>
-      <div id="progress-50"></div>
-      <div id="progress-0"></div>
+      <div id="progress-host-50"></div>
+      <div id="progress-host-0"></div>
     </section>
 
     <!-- Tabs -->
@@ -686,15 +686,19 @@
 
       // ==================== Progress ====================
       progress({
+        id: 'progress-50',
         value: 50,
         class: 'progress',
+        indicatorId: 'progress-indicator-50',
         indicatorClass: 'progress-indicator'
-      })(document.getElementById('progress-50'))
+      })(document.getElementById('progress-host-50'))
       progress({
+        id: 'progress-0',
         value: 0,
         class: 'progress',
+        indicatorId: 'progress-indicator-0',
         indicatorClass: 'progress-indicator'
-      })(document.getElementById('progress-0'))
+      })(document.getElementById('progress-host-0'))
 
       // ==================== Tabs ====================
       tabs({
