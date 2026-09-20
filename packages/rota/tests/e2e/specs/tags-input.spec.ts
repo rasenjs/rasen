@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test.describe('TagsInput', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/tags-input.html')
+    await page.goto('/tests/e2e/tags-input.html')
   })
 
   test.describe('rendering', () => {

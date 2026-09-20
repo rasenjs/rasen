@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test.describe('NumberField Component', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/number-field.html')
+    await page.goto('/tests/e2e/number-field.html')
     await page.waitForSelector('#numberfield-container')
   })
 
@@ -131,9 +131,13 @@ test.describe('NumberField Component', () => {
     await expect(incrementBtn).toBeDisabled()
     await expect(decrementBtn).toBeDisabled()
 
-    // Try to click increment - value should not change
+    // Try to click increment - value should not change.
+    // `force` is required, not a shortcut: the stepper is marked
+    // aria-disabled while disabled (it stays focusable on purpose), and
+    // Playwright's actionability check treats aria-disabled as disabled, so a
+    // plain click() would wait forever instead of proving the guard works.
     const originalValue = await page.locator('#current-value').textContent()
-    await incrementBtn.click()
+    await incrementBtn.click({ force: true })
 
     // Value should remain the same
     await expect(page.locator('#current-value')).toHaveText(originalValue)

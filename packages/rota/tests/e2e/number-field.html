@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rota E2E Test - NumberField</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 20px;
+      }
+      .numberfield {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .numberfield-input {
+        width: 90px;
+        padding: 4px 8px;
+        font: inherit;
+      }
+      .numberfield-increment,
+      .numberfield-decrement {
+        padding: 4px 10px;
+        font: inherit;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .controls button {
+        padding: 4px 10px;
+        font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>NumberField Component Tests</h1>
+
+    <div id="numberfield-container"></div>
+
+    <p>Current value: <span id="current-value"></span></p>
+
+    <!-- Test controls. These drive the component from the outside so a spec can
+         assert on controlled changes without reaching into the component. -->
+    <div class="controls">
+      <button id="set-50-btn" type="button">Set value to 50</button>
+      <button id="reset-btn" type="button">Reset to default</button>
+      <button id="disable-btn" type="button">Toggle disabled</button>
+    </div>
+
+    <script type="module">
+      import { numberField } from '@rasenjs/rota'
+
+      const DEFAULT_VALUE = 25
+      const MIN = 0
+      const MAX = 100
+
+      const container = document.getElementById('numberfield-container')
+      const readout = document.getElementById('current-value')
+
+      let value = DEFAULT_VALUE
+      let disabled = false
+      let unmount = null
+
+      /**
+       * The field runs in *controlled* mode: `value` is passed in and the page
+       * owns it. That is what makes `#current-value` a faithful readout — it is
+       * rendered from the same source the component is given, not copied out of
+       * the DOM, so a spec asserting on it is asserting on the component's
+       * reported value rather than on our own bookkeeping.
+       */
+      function render() {
+        unmount?.()
+        unmount = numberField({
+          value,
+          min: MIN,
+          max: MAX,
+          step: 1,
+          disabled,
+          class: 'numberfield',
+          inputClass: 'numberfield-input',
+          incrementClass: 'numberfield-increment',
+          decrementClass: 'numberfield-decrement',
+          onValueChange(next) {
+            value = next === null ? MIN : next
+            render()
+          }
+        })(container)
+        readout.textContent = String(value)
+      }
+
+      // The clamping specs re-initialise the field to a known value first.
+      window.initNumberField = (initial) => {
+        value = initial
+        disabled = false
+        render()
+      }
+
+      document.getElementById('set-50-btn').onclick = () => {
+        value = 50
+        render()
+      }
+
+      document.getElementById('reset-btn').onclick = () => {
+        value = DEFAULT_VALUE
+        render()
+      }
+
+      document.getElementById('disable-btn').onclick = () => {
+        disabled = !disabled
+        render()
+      }
+
+      render()
+    </script>
+  </body>
+</html>
