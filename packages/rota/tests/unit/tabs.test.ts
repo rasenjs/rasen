@@ -259,7 +259,7 @@ describe('@rasenjs/rota - Tabs', () => {
       expect(el?.hasAttribute('hidden')).toBe(false)
     })
 
-    it('should have data-state="hidden" and hidden attr when inactive', () => {
+    it('should have data-state="inactive" and hidden attr when inactive', () => {
       const container = document.createElement('div')
       const Root = createTabsRoot()
       const Content = createTabsContent()
@@ -270,7 +270,8 @@ describe('@rasenjs/rota - Tabs', () => {
       })(container)
 
       const el = container.querySelector('[role="tabpanel"]')
-      expect(el?.getAttribute('data-state')).toBe('hidden')
+      // Inactive matches the trigger's vocabulary for the same condition.
+      expect(el?.getAttribute('data-state')).toBe('inactive')
       expect(el?.hasAttribute('hidden')).toBe(true)
     })
 
@@ -299,7 +300,10 @@ describe('@rasenjs/rota - Tabs', () => {
       })(container)
 
       const el = container.querySelector('[role="tabpanel"]')
-      expect(el?.getAttribute('data-state')).toBe('hidden')
+      // forceMount keeps the panel in the DOM, but it is still not the active
+      // one - so the state says so even though it is not hidden.
+      expect(el?.getAttribute('data-state')).toBe('inactive')
+      expect(el?.hasAttribute('hidden')).toBe(false)
       expect(el?.querySelector('p')?.textContent).toBe('Always visible')
     })
 

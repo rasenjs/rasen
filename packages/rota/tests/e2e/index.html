@@ -704,14 +704,29 @@
       tabs({
         defaultValue: 'tab1',
         class: 'tabs',
+        listId: 'tabs-list',
         listClass: 'tabs-list',
         triggerClass: 'tabs-trigger',
         contentClass: 'tabs-content',
         tabs: [
-          { value: 'tab1', label: 'Tab 1', content: 'Tab 1 content' },
-          { value: 'tab2', label: 'Tab 2', content: 'Tab 2 content' },
+          {
+            value: 'tab1',
+            id: 'tab-1',
+            panelId: 'tabpanel-1',
+            label: 'Tab 1',
+            content: 'Tab 1 content'
+          },
+          {
+            value: 'tab2',
+            id: 'tab-2',
+            panelId: 'tabpanel-2',
+            label: 'Tab 2',
+            content: 'Tab 2 content'
+          },
           {
             value: 'tab3',
+            id: 'tab-3',
+            panelId: 'tabpanel-3',
             label: 'Tab 3',
             content: 'Tab 3 content',
             disabled: true

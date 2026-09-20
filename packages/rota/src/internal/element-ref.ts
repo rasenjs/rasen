@@ -21,9 +21,30 @@ export interface ElementRef<T extends HTMLElement> {
 
 /**
  * Create an element ref cell bound to the active reactive runtime.
+ *
+ * The cell is a runtime ref, but it is *read and written through the runtime*
+ * rather than by touching `.value` on the ref itself. That distinction is what
+ * makes this work on every adapter:
+ *
+ * - `@rasenjs/reactive-vue`'s ref is an object, so `ref.value` happens to work.
+ * - the builtin runtime's ref is a **callable** (`typeof ref === 'function'`,
+ *   read by calling it), so `ref.value` is `undefined` - writes still land
+ *   (element.ts uses `setValue`, which handles both shapes) but reads return
+ *   nothing, and an element ref silently degrades to write-only.
+ *
+ * Routed through `unref`/`setValue`, both shapes behave the same, so a cell
+ * written by the DOM renderer is readable by the component under any runtime.
  */
 export function createElementRef<T extends HTMLElement>(
   rt: ReactiveRuntime
 ): ElementRef<T> {
-  return rt.ref<T | null>(null) as unknown as ElementRef<T>
+  const cell = rt.ref<T | null>(null)
+  return {
+    get value(): T | null {
+      return rt.unref(cell) as T | null
+    },
+    set value(next: T | null) {
+      rt.setValue(cell, next)
+    }
+  }
 }
