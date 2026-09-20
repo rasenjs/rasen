@@ -144,10 +144,11 @@ test.describe('Collapsible', () => {
 
     test('should not trigger form submission', async ({ page }) => {
       const trigger = page.locator('#collapsible-trigger')
+      const urlBefore = page.url()
       await trigger.click()
 
       // Page should not reload or navigate
-      await expect(page).toHaveURL('/')
+      await expect(page).toHaveURL(urlBefore)
     })
   })
 })

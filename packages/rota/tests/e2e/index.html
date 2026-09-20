@@ -676,9 +676,12 @@
       // ==================== Collapsible ====================
       collapsible({
         class: 'collapsible',
+        triggerId: 'collapsible-trigger',
+        contentId: 'collapsible-content',
         triggerClass: 'collapsible-trigger',
         contentClass: 'collapsible-content',
-        children: 'This is collapsible content.'
+        trigger: () => text({ content: 'Toggle' }),
+        content: () => text({ content: 'This is collapsible content.' })
       })(document.getElementById('collapsible'))
 
       // ==================== Progress ====================

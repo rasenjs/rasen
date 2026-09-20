@@ -13,6 +13,13 @@ import { readProp } from '../../internal/props'
 export type CollapsibleState = 'open' | 'closed'
 
 export interface CollapsibleRootProps {
+  /** Id for the root element. */
+  id?: string
+  /**
+   * Id for the content panel. The trigger's `aria-controls` follows it, so a
+   * consumer that names the panel gets a labelled relationship for free.
+   */
+  contentId?: string
   defaultOpen?: PropValue<boolean>
   open?: PropValue<boolean>
   disabled?: PropValue<boolean>
@@ -23,6 +30,7 @@ export interface CollapsibleRootProps {
 }
 
 export interface CollapsibleTriggerProps {
+  id?: string
   asChild?: boolean
   class?: string
   style?: Record<string, string | number> | string
@@ -31,6 +39,7 @@ export interface CollapsibleTriggerProps {
 }
 
 export interface CollapsibleContentProps {
+  id?: string
   asChild?: boolean
   forceMount?: boolean
   class?: string
@@ -43,6 +52,19 @@ export interface CollapsibleContext {
   isOpen: () => boolean
   disabled: boolean
   toggle: () => void
+  /**
+   * The content panel's id. The panel registers whatever id it actually
+   * renders, so `aria-controls` can never point at something that is not there
+   * (that is the failure mode a hardcoded id invites).
+   */
+  contentId: () => string
+  setContentId: (id: string) => void
+}
+
+let contentIdCounter = 0
+
+function generateContentId(): string {
+  return `collapsible-content-${++contentIdCounter}`
 }
 
 /**
@@ -69,13 +91,22 @@ export function createCollapsibleRoot(): (
       props?.onOpenChange?.(next)
     }
 
+    // The panel's id lives here so the trigger can point at it; the panel
+    // overwrites it with whatever id it ends up rendering.
+    let currentContentId = props?.contentId ?? generateContentId()
+
     const getContext = (): CollapsibleContext => ({
       isOpen,
       disabled: isDisabled(),
-      toggle
+      toggle,
+      contentId: () => currentContentId,
+      setContentId: (id) => {
+        currentContentId = id
+      }
     })
 
     return div({
+      id: props?.id,
       'data-state': () => (isOpen() ? 'open' : 'closed'),
       'data-disabled': () => (isDisabled() ? '' : undefined),
       class: props?.class,
@@ -104,7 +135,9 @@ export function createCollapsibleTrigger(): (
 
     return button({
       type: 'button',
+      id: props?.id,
       'aria-expanded': () => String(isOpen()),
+      'aria-controls': () => getContext?.()?.contentId(),
       'data-state': () => (isOpen() ? 'open' : 'closed'),
       'data-disabled': () => (getContext?.()?.disabled ? '' : undefined),
       class: props?.class,
@@ -132,9 +165,14 @@ export function createCollapsibleContent(): (
   ) => {
     const forceMount = props?.forceMount ?? false
     const isOpen = (): boolean => getContext?.()?.isOpen() ?? false
+    // The consumer's id wins; either way the context learns the real one so the
+    // trigger's aria-controls matches.
+    const ctx = getContext?.()
+    const contentId = props?.id ?? ctx?.contentId() ?? generateContentId()
+    ctx?.setContentId(contentId)
 
     return div({
-      id: 'collapsible-content',
+      id: contentId,
       role: 'region',
       'data-state': () => (isOpen() ? 'open' : 'closed'),
       hidden: () => (forceMount || isOpen() ? false : true),
@@ -151,6 +189,8 @@ export function createCollapsibleContent(): (
  */
 export function createCollapsible(): (
   props?: CollapsibleRootProps & {
+    triggerId?: string
+    contentId?: string
     triggerClass?: string
     triggerStyle?: Record<string, string | number> | string
     contentClass?: string
@@ -165,6 +205,8 @@ export function createCollapsible(): (
 
   return (props) =>
     Root({
+      id: props?.id,
+      contentId: props?.contentId,
       defaultOpen: props?.defaultOpen,
       open: props?.open,
       disabled: props?.disabled,
@@ -176,6 +218,7 @@ export function createCollapsible(): (
           children: [
             Trigger(
               {
+                id: props?.triggerId,
                 class: props?.triggerClass,
                 style: props?.triggerStyle,
                 children: props?.trigger
@@ -184,6 +227,7 @@ export function createCollapsible(): (
             ),
             Content(
               {
+                id: props?.contentId,
                 class: props?.contentClass,
                 style: props?.contentStyle,
                 children: props?.content

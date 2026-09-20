@@ -97,17 +97,67 @@ describe('@rasenjs/rota - Collapsible', () => {
   })
 
   describe('createCollapsibleContent', () => {
-    it('should render a div element with id', () => {
-      const container = document.createElement('div')
-      const Root = createCollapsibleRoot()
-      const Content = createCollapsibleContent()
+    it('should give each instance its own content id', () => {
+      const a = document.createElement('div')
+      const b = document.createElement('div')
 
-      Root({
-        children: () => Content()
+      createCollapsibleRoot()({
+        children: (getContext) => createCollapsibleContent()({}, getContext)
+      })(a)
+      createCollapsibleRoot()({
+        children: (getContext) => createCollapsibleContent()({}, getContext)
+      })(b)
+
+      const first = a.querySelector('[role="region"]') as HTMLElement
+      const second = b.querySelector('[role="region"]') as HTMLElement
+      expect(first.id).toBeTruthy()
+      expect(second.id).toBeTruthy()
+      // A hardcoded id would make these equal and break aria-controls on a page
+      // that renders the component twice.
+      expect(first.id).not.toBe(second.id)
+    })
+
+    it('should point aria-controls at the panel it actually renders', () => {
+      const container = document.createElement('div')
+
+      createCollapsibleRoot()({
+        contentId: 'my-panel',
+        children: (getContext) =>
+          div({
+            children: [
+              createCollapsibleTrigger()({ id: 'my-trigger' }, getContext),
+              createCollapsibleContent()({}, getContext)
+            ]
+          })
       })(container)
 
-      const el = container.querySelector('div[id="collapsible-content"]')
-      expect(el).toBeTruthy()
+      const trigger = container.querySelector('button') as HTMLElement
+      const panel = container.querySelector('[role="region"]') as HTMLElement
+      expect(trigger.id).toBe('my-trigger')
+      expect(panel.id).toBe('my-panel')
+      expect(trigger.getAttribute('aria-controls')).toBe('my-panel')
+    })
+
+    it('should follow a panel id that overrides the root contentId', () => {
+      const container = document.createElement('div')
+
+      createCollapsibleRoot()({
+        contentId: 'from-root',
+        children: (getContext) =>
+          div({
+            children: [
+              createCollapsibleTrigger()({}, getContext),
+              createCollapsibleContent()({ id: 'from-panel' }, getContext)
+            ]
+          })
+      })(container)
+
+      const trigger = container.querySelector('button') as HTMLElement
+      const panel = container.querySelector('[role="region"]') as HTMLElement
+      expect(panel.id).toBe('from-panel')
+      // The trigger must agree with what the panel rendered, not with the root's
+      // original guess.
+      expect(trigger.getAttribute('aria-controls')).toBe('from-panel')
     })
 
     it('should have proper styling', () => {
