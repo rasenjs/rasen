@@ -32,20 +32,29 @@ test.describe('Progress', () => {
       await expect(progress).toHaveAttribute('aria-valuetext', '50%')
     })
 
-    test('should render indicator with correct width', async ({ page }) => {
+    test('should move the indicator to show the value', async ({ page }) => {
       const indicator = page.locator('#progress-indicator-50')
       await expect(indicator).toBeVisible()
       const style = await indicator.getAttribute('style')
-      expect(style).toContain('width: 50%')
+
+      // The fill is a full-width bar shifted left, not a percentage width.
+      // These tests asserted `width: 50%`, which was never the component's
+      // mechanism - `width` is a styling decision a consumer may override,
+      // while the transform is how the component expresses the value (the
+      // same technique Radix's Progress uses). Asserting the transform checks
+      // the behaviour instead of one implementation of the look.
+      expect(style).toContain('width: 100%')
+      expect(style).toContain('translateX(-50%)')
     })
 
-    test('should render zero progress correctly', async ({ page }) => {
+    test('should hide the whole indicator at zero', async ({ page }) => {
       const progress = page.locator('#progress-0')
       await expect(progress).toHaveAttribute('aria-valuenow', '0')
 
       const indicator = page.locator('#progress-indicator-0')
       const style = await indicator.getAttribute('style')
-      expect(style).toContain('width: 0%')
+      // Nothing filled: the full-width bar is shifted clear of the track.
+      expect(style).toContain('translateX(-100%)')
     })
   })
 
