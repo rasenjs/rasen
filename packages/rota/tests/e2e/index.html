@@ -621,10 +621,17 @@
       <div id="alert-dialog"></div>
     </section>
 
+    <!-- The application's own container for relocated layers. A real app
+         would put this next to its app root; here it is a plain element so the
+         spec can assert where the panel ended up. -->
+    <div id="overlay-root"></div>
+
     <!-- Dialog -->
     <section id="dialog-section">
       <h2>Dialog</h2>
       <div id="dialog"></div>
+      <p>Relocated into <code>#overlay-root</code> (see <code>container</code>):</p>
+      <div id="dialog-relocated"></div>
     </section>
 
     <!-- Label -->
@@ -1234,6 +1241,67 @@
         rangeClass: 'slider-range',
         thumbClass: 'slider-thumb'
       })(document.getElementById('slider-range'))
+
+      // ==================== Dialog (relocated) ====================
+      // Same component, with the panel and overlay rendered into an element the
+      // application owns. The escape hatch for an ancestor with `transform`
+      // (which becomes the containing block for a `fixed` layer), `filter` or
+      // `contain`, or one that clips with `overflow`.
+      {
+        const { Root, Trigger, Overlay, Content, Title, Close } = dialog
+        const toOverlayRoot = () => document.getElementById('overlay-root')
+        Root({
+          children: (getContext) =>
+            div({
+              children: [
+                Trigger(
+                  {
+                    class: 'dialog-trigger',
+                    id: 'dialog-relocated-trigger',
+                    children: () => text({ content: 'Open relocated dialog' })
+                  },
+                  getContext
+                ),
+                Overlay(
+                  {
+                    class: 'dialog-overlay',
+                    id: 'dialog-relocated-overlay',
+                    container: toOverlayRoot
+                  },
+                  getContext
+                ),
+                Content(
+                  {
+                    class: 'dialog-content',
+                    id: 'dialog-relocated-content',
+                    container: toOverlayRoot,
+                    children: (getCtx) =>
+                      div({
+                        children: [
+                          Title(
+                            {
+                              class: 'dialog-title',
+                              children: () => text({ content: 'Relocated' })
+                            },
+                            getCtx
+                          ),
+                          Close(
+                            {
+                              class: 'dialog-close',
+                              id: 'dialog-relocated-close',
+                              children: () => text({ content: 'Close' })
+                            },
+                            getCtx
+                          )
+                        ]
+                      })
+                  },
+                  getContext
+                )
+              ]
+            })
+        })(document.getElementById('dialog-relocated'))
+      }
 
       // ==================== NumberField ====================
       numberField({

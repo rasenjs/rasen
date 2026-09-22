@@ -251,7 +251,8 @@ rota/docs/
 
 | 能力 | 状态 |
 |------|------|
-| **Portal 渲染** | 未做。这是**框架机制**（渲染器/宿主层），不在组件内实现。弹层目前渲染在触发器旁，靠 `position:absolute` + `z-index`，祖先有 `overflow:hidden` 或 `transform` 时无法逃逸。 |
+| **Portal / teleport 层** | **有意不做**。`Mountable(host, hooks)` 本来就以 host 为参数，"渲染到别处"是**换一个 host**，不是新机制 —— 加一层 Portal 意味着每个渲染器（DOM/字符串/canvas/native）都要各自实现一套搬运协议。改为在浮动部件上提供 `container` 逃生口（见下行）。 |
+| **`container` 逃生口** | 已完成（`dialog` / `alert-dialog` 的 Content 与 Overlay）。应用传入自己的容器元素，部件挂载后**移动过去**（身份不变，故焦点与外部点击判定照常工作；水合时先就地认领再移动，所以 SSR 产物与默认路径**逐字节一致**）。代价：部件不再是组件的后代（祖先作用域 CSS 失效），且容器成为其定位上下文。 |
 | **RTL** | 未做（`accordion`、`collapsible`）。 |
 | **动画** | 有意不做。组件只暴露 `data-state`，动画交给消费方的 CSS。 |
 | **Floating UI / 碰撞检测 / 箭头定位** | 有意不做。`popover`/`tooltip` 用 CSS 定位（`data-side` / `data-align`），使组件可静态渲染、也能在无布局的测试环境运行。 |

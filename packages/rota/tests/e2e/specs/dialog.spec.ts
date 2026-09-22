@@ -91,6 +91,80 @@ test.describe('Dialog', () => {
     })
   })
 
+  test.describe('relocated into an application container', () => {
+    const movedTrigger = '#dialog-relocated-trigger'
+    const movedPanel = '#dialog-relocated-content'
+
+    test('should put the panel and overlay in the container, not in the root', async ({
+      page
+    }) => {
+      await page.locator(movedTrigger).click()
+      await expect(page.locator(movedPanel)).toBeVisible()
+
+      const placement = await page.evaluate(() => {
+        const panel = document.getElementById('dialog-relocated-content')!
+        const overlay = document.getElementById('dialog-relocated-overlay')!
+        const host = document.getElementById('overlay-root')!
+        const demo = document.getElementById('dialog-relocated')!
+        return {
+          panelParent: panel.parentElement?.id ?? null,
+          overlayParent: overlay.parentElement?.id ?? null,
+          panelStillInDemo: demo.contains(panel),
+          overlayIsHost: host.contains(overlay),
+          panelIsHost: host.contains(panel)
+        }
+      })
+
+      expect(placement.panelParent).toBe('overlay-root')
+      expect(placement.overlayParent).toBe('overlay-root')
+      expect(placement.panelStillInDemo).toBe(false)
+      expect(placement.overlayIsHost).toBe(true)
+      expect(placement.panelIsHost).toBe(true)
+      // One panel, moved - not a second copy left behind.
+      await expect(page.locator(movedPanel)).toHaveCount(1)
+    })
+
+    test('should keep working after the move', async ({ page }) => {
+      await page.locator(movedTrigger).click()
+      await expect(page.locator(movedPanel)).toBeVisible()
+
+      // The layer's listeners follow the element, wherever it now lives.
+      await page.keyboard.press('Escape')
+      await expect(page.locator(movedPanel)).toBeHidden()
+
+      // Opening again still moves focus into the relocated panel.
+      await page.locator(movedTrigger).click()
+      await expect(page.locator(movedPanel)).toBeVisible()
+      const focused = await page.evaluate(
+        () => document.activeElement?.id || document.activeElement?.tagName
+      )
+      expect(focused).toBe('dialog-relocated-close')
+    })
+
+    test('should not move the panels that were not asked to move', async ({
+      page
+    }) => {
+      await page.locator('#dialog-trigger').click()
+      await expect(page.locator('#dialog-content')).toBeVisible()
+
+      const where = await page.evaluate(() => {
+        const panel = document.getElementById('dialog-content')!
+        return {
+          // The default path is unchanged: still inside the demo that declared
+          // it. Asserted by containment rather than by parent id, because the
+          // wrapper between the host and the panel is the component's own.
+          inDemo: document.getElementById('dialog')!.contains(panel),
+          inOverlayRoot: document
+            .getElementById('overlay-root')!
+            .contains(panel)
+        }
+      })
+      expect(where.inDemo).toBe(true)
+      expect(where.inOverlayRoot).toBe(false)
+      await page.keyboard.press('Escape')
+    })
+  })
+
   test.describe('scroll lock', () => {
     test('should stop the page scrolling behind the modal', async ({ page }) => {
       // A modal that leaves the page scrollable underneath can be scrolled
