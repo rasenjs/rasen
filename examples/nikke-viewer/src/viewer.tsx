@@ -100,6 +100,50 @@ const currentAnim = ref('')
 const status = ref('Loading character list…')
 const loaded = ref(false)
 
+/**
+ * True while the pixel fit is still re-framing the model.
+ *
+ * The fit can only measure PIXELS, so it cannot run before something has been
+ * drawn — which means it used to correct the framing up to three times while the
+ * character was already on screen. Measured on c405: the deterministic bone fit
+ * is ~2x too large (w 2916 vs the true 1437), the first round halves it, and the
+ * three rounds together move 13.7% of the pixels. The character was therefore
+ * shown mis-framed and then re-framed under the viewer's nose, up to 5x the
+ * per-frame motion of the animation itself.
+ *
+ * Treating the fit as part of loading removes that: the model is revealed once
+ * framing has settled, so the corrections happen behind the loading overlay. The
+ * canvas must keep RENDERING while this is true (the fit measures it) — the
+ * overlay only covers it, it must not be hidden with display:none.
+ */
+const framing = ref(false)
+
+/**
+ * Frames still to wait before lifting the overlay.
+ *
+ * A camera change is applied during a tick but only reaches the canvas on the
+ * NEXT painted frame. Clearing `framing` in the same tick as the last fit round
+ * therefore still exposes that round: the overlay came down one frame before the
+ * pixels it was hiding changed. Verified with the frame probe — the reveal was
+ * reported at frame 34 while the last re-framing landed in frame 35's pixels.
+ *
+ * So the reveal is deferred by one frame, which is exactly enough to keep the
+ * final correction covered.
+ */
+let revealAfter = 0
+/**
+ * Frames the overlay may stay up, ever.
+ *
+ * The tick's fit branch is guarded by `atlasImg || atlasImgs` with `&&` short
+ * circuiting, so if the atlas never arrives `framesSinceFitRequest` never
+ * increments and the fit never reports itself finished — which would leave the
+ * overlay up forever behind an empty status line. That is a worse failure than
+ * the one being fixed, so the reveal has its own deadline that does not depend on
+ * anything the fit does.
+ */
+let framingFrames = 0
+const FRAMING_MAX_FRAMES = 240
+
 const bg = ref('#0b1020')
 const panX = ref(0)
 const panY = ref(0)
@@ -464,6 +508,31 @@ const fitStats = { pixelFits: 0, lastPixelFit: '' as string }
 // endpoints not bounding meshes, and camera-style animations that travel.
 let pendingPixelFit = false
 let framesSinceFitRequest = 0
+
+/**
+ * Diagnostic seam: `?nofit=1` (or `globalThis.__nikkeNoPixelFit`) turns the pixel
+ * fit off, leaving only the deterministic bone fit.
+ *
+ * It exists so "is the picture moving because of the fit?" can be answered with
+ * an A/B instead of by correlating timestamps. The fit re-writes the framing up
+ * to three times AFTER the model is already on screen, so it can re-frame the
+ * character while the user is watching — which reads as the picture jumping.
+ * With this flag the frames of a run either jump or they do not.
+ *
+ * Cached: read per frame, never changes mid-run.
+ */
+let pixelFitAllowed: boolean | null = null
+function pixelFitEnabled(): boolean {
+  if (pixelFitAllowed === null) {
+    const fromUrl =
+      typeof location !== 'undefined' &&
+      typeof location.search === 'string' &&
+      /[?&]nofit=1/.test(location.search)
+    const g = globalThis as { __nikkeNoPixelFit?: boolean }
+    pixelFitAllowed = !(fromUrl || g.__nikkeNoPixelFit === true)
+  }
+  return pixelFitAllowed
+}
 /** Completed pixel-fit rounds for the current fit cycle (converges in ≤3). */
 let pixelFitRounds = 0
 
@@ -761,7 +830,9 @@ async function loadCharacter(char: string, pose: PoseKind = 'fb'): Promise<boole
       // refine it from the actual first painted frame (pixel fit).
       fitGeneration++
       captureFitBounds()
-      pendingPixelFit = true
+      pendingPixelFit = pixelFitEnabled()
+      framing.value = pendingPixelFit
+      framingFrames = 0
       framesSinceFitRequest = 0
       pixelFitRounds = 0
     } else {
@@ -832,7 +903,9 @@ async function applySelection(match: { params: Record<string, unknown> } | null)
       // Re-frame once for the new animation's full loop, then pixel-refine.
       fitGeneration++
       captureFitBounds()
-      pendingPixelFit = true
+      pendingPixelFit = pixelFitEnabled()
+      framing.value = pendingPixelFit
+      framingFrames = 0
       framesSinceFitRequest = 0
       pixelFitRounds = 0
     }
@@ -1269,11 +1342,13 @@ const Stage = com(() => (
         })
     })}
     {when({
-      condition: () => !loaded.value,
+      // `framing` keeps the overlay up until the pixel fit has stopped moving the
+      // camera, so the model is never revealed mis-framed and then corrected.
+      condition: () => !loaded.value || framing.value,
       then: () => (
         <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-neutral-500 pointer-events-none transition">
           {iconUser()}
-          <p>{text({ content: () => status.value || 'Select a character to begin' })}</p>
+          <p>{text({ content: () => (framing.value ? '' : status.value || 'Select a character to begin') })}</p>
         </div>
       )
     })}
@@ -1770,6 +1845,8 @@ function findDefaultChar(): string {
   stageH: stageH.value,
   fitScale: fitScale.value,
   pendingPixelFit,
+  framing: framing.value,
+  pixelFitEnabled: pixelFitEnabled(),
   fitStats,
   atlasReady: !!(atlasImg.value || atlasImgs.value),
   skeletonReady: !!skeleton.value
@@ -1797,7 +1874,7 @@ function tick(now: number): void {
     zoom.value = pendingZoom
     pendingZoom = null
   }
-  if (pendingPixelFit && (atlasImg.value || atlasImgs.value) && ++framesSinceFitRequest >= 6) {
+  if (pendingPixelFit && pixelFitEnabled() && (atlasImg.value || atlasImgs.value) && ++framesSinceFitRequest >= 6) {
     // Wait 6 frames AFTER the atlas is ready (the first real draw needs the
     // atlas — assets stream from the network and can land many seconds after
     // the model load that armed this fit), then measure. The fit is
@@ -1818,13 +1895,34 @@ function tick(now: number): void {
       framesSinceFitRequest = -10 // next round in 16 frames
       if (pixelFitRounds >= 3) {
         pendingPixelFit = false
+        // 3, not 1: the decrement at the end of THIS tick would take a 1 straight
+        // to zero and reveal immediately — the exact frame the last correction
+        // was applied on. (Measured: the fit lands in frame 34's tick and the
+        // pixels only show it in frame 35.)
+        revealAfter = 3
         framesSinceFitRequest = 0
       }
     } else if (framesSinceFitRequest >= 90) {
+      // Readback never produced a box (tainted canvas, failed WebGPU readback,
+      // nothing drawn). Give up on the fit and reveal — the deterministic bone
+      // fit is what is on screen, and holding the overlay any longer would just
+      // hide a working model.
       pendingPixelFit = false
+      revealAfter = 3
       framesSinceFitRequest = 0
       pixelFitRounds = 0
     }
+  }
+  // Lift the overlay one frame after the last re-framing, so the frame that
+  // shows the final framing is the first one the user can see. The deadline is a
+  // backstop: the overlay must never be able to outlive a working model.
+  if (framing.value) {
+    framingFrames++
+    if (framingFrames > FRAMING_MAX_FRAMES && revealAfter === 0) revealAfter = 1
+  }
+  if (revealAfter > 0 && --revealAfter === 0) {
+    framing.value = false
+    pendingPixelFit = false
   }
   frame.value = frame.value + 1
   requestAnimationFrame(tick)

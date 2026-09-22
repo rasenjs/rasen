@@ -9,7 +9,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "deploy": "vite build && npx vercel deploy dist --prod --project nikke-viewer --archive=tgz"
+    "deploy": "vite build && npx vercel deploy dist --prod --project nikke-viewer --archive=tgz",
+    "check:fit": "node probe-camera-timeline.mjs http://localhost:5191 webgl 25 cold",
+    "check:fit:gpu": "node probe-camera-timeline.mjs http://localhost:5191 webgpu 25 cold",
+    "check:fit:canvas": "node probe-camera-timeline.mjs http://localhost:5191 canvas 25 cold"
   },
   "dependencies": {
     "@rasenjs/assets": "workspace:*",
