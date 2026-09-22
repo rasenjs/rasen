@@ -252,7 +252,6 @@ rota/docs/
 | 能力 | 状态 |
 |------|------|
 | **Portal 渲染** | 未做。这是**框架机制**（渲染器/宿主层），不在组件内实现。弹层目前渲染在触发器旁，靠 `position:absolute` + `z-index`，祖先有 `overflow:hidden` 或 `transform` 时无法逃逸。 |
-| **滚动锁定** | 未做。`dialog` 打开时背景仍可滚动。 |
 | **RTL** | 未做（`accordion`、`collapsible`）。 |
 | **动画** | 有意不做。组件只暴露 `data-state`，动画交给消费方的 CSS。 |
 | **Floating UI / 碰撞检测 / 箭头定位** | 有意不做。`popover`/`tooltip` 用 CSS 定位（`data-side` / `data-align`），使组件可静态渲染、也能在无布局的测试环境运行。 |

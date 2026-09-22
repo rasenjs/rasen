@@ -13,6 +13,7 @@ import { createElementRef } from '../../internal/element-ref'
 import { readProp } from '../../internal/props'
 import { createFocusScope } from '../../internal/focus-scope'
 import { createDismissableLayer } from '../../internal/dismissable-layer'
+import { lockScroll, unlockScroll } from '../../internal/scroll-lock'
 import { withCleanup } from '../../internal/with-cleanup'
 
 export interface AlertDialogContext {
@@ -267,11 +268,27 @@ export function createAlertDialogContent(): (
       onPointerDownOutside: (event) => props?.onPointerDownOutside?.(event)
     })
 
+    // Tracks whether *this* layer holds a lock, so the pairing can never go
+    // out of balance: the open/close subscription and the unmount cleanup can
+    // both run, in either order.
+    let scrollLocked = false
+    const lock = (): void => {
+      if (scrollLocked) return
+      scrollLocked = true
+      lockScroll()
+    }
+    const unlock = (): void => {
+      if (!scrollLocked) return
+      scrollLocked = false
+      unlockScroll()
+    }
+
     if (ctx) {
       let entered = false
 
       const enter = () => {
         // Remember where focus came from before anything moves it.
+        lock()
         scope.activate()
         layer.activate()
 
@@ -295,6 +312,7 @@ export function createAlertDialogContent(): (
       }
 
       const leave = () => {
+        unlock()
         layer.deactivate()
         const event = new Event('focus', { cancelable: true })
         props?.onCloseAutoFocus?.(event)
@@ -354,6 +372,7 @@ export function createAlertDialogContent(): (
     // the life of the page. Focus is not moved here — the element is going away
     // and nobody asked for it back.
     return withCleanup(panel, () => {
+      unlock()
       layer.deactivate()
       scope.deactivate(false)
     })

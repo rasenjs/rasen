@@ -91,6 +91,26 @@ test.describe('Dialog', () => {
     })
   })
 
+  test.describe('scroll lock', () => {
+    test('should stop the page scrolling behind the modal', async ({ page }) => {
+      // A modal that leaves the page scrollable underneath can be scrolled
+      // *behind*, which slides the panel out from under the pointer.
+      const overflow = () =>
+        page.evaluate(() => document.body.style.overflow)
+
+      expect(await overflow()).not.toBe('hidden')
+
+      await page.locator('#dialog-trigger').click()
+      await expect(page.locator('#dialog-content')).toBeVisible()
+      expect(await overflow()).toBe('hidden')
+
+      await page.keyboard.press('Escape')
+      await expect(page.locator('#dialog-content')).toBeHidden()
+      // Released, so the page is usable again.
+      expect(await overflow()).not.toBe('hidden')
+    })
+  })
+
   test.describe('dismissing', () => {
     test('should close on Escape', async ({ page }) => {
       await page.locator('#dialog-trigger').click()

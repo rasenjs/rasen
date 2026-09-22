@@ -22,6 +22,7 @@ import { createElementRef } from '../../internal/element-ref'
 import { readProp } from '../../internal/props'
 import { createFocusScope } from '../../internal/focus-scope'
 import { createDismissableLayer } from '../../internal/dismissable-layer'
+import { lockScroll, unlockScroll } from '../../internal/scroll-lock'
 import { withCleanup } from '../../internal/with-cleanup'
 
 export interface DialogContext {
@@ -273,10 +274,26 @@ export function createDialogContent(): (
       onDismiss: () => ctx?.setOpen(false)
     })
 
+    // Tracks whether *this* layer holds a lock, so the pairing can never go
+    // out of balance: the open/close subscription and the unmount cleanup can
+    // both run, in either order.
+    let scrollLocked = false
+    const lock = (): void => {
+      if (scrollLocked) return
+      scrollLocked = true
+      lockScroll()
+    }
+    const unlock = (): void => {
+      if (!scrollLocked) return
+      scrollLocked = false
+      unlockScroll()
+    }
+
     if (ctx) {
       let entered = false
 
       const enter = () => {
+        lock()
         scope.activate()
         layer.activate()
 
@@ -293,6 +310,7 @@ export function createDialogContent(): (
       }
 
       const leave = () => {
+        unlock()
         layer.deactivate()
         const event = new Event('focus', { cancelable: true })
         props?.onCloseAutoFocus?.(event)
@@ -343,6 +361,7 @@ export function createDialogContent(): (
     })
 
     return withCleanup(panel, () => {
+      unlock()
       layer.deactivate()
       scope.deactivate(false)
     })
