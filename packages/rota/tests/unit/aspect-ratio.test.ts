@@ -102,6 +102,46 @@ describe('@rasenjs/rota - AspectRatio', () => {
     })
   })
 
+  describe('content wrapper', () => {
+    it('should fill the ratio box', () => {
+      const container = document.createElement('div')
+      aspectRatio()(container)
+
+      const wrapper = container.querySelector<HTMLElement>(
+        '[data-aspect-ratio-content]'
+      )
+      expect(wrapper).toBeTruthy()
+      expect(wrapper!.style.position).toBe('absolute')
+      expect(wrapper!.style.top).toBe('0px')
+      expect(wrapper!.style.bottom).toBe('0px')
+    })
+
+    it('should centre its content', () => {
+      const container = document.createElement('div')
+      aspectRatio()(container)
+
+      // Centring is a layout policy, which jsdom cannot observe - so this
+      // asserts the contract that produces it (a flex box centring on both
+      // axes) and the e2e spec asserts the geometry.
+      const wrapper = container.querySelector<HTMLElement>(
+        '[data-aspect-ratio-content]'
+      )!
+      expect(wrapper.style.display).toBe('flex')
+      expect(wrapper.style.alignItems).toBe('center')
+      expect(wrapper.style.justifyContent).toBe('center')
+    })
+
+    it('should expose the hook a consumer overrides the policy with', () => {
+      const container = document.createElement('div')
+      aspectRatio()(container)
+
+      // Without this attribute the centring would be unoverridable, since only
+      // the root takes a `style` prop.
+      const wrapper = container.querySelector('[data-aspect-ratio-content]')
+      expect(wrapper).toBeTruthy()
+    })
+  })
+
   describe('with children', () => {
     it('should render children inside content wrapper', () => {
       const container = document.createElement('div')

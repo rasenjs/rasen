@@ -87,6 +87,11 @@
         position: relative;
         width: 100%;
       }
+      .aspect-ratio-centered-child {
+        width: 40px;
+        height: 40px;
+        background: #3b82f6;
+      }
       .aspect-ratio img {
         position: absolute;
         top: 0;
@@ -530,6 +535,10 @@
       <div style="width: 300px">
         <div id="aspect-ratio-host"></div>
       </div>
+      <p>Centred content (a child smaller than the box):</p>
+      <div style="width: 300px">
+        <div id="aspect-ratio-center-host"></div>
+      </div>
     </section>
 
     <!-- Avatar -->
@@ -831,6 +840,15 @@
           class: 'aspect-ratio-image'
         })
       )(document.getElementById('aspect-ratio-host'))
+
+      // A child with an intrinsic size, so centring is observable: the image
+      // demo above fills its box, which would look the same either way.
+      aspectRatio({ ratio: 16 / 9, class: 'aspect-ratio' }, () =>
+        div({
+          id: 'aspect-ratio-centered-child',
+          class: 'aspect-ratio-centered-child'
+        })
+      )(document.getElementById('aspect-ratio-center-host'))
 
       // ==================== Avatar ====================
       avatar({

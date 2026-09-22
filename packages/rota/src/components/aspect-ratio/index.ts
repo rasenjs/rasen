@@ -43,7 +43,17 @@ export function createAspectRatio(): (
         ...(typeof props?.style === 'object' ? props.style : {})
       },
       children: [
-        // Content wrapper: fills the padding-established box.
+        // Content wrapper: fills the padding-established box and centres what
+        // it holds. Centring is the useful default for a ratio box - content
+        // smaller than the box looks deliberate in the middle and broken in a
+        // corner - and it costs nothing for the common case, an image or video
+        // pinned with `position: absolute; inset: 0`, because out-of-flow
+        // children are unaffected by the flex layout.
+        //
+        // A child that should stretch instead of centring is the case to be
+        // aware of: a flex item no longer fills its container's width on its
+        // own. The wrapper carries `data-aspect-ratio-content` so that policy
+        // stays overridable from CSS without new props.
         div({
           'data-aspect-ratio-content': '',
           style: {
@@ -51,7 +61,10 @@ export function createAspectRatio(): (
             top: '0',
             right: '0',
             bottom: '0',
-            left: '0'
+            left: '0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           },
           children: children ? [children()] : undefined
         })
