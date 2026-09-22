@@ -215,42 +215,58 @@ rota/docs/
 - 屏幕阅读器支持
 - 焦点管理
 
-## 下一步计划
+## 实现状态
 
-### 1. 优先实现的核心组件
+> **这张表是唯一的进度来源。** 每份组件文档末尾的「实现优先级」清单记录的是调研阶段的
+> 计划，长期没有随实现更新 —— 它会把早已完成的能力显示为未完成（例如 accordion 的键盘
+> 导航、水平方向）。以本表为准。
 
-#### 高优先级
-- [ ] Accordion - 手风琴
-- [ ] Dialog - 对话框
-- [ ] DropdownMenu - 下拉菜单
-- [ ] Checkbox - 复选框
-- [ ] Select - 选择器
-- [ ] Tabs - 标签页
+### 已实现（21 个）
 
-#### 中优先级
-- [ ] Popover - 弹出框
-- [ ] Tooltip - 工具提示
-- [ ] Switch - 开关
-- [ ] Slider - 滑块
-- [ ] Progress - 进度条
+均有单元测试 + 浏览器 e2e 覆盖，并参与 SSR（服务端渲染）验证。
 
-#### 低优先级
-- [ ] Reka UI 独有组件（DateTime、Color、Input 等）
+| 分类 | 组件 |
+|------|------|
+| 基础 | `aspect-ratio` `avatar` `label` `separator` |
+| 披露 | `accordion` `collapsible` `tabs` |
+| 表单 | `checkbox` `switch` `radio-group` `slider` `number-field` `tags-input` `pin-input` `toggle` `toggle-group` |
+| 反馈 | `progress` |
+| 浮层 | `dialog` `alert-dialog` `popover` `tooltip` |
 
-### 2. 实现步骤
+### 未实现
 
-1. 创建基础组件结构
-2. 实现响应式状态管理
-3. 添加键盘交互
-4. 实现无障碍支持
-5. 添加动画支持
+| 分类 | 组件 | 备注 |
+|------|------|------|
+| 浮层 | `hover-card` | |
+| 表单 | `select` | 依赖 Portal 与定位能力，建议排在它们之后 |
+| 布局 | `scroll-area` | |
+| 反馈 | `toast` | |
+| 菜单 | `dropdown-menu` `context-menu` `menubar` `navigation-menu` | 整族未开始 |
+| 日期时间 | `calendar` `range-calendar` `date-picker` `date-range-picker` `date-field` `date-range-field` `time-field` `month-picker` `year-picker` | 整族未开始 |
+| 颜色 | 整族 | |
+| 数据 | `pagination` `listbox` `tree` `editable` | |
+| 输入增强 | `autocomplete` `combobox` | |
 
-### 3. 技术栈
+### 已实现组件中仍缺的能力
+
+| 能力 | 状态 |
+|------|------|
+| **Portal 渲染** | 未做。这是**框架机制**（渲染器/宿主层），不在组件内实现。弹层目前渲染在触发器旁，靠 `position:absolute` + `z-index`，祖先有 `overflow:hidden` 或 `transform` 时无法逃逸。 |
+| **滚动锁定** | 未做。`dialog` 打开时背景仍可滚动。 |
+| **RTL** | 未做（`accordion`、`collapsible`）。 |
+| **动画** | 有意不做。组件只暴露 `data-state`，动画交给消费方的 CSS。 |
+| **Floating UI / 碰撞检测 / 箭头定位** | 有意不做。`popover`/`tooltip` 用 CSS 定位（`data-side` / `data-align`），使组件可静态渲染、也能在无布局的测试环境运行。 |
+| Tooltip 的 Provider（共享延迟） | 未做。每个 Tooltip 各自设置 `delayMs`。 |
+| `aspect-ratio` 的内容居中 | 未做。内容容器只负责填满比例盒，居中属消费方 CSS。 |
+
+### 技术栈
 
 - 基于 Rasen 框架的响应式系统
-- 使用 Floating UI 进行定位
+- **定位**：分层组件用 CSS 定位并暴露 `data-side` / `data-align`，未引入 Floating UI
+  （原因见上表）
 - 完整的 TypeScript 支持
-- WAI-ARIA 合规
+- WAI-ARIA：角色、状态与键盘行为按 ARIA 模式实现，并由 e2e 断言覆盖（例如 radio group
+  的方向键移动即选中、tooltip 的 Escape 可关闭且不立刻重现）
 
 ## 总结
 

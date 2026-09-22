@@ -299,11 +299,11 @@ export const Collapsible = {
 
 ### 3. 实现优先级
 
-- [x] 基础结构
-- [ ] 受控/非受控模式
-- [ ] 禁用状态
-- [ ] 动画支持
-- [ ] asChild 支持
+Rota 已实现本组件（单元测试 + 浏览器 e2e 覆盖）。下面只记录**尚未做**的部分，其余项均已完成。
+
+- 未做：RTL
+- 有意不做：动画
+- `asChild`：未实现。它曾出现在类型里而实现从不读取，已从类型中移除（见 `src/components/collapsible/index.ts` 的注释）
 
 ## 与 Accordion 的关系
 
