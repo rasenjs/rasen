@@ -31,7 +31,12 @@ export interface CollapsibleRootProps {
 
 export interface CollapsibleTriggerProps {
   id?: string
-  asChild?: boolean
+  // No `asChild`. The reference notes under docs/ list it as a Rota priority
+  // and both Reka and Radix have it, but it is not implemented: taking over a
+  // consumer-supplied element is a feature, not a passthrough. Declaring it
+  // would let TypeScript accept a prop the implementation ignores - the
+  // consumer's `<a>` would silently end up nested inside a `<button>` instead
+  // of being the trigger.
   class?: string
   style?: Record<string, string | number> | string
   children?: () => Mountable<HTMLElement>
@@ -40,7 +45,7 @@ export interface CollapsibleTriggerProps {
 
 export interface CollapsibleContentProps {
   id?: string
-  asChild?: boolean
+  // `asChild` is absent for the same reason as on the trigger (see above).
   forceMount?: boolean
   class?: string
   style?: Record<string, string | number> | string
