@@ -9,6 +9,8 @@ import { com } from '@rasenjs/core'
 import { div } from '@rasenjs/web/elements'
 
 export interface AspectRatioProps {
+  /** Id for the ratio container itself. */
+  id?: string
   ratio?: number
   class?: string
   style?: Record<string, string | number> | string
@@ -28,6 +30,7 @@ export function createAspectRatio(): (
     const ratio = props?.ratio ?? 1
 
     return div({
+      id: props?.id,
       'data-ratio': String(ratio),
       class: props?.class,
       // The padding-bottom technique IS the ratio mechanism — these inline

@@ -106,6 +106,16 @@ describe('@rasenjs/rota - Avatar', () => {
   })
 
   describe('createAvatarFallback', () => {
+    it('should apply the class it accepts', () => {
+      const container = document.createElement('div')
+      const Fallback = createAvatarFallback()
+      // `class` is part of AvatarFallbackProps; it used to be declared and then
+      // ignored, so a consumer styling the fallback had nothing to hook onto.
+      Fallback({ class: 'my-fallback' })(container)
+
+      expect(container.querySelector('span')?.className).toContain('my-fallback')
+    })
+
     it('should render a span element', () => {
       const container = document.createElement('div')
       const Fallback = createAvatarFallback()

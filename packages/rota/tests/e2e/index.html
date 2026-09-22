@@ -477,15 +477,18 @@
     <section id="aspect-ratio-section">
       <h2>AspectRatio</h2>
       <div style="width: 300px">
-        <div id="aspect-ratio-16-9"></div>
+        <div id="aspect-ratio-host"></div>
       </div>
     </section>
 
     <!-- Avatar -->
     <section id="avatar-section">
       <h2>Avatar</h2>
-      <div id="avatar-with-image"></div>
-      <div id="avatar-with-fallback"></div>
+      <!-- The avatar fills its parent by default, so the host needs a size:
+           in an auto-height host the absolutely positioned parts give the box
+           no height at all. -->
+      <div id="avatar-image-host" style="width: 48px; height: 48px"></div>
+      <div id="avatar-fallback-host" style="width: 48px; height: 48px"></div>
     </section>
 
     <!-- Collapsible -->
@@ -659,7 +662,7 @@
       } from '@rasenjs/rota'
       // Element factories come from the isomorphic entry, exactly as a
       // consumer would import them (aliased in vite.e2e.config.ts).
-      import { div, text } from '@rasenjs/web/elements'
+      import { div, img, text } from '@rasenjs/web/elements'
 
       // ==================== Separator ====================
       hseparator({ class: 'separator' })(document.getElementById('separator-h'))
@@ -668,27 +671,41 @@
         document.getElementById('separator-decorative')
       )
 
+      // A single inlined image shared by the image-bearing demos. It is
+      // base64 rather than a percent-encoded SVG: a data URI with raw spaces
+      // is rejected by the browser, and the avatar then stays in its error
+      // state forever, which looks exactly like a component bug.
+      const SAMPLE_IMAGE =
+        'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjM2I4MmY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjE2Ij5KRDwvdGV4dD48L3N2Zz4='
+
       // ==================== AspectRatio ====================
-      aspectRatio({ ratio: 16 / 9, class: 'aspect-ratio' })(
-        document.getElementById('aspect-ratio-16-9')
-      )
+      // Children are the second argument here, not a prop.
+      aspectRatio({ id: 'aspect-ratio-16-9', ratio: 16 / 9, class: 'aspect-ratio' }, () =>
+        img({
+          src: SAMPLE_IMAGE,
+          alt: '16:9 ratio',
+          class: 'aspect-ratio-image'
+        })
+      )(document.getElementById('aspect-ratio-host'))
 
       // ==================== Avatar ====================
       avatar({
-        src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect fill='%233b82f6' width='48' height='48'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16'%3EJD%3C/text%3E%3C/svg%3E",
+        id: 'avatar-with-image',
+        src: SAMPLE_IMAGE,
         alt: 'John Doe',
+        imageClass: 'avatar-image',
         class: 'avatar'
-      })(document.getElementById('avatar-with-image'))
+      })(document.getElementById('avatar-image-host'))
 
       avatar({
+        id: 'avatar-with-fallback',
         // The fallback is a factory that returns a mountable, not a string:
         // passing one used to work and stopped when the parts took the
-        // `() => Mountable` contract. Nothing caught it because this page could
-        // not load at all (see vite.e2e.config.ts).
+        // `() => Mountable` contract.
         fallback: () => text({ content: 'AB' }),
         class: 'avatar',
         fallbackClass: 'avatar-fallback'
-      })(document.getElementById('avatar-with-fallback'))
+      })(document.getElementById('avatar-fallback-host'))
 
       // ==================== Collapsible ====================
       collapsible({

@@ -16,6 +16,8 @@ export type ImageLoadingStatus = 'loading' | 'loaded' | 'error'
 export type FallbackVisibility = 'visible' | 'hidden'
 
 export interface AvatarRootProps {
+  /** Id for the avatar box itself. */
+  id?: string
   class?: PropValue<string>
   style?: PropValue<string | Record<string, string | number>>
   /** May return several parts: they become children of the root box. */
@@ -59,6 +61,7 @@ export function createAvatarRoot(): (
     const statusRef = rt.ref<ImageLoadingStatus>('loading')
 
     return span({
+      id: props?.id,
       class: props?.class,
       // Positioning/overflow are functional: image and fallback stack
       // inside this box via absolute positioning.
@@ -179,6 +182,7 @@ export function createAvatarFallback(): (
 
     return span({
       ref: fallbackRef,
+      class: props?.class,
       'data-state': () => (shouldShow() ? 'visible' : 'hidden'),
       // Opacity (not hidden) so consumers can transition the swap in CSS.
       style: {
@@ -203,8 +207,16 @@ export function createAvatarFallback(): (
  * Avatar preset: root + image + fallback wired to one context.
  */
 export function createAvatar(): (props?: {
+  /** Id for the avatar container itself. */
+  id?: string
   src?: PropValue<string>
   alt?: PropValue<string>
+  /**
+   * Per-part class hooks. The parts take their own `class`; without these the
+   * preset had no way to reach them, so `fallbackClass` was silently dropped.
+   */
+  imageClass?: string
+  fallbackClass?: string
   fallback?: () => Mountable<HTMLElement>
   /** Milliseconds to wait before the fallback appears (0 = immediately). */
   delayMs?: PropValue<number>
@@ -218,6 +230,7 @@ export function createAvatar(): (props?: {
 
   return (props) =>
     Root({
+      id: props?.id,
       class: props?.class,
       style: props?.style,
       children: (getContext) => [
@@ -225,12 +238,17 @@ export function createAvatar(): (props?: {
           {
             src: props?.src,
             alt: props?.alt,
+            class: props?.imageClass,
             onLoadingStatusChange: props?.onLoadingStatusChange
           },
           getContext
         ),
         Fallback(
-          { children: props?.fallback, delayMs: props?.delayMs },
+          {
+            class: props?.fallbackClass,
+            children: props?.fallback,
+            delayMs: props?.delayMs
+          },
           getContext
         )
       ]
