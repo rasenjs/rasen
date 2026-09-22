@@ -650,10 +650,33 @@ export class WebGLRenderer extends Renderer {
     // the GPU buffers are this run's content unless something overwrote them
     // since (legacy uploads, buffer growth), which the invalidation helpers
     // handle by clearing the records.
+    //
+    // The declarations are per MESH but the upload below covers the RUN, so the
+    // skip is only valid when EVERY item in the run declares the stream
+    // unchanged. Reading it off `first` alone let a later item keep stale GPU
+    // bytes: when an attachment appears or disappears mid-animation its
+    // submission slot shifts, so that mesh stops being "owned" and rewrites its
+    // uv/color into staging — but the first item in the same run still declared
+    // unchanged, the run-level upload was skipped, and the mesh sampled whatever
+    // the GPU buffer happened to hold (a wrong region of the atlas, appearing as
+    // extra geometry for the frames until the run's first item changed and
+    // forced an upload).
+    let allUvUnchanged = true
+    let allColUnchanged = true
+    let allIdxUnchanged = true
+    for (let k = start; k < end; k++) {
+      const s = items[k].sealed!
+      if (s.unchangedUv !== true) allUvUnchanged = false
+      if (s.unchangedColor !== true) allColUnchanged = false
+      if (s.unchangedIndices !== true) allIdxUnchanged = false
+      // Nothing left to prove — stop paying for the rest of the run.
+      if (!allUvUnchanged && !allColUnchanged && !allIdxUnchanged) break
+    }
     let vrec = this.sealedVertexStreams.get(vBase)
-    const vertexKnown = vrec !== undefined && vrec.vCount === vCount && vrec.epoch === this.vertexBufferEpoch
-    const skipUv = first.unchangedUv === true && vertexKnown && vrec!.uvValid
-    const skipCol = first.unchangedColor === true && vertexKnown && vrec!.colValid
+    const vertexKnown =
+      vrec !== undefined && vrec.vCount === vCount && vrec.epoch === this.vertexBufferEpoch
+    const skipUv = allUvUnchanged && vertexKnown && vrec!.uvValid
+    const skipCol = allColUnchanged && vertexKnown && vrec!.colValid
     if (!vertexKnown) vrec = undefined
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
@@ -698,8 +721,11 @@ export class WebGLRenderer extends Renderer {
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer)
     const irec = this.sealedIndexStreams.get(iBase)
-    const indexKnown = irec !== undefined && irec.iCount === iCount && irec.epoch === this.indexBufferEpoch
-    if (!(first.unchangedIndices === true && indexKnown)) {
+    const indexKnown =
+      irec !== undefined && irec.iCount === iCount && irec.epoch === this.indexBufferEpoch
+    // Same run-vs-item rule as uv/color above: one upload covers every index in
+    // the run, so the skip needs the whole run to declare unchanged.
+    if (!(allIdxUnchanged && indexKnown)) {
       gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, iBase * 4, staging.indices!.subarray(iBase, iBase + iCount))
       this.sealedIndexStreams.set(iBase, { iCount, epoch: this.indexBufferEpoch })
     }

@@ -133,16 +133,31 @@ export function installStage(): HTMLDivElement {
 /**
  * Skeleton asset for every target page.
  *
- * `?skel=<id>` overrides the spec default so one harness can sweep RIG SIZE
+ * `?skel=<base>` overrides the spec default so one harness can sweep RIG SIZE
  * (c310 is 204 bones / 181 slots, c233 is 685 / 563). Bone count drives
  * updateWorldTransform while track count drives the timeline appliers, so
  * sweeping both isolates per-bone cost, per-track cost and the fixed per-apply
  * overhead from each other — three different fixes that a total cannot separate.
+ *
+ * The override is a BASE PATH, not a literal filename: the extension of the
+ * asset being requested is kept, so `?skel=c233/c233_00` resolves
+ * `/c233/c233_00.skel`, `/c233/c233_00.atlas` and `/c233/c233_00.png`.
+ *
+ * That matters because the same helper serves all three requests. Returning the
+ * override verbatim handed the identical path to each of them, so switching to a
+ * model in a subdirectory asked for the .skel file as the atlas too, and the
+ * model-switch knob was unusable — which is why c233 could not be driven from the
+ * harness at all. An override that still carries an extension is stripped, so
+ * both spellings work.
  */
 export function pickAsset(id: string): string {
   if (typeof location !== 'undefined' && typeof location.search === 'string') {
     const m = /[?&]skel=([^&]+)/.exec(location.search)
-    if (m) return `/${decodeURIComponent(m[1])}`
+    if (m) {
+      const override = decodeURIComponent(m[1]).replace(/\.[a-z0-9]+$/i, '')
+      const ext = /(\.[a-z0-9]+)$/i.exec(id)?.[1] ?? ''
+      return `/${override}${ext}`
+    }
   }
   return id
 }

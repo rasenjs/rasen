@@ -44,6 +44,36 @@ import {
 } from '@rasenjs/assets'
 
 /**
+ * Diagnostic seam: disable every clean-stream declaration (see the comment where
+ * they are assigned) and force each staging copy. Enabled with `?nocl=1` or by
+ * setting `globalThis.__rasenNoCleanStream = true` before the first frame.
+ *
+ * It exists because a wrong declaration is invisible to a final-image check: the
+ * renderer skips work it believes is redundant and presents stale bytes, which
+ * looks like ordinary geometry. Comparing a normal run against a no-skip run
+ * frame by frame is what makes a bad skip observable — any difference is work
+ * that was NOT redundant. Both layers have to be disabled together: forcing only
+ * the GPU upload would re-upload exactly the same (possibly stale) staging bytes
+ * and prove nothing.
+ *
+ * Cached after the first call — it is read once per mesh, i.e. hundreds of times
+ * per frame per instance, and a regex on every one of those is a real cost for a
+ * diagnostic that never changes mid-run.
+ */
+let noCleanStreamCached: boolean | null = null
+function noCleanStream(): boolean {
+  if (noCleanStreamCached === null) {
+    const fromUrl =
+      typeof location !== 'undefined' &&
+      typeof location.search === 'string' &&
+      /[?&]nocl=1/.test(location.search)
+    const g = globalThis as { __rasenNoCleanStream?: boolean }
+    noCleanStreamCached = fromUrl || g.__rasenNoCleanStream === true
+  }
+  return noCleanStreamCached
+}
+
+/**
  * Whether the atlas uses premultiplied-alpha blending.
  *
  * Nikke atlases ARE premultiplied alpha (verified: 777.png has rgb<=alpha for
@@ -615,7 +645,12 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
         // staged vBase (catches a clipped neighbour shifting the watermark).
         // Positions are recomputed every frame (the pose changed) and always
         // written.
-        const owned = prevSubs[seq] === sub && sub.stagedVBase === m.vBase
+        // `stage` forces the staging copies below; `owned` is the steady-state
+        // proof that they can be skipped. The ?nocl=1 seam disables BOTH layers:
+        // disabling only the GPU-side skip would re-upload exactly the same
+        // (possibly stale) staging bytes and prove nothing.
+        const forceAll = noCleanStream()
+        const owned = !forceAll && prevSubs[seq] === sub && sub.stagedVBase === m.vBase
         prevSubs[seq] = sub
         seq++
         // Clean-stream declarations for the batch renderer: a stream whose
@@ -627,7 +662,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
         let unchangedIndices = false
         let unchangedColor = false
         // uv: one memcpy from the layout's static atlas-space stream.
-        if (!owned || layout.uvStagedVBase !== m.vBase) {
+        if (forceAll || !owned || layout.uvStagedVBase !== m.vBase) {
           m.uv.set(layout.uvs, m.vBase * 2)
           layout.uvStagedVBase = m.vBase
         } else {
@@ -643,7 +678,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
           layout.idxLastVBase = m.vBase
           layout.idxLastIBase = m.iBase
         }
-        if (!owned || layout.idxStagedVBase !== m.vBase || layout.idxStagedIBase !== m.iBase) {
+        if (forceAll || !owned || layout.idxStagedVBase !== m.vBase || layout.idxStagedIBase !== m.iBase) {
           m.idx.set(layout.idxU32!, m.iBase)
           layout.idxStagedVBase = m.vBase
           layout.idxStagedIBase = m.iBase
@@ -655,7 +690,7 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
         // call and the staging copy — one string compare detects any color
         // timeline change (the same detector the stream memo uses).
         const hex = slot.color
-        if (!owned || sub.colHex !== hex || sub.colPremul !== premultiplied || sub.colStagedVBase !== m.vBase) {
+        if (forceAll || !owned || sub.colHex !== hex || sub.colPremul !== premultiplied || sub.colStagedVBase !== m.vBase) {
           const packed = packedColorStream(slot, premultiplied, nVerts)
           m.col.set(packed.stream, m.vBase * 4)
           sub.colStream = packed.stream
@@ -667,6 +702,21 @@ export const spine = com((props: SpineWebglProps): Mountable<GfxNode> => {
           sub.stagedVBase = m.vBase
         } else {
           unchangedColor = true
+        }
+        // TEST SEAM — force every clean-stream declaration off.
+        //
+        // These declarations let the backend skip re-uploading a stream it
+        // believes the GPU already holds, so a WRONG declaration renders stale
+        // bytes and a two-state visual gate can miss it entirely. Disabling them
+        // makes the renderer upload everything every frame, which is the
+        // reference for "did the skipping change the image?": run the same
+        // animation both ways and any pixel difference is a skipped upload that
+        // was not actually redundant. Diagnostic only (?nocl=1 / global flag),
+        // never enabled in normal operation.
+        if (noCleanStream()) {
+          unchangedUv = false
+          unchangedIndices = false
+          unchangedColor = false
         }
         m.unchangedUv = unchangedUv
         m.unchangedIndices = unchangedIndices
