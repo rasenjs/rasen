@@ -9,8 +9,13 @@
  *  - createMarker：创建标记（Comment），只创建不挂载，位置由 insert 决定
  *  - createText：创建游离文本节点，返回句柄（node + update）
  *  - insert / detach / nextSibling：定位与区间遍历原语
- *  - batch：DocumentFragment 批量插入（有界挂载的唯一方式：子树挂到 fragment，
- *    再一次性插到 ref 之前。不再用 Proxy 伪装宿主。）
+ *  - batch：DocumentFragment 暂存后一次性落位，合并 DOM 写入
+ *
+ * 有界挂载只有两种互斥方案，各宿主二选一：
+ *  - `batch`（本文件）：分支建在暂存 fragment 里、flush 时搬进真实父节点。
+ *    暂存容器会失效，因此 `insert` **必须**按 ref 取容器（见其文档）。
+ *  - `boundedHost`：长期有效的宿主视图（canvas-2d / gfx 采用）。
+ *    两者同时提供就会造出失效宿主。
  */
 
 import type { TextHandle } from '@rasenjs/core'
@@ -18,7 +23,37 @@ import { getHydrationContext } from './hydration-context'
 import { isMarkerMatch } from './marker-constants'
 
 /**
- * 受保护的插入：水合模式下跳过已被 claim 的节点（它们已在正确位置）。
+ * 插入 —— 按 `HostHooks.insert` 的**容器归属规则**实现。契约写在 core 的
+ * `host-context.ts`（设计层，三个宿主共用同一套语义），这里只说 DOM 侧的缘由。
+ *
+ * 规则：
+ *   - `ref === null`：追加，容器就是传进来的 `parent`；
+ *   - `ref !== null`：容器是 **`ref.parentNode`**，不是 `parent`。
+ *
+ * 容器本来就由 `ref` 唯一决定：调用方的意图是「紧贴 `ref` 之前」，而这个位置
+ * **只在 `ref` 当前所属的那个列表里存在**。`parent` 只是宿主引用，它是可失效的
+ * 信息；`ref` 是具体节点，它的位置永远是真的。
+ *
+ * DOM 宿主为什么必须靠 `ref` 取值——因为它提供 `batch`：为合并 DOM 写入，一个
+ * 分支先建在**暂存 DocumentFragment** 里，再由 flush 一次性搬进真实父节点。
+ * 于是：
+ *
+ *   1. 分支在 fragment 里挂载时，`parent === fragment`，`ref.parentNode` 也是
+ *      它 —— 两者一致，插入落在暂存区（写入被合并，这正是 `batch` 的目的）；
+ *   2. flush 之后 fragment 的子节点全部搬进真实 DOM，**fragment 自身变成游离
+ *      空壳**；而在其中挂载过的结构性组件（when/each/match/fragment）已经在
+ *      闭包里缓存了它；
+ *   3. 该组件此后每次「插到 ref 之前」传入的都是这个空壳 —— 用 `parent` 插入
+ *      必然抛 NotFoundError（`ref` 不在其中），且更新会中途中断：
+ *      旧分支已销毁、新分支没插进去 = **整个分支消失**。
+ *
+ * 关键点：按 `ref` 取值在**两种状态下都正确**（目标仍在 fragment 里时，
+ * `ref.parentNode` 就是那个 fragment，写入照样被合并），而按 `parent` 取值只能
+ * 对上第 1 种。所以这不是「两个都试一下」的容错，而是唯一正确的取值来源。
+ *
+ * 这也解释了为什么 canvas-2d / gfx 的 host-hooks **刻意不实现 `batch`**（它们用
+ * 长期有效的 `boundedHost` 视图，因此宿主引用永不失效）。`batch` 与
+ * `boundedHost` 是两种互斥的有界挂载方案，同时提供就会踩到这里。
  */
 function guardedInsertBefore(
   parent: HTMLElement,
@@ -27,7 +62,36 @@ function guardedInsertBefore(
 ): void {
   const ctx = getHydrationContext()
   if (ctx?.isHydrating && node.parentNode) return
-  parent.insertBefore(node, ref)
+  if (ref === null) {
+    parent.appendChild(node)
+    return
+  }
+  const container = ref.parentNode
+  if (container === null) {
+    // 无处可放，也不猜位置：插进一个可能已失效的 `parent` 会把内容放到错误的
+    // 末尾，错位比不插更难排查。结构性更新中途更不能抛——抛出会让 UI 停在
+    // 「旧内容已销毁、新内容未插入」的状态。
+    warnDetachedAnchor()
+    return
+  }
+  container.insertBefore(node, ref)
+}
+
+/**
+ * 锚点彻底脱离树时的告警（只报一次）。
+ *
+ * 这种状态说明调用方在更新**已销毁的分支**（通常是订阅没随组件释放），是需要
+ * 暴露的逻辑错误；但每次更新都刷屏没有意义。
+ */
+let warnedDetachedAnchor = false
+function warnDetachedAnchor(): void {
+  if (warnedDetachedAnchor) return
+  warnedDetachedAnchor = true
+  console.warn(
+    '[Rasen] insert() got an anchor that is no longer in any tree — the caller is' +
+      ' updating a branch that was torn down, so the node was not placed. This' +
+      ' usually means a subscription outlived its component.'
+  )
 }
 
 /**
@@ -144,7 +208,11 @@ export const hostHooks = {
     }
   },
 
-  /** DocumentFragment 批量插入：在暂存宿主上挂载，flush 时一次性落位 */
+  /**
+   * DocumentFragment 暂存后一次性落位。
+   * ⚠️ 返回的 `parent` 只在 flush 前有效（flush 后它是游离空壳），而挂载在其上
+   * 的子树会缓存它——因此定位一律走 `insert` 的 ref 规则，不依赖这个 `parent`。
+   */
   batch: (
     parent: HTMLElement
   ): {

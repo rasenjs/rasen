@@ -55,7 +55,30 @@ export interface HostHooks<Node = unknown> {
    * fragment 的文本子节点使用；canvas 等无文本概念可实现为空操作句柄。
    */
   createText?: (parent: Node, content: string) => TextHandle<Node>
-  /** 在 ref 之前插入节点（ref 为 null 表示追加到末尾）。也可用于移动已有节点。 */
+  /**
+   * 在 ref 之前插入节点（ref 为 null 表示追加到末尾）。也可用于移动已有节点。
+   *
+   * **容器归属规则（实现必须遵守）：**
+   *  - `ref === null`：追加，容器就是 `parent`；
+   *  - `ref !== null`：容器是 **`ref` 当前所在的节点**（DOM: `ref.parentNode`），
+   *    不是 `parent`。
+   *
+   * 为什么 `ref` 权威：`parent` 是宿主引用，可能已失效；`ref` 是具体节点，
+   * 它的位置永远是真的。而“把 node 放到 ref 紧邻之前”这个意图**只在 ref 现在
+   * 所属的列表里可实现**。
+   *
+   * `parent` 为什么会失效——这是 `batch` 的既定行为（见下）：分支先建在
+   * 暂存容器里，由 flush 搬进真实父节点，**搬完之后暂存容器成为游离空壳**；
+   * 而在其中挂载过的结构性组件（when/each/match/fragment）已在闭包里缓存了
+   * 它。因此组件之后每一次 `insert` 都会传入一个失效的 `parent`。
+   *
+   * 只要实现按上面的规则取值，在**两种状态下都正确**：目标仍在暂存容器里时
+   * `ref.parentNode` 就是那个容器（写入仍被合并），已被 flush 时它已是真实父
+   * 节点。而用 `parent` 取值只能对上第一种。
+   *
+   * 宿主引用不会失效的实现（如 canvas-2d/gfx 的 boundedHost 视图总是挂在真实
+   * 父节点上）天然满足本规则，无需特别处理。
+   */
   insert?: (parent: Node, node: Node, ref: Node | null) => void
   /** 将节点从树上摘除 */
   detach?: (node: Node) => void
@@ -64,12 +87,19 @@ export interface HostHooks<Node = unknown> {
   /**
    * 有界宿主：返回 host 的视图，使子树的所有"追加"都落在 marker 之前。
    * 用于 when/match 分支和 each 列表项的定位挂载。
-   * DOM 实现为拦截 appendChild/insertBefore 的 Proxy；SSR 为子 chunk 写入器。
+   * 视图必须**长期有效**（子树会缓存它），因此不能是会被搬空/游离的临时容器。
+   * 提供它的宿主通常就不需要 `batch`（DOM 正是如此：用 batch 暂存，不提供本项；
+   * canvas-2d/gfx 相反：不提供 batch，用本项做有界挂载）。
    */
   boundedHost?: (parent: Node, marker: Node) => Node
   /**
-   * 批量插入优化提示。返回一个暂存宿主，在其上完成的挂载由 flush 一次性落位。
+   * 批量插入优化提示。返回一个**暂存宿主**，在其上完成的挂载由 flush 一次性落位。
    * 缺省时引擎退化为逐个 insert。
+   *
+   * ⚠️ `parent` 只保证在 batch 打开期间有效：flush 把内容搬进真实父节点后，
+   * 它就变成游离空壳。挂载在其上的子树会在闭包里缓存它，所以后续定位**必须**
+   * 走 `insert` 的容器归属规则（见 `insert`），不能依赖这个 `parent`。
+   * 这正是各宿主二选一的原因（见 `boundedHost`）。
    */
   batch?: (
     parent: Node
