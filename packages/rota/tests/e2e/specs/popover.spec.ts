@@ -48,22 +48,35 @@ test.describe('Popover', () => {
 
   test.describe('anchoring', () => {
     test('should place the panel against its trigger', async ({ page }) => {
-      const triggerBox = await page.locator(trigger).boundingBox()
       await page.locator(trigger).click()
+      await expect(page.locator(panel)).toBeVisible()
 
-      const panelEl = page.locator(panel)
-      const panelBox = await panelEl.boundingBox()
-      expect(triggerBox).not.toBeNull()
-      expect(panelBox).not.toBeNull()
+      // Both rects from one in-page snapshot. Measuring them in two separate
+      // calls compares two moments, and opening the panel can scroll the page
+      // (focus moves into it), so the two boxes would not share a coordinate
+      // space - which is how this test first failed, comparing the trigger
+      // before the open with the panel after it.
+      const rects = await page.evaluate(() => {
+        const rect = (id: string) => {
+          const el = document.getElementById(id)!
+          const r = el.getBoundingClientRect()
+          return { x: r.x, y: r.y, width: r.width, height: r.height }
+        }
+        return { trigger: rect('popover-trigger'), panel: rect('popover-content') }
+      })
 
-      // Placed to the bottom side, so the panel starts at or below the
-      // trigger's bottom edge and overlaps it horizontally.
-      expect(panelBox!.y).toBeGreaterThanOrEqual(triggerBox!.y)
-      expect(panelBox!.x).toBeLessThanOrEqual(
-        triggerBox!.x + triggerBox!.width
+      // Placed to the bottom side: the panel starts at or below the trigger's
+      // bottom edge and overlaps it horizontally.
+      expect(rects.panel.y).toBeGreaterThanOrEqual(
+        rects.trigger.y + rects.trigger.height - 1
       )
-      expect(panelBox!.x + panelBox!.width).toBeGreaterThanOrEqual(triggerBox!.x)
-      await expect(panelEl).toHaveAttribute('data-side', 'bottom')
+      expect(rects.panel.x).toBeLessThanOrEqual(
+        rects.trigger.x + rects.trigger.width
+      )
+      expect(rects.panel.x + rects.panel.width).toBeGreaterThanOrEqual(
+        rects.trigger.x
+      )
+      await expect(page.locator(panel)).toHaveAttribute('data-side', 'bottom')
     })
   })
 

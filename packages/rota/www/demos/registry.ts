@@ -32,6 +32,7 @@ import {
   toggle,
   toggleGroup,
   popover,
+  tooltip,
   createCollapsibleRoot,
   createCollapsibleTrigger,
   createCollapsibleContent,
@@ -333,6 +334,42 @@ vseparator({ decorative: true })`,
                         input({ class: 'text-input', placeholder: 'Any' })
                       ]
                     })
+                },
+                getContext
+              )
+            ]
+          })
+        ]
+      })
+    }
+  },
+
+  tooltip: {
+    title: 'Tooltip',
+    description:
+      'A description on hover or focus. It never takes focus, and Escape dismisses it.',
+    code: `const { Root, Trigger, Content } = tooltip`,
+    build: () => {
+      const { Root, Trigger, Content } = tooltip
+
+      return div({
+        children: [
+          Root({
+            defaultOpen: true,
+            delayMs: 0,
+            class: 'tooltip',
+            children: (getContext) => [
+              Trigger(
+                {
+                  class: 'tooltip__trigger',
+                  children: () => text({ content: 'Hover or focus me' })
+                },
+                getContext
+              ),
+              Content(
+                {
+                  class: 'tooltip__content',
+                  children: () => text({ content: 'A short explanation' })
                 },
                 getContext
               )

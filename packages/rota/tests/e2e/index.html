@@ -44,6 +44,26 @@
         height: auto;
       }
 
+      /* Tooltip */
+      .tooltip-root {
+        position: relative;
+        display: inline-block;
+      }
+      .tooltip-trigger {
+        border-bottom: 1px dotted #888;
+      }
+      .tooltip-content {
+        /* Padding rather than an offset: the tooltip is a DOM child of the
+           root, so spacing made of padding keeps the pointer inside the hover
+           area, while a gap would not. */
+        padding: 4px 8px;
+        background: #333;
+        color: #fff;
+        border-radius: 4px;
+        white-space: nowrap;
+        z-index: 10;
+      }
+
       /* Popover */
       .popover {
         position: relative;
@@ -492,6 +512,12 @@
       <div id="separator-decorative-demo"></div>
     </section>
 
+    <!-- Tooltip -->
+    <section id="tooltip-section">
+      <h2>Tooltip</h2>
+      <div id="tooltip-demo"></div>
+    </section>
+
     <!-- Popover -->
     <section id="popover-section">
       <h2>Popover</h2>
@@ -681,6 +707,7 @@
         alertDialog,
         dialog,
         popover,
+        tooltip,
         label,
         toggle,
         radioGroup,
@@ -725,6 +752,35 @@
       // state forever, which looks exactly like a component bug.
       const SAMPLE_IMAGE =
         'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjM2I4MmY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjE2Ij5KRDwvdGV4dD48L3N2Zz4='
+
+      // ==================== Tooltip ====================
+      {
+        const { Root, Trigger, Content } = tooltip
+        Root({
+          class: 'tooltip-root',
+          // Zero so the spec does not have to wait out the hover delay; the
+          // delay itself is covered by the unit tests.
+          delayMs: 0,
+          children: (getContext) => [
+            Trigger(
+              {
+                id: 'tooltip-trigger',
+                class: 'tooltip-trigger',
+                children: () => text({ content: 'Hover or focus me' })
+              },
+              getContext
+            ),
+            Content(
+              {
+                id: 'tooltip-content',
+                class: 'tooltip-content',
+                children: () => text({ content: 'A short explanation' })
+              },
+              getContext
+            )
+          ]
+        })(document.getElementById('tooltip-demo'))
+      }
 
       // ==================== Popover ====================
       {
