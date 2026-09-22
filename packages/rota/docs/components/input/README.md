@@ -331,12 +331,14 @@ const value = ref('点击编辑')
 
 ## Rota 实现建议
 
+> 本清单是调研阶段的**计划**，不反映当前进度。组件实现状态以 [`docs/README.md` 的「实现状态」](../README.md) 为准。
+
 ### 1. 实现优先级
 
 #### 高优先级
-- [ ] NumberField - 数字输入（常用）
-- [ ] TagsInput - 标签输入（常用）
-- [ ] PinInput - PIN 输入（验证码场景）
+- [x] NumberField - 数字输入（常用）
+- [x] TagsInput - 标签输入（常用）
+- [x] PinInput - PIN 输入（验证码场景）
 
 #### 中优先级
 - [ ] Autocomplete - 自动完成

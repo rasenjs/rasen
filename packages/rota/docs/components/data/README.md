@@ -279,6 +279,8 @@ const items = ['Apple', 'Banana', 'Cherry', 'Date']
 
 ## Rota 实现建议
 
+> 本清单是调研阶段的**计划**，不反映当前进度。组件实现状态以 [`docs/README.md` 的「实现状态」](../README.md) 为准。
+
 ### 1. 实现优先级
 
 #### 高优先级

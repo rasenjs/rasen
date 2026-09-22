@@ -299,11 +299,9 @@ export const Collapsible = {
 
 ### 3. 实现优先级
 
-Rota 已实现本组件（单元测试 + 浏览器 e2e 覆盖）。下面只记录**尚未做**的部分，其余项均已完成。
-
-- 未做：RTL
-- 有意不做：动画
+Rota 已实现本组件（单元测试 + 浏览器 e2e 覆盖）。以下是遗留项、有意不做的项，以及需要澄清的实现决定；跨组件的通用事项（动画政策、RTL）见 README 的「实现状态」。
 - `asChild`：未实现。它曾出现在类型里而实现从不读取，已从类型中移除（见 `src/components/collapsible/index.ts` 的注释）
+
 
 ## 与 Accordion 的关系
 

@@ -283,6 +283,8 @@ interface Color {
 - **colord**: 小巧快速的颜色操作库
 - **color**: JavaScript 颜色转换库
 
+> 本清单是调研阶段的**计划**，不反映当前进度。组件实现状态以 [`docs/README.md` 的「实现状态」](../README.md) 为准。
+
 ### 2. 实现优先级
 
 #### 高优先级

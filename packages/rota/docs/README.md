@@ -253,8 +253,8 @@ rota/docs/
 |------|------|
 | **Portal / teleport 层** | **有意不做**。`Mountable(host, hooks)` 本来就以 host 为参数，"渲染到别处"是**换一个 host**，不是新机制 —— 加一层 Portal 意味着每个渲染器（DOM/字符串/canvas/native）都要各自实现一套搬运协议。改为在流外部件上提供统一的 `container` 逃生口（见下行）。 |
 | **`container` 逃生口** | 已完成，且**规则统一**：凡把内容渲染在流外的部件都接受同一个 `container`（6 处 —— `dialog` / `alert-dialog` 的 Content 与 Overlay，`popover` / `tooltip` 的 Content），prop 只声明一次（`ContainerProp`）。应用传入自己的容器元素，部件挂载后**移动过去**（身份不变，故焦点与外部点击判定照常工作；水合时先就地认领再移动，SSR 产物与默认路径**逐字节一致**；服务端**从不执行**消费者的 getter）。代价：部件不再是组件的后代（祖先作用域 CSS 失效），容器成为其定位上下文 —— 对锚定部件（popover/tooltip）意味着定位转由应用负责，但**不因此把它们排除在外**，否则 API 不可预测。 |
-| **RTL** | 未做（`accordion`、`collapsible`）。 |
-| **动画** | 有意不做。组件只暴露 `data-state`，动画交给消费方的 CSS。 |
+| **RTL** | **全部组件未做**（`dir` 没有任何组件读取）。方向敏感的是一批具体行为，而不只是样式：水平方向键（`accordion` / `tabs` / `toggle-group` / `radio-group`）、`slider` 的横向增减方向、以及 `popover` / `tooltip` 的 `side` / `align` 语义。 |
+| **动画** | **有意不做，21 个组件全部如此**（源码里没有任何 `transition` / `animation`）。组件只暴露 `data-state`，动画交给消费方的 CSS —— headless 库的常规做法，因此不是缺口而是取舍。 |
 | **Floating UI / 碰撞检测 / 箭头定位** | 有意不做。`popover`/`tooltip` 用 CSS 定位（`data-side` / `data-align`），使组件可静态渲染、也能在无布局的测试环境运行。 |
 | Tooltip 的 Provider（共享延迟） | 未做。每个 Tooltip 各自设置 `delayMs`。 |
 | `aspect-ratio` 的内容居中 | 未做。内容容器只负责填满比例盒，居中属消费方 CSS。 |
