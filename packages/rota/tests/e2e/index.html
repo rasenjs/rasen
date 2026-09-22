@@ -535,13 +535,28 @@
     <!-- Accordion Single -->
     <section id="accordion-single-section">
       <h2>Accordion (Single)</h2>
-      <div id="accordion-single"></div>
+      <!-- The host is not the accordion: the component's own element carries
+           the id, so assertions land on the element that has the role and the
+           orientation, not on a wrapper. -->
+      <div id="accordion-single-host"></div>
     </section>
 
     <!-- Accordion Multiple -->
     <section id="accordion-multiple-section">
       <h2>Accordion (Multiple)</h2>
-      <div id="accordion-multiple"></div>
+      <div id="accordion-multiple-host"></div>
+    </section>
+
+    <!-- Accordion Horizontal -->
+    <section id="accordion-horizontal-section">
+      <h2>Accordion (Horizontal)</h2>
+      <div id="accordion-horizontal-host"></div>
+    </section>
+
+    <!-- Accordion Collapsible -->
+    <section id="accordion-collapsible-section">
+      <h2>Accordion (Collapsible)</h2>
+      <div id="accordion-collapsible-host"></div>
     </section>
 
     <!-- AlertDialog -->
@@ -771,9 +786,17 @@
       })(document.getElementById('switch-disabled'))
 
       // ==================== Accordion Single ====================
+      // Each instance gets its own id prefix, so the ids are predictable per
+      // accordion (`accordion-trigger-1`) instead of depending on how many
+      // accordions happen to be rendered before it.
       accordion({
+        id: 'accordion-single',
+        idPrefix: 'accordion',
         type: 'single',
         collapsible: false,
+        // Single mode starts with the first item open, so the specs have
+        // expanded/collapsed cases side by side.
+        defaultValue: 'item1',
         class: 'accordion',
         itemClass: 'accordion-item',
         headerClass: 'accordion-header',
@@ -789,11 +812,13 @@
             disabled: true
           }
         ]
-      })(document.getElementById('accordion-single'))
+      })(document.getElementById('accordion-single-host'))
 
       // ==================== Accordion Multiple ====================
       accordion({
+        idPrefix: 'accordion-multi',
         type: 'multiple',
+        defaultValue: ['item1', 'item2'],
         class: 'accordion',
         itemClass: 'accordion-item',
         headerClass: 'accordion-header',
@@ -811,7 +836,38 @@
             content: 'Content for multi item 2'
           }
         ]
-      })(document.getElementById('accordion-multiple'))
+      })(document.getElementById('accordion-multiple-host'))
+
+      // ==================== Accordion Horizontal ====================
+      accordion({
+        idPrefix: 'accordion-horizontal',
+        orientation: 'horizontal',
+        class: 'accordion',
+        itemClass: 'accordion-item',
+        headerClass: 'accordion-header',
+        triggerClass: 'accordion-trigger',
+        contentClass: 'accordion-content',
+        items: [
+          { value: 'item1', label: 'H Item 1', content: 'Content for h item 1' },
+          { value: 'item2', label: 'H Item 2', content: 'Content for h item 2' }
+        ]
+      })(document.getElementById('accordion-horizontal-host'))
+
+      // ==================== Accordion Collapsible ====================
+      accordion({
+        idPrefix: 'accordion-collapsible',
+        type: 'single',
+        collapsible: true,
+        defaultValue: 'item1',
+        class: 'accordion',
+        itemClass: 'accordion-item',
+        headerClass: 'accordion-header',
+        triggerClass: 'accordion-trigger',
+        contentClass: 'accordion-content',
+        items: [
+          { value: 'item1', label: 'C Item 1', content: 'Content for c item 1' }
+        ]
+      })(document.getElementById('accordion-collapsible-host'))
 
       // ==================== AlertDialog ====================
       {

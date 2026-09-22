@@ -48,6 +48,16 @@ export interface AccordionItemContext {
 
 export interface AccordionRootProps {
   type: AccordionType
+  /** Id for the accordion element itself. */
+  id?: string
+  /**
+   * Prefix for the ids of this instance's headers, triggers and panels.
+   *
+   * Defaults to a generated prefix, so two accordions on a page can never
+   * collide. Pass one when the ids have to be predictable (a test fixture, a
+   * stylesheet, an existing anchor).
+   */
+  idPrefix?: string
   collapsible?: boolean
   defaultValue?: PropValue<string | string[]>
   value?: PropValue<string | string[]>
@@ -188,30 +198,33 @@ export function createAccordionRoot(): (
       isGroupDisabled: isDisabled,
       loop: true
     })
-    const triggerIds = new Map<string, string>()
-    const headerIds = new Map<string, string>()
-    const contentIds = new Map<string, string>()
+    // Ids are `<prefix>-<kind>-<position>`, where the position counts every
+    // item (disabled ones hold their place). Per-instance instead of a global
+    // counter, so the ids of one accordion do not shift when another one is
+    // rendered elsewhere on the page.
+    const idPrefix = props?.idPrefix ?? generateId('accordion')
 
-    const getTriggerId = (itemValue: string): string => {
-      if (!triggerIds.has(itemValue)) {
-        triggerIds.set(itemValue, generateId('accordion-trigger'))
+    const idFactory = (kind: 'trigger' | 'header' | 'content') => {
+      const cache = new Map<string, string>()
+      return (itemValue: string): string => {
+        let id = cache.get(itemValue)
+        if (id === undefined) {
+          const at = roving.valueIndex(itemValue)
+          // An item that has not registered yet cannot be numbered; fall back
+          // to a unique id rather than emitting `-0`.
+          id =
+            at === -1
+              ? generateId(`${idPrefix}-${kind}`)
+              : `${idPrefix}-${kind}-${at + 1}`
+          cache.set(itemValue, id)
+        }
+        return id
       }
-      return triggerIds.get(itemValue)!
     }
 
-    const getHeaderId = (itemValue: string): string => {
-      if (!headerIds.has(itemValue)) {
-        headerIds.set(itemValue, generateId('accordion-header'))
-      }
-      return headerIds.get(itemValue)!
-    }
-
-    const getContentId = (itemValue: string): string => {
-      if (!contentIds.has(itemValue)) {
-        contentIds.set(itemValue, generateId('accordion-content'))
-      }
-      return contentIds.get(itemValue)!
-    }
+    const getTriggerId = idFactory('trigger')
+    const getHeaderId = idFactory('header')
+    const getContentId = idFactory('content')
 
     const isOpen = (itemValue: string): boolean => {
       const value = current()
@@ -276,6 +289,7 @@ export function createAccordionRoot(): (
     const getContext = (): AccordionContext => context
 
     return div({
+      id: props?.id,
       'data-orientation': orientation,
       'data-disabled': () => (isDisabled() ? '' : undefined),
       class: props?.class,
@@ -303,11 +317,14 @@ export function createAccordionItem(): (
 
     const ctx = getContext?.()
     const itemDisabled = props.disabled ?? false
-    const headerId =
-      ctx?.getHeaderId(props.value) ?? generateId('accordion-header')
 
     // Items announce themselves (value + disabled flag); no element needed.
+    // This happens before the ids below, because an id encodes the item's
+    // position in the group.
     ctx?.registerItem(props.value, itemDisabled)
+
+    const headerId =
+      ctx?.getHeaderId(props.value) ?? generateId('accordion-header')
 
     const itemContext: AccordionItemContext = {
       value: props.value,
@@ -493,6 +510,8 @@ export function createAccordion(): (
 
   return (props) =>
     Root({
+      id: props?.id,
+      idPrefix: props?.idPrefix,
       type: props?.type ?? 'single',
       collapsible: props?.collapsible,
       defaultValue: props?.defaultValue,

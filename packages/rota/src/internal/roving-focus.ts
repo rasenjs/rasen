@@ -27,6 +27,12 @@ export interface RovingFocus<T extends HTMLElement = HTMLElement> {
   enabledValues: () => string[]
   /** Position of a value among the enabled items, or -1. */
   indexOf: (value: string) => number
+  /**
+   * Position among *all* registered items, or -1. This is the one to use for
+   * naming, because a disabled item still occupies a position and still needs
+   * a stable identity (`indexOf` skips it, so it would shift the numbering).
+   */
+  valueIndex: (value: string) => number
   /** Focus the n-th enabled item. */
   focusItem: (index: number) => void
   /**
@@ -93,6 +99,7 @@ export function createRovingFocus<T extends HTMLElement = HTMLElement>(
   }
 
   const indexOf = (value: string): number => enabledValues().indexOf(value)
+  const valueIndex = (value: string): number => stated.indexOf(value)
 
   const handleArrows = (
     event: KeyboardEvent,
@@ -146,6 +153,7 @@ export function createRovingFocus<T extends HTMLElement = HTMLElement>(
     },
     enabledValues,
     indexOf,
+    valueIndex,
     focusItem,
     resolveIndex,
     handleArrows

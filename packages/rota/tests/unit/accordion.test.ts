@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime } from '@rasenjs/reactive-vue'
+import { div } from '@rasenjs/web/elements'
 import {
   createAccordionRoot,
   createAccordionItem,
@@ -166,6 +167,8 @@ describe('@rasenjs/rota - Accordion', () => {
       const Item = createAccordionItem()
       const Header = createAccordionHeader()
 
+      let announcedHeaderId: string | undefined
+
       Root({
         type: 'single',
         defaultValue: 'item-1',
@@ -173,8 +176,10 @@ describe('@rasenjs/rota - Accordion', () => {
           Item(
             {
               value: 'item-1',
-              children: (getContext2, getItemContext) =>
-                Header({}, getContext2, getItemContext)
+              children: (getContext2, getItemContext) => {
+                announcedHeaderId = getItemContext()?.headerId
+                return Header({}, getContext2, getItemContext)
+              }
             },
             getContext
           )
@@ -182,7 +187,136 @@ describe('@rasenjs/rota - Accordion', () => {
 
       const header = container.querySelector('h3')
       expect(header?.id).toBeTruthy()
-      expect(header?.id).toContain('accordion-header')
+      // The header renders the id the item announced the moment it mounted.
+      // That equality is what lets the panel's aria-labelledby point at it.
+      expect(header?.id).toBe(announcedHeaderId)
+    })
+
+    it('should name ids from the instance prefix and the item position', () => {
+      const container = document.createElement('div')
+      const Root = createAccordionRoot()
+      const Item = createAccordionItem()
+      const Header = createAccordionHeader()
+      const Trigger = createAccordionTrigger()
+
+      Root({
+        type: 'single',
+        idPrefix: 'demo',
+        children: (getContext) =>
+          div({
+            children: ['a', 'b'].map((value, index) =>
+              Item(
+                {
+                  value,
+                  children: (getContext2, getItemContext) =>
+                    Header(
+                      {
+                        children: () =>
+                          Trigger({}, getContext2, getItemContext)
+                      },
+                      getContext2,
+                      getItemContext
+                    )
+                },
+                getContext
+              )
+            )
+          })
+      })(container)
+
+      const triggers = container.querySelectorAll('button')
+      expect(triggers[0]?.id).toBe('demo-trigger-1')
+      expect(triggers[1]?.id).toBe('demo-trigger-2')
+      expect(container.querySelector('h3')?.id).toBe('demo-header-1')
+    })
+
+    it('should number a disabled item in place instead of skipping it', () => {
+      const container = document.createElement('div')
+      const Root = createAccordionRoot()
+      const Item = createAccordionItem()
+      const Header = createAccordionHeader()
+      const Trigger = createAccordionTrigger()
+
+      Root({
+        type: 'single',
+        idPrefix: 'demo',
+        children: (getContext) =>
+          div({
+            // The disabled item is second, so the third item is number 3 -
+            // skipping the disabled one would renumber it to 2 and move the
+            // id out from under anything referring to it.
+            children: ['a', 'b', 'c'].map((value, index) =>
+              Item(
+                {
+                  value,
+                  disabled: index === 1,
+                  children: (getContext2, getItemContext) =>
+                    Header(
+                      {
+                        children: () => Trigger({}, getContext2, getItemContext)
+                      },
+                      getContext2,
+                      getItemContext
+                    )
+                },
+                getContext
+              )
+            )
+          })
+      })(container)
+
+      const triggers = container.querySelectorAll('button')
+      expect(triggers[0]?.id).toBe('demo-trigger-1')
+      // Disabled, but still number 2.
+      expect(triggers[1]?.id).toBe('demo-trigger-2')
+      expect(triggers[2]?.id).toBe('demo-trigger-3')
+    })
+
+    it('should not share ids between two accordions', () => {
+      const first = document.createElement('div')
+      const second = document.createElement('div')
+      const Root = createAccordionRoot()
+      const Item = createAccordionItem()
+      const Header = createAccordionHeader()
+      const Trigger = createAccordionTrigger()
+
+      const render = (container: HTMLElement) =>
+        Root({
+          type: 'single',
+          // No idPrefix: each instance has to invent its own, or the ids of
+          // two accordions on one page would collide.
+          children: (getContext) =>
+            Item(
+              {
+                value: 'only',
+                children: (getContext2, getItemContext) =>
+                  Header(
+                    {
+                      children: () => Trigger({}, getContext2, getItemContext)
+                    },
+                    getContext2,
+                    getItemContext
+                  )
+              },
+              getContext
+            )
+        })(container)
+
+      render(first)
+      render(second)
+
+      const a = first.querySelector('button')?.id
+      const b = second.querySelector('button')?.id
+      expect(a).toBeTruthy()
+      expect(b).toBeTruthy()
+      expect(a).not.toBe(b)
+    })
+
+    it('should put the id prop on the root element', () => {
+      const container = document.createElement('div')
+      createAccordionRoot()({ type: 'single', id: 'my-accordion' })(container)
+
+      expect(container.querySelector('#my-accordion')).toBeTruthy()
     })
   })
 
