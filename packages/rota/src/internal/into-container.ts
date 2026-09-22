@@ -29,13 +29,21 @@
  *   the server, so `() => document.getElementById(...)` is safe to write, and
  *   the component does not need a second output target.
  *
+ * **One rule, every part that renders out of flow.** Any part whose element is
+ * a layer or an overlay - dialog and alert-dialog content and overlay, popover
+ * and tooltip content - accepts the same prop with the same meaning. A part
+ * that positions itself against its trigger (popover, tooltip) is not excepted:
+ * the prop means the same thing there, and the positioning consequence below is
+ * the application's to handle. Special-casing which components get it would
+ * make the API unpredictable, which costs more than the case it saves.
+ *
  * The contract this creates belongs to the application, and it is the price of
  * not hiding the decision in a provider:
  *
  * 1. the container is the application's element, and the part is no longer a
  *    descendant of its component - so ancestor-scoped CSS no longer matches it
- * 2. for a part that positions against its trigger, the container becomes the
- *    positioning context
+ * 2. the container becomes the part's positioning context, so a part that
+ *    positions against its trigger needs the application to position it
  * 3. if the container cannot be resolved when the part mounts (for example the
  *    application has not hydrated it yet), the part stays inline - which is the
  *    default behaviour, not a broken state
@@ -46,6 +54,19 @@
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { readProp } from './props'
 import type { ElementRef } from './element-ref'
+
+/**
+ * The escape hatch, declared once.
+ *
+ * Every out-of-flow part extends this, so the prop cannot drift between
+ * components - and its documentation lives in exactly one place (the file
+ * comment above), rather than being restated per component with the risk of
+ * describing it differently.
+ */
+export interface ContainerProp {
+  /** See the file comment: render this part into an element of your choosing. */
+  container?: PropValue<HTMLElement | null>
+}
 
 export function intoContainer(
   node: Mountable<HTMLElement>,

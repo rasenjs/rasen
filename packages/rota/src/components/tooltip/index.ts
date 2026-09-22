@@ -32,6 +32,10 @@ import { span } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
 import { toMountables } from '../../internal/children'
 import { createElementRef } from '../../internal/element-ref'
+import {
+  intoContainer,
+  type ContainerProp
+} from '../../internal/into-container'
 import { createDismissableLayer } from '../../internal/dismissable-layer'
 import { withCleanup } from '../../internal/with-cleanup'
 import type { PopoverAlign, PopoverSide } from '../popover'
@@ -97,7 +101,7 @@ export interface TooltipTriggerProps {
   children?: () => Mountable<HTMLElement>
 }
 
-export interface TooltipContentProps {
+export interface TooltipContentProps extends ContainerProp {
   id?: string
   /** Default `top`. */
   side?: TooltipSide
@@ -353,12 +357,16 @@ export function createTooltipContent(): (
     const side = props?.side ?? 'top'
     const align = props?.align ?? 'center'
 
+    const rt = getReactiveRuntime()
+    const contentRef = createElementRef<HTMLSpanElement>(rt)
+
     const contentId = props?.id ?? generateId('tooltip-content')
     ctx?.setContentId(contentId)
 
-    return span({
+    const content = span({
       id: contentId,
       role: 'tooltip',
+      ref: contentRef,
       'data-state': () => (ctx?.open ? 'open' : 'closed'),
       'data-side': side,
       'data-align': align,
@@ -374,6 +382,8 @@ export function createTooltipContent(): (
       },
       children: props?.children ? [props.children()] : undefined
     })
+
+    return intoContainer(content, contentRef, props?.container)
   }
   return com(component)
 }

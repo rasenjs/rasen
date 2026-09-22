@@ -19,7 +19,10 @@ import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, h2, p } from '@rasenjs/web/elements'
 import { createElementRef } from '../../internal/element-ref'
-import { intoContainer } from '../../internal/into-container'
+import {
+  intoContainer,
+  type ContainerProp
+} from '../../internal/into-container'
 import { readProp } from '../../internal/props'
 import { createFocusScope } from '../../internal/focus-scope'
 import { createDismissableLayer } from '../../internal/dismissable-layer'
@@ -59,20 +62,7 @@ export interface DialogTriggerProps {
   children?: () => Mountable<HTMLElement>
 }
 
-export interface DialogContentProps {
-  /**
-   * Render this part into an element of the application's choosing instead of
-   * where it sits, for the cases the inline position cannot survive: an
-   * ancestor with `transform`, `filter` or `contain` becomes the containing
-   * block for a `fixed` layer, and `overflow` clips it.
-   *
-   * Not a Portal layer - see `internal/into-container.ts` for why, and for the
-   * contract it puts on the application (the container is not a descendant of
-   * the component, so ancestor-scoped CSS stops matching, and it becomes the
-   * positioning context). Resolved lazily, and never on the server, so
-   * `() => document.getElementById('overlay-root')` is safe to write.
-   */
-  container?: PropValue<HTMLElement | null>
+export interface DialogContentProps extends ContainerProp {
   id?: string
   class?: string
   style?: Record<string, string | number> | string
@@ -118,20 +108,7 @@ export interface DialogCloseProps {
   children?: () => Mountable<HTMLElement>
 }
 
-export interface DialogOverlayProps {
-  /**
-   * Render this part into an element of the application's choosing instead of
-   * where it sits, for the cases the inline position cannot survive: an
-   * ancestor with `transform`, `filter` or `contain` becomes the containing
-   * block for a `fixed` layer, and `overflow` clips it.
-   *
-   * Not a Portal layer - see `internal/into-container.ts` for why, and for the
-   * contract it puts on the application (the container is not a descendant of
-   * the component, so ancestor-scoped CSS stops matching, and it becomes the
-   * positioning context). Resolved lazily, and never on the server, so
-   * `() => document.getElementById('overlay-root')` is safe to write.
-   */
-  container?: PropValue<HTMLElement | null>
+export interface DialogOverlayProps extends ContainerProp {
   id?: string
   class?: string
   style?: Record<string, string | number> | string

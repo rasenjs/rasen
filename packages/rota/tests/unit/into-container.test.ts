@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { div } from '@rasenjs/web/elements'
-import { dialog } from '@rasenjs/rota'
+import { dialog, popover, tooltip } from '@rasenjs/rota'
 import type { PropValue } from '@rasenjs/core'
 
 let root: HTMLElement
@@ -141,5 +141,94 @@ describe('@rasenjs/rota - container', () => {
     await flush()
 
     expect(panel().parentElement).toBe(target)
+  })
+
+  // The same rule on the parts that position against their trigger. They are
+  // not excepted: the prop means the same thing, and the positioning
+  // consequence is the application's - special-casing which components get it
+  // would make the API unpredictable.
+  describe('the anchored parts', () => {
+    function mountPopover(container?: PropValue<HTMLElement | null>) {
+      const { Root, Trigger, Content } = popover
+      const unmount = Root({
+        id: 'pop-root',
+        defaultOpen: true,
+        children: (getContext) => [
+          Trigger({ id: 'pop-trigger' }, getContext),
+          Content(
+            { id: 'pop-panel', container, children: () => 'panel' },
+            getContext
+          )
+        ]
+      })(root)
+      mounted.push(unmount)
+      return document.getElementById('pop-panel')!
+    }
+
+    function mountTooltip(container?: PropValue<HTMLElement | null>) {
+      const { Root, Trigger, Content } = tooltip
+      const unmount = Root({
+        id: 'tip-root',
+        defaultOpen: true,
+        delayMs: 0,
+        children: (getContext) => [
+          Trigger({ id: 'tip-trigger' }, getContext),
+          Content(
+            { id: 'tip-panel', container, children: () => 'tip' },
+            getContext
+          )
+        ]
+      })(root)
+      mounted.push(unmount)
+      return document.getElementById('tip-panel')!
+    }
+
+    it('should render a popover panel in the container', async () => {
+      const panel = mountPopover(() => target)
+      await flush()
+
+      expect(panel.parentElement).toBe(target)
+      expect(root.contains(panel)).toBe(false)
+      // Moved, not copied.
+      expect(document.querySelectorAll('#pop-panel').length).toBe(1)
+    })
+
+    it('should render a tooltip in the container', async () => {
+      const panel = mountTooltip(() => target)
+      await flush()
+
+      expect(panel.parentElement).toBe(target)
+      expect(root.contains(panel)).toBe(false)
+      expect(document.querySelectorAll('#tip-panel').length).toBe(1)
+    })
+
+    it('should leave the anchored parts in place without a container', async () => {
+      const panel = mountPopover()
+      const tip = mountTooltip()
+      await flush()
+
+      expect(root.contains(panel)).toBe(true)
+      expect(root.contains(tip)).toBe(true)
+      expect(target.children.length).toBe(0)
+    })
+
+    it('should keep a relocated popover panel under the layer', async () => {
+      const panel = mountPopover(() => target)
+      await flush()
+      expect(isOpen(panel)).toBe(true)
+
+      // The dismissable layer follows the element, so an outside press still
+      // closes it - which is what would break if the move changed identity or
+      // detached the listeners.
+      const outside = document.createElement('button')
+      document.body.appendChild(outside)
+      outside.dispatchEvent(
+        new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+      )
+      await flush()
+
+      expect(isOpen(panel)).toBe(false)
+      outside.remove()
+    })
   })
 })

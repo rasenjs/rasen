@@ -29,6 +29,10 @@ import { com, getReactiveRuntime } from '@rasenjs/core'
 import { button, div } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
 import { toMountables, type ChildSlot } from '../../internal/children'
+import {
+  intoContainer,
+  type ContainerProp
+} from '../../internal/into-container'
 import { createElementRef } from '../../internal/element-ref'
 import { createFocusScope } from '../../internal/focus-scope'
 import { createDismissableLayer } from '../../internal/dismissable-layer'
@@ -73,7 +77,7 @@ export interface PopoverTriggerProps {
   children?: () => Mountable<HTMLElement>
 }
 
-export interface PopoverContentProps {
+export interface PopoverContentProps extends ContainerProp {
   id?: string
   /** Default `bottom`. */
   side?: PopoverSide
@@ -362,7 +366,7 @@ export function createPopoverContent(): (
       children: props?.children ? [props.children()] : undefined
     })
 
-    return withCleanup(content, () => {
+    return withCleanup(intoContainer(content, contentRef, props?.container), () => {
       // Unconditional teardown: whatever state the signals are in, listeners
       // must not outlive the element.
       layer.deactivate()
