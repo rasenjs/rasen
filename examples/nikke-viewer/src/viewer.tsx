@@ -1346,7 +1346,18 @@ const Stage = com(() => (
       // camera, so the model is never revealed mis-framed and then corrected.
       condition: () => !loaded.value || framing.value,
       then: () => (
-        <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-neutral-500 pointer-events-none transition">
+        // The overlay has to be OPAQUE. It used to be a bare positioned div with an
+        // icon and a label and no background, which made it a label ON TOP of the
+        // canvas rather than a cover over it — the character stayed visible through
+        // it, so hiding the fit behind it hid nothing. Verified by reading the
+        // element's computed background: none.
+        //
+        // The background is the same colour the canvas paints its own backdrop
+        // with, so revealing the canvas is seamless rather than a colour pop.
+        <div
+          class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-neutral-500 pointer-events-none transition"
+          style={() => ({ background: bg.value })}
+        >
           {iconUser()}
           <p>{text({ content: () => (framing.value ? '' : status.value || 'Select a character to begin') })}</p>
         </div>
