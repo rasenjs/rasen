@@ -510,16 +510,18 @@
     <!-- Checkbox -->
     <section id="checkbox-section">
       <h2>Checkbox</h2>
+      <!-- The host only positions the component; the component's own element
+           carries the id the specs address (it is the one with the role). -->
       <label id="checkbox-unchecked" class="checkbox">
-        <div id="checkbox-root-1"></div>
+        <div id="checkbox-host-1"></div>
         <span>Unchecked</span>
       </label>
       <label id="checkbox-checked" class="checkbox">
-        <div id="checkbox-root-2"></div>
+        <div id="checkbox-host-2"></div>
         <span>Checked</span>
       </label>
       <label id="checkbox-disabled" class="checkbox">
-        <div id="checkbox-root-3"></div>
+        <div id="checkbox-host-3"></div>
         <span>Disabled</span>
       </label>
     </section>
@@ -527,9 +529,9 @@
     <!-- Switch -->
     <section id="switch-section">
       <h2>Switch</h2>
-      <div id="switch-off"></div>
-      <div id="switch-on"></div>
-      <div id="switch-disabled"></div>
+      <div id="switch-host-off"></div>
+      <div id="switch-host-on"></div>
+      <div id="switch-host-disabled"></div>
     </section>
 
     <!-- Accordion Single -->
@@ -751,39 +753,45 @@
 
       // ==================== Checkbox ====================
       checkbox({
+        id: 'checkbox-root-1',
         class: 'checkbox-root',
         indicatorClass: 'checkbox-indicator'
-      })(document.getElementById('checkbox-root-1'))
+      })(document.getElementById('checkbox-host-1'))
 
       checkbox({
+        id: 'checkbox-root-2',
         defaultChecked: true,
         class: 'checkbox-root',
         indicatorClass: 'checkbox-indicator'
-      })(document.getElementById('checkbox-root-2'))
+      })(document.getElementById('checkbox-host-2'))
 
       checkbox({
+        id: 'checkbox-root-3',
         disabled: true,
         class: 'checkbox-root',
         indicatorClass: 'checkbox-indicator'
-      })(document.getElementById('checkbox-root-3'))
+      })(document.getElementById('checkbox-host-3'))
 
       // ==================== Switch ====================
       switchRoot({
+        id: 'switch-off',
         class: 'switch',
         thumbClass: 'switch-thumb'
-      })(document.getElementById('switch-off'))
+      })(document.getElementById('switch-host-off'))
 
       switchRoot({
+        id: 'switch-on',
         defaultChecked: true,
         class: 'switch',
         thumbClass: 'switch-thumb'
-      })(document.getElementById('switch-on'))
+      })(document.getElementById('switch-host-on'))
 
       switchRoot({
+        id: 'switch-disabled',
         disabled: true,
         class: 'switch',
         thumbClass: 'switch-thumb'
-      })(document.getElementById('switch-disabled'))
+      })(document.getElementById('switch-host-disabled'))
 
       // ==================== Accordion Single ====================
       // Each instance gets its own id prefix, so the ids are predictable per

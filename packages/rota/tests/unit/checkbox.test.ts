@@ -219,7 +219,7 @@ describe('@rasenjs/rota - Checkbox', () => {
       expect(changedValue).toBe(true)
     })
 
-    it('should cycle through unchecked -> checked -> indeterminate -> unchecked', () => {
+    it('should toggle between unchecked and checked', () => {
       const container = document.createElement('div')
       const Root = createCheckboxRoot()
       const Indicator = createCheckboxIndicator()
@@ -234,13 +234,34 @@ describe('@rasenjs/rota - Checkbox', () => {
       btn?.click()
       expect(btn?.getAttribute('data-state')).toBe('checked')
 
-      // checked -> indeterminate
-      btn?.click()
-      expect(btn?.getAttribute('data-state')).toBe('indeterminate')
-
-      // indeterminate -> unchecked
+      // checked -> unchecked. Never `indeterminate`: a click cannot invent a
+      // partial selection.
       btn?.click()
       expect(btn?.getAttribute('data-state')).toBe('unchecked')
+
+      btn?.click()
+      expect(btn?.getAttribute('data-state')).toBe('checked')
+    })
+
+    it('should resolve an indeterminate checkbox to checked on click', () => {
+      const container = document.createElement('div')
+      const Root = createCheckboxRoot()
+      const Indicator = createCheckboxIndicator()
+
+      Root({
+        defaultChecked: 'indeterminate',
+        children: (getContext) => Indicator({}, getContext)
+      })(container)
+
+      const btn = container.querySelector('button')
+      expect(btn?.getAttribute('data-state')).toBe('indeterminate')
+
+      btn?.click()
+
+      // Mixed means "some children are checked", so a click settles it on
+      // checked rather than clearing it.
+      expect(btn?.getAttribute('data-state')).toBe('checked')
+      expect(btn?.getAttribute('aria-checked')).toBe('true')
     })
 
     it('should handle Space key to toggle', () => {

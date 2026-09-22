@@ -75,15 +75,15 @@ export function createCheckboxRoot(): (
     const toggle = (): void => {
       if (isDisabled()) return
 
-      const cur = current()
-      let newValue: CheckboxCheckedState
-      if (cur === false) {
-        newValue = true
-      } else if (cur === true) {
-        newValue = 'indeterminate'
-      } else {
-        newValue = false
-      }
+      // A click toggles between checked and unchecked only.
+      //
+      // `indeterminate` means "partially selected" (a parent whose children
+      // disagree), so it is a state the consumer reports - not one a click may
+      // produce. Cycling into it made two clicks on a plain checkbox leave it
+      // `mixed`, which reads as partial selection when the user has only been
+      // toggling. Clicking a mixed checkbox resolves it to checked, matching
+      // both the native control and the ARIA convention.
+      const newValue: CheckboxCheckedState = current() === true ? false : true
 
       if (!isControlled) {
         rt.setValue(internal, newValue)
@@ -190,6 +190,7 @@ export function createCheckbox(): (
 
   return (props) =>
     Root({
+      id: props?.id,
       checked: props?.checked,
       defaultChecked: props?.defaultChecked,
       disabled: props?.disabled,

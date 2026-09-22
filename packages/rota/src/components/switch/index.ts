@@ -91,6 +91,10 @@ export function createSwitchRoot(): (
       'aria-required': () => (readProp(props?.required, false) ? 'true' : undefined),
       'data-state': () => (isChecked() ? 'checked' : 'unchecked'),
       'data-disabled': () => (isDisabled() ? '' : undefined),
+      // A disabled switch is taken out of the tab order explicitly, matching
+      // the checkbox - relying on the native `disabled` alone leaves the
+      // attribute off, so nothing can assert the tab order.
+      tabIndex: () => (isDisabled() ? -1 : 0),
       disabled: () => isDisabled(),
       name: props?.name,
       value: props?.value,
