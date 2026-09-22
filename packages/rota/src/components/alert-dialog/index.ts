@@ -315,7 +315,19 @@ export function createAlertDialogContent(): (
           leave()
         }
       }
-      rt.subscribe(() => (contentRef.value ? ctx.open : false), sync)
+      // Read *both* sources unconditionally, including on the evaluation that
+      // collects dependencies. A subscription only tracks what its getter
+      // reads when it is created, so a short-circuiting getter -
+      // `contentRef.value ? ctx.open : false` - never tracks `ctx.open`: the
+      // ref is still null at this point (the panel is built just below), so
+      // the getter returns early, and the subscription then never hears about
+      // the dialog opening. `enter()` would never run, taking initial focus,
+      // the focus trap and Escape with it.
+      rt.subscribe(() => {
+        const panelMounted = !!contentRef.value
+        const isOpen = !!ctx.open
+        return panelMounted && isOpen
+      }, sync)
       sync()
     }
 

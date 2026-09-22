@@ -55,15 +55,46 @@ afterAll(() => {
 
 describe('@rasenjs/rota - server rendering with a static runtime', () => {
   /**
-   * Ids come from a process-wide counter (they have to be unique per document),
-   * so two render passes never match literally. Normalizing them is what makes
+   * Generated identifiers never match between two render passes (they have to
+   * be unique per document), so they are normalized away, which is what makes
    * the comparison about markup instead of about which pass ran first.
+   *
+   * Only the *values of id-referencing attributes* are rewritten. A blanket
+   * "replace digit runs" rule would also flatten `aria-level="3"` or
+   * `tabindex="-1"`, and those have to keep their real values for this
+   * comparison to be able to catch a genuine difference. The digits are
+   * replaced anywhere inside the value, not just at the end: an id is built
+   * from an instance prefix and a position (`accordion-1-header-2`), so a
+   * counter can sit in the middle.
    */
+  const normalizeIds = (markup: string): string =>
+    markup.replace(
+      /\b(id|for|aria-controls|aria-labelledby|aria-describedby|aria-owns|aria-activedescendant)="([^"]*)"/g,
+      (_match, attribute: string, value: string) =>
+        `${attribute}="${value.replace(/\d+/g, 'N')}"`
+    )
+
   const markupOf = (): string =>
-    Object.values(demos)
-      .map((demo) => renderToString(demo.build()))
-      .join('\n')
-      .replace(/-\d+"/g, '-N"')
+    normalizeIds(
+      Object.values(demos)
+        .map((demo) => renderToString(demo.build()))
+        .join('\n')
+    )
+
+  it('should flatten generated ids without flattening meaning', () => {
+    // Ids that differ only in their generated parts must normalize equal...
+    expect(normalizeIds('<b id="x-9" aria-controls="x-9-content-1">')).toBe(
+      normalizeIds('<b id="x-4" aria-controls="x-4-content-7">')
+    )
+    // ...while attributes that carry meaning must survive normalization, or
+    // this suite would be hiding exactly the differences it exists to catch.
+    expect(normalizeIds('<b tabindex="-1" aria-level="3" data-state="open">')).not.toBe(
+      normalizeIds('<b tabindex="-1" aria-level="3" data-state="closed">')
+    )
+    expect(normalizeIds('<b aria-expanded="true">')).not.toBe(
+      normalizeIds('<b aria-expanded="false">')
+    )
+  })
 
   it('should produce the same markup as the interactive runtime', () => {
     useReactiveRuntime()
