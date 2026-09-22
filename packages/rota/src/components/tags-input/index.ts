@@ -361,6 +361,10 @@ export function createTagsInputItem(): (
       'data-index': String(index),
       'aria-selected': () => String(isSelected()),
       'data-state': () => (isSelected() ? 'selected' : 'unselected'),
+      // Present/absent flag for styling, the same shape as `data-disabled`:
+      // a rule can select on the attribute's presence without knowing the
+      // state vocabulary.
+      'data-selected': () => (isSelected() ? '' : undefined),
       tabIndex: -1,
       class: props?.class,
       style: props?.style,

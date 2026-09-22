@@ -3,6 +3,11 @@ import { test, expect } from '@playwright/test'
 /**
  * PinInput in a real browser.
  *
+ * These drive `#pininput-six`, the explicitly six-cell demo: several
+ * assertions depend on a cell existing after the fourth (`nth(4)`), which the
+ * four-cell field - the component's own default, which `#pininput-default`
+ * uses - cannot provide.
+ *
  * Unlike the unit tests, this uses real `type` and real clipboard-less typing,
  * so it checks the behaviour that depends on a real selection and a real cursor:
  * characters land in the cell they were typed into, and focus moves on by
@@ -15,7 +20,7 @@ test.describe('PinInput', () => {
 
   test.describe('rendering', () => {
     test('should render one input per digit', async ({ page }) => {
-      const inputs = page.locator('#pininput-default input')
+      const inputs = page.locator('#pininput-six input')
       await expect(inputs).toHaveCount(6)
     })
 
@@ -27,7 +32,7 @@ test.describe('PinInput', () => {
     })
 
     test('should start empty otherwise', async ({ page }) => {
-      const inputs = page.locator('#pininput-default input')
+      const inputs = page.locator('#pininput-six input')
       const count = await inputs.count()
       for (let i = 0; i < count; i++) {
         await expect(inputs.nth(i)).toHaveValue('')
@@ -46,7 +51,7 @@ test.describe('PinInput', () => {
     test('should mark the group as a single labelled field', async ({
       page
     }) => {
-      const inputs = page.locator('#pininput-default input')
+      const inputs = page.locator('#pininput-six input')
       // Each cell is part of one logical input for assistive technology.
       await expect(inputs.nth(0)).toHaveAttribute('inputmode', 'numeric')
     })
@@ -54,7 +59,7 @@ test.describe('PinInput', () => {
 
   test.describe('typing', () => {
     test('should fill a cell and move to the next', async ({ page }) => {
-      const inputs = page.locator('#pininput-default input')
+      const inputs = page.locator('#pininput-six input')
       await inputs.nth(0).click()
       await page.keyboard.type('7')
 
@@ -64,7 +69,7 @@ test.describe('PinInput', () => {
     })
 
     test('should fill several cells in sequence', async ({ page }) => {
-      const inputs = page.locator('#pininput-default input')
+      const inputs = page.locator('#pininput-six input')
       await inputs.nth(0).click()
       await page.keyboard.type('1234')
 

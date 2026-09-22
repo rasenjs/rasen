@@ -255,8 +255,22 @@ test.describe('PinInput Component (Framework Rendered)', () => {
       const container = page.locator('#pininput-default')
       const inputs = container.locator('.pininput-input')
 
-      // Paste 4-digit code
-      await inputs.nth(0).fill('1234')
+      // A real paste, not `fill()`: fill() assigns the value and fires a single
+      // `input` event, which is the "one character typed" path - the cell
+      // rejects a multi-character value, so nothing is distributed. Pasting is
+      // a separate event carrying a clipboard payload, which is what the
+      // component listens for.
+      await inputs.nth(0).evaluate((el, text) => {
+        const transfer = new DataTransfer()
+        transfer.setData('text/plain', text)
+        el.dispatchEvent(
+          new ClipboardEvent('paste', {
+            clipboardData: transfer,
+            bubbles: true,
+            cancelable: true
+          })
+        )
+      }, '1234')
 
       await expect(inputs.nth(0)).toHaveValue('1')
       await expect(inputs.nth(1)).toHaveValue('2')

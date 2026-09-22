@@ -629,7 +629,11 @@
     <!-- PinInput -->
     <section id="pininput-section">
       <h2>PinInput</h2>
+      <!-- `default` really is the component's default (four cells); `six` is
+           the explicitly configured six-cell field, and `with-value` needs six
+           so the specs can see the cells after the filled ones. -->
       <div id="pininput-default"></div>
+      <div id="pininput-six"></div>
       <div id="pininput-with-value"></div>
       <div id="pininput-numeric"></div>
       <div id="pininput-disabled"></div>
@@ -1180,7 +1184,14 @@
       })(document.getElementById('pininput-default'))
 
       pinInput({
+        length: 6,
+        class: 'pininput',
+        inputClass: 'pininput-input'
+      })(document.getElementById('pininput-six'))
+
+      pinInput({
         defaultValue: '1234',
+        length: 6,
         class: 'pininput',
         inputClass: 'pininput-input'
       })(document.getElementById('pininput-with-value'))
