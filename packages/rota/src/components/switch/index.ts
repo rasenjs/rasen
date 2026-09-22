@@ -11,8 +11,9 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { button, span } from '@rasenjs/web/elements'
+import { button, input, span } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
+import { HIDDEN_INPUT_STYLE } from '../../internal/hidden-input'
 
 export interface SwitchRootProps {
   checked?: PropValue<boolean>
@@ -96,11 +97,31 @@ export function createSwitchRoot(): (
       // attribute off, so nothing can assert the tab order.
       tabIndex: () => (isDisabled() ? -1 : 0),
       disabled: () => isDisabled(),
-      name: props?.name,
-      value: props?.value,
       class: props?.class,
       style: props?.style,
-      children: props?.children ? [props.children(getContext)] : undefined,
+      children: [
+        // Form participation, the same as Checkbox: a real input, because a
+        // `type="button"` never submits and `required` on it would only reach
+        // `aria-required`. `type="checkbox"` is the honest native control for
+        // a boolean value - the switch role is an announcement about
+        // appearance, not a different kind of value.
+        ...(props?.name
+          ? [
+              input({
+                type: 'checkbox',
+                name: props.name,
+                value: props.value,
+                required: props.required,
+                checked: () => isChecked(),
+                disabled: () => isDisabled(),
+                tabIndex: -1,
+                'aria-hidden': 'true',
+                style: HIDDEN_INPUT_STYLE
+              })
+            ]
+          : []),
+        ...(props?.children ? [props.children(getContext)] : [])
+      ],
       onClick: toggle,
       onKeyDown: (e: Event) => {
         const ke = e as KeyboardEvent

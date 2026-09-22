@@ -182,6 +182,27 @@ describe('@rasenjs/rota - Avatar', () => {
       expect(root?.className).toContain('my-avatar')
       expect(root?.style.borderRadius).toBe('50%')
     })
+
+    it('should forward the responsive image attributes to the image', () => {
+      const container = document.createElement('div')
+      const Avatar = createAvatar()
+
+      Avatar({
+        src: 'small.jpg',
+        srcSet: 'small.jpg 1x, large.jpg 2x',
+        sizes: '(min-width: 600px) 48px, 32px',
+        alt: 'Portrait'
+      })(container)
+
+      // The Image part has always accepted these; the preset did not pass them
+      // on, so a consumer going through the preset could not reach responsive
+      // images at all - and nothing failed, because the props were optional.
+      const img = container.querySelector('img')
+      expect(img?.getAttribute('src')).toBe('small.jpg')
+      expect(img?.getAttribute('srcset')).toBe('small.jpg 1x, large.jpg 2x')
+      expect(img?.getAttribute('sizes')).toBe('(min-width: 600px) 48px, 32px')
+      expect(img?.getAttribute('alt')).toBe('Portrait')
+    })
   })
 
   describe('cleanup', () => {

@@ -210,6 +210,13 @@ export function createAvatar(): (props?: {
   /** Id for the avatar container itself. */
   id?: string
   src?: PropValue<string>
+  /**
+   * Forwarded to the image. The part has always accepted these; the preset did
+   * not pass them, so a consumer going through the preset had no way to reach
+   * responsive images at all.
+   */
+  srcSet?: PropValue<string>
+  sizes?: PropValue<string>
   alt?: PropValue<string>
   /**
    * Per-part class hooks. The parts take their own `class`; without these the
@@ -237,6 +244,8 @@ export function createAvatar(): (props?: {
         Image(
           {
             src: props?.src,
+            srcSet: props?.srcSet,
+            sizes: props?.sizes,
             alt: props?.alt,
             class: props?.imageClass,
             onLoadingStatusChange: props?.onLoadingStatusChange

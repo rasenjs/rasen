@@ -7,8 +7,9 @@
  */
 import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
-import { button, span } from '@rasenjs/web/elements'
+import { button, input, span } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
+import { HIDDEN_INPUT_STYLE } from '../../internal/hidden-input'
 
 export type CheckboxCheckedState = boolean | 'indeterminate'
 
@@ -113,11 +114,32 @@ export function createCheckboxRoot(): (
       'aria-required': () =>
         readProp(props?.required, false) ? 'true' : undefined,
       disabled: () => isDisabled(),
-      name: props?.name,
-      value: props?.value,
       class: props?.class,
       style: props?.style,
-      children: props?.children ? [props.children(getContext)] : undefined,
+      children: [
+        // Form participation: a real checkbox input, hidden from view and from
+        // the accessibility tree (the button is the control the user sees).
+        // `name`/`value` used to be set on the button instead, where they were
+        // dead - a `type="button"` is never a submitter - and `required` only
+        // reached `aria-required`, which tells a screen reader about a
+        // requirement the browser would never enforce.
+        ...(props?.name
+          ? [
+              input({
+                type: 'checkbox',
+                name: props.name,
+                value: props.value,
+                required: props.required,
+                checked: () => current() === true,
+                disabled: () => isDisabled(),
+                tabIndex: -1,
+                'aria-hidden': 'true',
+                style: HIDDEN_INPUT_STYLE
+              })
+            ]
+          : []),
+        ...(props?.children ? [props.children(getContext)] : [])
+      ],
       onClick: toggle,
       onKeyDown: (e: Event) => {
         const ke = e as KeyboardEvent

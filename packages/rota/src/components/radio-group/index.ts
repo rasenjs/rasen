@@ -12,6 +12,7 @@ import type { Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { div, button, input, text } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
+import { HIDDEN_INPUT_STYLE } from '../../internal/hidden-input'
 import {
   createRovingFocus,
   type Orientation,
@@ -22,17 +23,6 @@ import { withCleanup } from '../../internal/with-cleanup'
 export type RadioGroupOrientation = Orientation
 
 /** Functional: the input speaks for the group in forms, never for the eye. */
-const HIDDEN_INPUT_STYLE = {
-  position: 'absolute',
-  width: '1px',
-  height: '1px',
-  padding: '0',
-  margin: '-1px',
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-  border: '0'
-} as const
 
 export interface RadioGroupContext extends RovingFocus {
   orientation: RadioGroupOrientation
