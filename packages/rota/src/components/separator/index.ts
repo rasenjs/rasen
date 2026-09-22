@@ -12,6 +12,8 @@ import { com } from '@rasenjs/core'
 import { hr } from '@rasenjs/web/elements'
 
 export interface SeparatorProps {
+  /** Id for the separator element itself. */
+  id?: string
   orientation?: 'horizontal' | 'vertical'
   decorative?: boolean
   class?: string
@@ -29,6 +31,7 @@ export function createSeparator(): (
     const decorative = props?.decorative ?? false
 
     return hr({
+      id: props?.id,
       role: decorative ? undefined : 'separator',
       'aria-orientation': decorative ? undefined : orientation,
       'data-orientation': orientation,

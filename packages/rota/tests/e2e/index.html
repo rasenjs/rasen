@@ -464,13 +464,14 @@
     <!-- Separator -->
     <section id="separator-section">
       <h2>Separator</h2>
-      <div id="separator-h"></div>
-      <div style="display: flex; align-items: center; gap: 8px">
-        <span>Left</span>
-        <div id="separator-v"></div>
-        <span>Right</span>
+      <div id="separator-h-demo">
+        <p>Content above the separator</p>
       </div>
-      <div id="separator-decorative"></div>
+      <div
+        id="separator-v-demo"
+        style="display: flex; align-items: center; gap: 8px"
+      ></div>
+      <div id="separator-decorative-demo"></div>
     </section>
 
     <!-- AspectRatio -->
@@ -666,14 +667,32 @@
       } from '@rasenjs/rota'
       // Element factories come from the isomorphic entry, exactly as a
       // consumer would import them (aliased in vite.e2e.config.ts).
-      import { div, img, text } from '@rasenjs/web/elements'
+      import { div, img, p, text } from '@rasenjs/web/elements'
 
       // ==================== Separator ====================
-      hseparator({ class: 'separator' })(document.getElementById('separator-h'))
-      vseparator({ class: 'separator' })(document.getElementById('separator-v'))
-      separator({ class: 'separator' })(
-        document.getElementById('separator-decorative')
+      // A component appends its element to the host, so content that should
+      // follow it is added afterwards. That matters here: the specs check the
+      // *sibling* axis around the separator to show it does not swallow its
+      // neighbours, and that is only meaningful while the separator really is
+      // their sibling.
+      const separatorHDemo = document.getElementById('separator-h-demo')
+      hseparator({ id: 'separator-h', class: 'separator' })(separatorHDemo)
+      // Factories return mountables, so they are mounted by calling them with
+      // the host - `appendChild` would receive a function, not a node.
+      p({ children: [text({ content: 'Content below the separator' })] })(
+        separatorHDemo
       )
+
+      const separatorVDemo = document.getElementById('separator-v-demo')
+      vseparator({ id: 'separator-v', class: 'separator' })(separatorVDemo)
+      p({ children: [text({ content: 'Left' })] })(separatorVDemo)
+      p({ children: [text({ content: 'Right' })] })(separatorVDemo)
+
+      separator({
+        id: 'separator-decorative',
+        decorative: true,
+        class: 'separator'
+      })(document.getElementById('separator-decorative-demo'))
 
       // A single inlined image shared by the image-bearing demos. It is
       // base64 rather than a percent-encoded SVG: a data URI with raw spaces
