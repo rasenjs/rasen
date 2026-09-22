@@ -44,6 +44,24 @@
         height: auto;
       }
 
+      /* Popover */
+      .popover {
+        position: relative;
+        display: inline-block;
+      }
+      .popover-trigger {
+        padding: 4px 10px;
+        font: inherit;
+      }
+      .popover-content {
+        min-width: 120px;
+        padding: 8px;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        z-index: 10;
+      }
+
       /* AspectRatio */
       .aspect-ratio {
         position: relative;
@@ -474,6 +492,12 @@
       <div id="separator-decorative-demo"></div>
     </section>
 
+    <!-- Popover -->
+    <section id="popover-section">
+      <h2>Popover</h2>
+      <div id="popover-demo"></div>
+    </section>
+
     <!-- AspectRatio -->
     <section id="aspect-ratio-section">
       <h2>AspectRatio</h2>
@@ -656,6 +680,7 @@
         accordion,
         alertDialog,
         dialog,
+        popover,
         label,
         toggle,
         radioGroup,
@@ -667,7 +692,7 @@
       } from '@rasenjs/rota'
       // Element factories come from the isomorphic entry, exactly as a
       // consumer would import them (aliased in vite.e2e.config.ts).
-      import { div, img, p, text } from '@rasenjs/web/elements'
+      import { button, div, img, p, text } from '@rasenjs/web/elements'
 
       // ==================== Separator ====================
       // A component appends its element to the host, so content that should
@@ -700,6 +725,39 @@
       // state forever, which looks exactly like a component bug.
       const SAMPLE_IMAGE =
         'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjM2I4MmY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjE2Ij5KRDwvdGV4dD48L3N2Zz4='
+
+      // ==================== Popover ====================
+      {
+        const { Root, Trigger, Content } = popover
+        Root({
+          class: 'popover',
+          children: (getContext) => [
+            Trigger(
+              {
+                id: 'popover-trigger',
+                class: 'popover-trigger',
+                children: () => text({ content: 'Filters' })
+              },
+              getContext
+            ),
+            Content(
+              {
+                id: 'popover-content',
+                class: 'popover-content',
+                // A focusable child, so the focus assertions have somewhere
+                // real to land rather than falling back to the panel.
+                children: () =>
+                  button({
+                    id: 'popover-inner',
+                    class: 'popover-inner',
+                    children: [text({ content: 'Apply' })]
+                  })
+              },
+              getContext
+            )
+          ]
+        })(document.getElementById('popover-demo'))
+      }
 
       // ==================== AspectRatio ====================
       // Children are the second argument here, not a prop.

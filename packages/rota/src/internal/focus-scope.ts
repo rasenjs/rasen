@@ -80,10 +80,20 @@ export interface FocusScope {
 export interface FocusScopeOptions {
   /** The element whose subtree the keyboard must stay inside. */
   container: () => HTMLElement | null
+  /**
+   * Whether Tab is kept inside the container (default `true`).
+   *
+   * A modal traps; a non-modal layer such as a popover must not - the user has
+   * to be able to Tab out of it. Everything else the scope does (remember
+   * where focus came from, move it inside, put it back on deactivate) still
+   * applies, so the two share one primitive instead of two lookalikes.
+   */
+  trapped?: boolean
 }
 
 export function createFocusScope(options: FocusScopeOptions): FocusScope {
   const { container } = options
+  const trapped = options.trapped ?? true
   let previous: HTMLElement | null = null
   let active = false
 
@@ -147,7 +157,9 @@ export function createFocusScope(options: FocusScopeOptions): FocusScope {
     previous = (doc.activeElement as HTMLElement | null) ?? null
     // Capture phase: the trap has to see Tab even when focus sits outside the
     // container, which is exactly the case it exists to repair.
-    doc.addEventListener('keydown', onKeyDown, true)
+    if (trapped) {
+      doc.addEventListener('keydown', onKeyDown, true)
+    }
     active = true
   }
 

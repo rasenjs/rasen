@@ -31,6 +31,7 @@ import {
   tagsInput,
   toggle,
   toggleGroup,
+  popover,
   createCollapsibleRoot,
   createCollapsibleTrigger,
   createCollapsibleContent,
@@ -294,6 +295,48 @@ vseparator({ decorative: true })`,
                   )
                 ]
               })
+          })
+        ]
+      })
+    }
+  },
+
+  popover: {
+    title: 'Popover',
+    description:
+      'A non-modal layer anchored to its trigger: Escape or a press outside closes it, and Tab leaves it.',
+    code: `const { Root, Trigger, Content } = popover`,
+    build: () => {
+      const { Root, Trigger, Content } = popover
+
+      return div({
+        children: [
+          Root({
+            // Open, so the server-rendered markup also exercises the panel.
+            defaultOpen: true,
+            class: 'popover',
+            children: (getContext) => [
+              Trigger(
+                { class: 'btn', children: () => text({ content: 'Filters' }) },
+                getContext
+              ),
+              Content(
+                {
+                  class: 'popover__panel',
+                  side: 'bottom',
+                  align: 'start',
+                  children: () =>
+                    div({
+                      class: 'popover__body',
+                      children: [
+                        span({ children: ['Depth'] }),
+                        input({ class: 'text-input', placeholder: 'Any' })
+                      ]
+                    })
+                },
+                getContext
+              )
+            ]
           })
         ]
       })
