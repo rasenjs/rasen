@@ -138,18 +138,32 @@ describe('@rasenjs/rota - Slider', () => {
     expect(thumb.getAttribute('data-disabled')).toBe('')
   })
 
-  it('should follow the orientation for keys', () => {
-    const c = mountSlider({
+  it('should answer every arrow key, in either orientation', () => {
+    // The ARIA slider pattern binds the arrows to direction rather than to the
+    // axis. Mapping them onto the axis (what this used to do) left Up and Down
+    // dead on a horizontal slider.
+    const horizontal = mountSlider({ defaultValue: [10] })
+    const hThumb = thumbs(horizontal)[0]!
+
+    press(hThumb, 'ArrowUp')
+    expect(hThumb.getAttribute('aria-valuenow')).toBe('11')
+    press(hThumb, 'ArrowDown')
+    expect(hThumb.getAttribute('aria-valuenow')).toBe('10')
+    press(hThumb, 'ArrowRight')
+    expect(hThumb.getAttribute('aria-valuenow')).toBe('11')
+
+    const vertical = mountSlider({
       defaultValue: [10],
       orientation: 'vertical'
     })
-    const thumb = thumbs(c)[0]!
+    const vThumb = thumbs(vertical)[0]!
 
-    press(thumb, 'ArrowRight')
-    expect(thumb.getAttribute('aria-valuenow')).toBe('10')
-
-    press(thumb, 'ArrowUp')
-    expect(thumb.getAttribute('aria-valuenow')).toBe('11')
+    press(vThumb, 'ArrowUp')
+    expect(vThumb.getAttribute('aria-valuenow')).toBe('11')
+    press(vThumb, 'ArrowRight')
+    expect(vThumb.getAttribute('aria-valuenow')).toBe('12')
+    press(vThumb, 'ArrowDown')
+    expect(vThumb.getAttribute('aria-valuenow')).toBe('11')
   })
 
   it('should position the range from the value', () => {

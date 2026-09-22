@@ -53,6 +53,19 @@ test.describe('Slider', () => {
       await expect(thumb).toHaveAttribute('aria-valuenow', '30')
     })
 
+    test('should answer the other axis arrows too', async ({ page }) => {
+      // A horizontal slider answers Up/Down as well as Right/Left: the ARIA
+      // slider pattern binds the keys to direction, not to the orientation.
+      const thumb = page.locator('#slider-default [role="slider"]')
+      await thumb.focus()
+
+      await page.keyboard.press('ArrowUp')
+      await expect(thumb).toHaveAttribute('aria-valuenow', '31')
+
+      await page.keyboard.press('ArrowDown')
+      await expect(thumb).toHaveAttribute('aria-valuenow', '30')
+    })
+
     test('should jump to the ends with Home and End', async ({ page }) => {
       const thumb = page.locator('#slider-default [role="slider"]')
       await thumb.focus()

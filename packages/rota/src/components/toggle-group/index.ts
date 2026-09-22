@@ -169,7 +169,27 @@ export function createToggleGroupItem(): (
       const event = e as KeyboardEvent
       const current = getContext?.()
       if (!current) return
-      if (current.handleArrows(event, itemValue, current.orientation)) return
+
+      if (current.handleArrows(event, itemValue, current.orientation)) {
+        // Single mode announces `radiogroup` with `radio` items, and a radio
+        // group selects as the arrows move - the ARIA radio-group pattern, and
+        // what this library's own RadioGroup does. Moving focus alone while
+        // claiming the radio roles tells a screen reader the selection moved
+        // when it did not.
+        //
+        // Multiple mode is a group of toggle buttons, where the arrows move
+        // focus only and Enter/Space presses. The asymmetry is deliberate: the
+        // roles differ, so the keyboard contract differs with them.
+        if (current.type === 'single') {
+          const focused = document.activeElement
+          const landed = current
+            .enabledValues()
+            .find((value) => current.itemRef(value).value === focused)
+          if (landed !== undefined) current.press(landed)
+        }
+        return
+      }
+
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
         current.press(itemValue)

@@ -149,7 +149,9 @@ describe('@rasenjs/rota - ToggleGroup', () => {
     expect(items(c).map((el) => el.tabIndex)).toEqual([-1, 0, -1])
   })
 
-  it('should move focus with arrow keys without selecting', () => {
+  it('should select what the arrow keys move to in single mode', () => {
+    // Single mode announces radiogroup/radio, so it has to select as it moves.
+    // Focusing without selecting would contradict the announced roles.
     const c = build({ type: 'single', defaultValue: ['a'] }, ['a', 'b', 'c'])
 
     items(c)[0]!.focus()
@@ -158,8 +160,26 @@ describe('@rasenjs/rota - ToggleGroup', () => {
     )
 
     expect(document.activeElement).toBe(items(c)[1])
-    // Focus alone does not press in a toggle group.
     expect(items(c).map((el) => el.getAttribute('aria-checked'))).toEqual([
+      'false',
+      'true',
+      'false'
+    ])
+  })
+
+  it('should move focus without selecting in multiple mode', () => {
+    // Multiple mode is a group of toggle buttons, not a radio group: the
+    // arrows move focus and Enter/Space presses. The difference in behaviour
+    // follows the difference in roles.
+    const c = build({ type: 'multiple', defaultValue: ['a'] }, ['a', 'b', 'c'])
+
+    items(c)[0]!.focus()
+    items(c)[0]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    )
+
+    expect(document.activeElement).toBe(items(c)[1])
+    expect(items(c).map((el) => el.getAttribute('aria-pressed'))).toEqual([
       'true',
       'false',
       'false'

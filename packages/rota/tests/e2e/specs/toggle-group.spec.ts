@@ -36,18 +36,22 @@ test.describe('ToggleGroup', () => {
       await expect(items.nth(0)).toHaveAttribute('aria-checked', 'false')
     })
 
-    test('should move focus with the arrow keys', async ({ page }) => {
+    test('should move the selection with the arrow keys', async ({ page }) => {
       const items = page.locator(`${single} [role="radio"]`)
       await items.nth(0).focus()
 
       await page.keyboard.press('ArrowRight')
 
-      // Focus moves; the unit tests pin that it does not select by itself,
-      // which is the Radix model this mirrors.
+      // Single mode announces radiogroup/radio, so the arrows select as they
+      // move - the same contract RadioGroup keeps.
       await expect(items.nth(1)).toBeFocused()
+      await expect(items.nth(1)).toHaveAttribute('aria-checked', 'true')
+      await expect(items.nth(0)).toHaveAttribute('aria-checked', 'false')
     })
 
-    test('should select the focused option with Space', async ({ page }) => {
+    test('should keep the selection on the option Space presses', async ({
+      page
+    }) => {
       const items = page.locator(`${single} [role="radio"]`)
       await items.nth(0).focus()
 

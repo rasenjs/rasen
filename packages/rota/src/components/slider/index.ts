@@ -333,18 +333,22 @@ export function createSliderThumb(): (
       const current = getContext?.()
       if (!current || disabledNow()) return
 
-      const vertical = axis() === 'vertical'
-      const up = vertical ? 'ArrowUp' : 'ArrowRight'
-      const down = vertical ? 'ArrowDown' : 'ArrowLeft'
+      // The ARIA slider pattern binds the keys to direction, not to the axis:
+      // Right/Up increase and Left/Down decrease, for a horizontal slider and a
+      // vertical one alike. Mapping them onto the axis instead left half the
+      // arrow keys dead - Up and Down did nothing on a horizontal slider - which
+      // is not how any slider a user has met behaves.
       const page = 10
 
       switch (event.key) {
-        case up:
+        case 'ArrowRight':
+        case 'ArrowUp':
           event.preventDefault()
           current.stepBy(index, 1)
           current.commit()
           break
-        case down:
+        case 'ArrowLeft':
+        case 'ArrowDown':
           event.preventDefault()
           current.stepBy(index, -1)
           current.commit()
