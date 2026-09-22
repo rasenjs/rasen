@@ -317,6 +317,8 @@ export const Tooltip = {
 
 Rota 已实现本组件（单元测试 + 浏览器 e2e 覆盖）。以下是遗留项、有意不做的项，以及需要澄清的实现决定；跨组件的通用事项（动画政策、RTL）见 README 的「实现状态」。
 - `container` 逃生口：已完成（传入自己的容器元素即把该部件移动过去；不传则行为不变）。
-- 未做：Provider 配置（共享延迟）
+- Provider（共享延迟）：已完成。`Tooltip.Provider` 为内部所有 tooltip 提供默认 `delayMs`，单个 tooltip 的 `delayMs` 优先；它**不渲染任何元素**（是作用域而非包装层）。
+
+  ⚠️ 生效范围限于**在该 Provider 的 children 回调里构建**的 tooltip（即通过嵌套书写的那些）——组件体是在回调执行时运行的。异步挂载（延迟/过渡内）超出该递归，需显式传 `delayMs`；这与 Accordion 的 ambient scope 是同一约定。
 - 有意不做：Floating UI 集成（本组件用 CSS 定位，见组件头部注释）
 

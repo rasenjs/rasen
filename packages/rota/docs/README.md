@@ -256,7 +256,6 @@ rota/docs/
 | **RTL** | **全部组件未做**（`dir` 没有任何组件读取）。方向敏感的是一批具体行为，而不只是样式：水平方向键（`accordion` / `tabs` / `toggle-group` / `radio-group`）、`slider` 的横向增减方向、以及 `popover` / `tooltip` 的 `side` / `align` 语义。 |
 | **动画** | **有意不做，21 个组件全部如此**（源码里没有任何 `transition` / `animation`）。组件只暴露 `data-state`，动画交给消费方的 CSS —— headless 库的常规做法，因此不是缺口而是取舍。 |
 | **Floating UI / 碰撞检测 / 箭头定位** | 有意不做。`popover`/`tooltip` 用 CSS 定位（`data-side` / `data-align`），使组件可静态渲染、也能在无布局的测试环境运行。 |
-| Tooltip 的 Provider（共享延迟） | 未做。每个 Tooltip 各自设置 `delayMs`。 |
 
 ### 技术栈
 

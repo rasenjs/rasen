@@ -26,7 +26,7 @@
  *   tooltip - the gap belongs to neither - so make the visual separation with
  *   padding on the content rather than a margin or an offset.
  */
-import type { Mountable, PropValue } from '@rasenjs/core'
+import type { HostHooks, Mountable, PropValue } from '@rasenjs/core'
 import { com, getReactiveRuntime } from '@rasenjs/core'
 import { span } from '@rasenjs/web/elements'
 import { readProp } from '../../internal/props'
@@ -42,6 +42,82 @@ import type { PopoverAlign, PopoverSide } from '../popover'
 
 /** How long the pointer must rest on the trigger before the tooltip opens. */
 export const DEFAULT_TOOLTIP_DELAY = 700
+
+/**
+ * The delay a `Tooltip.Provider` established for the tooltips beneath it.
+ *
+ * Same shape as Accordion's ambient scope, and for the same reason: this
+ * framework has no injectable context, so a value that parts must agree on
+ * without being handed it travels through a module-level slot set around the
+ * provider's **synchronous** mount recursion and restored afterwards. The
+ * caveat is identical and worth repeating: a part mounted asynchronously
+ * (deferred, inside a transition) is outside that recursion and must be given
+ * its `delayMs` explicitly.
+ */
+interface TooltipAmbientScope {
+  delayMs: number
+}
+
+let ambientScope: TooltipAmbientScope | undefined
+
+function withAmbientScope<T>(scope: TooltipAmbientScope, fn: () => T): T {
+  const previous = ambientScope
+  ambientScope = scope
+  try {
+    return fn()
+  } finally {
+    ambientScope = previous
+  }
+}
+
+/** The delay the surrounding Provider established, if any. */
+function getAmbientDelay(): number | undefined {
+  return ambientScope?.delayMs
+}
+
+export interface TooltipProviderProps {
+  /**
+   * Delay for every tooltip inside, so a set of them is configured in one place
+   * rather than each repeating the same number.
+   *
+   * A tooltip's own `delayMs` wins over this.
+   */
+  delayMs?: number
+  /** May return one or several mountables; the provider renders no element. */
+  children?: () => Mountable<HTMLElement> | Mountable<HTMLElement>[]
+}
+
+/**
+ * Create the Tooltip Provider: shared configuration for the tooltips beneath it.
+ *
+ * Renders **no element**. It is a scope, not a wrapper - putting a `<div>` in
+ * the tree would change the layout of whatever it surrounds, which is the one
+ * thing a configuration provider must not do.
+ */
+export function createTooltipProvider(): (
+  props?: TooltipProviderProps
+) => Mountable<HTMLElement> {
+  const component = (props?: TooltipProviderProps) => {
+    const delayMs = props?.delayMs ?? DEFAULT_TOOLTIP_DELAY
+    const scope: TooltipAmbientScope = { delayMs }
+
+    return (host: HTMLElement, hooks: HostHooks<HTMLElement> | undefined) => {
+      // The children callback runs *inside* the scope, and that is the whole
+      // mechanism: invoking it is what runs the tooltips' component bodies, so
+      // anything evaluated before this point would read no ambient value at
+      // all. (Getting this wrong is silent - the tooltips simply fall back to
+      // the default delay, which looks like the provider working.)
+      const unmounts = withAmbientScope(scope, () => {
+        const children = toMountables(props?.children?.()) ?? []
+        return children.map((child) => child(host, hooks))
+      })
+      return () => {
+        for (const unmount of unmounts) unmount?.()
+      }
+    }
+  }
+  return com(component)
+}
 
 /**
  * The placement vocabulary, under tooltip-appropriate names. The geometry is
@@ -169,7 +245,11 @@ export function createTooltipRoot(): (
       props?.onOpenChange?.(open)
     }
 
-    const delayMs = (): number => props?.delayMs ?? DEFAULT_TOOLTIP_DELAY
+    // Resolved once, at render: a tooltip keeps the provider it was mounted
+    // inside even if the ambient slot has since been restored.
+    const providerDelay = getAmbientDelay()
+    const delayMs = (): number =>
+      props?.delayMs ?? providerDelay ?? DEFAULT_TOOLTIP_DELAY
 
     let timer: ReturnType<typeof setTimeout> | null = null
     const clearTimer = (): void => {
@@ -392,6 +472,7 @@ export function createTooltipContent(): (
  * The Tooltip parts, exported like the other layered components.
  */
 export function createTooltip(): {
+  Provider: (props?: TooltipProviderProps) => Mountable<HTMLElement>
   Root: (props?: TooltipRootProps) => Mountable<HTMLElement>
   Trigger: (
     props?: TooltipTriggerProps,
@@ -403,6 +484,7 @@ export function createTooltip(): {
   ) => Mountable<HTMLElement>
 } {
   return {
+    Provider: createTooltipProvider(),
     Root: createTooltipRoot(),
     Trigger: createTooltipTrigger(),
     Content: createTooltipContent()

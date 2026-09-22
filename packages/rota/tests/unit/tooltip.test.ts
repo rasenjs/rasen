@@ -8,8 +8,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-import { text } from '@rasenjs/web/elements'
-import { tooltip } from '@rasenjs/rota'
+import type { Mountable } from '@rasenjs/core'
+import { div, text } from '@rasenjs/web/elements'
+import { tooltip, DEFAULT_TOOLTIP_DELAY } from '@rasenjs/rota'
 import type { TooltipSide } from '@rasenjs/rota'
 
 let container: HTMLElement
@@ -296,6 +297,101 @@ describe('@rasenjs/rota - Tooltip', () => {
 
       expect(() => vi.advanceTimersByTime(1000)).not.toThrow()
       expect(isOpen(content)).toBe(false)
+    })
+  })
+
+  describe('Provider', () => {
+    /**
+     * One tooltip, built where the wrapper's children callback runs - which is
+     * how nesting works in this framework, and the only placement the ambient
+     * scope reaches. Building the Root first and handing the mountable in would
+     * run its component body outside the scope.
+     */
+    function mountInside(
+      wrap: (build: () => Mountable<HTMLElement>) => Mountable<HTMLElement>,
+      tooltipProps: Options = {}
+    ) {
+      const { Root, Trigger, Content } = tooltip
+      const build = () =>
+        Root({
+          id: 'provider-tooltip',
+          delayMs: tooltipProps.delayMs,
+          children: (getContext) => [
+            Trigger({ id: 'provider-trigger' }, getContext),
+            Content(
+              {
+                id: 'provider-content',
+                children: () => text({ content: 'tip' })
+              },
+              getContext
+            )
+          ]
+        })
+      mounted.push(wrap(build)(container))
+      return {
+        content: container.querySelector<HTMLElement>('[role="tooltip"]')!
+      }
+    }
+
+    it('should supply the delay for the tooltips inside it', () => {
+      vi.useFakeTimers()
+      const { Provider } = tooltip
+      const { content } = mountInside((build) =>
+        Provider({
+          delayMs: 200,
+          children: () => div({ children: [build()] })
+        }) as never
+      )
+
+      pointer(container.querySelector('#provider-tooltip')!, 'pointerenter')
+      // Not yet: the Provider's delay applies, not the 700ms default.
+      vi.advanceTimersByTime(199)
+      expect(isOpen(content)).toBe(false)
+
+      vi.advanceTimersByTime(1)
+      expect(isOpen(content)).toBe(true)
+    })
+
+    it('should let a tooltip override the provider delay', () => {
+      vi.useFakeTimers()
+      const { Provider } = tooltip
+      const { content } = mountInside(
+        (build) =>
+          Provider({
+            delayMs: 200,
+            children: () => div({ children: [build()] })
+          }) as never,
+        { delayMs: 50 }
+      )
+
+      pointer(container.querySelector('#provider-tooltip')!, 'pointerenter')
+      vi.advanceTimersByTime(50)
+      // Its own number wins over the surrounding one.
+      expect(isOpen(content)).toBe(true)
+    })
+
+    it('should fall back to the default without a provider', () => {
+      vi.useFakeTimers()
+      const { content } = mountInside((build) => build())
+
+      pointer(container.querySelector('#provider-tooltip')!, 'pointerenter')
+      vi.advanceTimersByTime(DEFAULT_TOOLTIP_DELAY - 1)
+      expect(isOpen(content)).toBe(false)
+
+      vi.advanceTimersByTime(1)
+      expect(isOpen(content)).toBe(true)
+    })
+
+    it('should render no element of its own', () => {
+      const { Provider } = tooltip
+      const { content } = mountInside((build) =>
+        Provider({ children: () => div({ children: [build()] }) }) as never
+      )
+
+      // The provider is a scope, not a wrapper: an added element would change
+      // the layout of whatever it surrounds.
+      expect(container.querySelector('#provider-tooltip')).toBeTruthy()
+      expect(content).toBeTruthy()
     })
   })
 

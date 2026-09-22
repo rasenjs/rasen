@@ -348,34 +348,41 @@ vseparator({ decorative: true })`,
     title: 'Tooltip',
     description:
       'A description on hover or focus. It never takes focus, and Escape dismisses it.',
-    code: `const { Root, Trigger, Content } = tooltip`,
+    code: `const { Provider, Root, Trigger, Content } = tooltip`,
     build: () => {
-      const { Root, Trigger, Content } = tooltip
+      const { Provider, Root, Trigger, Content } = tooltip
 
-      return div({
-        children: [
-          Root({
-            defaultOpen: true,
-            delayMs: 0,
-            class: 'tooltip',
-            children: (getContext) => [
-              Trigger(
-                {
-                  class: 'tooltip__trigger',
-                  children: () => text({ content: 'Hover or focus me' })
-                },
-                getContext
-              ),
-              Content(
-                {
-                  class: 'tooltip__content',
-                  children: () => text({ content: 'A short explanation' })
-                },
-                getContext
-              )
+      // Configured through a Provider, so the shared-delay part is exercised
+      // on the server too. The Provider renders no element, so the markup it
+      // produces is identical to an unwrapped tooltip.
+      return Provider({
+        delayMs: 0,
+        children: () =>
+          div({
+            children: [
+              Root({
+                defaultOpen: true,
+                delayMs: 0,
+                class: 'tooltip',
+                children: (getContext) => [
+                  Trigger(
+                    {
+                      class: 'tooltip__trigger',
+                      children: () => text({ content: 'Hover or focus me' })
+                    },
+                    getContext
+                  ),
+                  Content(
+                    {
+                      class: 'tooltip__content',
+                      children: () => text({ content: 'A short explanation' })
+                    },
+                    getContext
+                  )
+                ]
+              })
             ]
           })
-        ]
       })
     }
   },
