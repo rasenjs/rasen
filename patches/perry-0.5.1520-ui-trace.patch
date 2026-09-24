@@ -1,0 +1,111 @@
+diff --git a/crates/perry-ui-macos/src/widgets/bloomview.rs b/crates/perry-ui-macos/src/widgets/bloomview.rs
+index 297ad1611..e2c4871db 100644
+--- a/crates/perry-ui-macos/src/widgets/bloomview.rs
++++ b/crates/perry-ui-macos/src/widgets/bloomview.rs
+@@ -56,6 +56,9 @@ pub fn create(width: f64, height: f64) -> i64 {
+     }
+     let ns: Retained<NSView> = unsafe { Retained::cast_unchecked(view) };
+     let handle = super::register_widget(ns);
++    if std::env::var_os("PERRY_UI_TRACE").is_some() {
++        eprintln!("[bloomview] create handle={handle} size={width}x{height}");
++    }
+     if width.is_finite() && width >= 1.0 {
+         super::set_width(handle, width);
+     }
+diff --git a/crates/perry-ui-macos/src/widgets/lazyvstack.rs b/crates/perry-ui-macos/src/widgets/lazyvstack.rs
+index 08b187d92..e379c537a 100644
+--- a/crates/perry-ui-macos/src/widgets/lazyvstack.rs
++++ b/crates/perry-ui-macos/src/widgets/lazyvstack.rs
+@@ -72,6 +72,26 @@ define_class!(
+             let child_f64 = unsafe { js_closure_call1(render_ptr, row as f64) };
+             let child_handle = unsafe { js_nanbox_get_pointer(child_f64) };
+             if let Some(view) = super::get_widget(child_handle) {
++                // Which widget did the row renderer hand back, and what is it?
++                // An embedded GPU view being adopted as a row is invisible from
++                // the TS side (nothing there re-parents it), so the identity of
++                // the returned view is the only place this can be caught.
++                if std::env::var_os("PERRY_UI_TRACE").is_some() {
++                    let cls: *const std::ffi::c_char = unsafe {
++                        objc2::ffi::object_getClassName(&*view as *const NSView as *const _)
++                    };
++                    let name = if cls.is_null() {
++                        String::from("?")
++                    } else {
++                        unsafe { std::ffi::CStr::from_ptr(cls) }.to_string_lossy().into_owned()
++                    };
++                    let b = view.bounds().size;
++                    eprintln!(
++                        "[uivstack] viewForRow row={row} handle={child_handle} \
++                         cls={name} size={}x{}",
++                        b.width, b.height
++                    );
++                }
+                 Retained::as_ptr(&view) as *mut NSView
+             } else {
+                 std::ptr::null_mut()
+diff --git a/crates/perry-ui-macos/src/widgets/mod.rs b/crates/perry-ui-macos/src/widgets/mod.rs
+index 0409a9e93..bf7501aea 100644
+--- a/crates/perry-ui-macos/src/widgets/mod.rs
++++ b/crates/perry-ui-macos/src/widgets/mod.rs
+@@ -276,6 +276,12 @@ pub fn set_hidden(handle: i64, hidden: bool) {
+ 
+             if needs_reattach {
+                 let parent_info = PARENT_MAP.with(|m| m.borrow().get(&handle).copied());
++                if std::env::var_os("PERRY_UI_TRACE").is_some() {
++                    eprintln!(
++                        "[reparent] set_hidden(unhide) handle={handle} orphaned, PARENT_MAP={:?}",
++                        parent_info
++                    );
++                }
+                 if let Some((parent_handle, index)) = parent_info {
+                     if let Some(parent) = get_widget(parent_handle) {
+                         let is_stack = AnyClass::get(c"NSStackView")
+@@ -428,6 +434,9 @@ fn cleanup_widget_maps(handles: &[i64]) {
+ /// Safe implementation: snapshots subviews before mutation, deactivates
+ /// constraints in batch, removes in reverse order, and cleans up metadata maps.
+ pub fn clear_children(handle: i64) {
++    if std::env::var_os("PERRY_UI_TRACE").is_some() {
++        eprintln!("[reparent] clear_children handle={handle}");
++    }
+     if let Some(parent) = get_widget(handle) {
+         let is_stack = if let Some(cls) = AnyClass::get(c"NSStackView") {
+             parent.isKindOfClass(cls)
+@@ -486,8 +495,22 @@ pub fn clear_children(handle: i64) {
+     }
+ }
+ 
++/// Log a reparenting operation when `PERRY_UI_TRACE` is set.
++///
++/// The host hands the renderer one view pointer and keeps presenting into it, so
++/// a view that gets moved into a different container afterwards still reports a
++/// live window and successful presents while the picture is scaled into whatever
++/// size the new container has. Which of these four functions did the move is the
++/// only thing that needs establishing.
++fn ui_trace(op: &str, parent: i64, child: i64) {
++    if std::env::var_os("PERRY_UI_TRACE").is_some() {
++        eprintln!("[reparent] {op} parent_handle={parent} child_handle={child}");
++    }
++}
++
+ /// Add a child view to a parent view at a specific index.
+ pub fn add_child_at(parent_handle: i64, child_handle: i64, index: i64) {
++    ui_trace("add_child_at", parent_handle, child_handle);
+     if let (Some(parent), Some(child)) = (get_widget(parent_handle), get_widget(child_handle)) {
+         let is_stack = if let Some(cls) = AnyClass::get(c"NSStackView") {
+             parent.isKindOfClass(cls)
+@@ -518,6 +541,7 @@ pub fn add_child_at(parent_handle: i64, child_handle: i64, index: i64) {
+ /// Add a child view to a parent view.
+ /// If the parent is an NSStackView, uses addArrangedSubview for proper layout.
+ pub fn add_child(parent_handle: i64, child_handle: i64) {
++    ui_trace("add_child", parent_handle, child_handle);
+     if let (Some(parent), Some(child)) = (get_widget(parent_handle), get_widget(child_handle)) {
+         // Check if parent is an NSStackView
+         let is_stack = if let Some(cls) = AnyClass::get(c"NSStackView") {
+@@ -553,6 +577,7 @@ pub fn add_child(parent_handle: i64, child_handle: i64) {
+ /// If the parent is an NSStackView, removes from arranged subviews first.
+ /// Also cleans up metadata maps for the removed child and its descendants.
+ pub fn remove_child(parent_handle: i64, child_handle: i64) {
++    ui_trace("remove_child", parent_handle, child_handle);
+     if let (Some(parent), Some(child)) = (get_widget(parent_handle), get_widget(child_handle)) {
+         let is_stack = if let Some(cls) = AnyClass::get(c"NSStackView") {
+             parent.isKindOfClass(cls)

@@ -1,0 +1,74 @@
+diff --git a/crates/perry-runtime/src/event_pump.rs b/crates/perry-runtime/src/event_pump.rs
+index bf6799de1..22dbb8a6c 100644
+--- a/crates/perry-runtime/src/event_pump.rs
++++ b/crates/perry-runtime/src/event_pump.rs
+@@ -426,12 +426,38 @@ pub extern "C" fn perry_poll() -> i32 {
+     // `extern "C"` linkage and stable across host builds; no thread-safety
+     // invariants beyond what each individual function already documents.
+     unsafe {
++        // Drive native work as well as draining it. ``js_run_stdlib_pump`` only
++        // *delivers* resolutions that are already queued; in the single-thread
++        // async model the tokio runtime that *produces* them advances here and
++        // nowhere else for a host-owned run loop. Without this line a host that
++        // calls `perry_poll` — the documented "host's event-loop tick" entry —
++        // never progresses an in-flight `fetch`, which is exactly the bug: the
++        // identical program works from the generated top-level loop (which goes
++        // through `js_wait_for_event`) and hangs under `App()`.
++        invoke_wait_driver_fast();
+         let microtasks = js_promise_run_microtasks();
+         js_run_stdlib_pump();
+         microtasks
+     }
+ }
+ 
++/// Drive one bounded turn of native async work (fetch / net / ws / timers that
++/// live in the tokio runtime).
++///
++/// Exists for hosts that drive their own run loop and therefore never call
++/// [`js_wait_for_event`] — perry-ui-macos's ~8 ms `NSTimer` pump is the case
++/// that motivated it. Such a host MUST call this every tick: `js_run_stdlib_pump`
++/// (which it already calls) only drains resolutions that have been queued, and in
++/// the unified single-thread async model nothing else on that path advances the
++/// runtime, so every native request stays pending forever.
++///
++/// No-ops cheaply (a single atomic load) when no wait-driver is registered or
++/// nothing native is in flight, so it is safe unconditionally.
++#[no_mangle]
++pub extern "C" fn perry_drive_native_tasks() {
++    invoke_wait_driver_fast();
++}
++
+ /// Returns 1 if the host should keep the event loop alive — anything
+ /// pending across all of Perry's internal queues. Use as the gate for
+ /// `ControlFlow::Wait` vs `ControlFlow::Poll` in winit, or the equivalent
+diff --git a/crates/perry-ui-macos/src/app.rs b/crates/perry-ui-macos/src/app.rs
+index 3818a0e58..4bfbd6a80 100644
+--- a/crates/perry-ui-macos/src/app.rs
++++ b/crates/perry-ui-macos/src/app.rs
+@@ -1305,6 +1305,16 @@ define_class!(
+             crate::catch_callback_panic("pump", std::panic::AssertUnwindSafe(|| {
+                 extern "C" {
+                     fn js_run_stdlib_pump();
++                    // Drives one bounded turn of native async work (fetch / net /
++                    // ws). `js_run_stdlib_pump` below only DELIVERS resolutions
++                    // that are already queued; in the unified single-thread async
++                    // model the tokio runtime that produces them is advanced by
++                    // the wait-driver, which `js_wait_for_event` normally invokes.
++                    // An NSApplication run loop never calls `js_wait_for_event`,
++                    // so this host must drive it itself — without this call every
++                    // `fetch()` in a perry/ui app stays pending forever while the
++                    // same code works in a non-UI program.
++                    fn perry_drive_native_tasks();
+                     // perry-runtime's embedder GC stepper: spends up to
+                     // `budget_us` advancing an ACTIVE budgeted collection
+                     // in bounded work units; a cheap status probe when no
+@@ -1318,6 +1328,9 @@ define_class!(
+                     // callbacks. Driven off the same ~8ms pump for now;
+                     // CADisplayLink-quality vsync alignment is a follow-up.
+                     js_frame_pump_default();
++                    // Advance native async work BEFORE draining it, so a request
++                    // that completes on this tick is delivered on the same tick.
++                    perry_drive_native_tasks();
+                     js_promise_run_microtasks();
+                     // Process deferred promise resolutions from perry-stdlib tokio workers.
+                     // No-op if perry-stdlib is not linked (function pointer not registered).

@@ -1,0 +1,63 @@
+# Perry v0.5.1647 — drive the wait driver from the pump.
+#
+# STATUS: MEASURED, DOES NOT WORK. Keep it only as a record of what was tried.
+#
+# It is a faithful diff of the attempt, not a fix. Applying it compiles cleanly
+# and the change is present in the linked binary, but fetch still never resolves
+# in a UI application: with a fresh asset cache the viewer stays at `rows=3`, no
+# cache file is written and no model loads.
+#
+# Why it cannot be enough: on v0.5.1647 fetch prefers the turnloop client engine
+# and keeps its reqwest future only when the engine declines
+# (crates/perry-stdlib/src/fetch/mod.rs). The documented remaining decline case
+# is "no loop for this agent at all" (fetch/turnloop_bridge.rs) — and a UI host
+# never creates one, because the loop is made by the primary agent's first real
+# park while the host's main thread sits in the platform run loop. Driving the
+# LEGACY wait driver therefore drives a driver that correctly reports no native
+# work: the missing piece is agent-loop ownership in the host, not a tick.
+#
+# See docs/PERRY-PITFALLS.md for the full measurement and the upgrade gate.
+#
+diff --git a/crates/perry-runtime/src/event_pump.rs b/crates/perry-runtime/src/event_pump.rs
+index 055b81549..040ad1bda 100644
+--- a/crates/perry-runtime/src/event_pump.rs
++++ b/crates/perry-runtime/src/event_pump.rs
+@@ -390,8 +390,14 @@ fn invoke_wait_driver_wake() {
+ /// Give in-flight native tasks a brief driven turn before returning to run
+ /// pending JS work. No-ops cheaply (a single atomic load) when no wait-driver is
+ /// registered; the driver itself no-ops when nothing native is in flight.
++///
++/// `pub(crate)` so the process-wide outer pump (`js_run_stdlib_pump`) can give
++/// in-flight native work its turn. A UI host reaches that boundary every pump
++/// tick but never enters `js_wait_for_event`'s park, and this was the ONLY place
++/// the wait driver got driven — so a host that pumps instead of parking stalled
++/// every `fetch` it started, silently and with no `then`/`catch` ever running.
+ #[inline]
+-fn invoke_wait_driver_fast() {
++pub(crate) fn invoke_wait_driver_fast() {
+     let p = WAIT_DRIVER_FAST.load(Ordering::Acquire);
+     if p.is_null() {
+         return;
+diff --git a/crates/perry-runtime/src/lib.rs b/crates/perry-runtime/src/lib.rs
+index f8214b662..27dc0b3e1 100644
+--- a/crates/perry-runtime/src/lib.rs
++++ b/crates/perry-runtime/src/lib.rs
+@@ -764,6 +764,18 @@ pub(crate) mod stdlib_pump {
+         // process-wide entry gate. This branch documents the lifecycle point
+         // and keeps the result live for debug assertions/tests.
+         debug_assert!(!outermost || ACTIVE_OUTER_PUMPS.load(Ordering::Acquire) > 0);
++        // Drive in-flight native tasks HERE, not only inside the park.
++        //
++        // `invoke_wait_driver_fast` is what advances a fetch's reqwest `send`
++        // (and every other in-flight native task). It was reachable exclusively
++        // from inside `js_wait_for_event`'s park path, so a UI host — whose main
++        // thread sits in the platform run loop and never parks — started requests
++        // that never progressed: no `then`, no `catch`, not even the caller's own
++        // deadline firing. Every UI host already reaches this boundary from its
++        // own pump (`perry-ui-macos` and `perry-ui-gtk4` both call
++        // `js_run_stdlib_pump`), which makes this the one place that fixes all of
++        // them. No-op (one atomic load) when no driver is registered.
++        crate::event_pump::invoke_wait_driver_fast();
+         crate::promise::js_native_async_process_pending();
+         #[cfg(feature = "node-api-host")]
+         crate::node_api_host::process_pending();
