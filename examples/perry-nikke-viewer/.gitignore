@@ -1,5 +1,11 @@
 # Compiled binaries (the build is `yarn build`; ~34 MB each).
 dist/
 
+# The structural-rewrite output: `node prebuild.mjs` copies src/ here with
+# `.map()` / `&&` / `?:` rewritten into `each` / `when`, and Perry compiles
+# from this tree. Generated on every build, never edited by hand — the source
+# under src/ is the readable form.
+.build/
+
 # Perry's per-package caches.
 node_modules/.cache/

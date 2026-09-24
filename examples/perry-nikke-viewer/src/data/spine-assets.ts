@@ -207,7 +207,11 @@ export async function loadSpine(
   }
   if (!primary) throw new Error("atlas listed no pages for " + id);
 
+  // `regions` is a `Record<string, AtlasRegion>`, so it has no `length` — the
+  // status line used to print `atlas.regions.length`, which reads `undefined`
+  // by definition and looks exactly like a parse failure. Count the keys.
+  const regionCount = Object.keys(atlas.regions).length;
   report("Loaded " + id + " — " + data.bones.length + " bones, "
-    + atlas.regions.length + " regions, " + pages.size + " page(s)");
+    + regionCount + " regions, " + pages.size + " page(s)");
   return { data: data, atlas: atlas, pages: pages, primary: primary, dir: dir };
 }

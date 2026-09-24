@@ -340,7 +340,19 @@ export interface ImageProps extends StyleProps {
  */
 export const image = com(function (props: ImageProps): Mountable<PerryNode> {
   return function (parent: PerryNode): () => void {
-    const widget = ImageWidget(toValue(props.url), props.alt);
+    // Options-object form, NOT `ImageWidget(url, alt)`.
+    //
+    // The positional overload is declared and compiles, but returns
+    // `undefined` on this Perry build (measured on 0.5.1654 with
+    // `src/imgprobe.ts`: `typeof Image(url)` and `typeof Image(url, alt)` are
+    // both "undefined", while `Image({url, alt})` yields a live widget). An
+    // `undefined` child crosses the FFI as handle 1, which the native layer
+    // resolves to the FIRST registered widget — here the embedded GPU view —
+    // and re-parents it into this row.
+    const widget = ImageWidget({
+      url: toValue(props.url),
+      alt: props.alt,
+    });
     // `Image` builds a 64x64 view; a thumbnail is smaller, and the setter also
     // pins the intrinsic size so the surrounding stack lays out correctly.
     const w = props.width !== undefined ? toValue(props.width) : undefined;

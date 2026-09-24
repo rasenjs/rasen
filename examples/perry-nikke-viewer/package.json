@@ -6,10 +6,12 @@
   "description": "NIKKE character viewer running natively on Perry - rasen component model over perry/ui widgets, spine rendered by @rasenjs/gfx on WebGPU",
   "main": "src/main.ts",
   "scripts": {
-    "build": "perry compile src/main.ts -o dist/perry-nikke-viewer",
-    "build:smoke": "perry compile src/smoke.ts -o dist/perry-nikke-viewer-smoke",
-    "build:sweep": "perry compile src/viewer/sweep.ts -o dist/perry-nikke-viewer-sweep",
+    "prebuild": "node prebuild.mjs",
+    "build": "node prebuild.mjs && perry compile .build/main.ts -o dist/perry-nikke-viewer",
+    "build:smoke": "node prebuild.mjs && perry compile .build/smoke.ts -o dist/perry-nikke-viewer-smoke",
+    "build:sweep": "node prebuild.mjs && perry compile .build/viewer/sweep.ts -o dist/perry-nikke-viewer-sweep",
     "build:all": "yarn build && yarn build:smoke && yarn build:sweep",
+    "check:structural": "node prebuild.mjs --check",
     "run": "yarn build && ./dist/perry-nikke-viewer",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -28,19 +30,21 @@
         "alien-signals"
       ],
       "nativeLibrary": [
-        "@perryts/webgpu"
+        "@rasenjs/perry-wgpu"
       ]
     }
   },
   "dependencies": {
-    "@perryts/webgpu": "^0.3.0",
     "@rasenjs/assets": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/gfx": "workspace:*",
     "@rasenjs/math": "workspace:*",
+    "@rasenjs/perry-wgpu": "workspace:*",
     "@rasenjs/reactive-alien-signals": "workspace:*"
   },
   "devDependencies": {
+    "@perryts/perry": "0.5.1520",
+    "@rasenjs/compiler": "workspace:*",
     "typescript": "^5.3.3"
   }
 }

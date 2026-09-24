@@ -397,6 +397,19 @@ export function insertNode(
     if (a === child) throw new Error("Cannot insert a node into its own subtree");
   }
 
+  // A widget factory that returned nothing must not reach the native layer.
+  //
+  // `undefined` crosses the FFI as handle 1, and the native side resolves that
+  // to the first registered widget — silently re-parenting an unrelated view
+  // (in this app the embedded GPU surface) into the offending row. Raising it
+  // here is what turns "the picture is subtly wrong" into a located failure.
+  if (child.widget === undefined || child.widget === null) {
+    throw new Error(
+      "Cannot insert a node with no widget (kind=" + child.kind +
+      " into " + parent.kind + "). A widget factory returned undefined.",
+    );
+  }
+
   const previousParent = child.parent;
   if (previousParent) {
     // Detach from the native parent too, not just the mirror, or the widget

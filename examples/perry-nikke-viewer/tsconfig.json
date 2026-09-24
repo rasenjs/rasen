@@ -9,7 +9,12 @@
     "`perry/ui` is not an npm package - the compiler injects it and the runtime",
     "ships no declarations. The vendored copy under `types/perry/` comes from the",
     "Perry source tree (`types/perry/ui/index.d.ts`) so this example typechecks",
-    "without a checkout present."
+    "without a checkout present.",
+    "",
+    "`jsx: preserve` + `jsxImportSource` are for TSX files under src/. Perry does",
+    "its own JSX lowering (it emits `jsx(type, props)` calls and routes them to",
+    "whatever binding the module imports - see src/perry-ui/jsx-runtime.ts), so",
+    "`preserve` keeps tsc from rewriting the syntax it needs to see."
   ],
   "compilerOptions": {
     "target": "ES2022",
@@ -20,11 +25,15 @@
     "noEmit": true,
     "skipLibCheck": true,
     "types": ["node"],
+    "jsx": "preserve",
+    "jsxImportSource": "@local/jsx",
     "baseUrl": ".",
     "paths": {
       "perry/ui": ["types/perry/ui/index.d.ts"],
-      "perry/thread": ["types/perry/thread/index.d.ts"]
+      "perry/thread": ["types/perry/thread/index.d.ts"],
+      "@local/jsx/jsx-runtime": ["src/perry-ui/jsx-runtime.ts"],
+      "@local/jsx/jsx-dev-runtime": ["src/perry-ui/jsx-runtime.ts"]
     }
   },
-  "include": ["src/**/*.ts", "types/**/*.d.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "types/**/*.d.ts"]
 }

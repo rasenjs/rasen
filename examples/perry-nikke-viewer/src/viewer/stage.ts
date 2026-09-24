@@ -14,21 +14,69 @@
  * that window.
  *
  * ── Scope ─────────────────────────────────────────────────────────────────
- * This is the same plumbing as `examples/perry-spine/src/gfx-host.ts` (which it
- * imports) plus the frame loop. The example-level difference is that this
- * version swaps models at runtime, so it can unmount and remount the spine
- * component.
+ * This is the same plumbing as `examples/perry-spine/src/gfx-host.ts` plus the
+ * frame loop. The example-level difference is that this version swaps models at
+ * runtime, so it can unmount and remount the spine component.
  */
 import { BloomView, bloomViewGetNativeHandle, type Widget } from "perry/ui";
-import {
-  requestAdapter,
-  adapterRequestDeviceSync,
-  deviceGetQueueSync,
-  surfaceFromNativeView,
-  surfaceGetPreferredFormat,
-  type GPUAdapter,
-  type GPUSurface,
-} from "@perryts/webgpu";
+import * as fs from "fs";
+
+/**
+ * Unbuffered trace, active when SPINE_TRACE_FILE is set.
+ *
+ * Local to this module on purpose: reaching for the host module's trace would
+ * pull the host in before the stage is ready to build a renderer. An earlier
+ * revision used an undefined `t` and the resulting `ReferenceError` was
+ * swallowed by the attach `try/catch`, leaving the renderer unconstructed and
+ * the viewport empty while every log line still looked plausible.
+ */
+/** How many trace writes have failed. A dead channel must be visible. */
+let traceFailures = 0;
+
+function trace(line: string): void {
+  const path = process.env.SPINE_TRACE_FILE;
+  if (!path) return;
+  try {
+    fs.appendFileSync(String(path), "[stage] " + line + "\n");
+  } catch (e) {
+    // Never fatal to rendering — but never silent either.
+    //
+    // This used to swallow the error, which made a dead logging channel
+    // indistinguishable from a frozen application: both show a trace that stops
+    // mid-line while the process keeps burning CPU. Reporting the first failure
+    // and every 1000th after that keeps the diagnosis unambiguous without
+    // letting a broken channel flood the output.
+    traceFailures = traceFailures + 1;
+    if (traceFailures === 1 || traceFailures % 1000 === 0) {
+      console.log("[stage] TRACE WRITE FAILED x" + traceFailures + ": " + String(e));
+    }
+  }
+}
+
+/**
+ * Route the renderer's optional per-frame internals into this module's trace.
+ *
+ * `@rasenjs/gfx` emits nothing unless a host installs `globalThis.__gfxTrace`,
+ * so this is the only place the hook is set and removing the assignment
+ * silences the whole channel. Installed once, lazily, from `tick()` — module
+ * scope runs before Perry has necessarily exposed `globalThis`.
+ *
+ * The hook is installed ONLY when the trace file is configured. Installing it
+ * unconditionally would make `gfxTraced()` true in every run, and the renderer
+ * guards its heavier diagnostics (per-vertex checksums over the staging ranges)
+ * on exactly that — so an untraced run would pay for instrumentation it never
+ * prints.
+ */
+let gfxHookChecked = false;
+function installGfxHook(): void {
+  if (gfxHookChecked) return;
+  gfxHookChecked = true;
+  if (!process.env.SPINE_TRACE_FILE) return;
+  (globalThis as unknown as { __gfxTrace?: (l: string) => void }).__gfxTrace = (l: string) => {
+    trace("gfx " + l);
+  };
+}
+
 import { createRootNode, spine, type GfxNode } from "@rasenjs/gfx";
 import {
   Skeleton,
@@ -38,24 +86,12 @@ import {
   type SpineAtlas,
 } from "@rasenjs/assets";
 import {
-  createPerryRenderer,
-  createPerrySurface,
-  swapchainFormat,
-  type PerryRendererOptions,
+  attach,
+  makeRenderer,
+  type GpuSetup,
   type PerrySurface,
 } from "../host/gfx-host";
 import type { LoadedSpine } from "../data/spine-assets";
-
-/**
- * Retina backing scale.
- *
- * The swapchain is sized in PHYSICAL pixels (`set_drawable_size`) while the
- * view and camera work in points, so the boundary multiplies here. Perry exposes
- * no `devicePixelRatio`, so the host has to know it.
- */
-const SCALE = 2;
-
-const NO_SURFACE = 0 as unknown as GPUSurface;
 
 /** What the stage reports back so the UI can show real state. */
 export interface StageStatus {
@@ -158,11 +194,12 @@ export class Stage {
   private readonly widthPt: number;
   private readonly heightPt: number;
 
-  private surface: GPUSurface = NO_SURFACE;
+  /** Non-zero once the GPU is up. */
+  private viewPtr = 0;
   private perrySurface: PerrySurface | null = null;
-  private renderer: ReturnType<typeof createPerryRenderer> | null = null;
+  private renderer: ReturnType<typeof makeRenderer> | null = null;
   private root: GfxNode | null = null;
-  private nodeOpts: PerryRendererOptions | null = null;
+  private setup: GpuSetup | null = null;
 
   /** Unmount for the currently mounted spine component, if any. */
   private unmountSpine: (() => void) | null = null;
@@ -253,7 +290,6 @@ export class Stage {
       this.heightPt,
     );
     this.camera = camera;
-    if (this.nodeOpts) this.nodeOpts.camera = camera;
     if (this.renderer) this.renderer.setCamera(camera);
 
     this.needsMount = true;
@@ -280,9 +316,10 @@ export class Stage {
    * the caller.
    */
   tick(dtSeconds: number): void {
+    installGfxHook();
     if (this.error) return;
 
-    if (this.surface === NO_SURFACE) {
+    if (this.viewPtr === 0) {
       this.tryAttach();
       return;
     }
@@ -325,6 +362,7 @@ export class Stage {
     this.poseAccMs = 0;
     this.drawAccMs = 0;
     this.measured = 0;
+
     if (this.opts.onStatus) {
       this.opts.onStatus({
         attached: true,
@@ -340,37 +378,33 @@ export class Stage {
   private tryAttach(): void {
     const handle = bloomViewGetNativeHandle(this.widget);
     if (handle === 0) return;
+    this.viewPtr = handle;
 
-    const surface = surfaceFromNativeView(handle);
-    this.surface = surface;
-
-    requestAdapter(surface).then((adapter: GPUAdapter): void => {
+    // The host owns the GPU bring-up (see host/gfx-host.ts); the stage only
+    // decides WHEN it happens. Perry's promise channel drops object pointers,
+    // so this resolves the device synchronously inside `attach` and the work
+    // is driven by the tick loop from here on.
+    attach(handle).then((setup: GpuSetup): void => {
       try {
-        const device = adapterRequestDeviceSync(adapter);
-        const queue = deviceGetQueueSync(device);
-        const preferred = String(surfaceGetPreferredFormat(surface, adapter));
+        const widthPt = this.widthPt;
+        const heightPt = this.heightPt;
+        trace(
+          "attach: view backing = " + setup.widthPx + "x" + setup.heightPx +
+          "px, format = " + setup.format +
+          "  constructed with " + widthPt + "x" + heightPt + "pt"
+        );
 
-        const opts: PerryRendererOptions = {
-          surface: surface,
-          deviceHandle: device,
-          queueHandle: queue,
-          // Physical pixels for the swapchain, points for the camera.
-          widthPx: this.widthPt * SCALE,
-          heightPx: this.heightPt * SCALE,
-          logicalWidth: this.widthPt,
-          logicalHeight: this.heightPt,
-          preferredFormat: preferred,
+        this.setup = setup;
+        this.perrySurface = setup.surface;
+        this.renderer = makeRenderer(setup, {
+          logicalWidth: widthPt,
+          logicalHeight: heightPt,
           camera: this.camera,
           clearColor: this.clearColor,
-        };
-        this.nodeOpts = opts;
-        // The host adapts the surface first (it owns the swapchain and the
-        // per-frame acquire cache), then hands gfx the context half.
-        this.perrySurface = createPerrySurface(opts, swapchainFormat(preferred));
-        this.renderer = createPerryRenderer(opts, this.perrySurface);
+        });
         // Apply a background chosen while the window was still coming up.
         this.renderer.setClearColor(this.clearColor);
-        this.root = createRootNode(this.renderer, surface);
+        this.root = createRootNode(this.renderer, setup.surface.context);
         // A model may already have been loaded while the window was coming up.
         if (this.current) this.mountSpine();
       } catch (e: unknown) {
@@ -396,11 +430,6 @@ export class Stage {
     if (!this.root || !this.current || !this.skeleton || !this.state) return;
     this.needsMount = false;
 
-    if (this.unmountSpine) {
-      this.unmountSpine();
-      this.unmountSpine = null;
-    }
-
     const model = this.current;
     const spineProps: Record<string, unknown> = {
       skeleton: this.skeleton,
@@ -412,7 +441,13 @@ export class Stage {
         bytes: model.spine.primary.bytes,
       },
       state: this.state,
-      animation: model.animation,
+      // Getter, not a value. The component re-asserts the animation every
+      // frame from this prop (`toValue` calls a function and returns a plain
+      // value as-is), so passing `model.animation` would freeze it at whatever
+      // the model loaded with: `stage.setAnimation` changed the state, and the
+      // next frame's `props.animation !== currentAnimation` check set it right
+      // back. The symptom was "clicking an animation does nothing".
+      animation: (): string => model.animation,
       loop: true,
       // Read once per draw so the component re-poses every frame.
       frame: () => this.frameCount,
@@ -451,7 +486,6 @@ export class Stage {
    */
   setCamera(camera: { x: number; y: number; zoom: number }): void {
     this.camera = camera;
-    if (this.nodeOpts) this.nodeOpts.camera = camera;
     if (this.renderer) this.renderer.setCamera(camera);
   }
 
