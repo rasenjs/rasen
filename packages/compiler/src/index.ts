@@ -19,4 +19,5 @@ export {
   type RasenCompilerPluginOptions,
 } from './unplugin'
 export { transformJsxExpressions } from './jsx-transform'
+export { transformStructural, type StructuralTransformOptions } from './structural'
 export { injectHmr, usesCom, hasHmrWrapping } from './hmr'

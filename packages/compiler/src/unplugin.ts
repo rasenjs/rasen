@@ -30,6 +30,7 @@
 import { createUnplugin } from 'unplugin'
 import { compileModule, type CompilerOptions } from './core'
 import { transformJsxExpressions } from './jsx-transform'
+import { transformStructural } from './structural'
 import { injectHmr, usesCom, hasHmrWrapping } from './hmr'
 
 export interface RasenCompilerPluginOptions extends CompilerOptions {
@@ -42,6 +43,15 @@ export interface RasenCompilerPluginOptions extends CompilerOptions {
   compile?: boolean
   /** HMR wrapping injection (default: enabled, dev only). */
   hmr?: boolean
+  /**
+   * Structural JSX rewrite — `.map()` → `each`, `&&` / `?:` → `when`.
+   *
+   * **Off by default.** It emits calls to `each`/`when` from `@rasenjs/core`,
+   * which only exist in a Rasen host. Enabling it for a React or Vue project
+   * compiling through this plugin would produce code that does not render —
+   * see `structural.ts` for the full argument.
+   */
+  structural?: boolean
 }
 
 function isExcluded(id: string, exclusions: Set<string>): boolean {
@@ -64,8 +74,17 @@ export function transformModule(
   filename: string,
   options: RasenCompilerPluginOptions = {}
 ): string | null {
-  const { jsxTransform = true, compile = true, hmr = false } = options
+  const { jsxTransform = true, compile = true, hmr = false, structural = false } =
+    options
   let out = code
+
+  // 0. Structural rewrite — must see raw JSX children, and the freed
+  //    `.map()`/`&&` shapes are what the hoisting pass wants to leave alone
+  //    anyway. Opt-in: it emits `each`/`when` calls that only a Rasen host
+  //    provides.
+  if (structural) {
+    out = transformStructural(out)
+  }
 
   // 1. Static hoisting — consumes raw JSX.
   if (compile) {
@@ -93,6 +112,7 @@ export const rasenCompile = createUnplugin(
     const jsxTransform = options.jsxTransform ?? true
     const compile = options.compile ?? true
     const hmr = options.hmr ?? true
+    const structural = options.structural ?? false
     const excludeSet = new Set(
       options.exclude ?? ['node_modules', '/dist/', '/.yarn/']
     )
@@ -132,6 +152,7 @@ export const rasenCompile = createUnplugin(
             ...options,
             jsxTransform,
             compile,
+            structural,
             // HMR wrapping is dev-only; the pipeline itself is env-agnostic.
             hmr: hmr && dev,
           })
