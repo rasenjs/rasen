@@ -3486,6 +3486,77 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@perryts/perry-darwin-arm64@npm:0.5.1520":
+  version: 0.5.1520
+  resolution: "@perryts/perry-darwin-arm64@npm:0.5.1520"
+  conditions: os=darwin & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@perryts/perry-darwin-x64@npm:0.5.1520":
+  version: 0.5.1520
+  resolution: "@perryts/perry-darwin-x64@npm:0.5.1520"
+  conditions: os=darwin & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@perryts/perry-linux-arm64@npm:0.5.1520":
+  version: 0.5.1520
+  resolution: "@perryts/perry-linux-arm64@npm:0.5.1520"
+  conditions: os=linux & cpu=arm64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@perryts/perry-linux-x64@npm:0.5.1520":
+  version: 0.5.1520
+  resolution: "@perryts/perry-linux-x64@npm:0.5.1520"
+  conditions: os=linux & cpu=x64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@perryts/perry-win32-arm64@npm:0.5.1520":
+  version: 0.5.1520
+  resolution: "@perryts/perry-win32-arm64@npm:0.5.1520"
+  conditions: os=win32 & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@perryts/perry-win32-x64@npm:0.5.1520":
+  version: 0.5.1520
+  resolution: "@perryts/perry-win32-x64@npm:0.5.1520"
+  conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@perryts/perry@npm:0.5.1520":
+  version: 0.5.1520
+  resolution: "@perryts/perry@npm:0.5.1520"
+  dependencies:
+    "@perryts/perry-darwin-arm64": "npm:0.5.1520"
+    "@perryts/perry-darwin-x64": "npm:0.5.1520"
+    "@perryts/perry-linux-arm64": "npm:0.5.1520"
+    "@perryts/perry-linux-x64": "npm:0.5.1520"
+    "@perryts/perry-win32-arm64": "npm:0.5.1520"
+    "@perryts/perry-win32-x64": "npm:0.5.1520"
+  dependenciesMeta:
+    "@perryts/perry-darwin-arm64":
+      optional: true
+    "@perryts/perry-darwin-x64":
+      optional: true
+    "@perryts/perry-linux-arm64":
+      optional: true
+    "@perryts/perry-linux-x64":
+      optional: true
+    "@perryts/perry-win32-arm64":
+      optional: true
+    "@perryts/perry-win32-x64":
+      optional: true
+  bin:
+    perry: bin/perry.js
+  checksum: 10c0/f65a8e138d19d361f615396dbdd39fd832449e5d4bd211a7eee930c9826bbcf891adf931a36095b518a310a3f93c4ace1ed360b8b057c812f8919060edfa5ad7
+  languageName: node
+  linkType: hard
+
 "@perryts/webgpu@npm:^0.3.0":
   version: 0.3.0
   resolution: "@perryts/webgpu@npm:0.3.0"
@@ -4055,8 +4126,8 @@ __metadata:
 
 "@rasenjs/assets@file:../../packages/assets::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=06ccd9&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
-  checksum: 10c0/107bf1e337d24499ab0985e9eab6e7d5ac1227b4bbcc2263175187911f5ee3fc1fdab2a2802807e91b87b30e2311ee0ecd228430553a8a3e78e1c7bd21ab9456
+  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=e862d3&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  checksum: 10c0/535d726cde55613cf8e2c06b2c1cea8127324a35cb920141bd57e59059f9fc82eaa54bc6e35704aff64bc911d0f8a3f914f5797c8eb178e94d104a3ea68e871c
   languageName: node
   linkType: hard
 
@@ -4072,11 +4143,11 @@ __metadata:
 
 "@rasenjs/canvas-2d@file:../../packages/canvas-2d::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.1
-  resolution: "@rasenjs/canvas-2d@file:../../packages/canvas-2d#../../packages/canvas-2d::hash=3f6ed6&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/canvas-2d@file:../../packages/canvas-2d#../../packages/canvas-2d::hash=12325a&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
-  checksum: 10c0/d305f5fdb4218b42704579946aad966fb94a0b2ba2239c65817fcbdc234dcf90906b8a655f8cc447aff84246f8e4f50d2e5f35716c6fe8b6da831870b39bbed8
+  checksum: 10c0/0c935243bc310338a3b2c54291186074e1454400c3e4895479b2428368bc4175c77e32137489d7f44e39678e5543c0b8d4cfa37cd46378996cdc3d768c93e95b
   languageName: node
   linkType: hard
 
@@ -4110,25 +4181,25 @@ __metadata:
 
 "@rasenjs/core@file:../../packages/core::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
   version: 0.1.8
-  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=45bddb&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=01cbea&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   peerDependencies:
     zod: ^3.0.0
   peerDependenciesMeta:
     zod:
       optional: true
-  checksum: 10c0/e624382dd6d92676d8b618df187cbd06ee1c51a67d6903c24afe1750f24f39404ccf947c2d7582506fe2dbd954a8d152e1cef3125b75c40f43394df1969da263
+  checksum: 10c0/9bc634c0a3fbd1c8a11759ba8ebdd4afeff2c4e0301cb066e0b93fde3926c5c84ca4ec737c9e26916edf4ab0e475da172030554567f75286e8a778d3ba41b6bb
   languageName: node
   linkType: hard
 
 "@rasenjs/core@file:../../packages/core::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=45bddb&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=01cbea&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   peerDependencies:
     zod: ^3.0.0
   peerDependenciesMeta:
     zod:
       optional: true
-  checksum: 10c0/e624382dd6d92676d8b618df187cbd06ee1c51a67d6903c24afe1750f24f39404ccf947c2d7582506fe2dbd954a8d152e1cef3125b75c40f43394df1969da263
+  checksum: 10c0/9bc634c0a3fbd1c8a11759ba8ebdd4afeff2c4e0301cb066e0b93fde3926c5c84ca4ec737c9e26916edf4ab0e475da172030554567f75286e8a778d3ba41b6bb
   languageName: node
   linkType: hard
 
@@ -4145,13 +4216,13 @@ __metadata:
 
 "@rasenjs/dom@file:../../packages/dom::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=e3f22f&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=0f1c9d&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/gfx": "workspace:*"
-  checksum: 10c0/473233b93cf8abefcde356d20b8128e7cce6fb00adcb1eccd49b7dcc4f0fd965e2529cc904d8dd71510e805bc02c875767bb97e19a7e1e59cebed47f673a49ff
+  checksum: 10c0/29f1ebd896e3cbf2b4f6c208adf3930ce75960ad36f2a74d440c3e3a1b369d8e46c5083e8c0ed063721500e453fc513f0d7bf42f6ec42c99ec486e3cb186ffcd
   languageName: node
   linkType: hard
 
@@ -4288,11 +4359,13 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/examples-perry-nikke-viewer@workspace:examples/perry-nikke-viewer"
   dependencies:
-    "@perryts/webgpu": "npm:^0.3.0"
+    "@perryts/perry": "npm:0.5.1520"
     "@rasenjs/assets": "workspace:*"
+    "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/gfx": "workspace:*"
     "@rasenjs/math": "workspace:*"
+    "@rasenjs/perry-wgpu": "workspace:*"
     "@rasenjs/reactive-alien-signals": "workspace:*"
     typescript: "npm:^5.3.3"
   languageName: unknown
@@ -4369,23 +4442,23 @@ __metadata:
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=808a0b&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=fcc64a&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/00b0eff35d241eb3e23d499bfea22a8ff082f4379083f36bc73759bbd27c0f50ea9e29824974b7d36a71578bbb4671c003c0806518713e6629abcc0ce7a0d718
+  checksum: 10c0/ee424ce592c7b5d80a60ccc3493fcb63741741652623ba97e60e6b3960958aae5ff5ef8abaf56b80644c2d4a312461cc78e06100449c694012c0b8a8fe17996b
   languageName: node
   linkType: hard
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=808a0b&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=fcc64a&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/00b0eff35d241eb3e23d499bfea22a8ff082f4379083f36bc73759bbd27c0f50ea9e29824974b7d36a71578bbb4671c003c0806518713e6629abcc0ce7a0d718
+  checksum: 10c0/ee424ce592c7b5d80a60ccc3493fcb63741741652623ba97e60e6b3960958aae5ff5ef8abaf56b80644c2d4a312461cc78e06100449c694012c0b8a8fe17996b
   languageName: node
   linkType: hard
 
@@ -4424,7 +4497,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/html@workspace:*, @rasenjs/html@workspace:packages/html":
+"@rasenjs/html@workspace:*, @rasenjs/html@workspace:^, @rasenjs/html@workspace:packages/html":
   version: 0.0.0-use.local
   resolution: "@rasenjs/html@workspace:packages/html"
   dependencies:
@@ -4465,6 +4538,12 @@ __metadata:
 "@rasenjs/math@workspace:*, @rasenjs/math@workspace:^, @rasenjs/math@workspace:packages/math":
   version: 0.0.0-use.local
   resolution: "@rasenjs/math@workspace:packages/math"
+  languageName: unknown
+  linkType: soft
+
+"@rasenjs/perry-wgpu@workspace:*, @rasenjs/perry-wgpu@workspace:packages/perry-wgpu":
+  version: 0.0.0-use.local
+  resolution: "@rasenjs/perry-wgpu@workspace:packages/perry-wgpu"
   languageName: unknown
   linkType: soft
 
@@ -4642,6 +4721,8 @@ __metadata:
   resolution: "@rasenjs/rota@workspace:packages/rota"
   dependencies:
     "@playwright/test": "npm:^1.40.0"
+    "@rasenjs/html": "workspace:^"
+    "@rasenjs/reactive-vue": "workspace:^"
     "@testing-library/dom": "npm:^10.0.0"
     "@testing-library/jest-dom": "npm:^6.4.0"
     "@testing-library/user-event": "npm:^14.5.0"
@@ -4649,8 +4730,7 @@ __metadata:
     vitest: "npm:^1.0.4"
   peerDependencies:
     "@rasenjs/core": "workspace:^"
-    "@rasenjs/dom": "workspace:^"
-    "@rasenjs/html": "workspace:^"
+    "@rasenjs/web": "workspace:^"
   languageName: unknown
   linkType: soft
 

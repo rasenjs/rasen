@@ -232,7 +232,9 @@
 ### **Phase 6: Ray Tracing (WebGPU)**
 > Real-time ray tracing effects
 
-> **Note**: This phase requires WebGPU support. May need to create `@rasenjs/webgpu` package.
+> **Note**: This phase requires WebGPU support, which `@rasenjs/perry-wgpu`
+> provides for the Perry/native targets. The browser targets use the host's own
+> `navigator.gpu`.
 
 #### 6.1 WebGPU Foundation
 - [ ] WebGPU context setup
