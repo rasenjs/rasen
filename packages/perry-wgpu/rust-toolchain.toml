@@ -1,0 +1,14 @@
+# Pinned to match the Perry release CLI this crate is built against.
+#
+# Why nightly at all: perry-ffi's own workspace pins this channel, and the
+# `v0.5.1520` workspace sets `[unstable] min-publish-age` in
+# `.cargo/config.toml`, which stable cargo ignores. Pinning it here means a
+# `cargo build` in this directory reproduces what `perry compile` does,
+# rather than silently using whatever `rustup` considers active.
+#
+# If a future CLI moves to a different channel, bump this file in the same
+# commit — an out-of-sync toolchain shows up as confusing `E0658` errors
+# from *inside* a dependency, not from this crate.
+[toolchain]
+channel = "nightly"
+components = ["rustfmt", "clippy"]

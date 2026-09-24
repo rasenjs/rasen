@@ -1,0 +1,6 @@
+# Cargo build output.
+#
+# `perry compile` builds this crate in place when the manifest declares no
+# `prebuilt` entry, and the wgpu dependency tree makes that directory ~750 MB
+# of intermediate artifacts. Never commit it.
+/target/

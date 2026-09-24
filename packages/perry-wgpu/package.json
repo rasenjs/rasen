@@ -1,0 +1,700 @@
+{
+  "name": "@rasenjs/perry-wgpu",
+  "version": "0.1.0",
+  "description": "WebGPU for the Perry TypeScript-to-native compiler (backed by wgpu). The package IS the browser API — spec-shaped objects over Perry's flat FFI. Vendored from @perryts/webgpu 0.3.0, migrated to wgpu 30.",
+  "license": "MIT",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "perry": "./src/index.ts",
+      "types": "./src/index.ts"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryTS/webgpu.git"
+  },
+  "homepage": "https://github.com/PerryTS/webgpu#readme",
+  "bugs": {
+    "url": "https://github.com/PerryTS/perry/issues"
+  },
+  "keywords": [
+    "perry",
+    "perryts",
+    "webgpu",
+    "wgpu",
+    "gpu",
+    "graphics",
+    "compute",
+    "wgsl"
+  ],
+  "files": [
+    "src/",
+    "Cargo.toml",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "perry": {
+    "nativeLibrary": {
+      "abiVersion": "0.5",
+      "functions": [
+        {
+          "name": "js_webgpu_request_adapter",
+          "params": [
+            "i64"
+          ],
+          "returns": "promise"
+        },
+        {
+          "name": "js_webgpu_adapter_request_device",
+          "params": [
+            "i64"
+          ],
+          "returns": "promise"
+        },
+        {
+          "name": "js_webgpu_adapter_drop",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_device_destroy",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_device_poll",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_device_create_buffer",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_buffer_destroy",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_buffer_map_async",
+          "params": [
+            "i64",
+            "i32",
+            "number",
+            "number"
+          ],
+          "returns": "promise"
+        },
+        {
+          "name": "js_webgpu_buffer_get_mapped_range",
+          "params": [
+            "i64",
+            "number",
+            "number"
+          ],
+          "returns": "f64"
+        },
+        {
+          "name": "js_webgpu_buffer_unmap",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_device_create_shader_module",
+          "params": [
+            "i64",
+            "string"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_create_bind_group_layout",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_create_pipeline_layout",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_create_bind_group",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_create_compute_pipeline",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_create_compute_pipeline_async",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "promise"
+        },
+        {
+          "name": "js_webgpu_compute_pipeline_get_bind_group_layout",
+          "params": [
+            "i64",
+            "i32"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_create_render_pipeline",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_create_render_pipeline_async",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "promise"
+        },
+        {
+          "name": "js_webgpu_render_pipeline_get_bind_group_layout",
+          "params": [
+            "i64",
+            "i32"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_create_texture",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_texture_create_view",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_texture_destroy",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_device_create_sampler",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_create_query_set",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_query_set_destroy",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_device_create_command_encoder",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_command_encoder_begin_compute_pass",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_command_encoder_begin_render_pass",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_command_encoder_copy_buffer_to_buffer",
+          "params": [
+            "i64",
+            "i64",
+            "number",
+            "i64",
+            "number",
+            "number"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_command_encoder_copy_buffer_to_texture",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_command_encoder_copy_texture_to_buffer",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_command_encoder_copy_texture_to_texture",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_command_encoder_resolve_query_set",
+          "params": [
+            "i64",
+            "i64",
+            "i32",
+            "i32",
+            "i64",
+            "number"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_command_encoder_finish",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_compute_pass_set_pipeline",
+          "params": [
+            "i64",
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_compute_pass_set_bind_group",
+          "params": [
+            "i64",
+            "i32",
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_compute_pass_set_bind_group_dyn",
+          "params": [
+            "i64",
+            "i32",
+            "i64",
+            "string"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_compute_pass_dispatch_workgroups",
+          "params": [
+            "i64",
+            "i32",
+            "i32",
+            "i32"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_compute_pass_end",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_set_pipeline",
+          "params": [
+            "i64",
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_set_bind_group",
+          "params": [
+            "i64",
+            "i32",
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_set_bind_group_dyn",
+          "params": [
+            "i64",
+            "i32",
+            "i64",
+            "string"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_set_vertex_buffer",
+          "params": [
+            "i64",
+            "i32",
+            "i64",
+            "number",
+            "number"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_set_index_buffer",
+          "params": [
+            "i64",
+            "i64",
+            "string",
+            "number",
+            "number"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_draw",
+          "params": [
+            "i64",
+            "i32",
+            "i32",
+            "i32",
+            "i32"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_draw_indexed",
+          "params": [
+            "i64",
+            "i32",
+            "i32",
+            "i32",
+            "i32",
+            "i32"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_set_viewport",
+          "params": [
+            "i64",
+            "number",
+            "number",
+            "number",
+            "number",
+            "number",
+            "number"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_set_scissor_rect",
+          "params": [
+            "i64",
+            "i32",
+            "i32",
+            "i32",
+            "i32"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_set_blend_constant",
+          "params": [
+            "i64",
+            "number",
+            "number",
+            "number",
+            "number"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_set_stencil_reference",
+          "params": [
+            "i64",
+            "i32"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_begin_occlusion_query",
+          "params": [
+            "i64",
+            "i32"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_end_occlusion_query",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_render_pass_end",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_queue_submit",
+          "params": [
+            "i64",
+            "string"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_queue_write_buffer",
+          "params": [
+            "i64",
+            "i64",
+            "number",
+            "ptr"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_queue_write_texture",
+          "params": [
+            "i64",
+            "json",
+            "ptr"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_queue_on_submitted_work_done",
+          "params": [
+            "i64"
+          ],
+          "returns": "promise"
+        },
+        {
+          "name": "js_webgpu_device_push_error_scope",
+          "params": [
+            "i64",
+            "string"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_device_pop_error_scope",
+          "params": [
+            "i64"
+          ],
+          "returns": "promise"
+        },
+        {
+          "name": "js_webgpu_request_surface",
+          "params": [
+            "json"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_surface_from_native_view",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_surface_get_view_ptr",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_view_backing_size",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64_str"
+        },
+        {
+          "name": "js_webgpu_surface_get_preferred_format",
+          "params": [
+            "i64",
+            "i64"
+          ],
+          "returns": "i64_str"
+        },
+        {
+          "name": "js_webgpu_surface_configure",
+          "params": [
+            "i64",
+            "json"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_surface_get_current_texture",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_surface_present",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_surface_unconfigure",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_surface_drop",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_adapter_request_device_sync",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_device_get_queue_sync",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64"
+        },
+        {
+          "name": "js_webgpu_texture_view_destroy",
+          "params": [
+            "i64"
+          ],
+          "returns": "void"
+        },
+        {
+          "name": "js_webgpu_list_bloom_views",
+          "params": [
+            "i64"
+          ],
+          "returns": "i64_str"
+        }
+      ],
+      "targets": {
+        "macos": {
+          "cargo_features": [],
+          "crate": ".",
+          "lib": "libperry_ext_perry_wgpu.a",
+          "frameworks": [
+            "Metal",
+            "QuartzCore",
+            "CoreGraphics",
+            "Foundation",
+            "AppKit"
+          ]
+        },
+        "ios": {
+          "cargo_features": [],
+          "crate": ".",
+          "lib": "libperry_ext_perry_wgpu.a",
+          "frameworks": [
+            "Metal",
+            "QuartzCore",
+            "CoreGraphics",
+            "Foundation",
+            "UIKit"
+          ]
+        },
+        "linux": {
+          "cargo_features": [],
+          "crate": ".",
+          "lib": "libperry_ext_perry_wgpu.a"
+        },
+        "windows": {
+          "cargo_features": [],
+          "crate": ".",
+          "lib": "libperry_ext_perry_wgpu.a",
+          "libs": [
+            "d3dcompiler",
+            "opengl32"
+          ]
+        },
+        "android": {
+          "cargo_features": [],
+          "crate": ".",
+          "lib": "libperry_ext_perry_wgpu.a"
+        }
+      }
+    }
+  }
+}

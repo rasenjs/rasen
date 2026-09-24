@@ -1,0 +1,112 @@
+[package]
+name = "perry-ext-perry-wgpu"
+version = "0.1.2"
+edition = "2021"
+license = "MIT"
+description = "Native WebGPU bindings (backed by `wgpu`) for the Perry TypeScript-to-native compiler. Spec-faithful surface so shaders + pipelines authored against the browser WebGPU API run unmodified under perry."
+repository = "https://github.com/PerryTS/webgpu"
+homepage = "https://github.com/PerryTS/webgpu"
+
+# Vendored from `@perryts/webgpu` 0.3.0 (MIT, Copyright (c) 2026 PerryTS
+# contributors) and maintained here. See `patches/README.md` for what diverged
+# and why.
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+# The perry-ffi v0.5 ABI surface, pinned to the Perry commit the runtime
+# libraries in `PERRY_RUNTIME_DIR` were built from.
+#
+# A git dependency, because `perry-ffi` is not published to crates.io — verified
+# 404 for both `perry-ffi` and `perry_ffi`, despite a comment in the upstream
+# workspace claiming otherwise (and its own manifest notes `cargo publish` cannot
+# work until `perry-native-registration` and `perry-runtime` go up first).
+#
+# Pinned to a COMMIT, not a branch: `main` moves and has repeatedly broken this
+# build, and the crate has to agree with the runtime libraries the compiler
+# links. `25ef4637f` is the commit exercised by the viewer's build.
+#
+# Working on a local Perry checkout instead? Override without editing this file:
+#
+#   cargo build --release --config 'patch."https://github.com/PerryTS/perry".perry-ffi.path="/path/to/perry/crates/perry-ffi"'
+#
+# ...or commit the same `[patch]` block to `.cargo/config.toml` (not tracked).
+perry-ffi = { git = "https://github.com/PerryTS/perry.git", rev = "25ef4637f" }
+
+# wgpu is the native implementation of the WebGPU spec. We track
+# the latest stable release; it carries naga (the WGSL compiler)
+# transitively so we don't need to depend on it directly.
+#
+# 30.x rather than 22.x: `wgpu-hal` only gained Metal ray tracing
+# (`EXPERIMENTAL_RAY_QUERY`) at 29, and this crate exists to reach it. The
+# known-good reference is `wgpu-rt-probe` (30.0.1), which validated
+# `rayQueryInitialize`/`rayQueryGetCommittedIntersection` on M4 with exact
+# barycentrics — see docs/DESIGN.md for the migration notes.
+wgpu = "30"
+
+# Async dispatch — every WebGPU async method (`requestAdapter`,
+# `requestDevice`, `createComputePipelineAsync`, `mapAsync`,
+# `onSubmittedWorkDone`) routes through `spawn_blocking` + a
+# tokio `block_on` to wait on the wgpu future, mirroring the
+# iroh-bindings async pattern.
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+
+# pollster's `block_on` is needed for the no-runtime fallback in
+# `device.poll()` — wgpu's poll loop runs synchronously and we
+# don't always have a tokio runtime in scope when GC kicks in.
+pollster = "0.3"
+
+# Once wgpu surfaces a callback we have to materialise on the
+# main thread, parking_lot's lighter Mutex avoids contention vs.
+# std's poison-tracking variant.
+parking_lot = "0.12"
+
+# Descriptor passing: WebGPU's descriptor objects (`GPUBufferDescriptor`,
+# `GPUBindGroupLayoutDescriptor`, `GPURenderPipelineDescriptor`, …) are
+# deeply nested with many optional fields. Rather than exploding each
+# descriptor into a wide function-arg list, the TS side calls
+# `JSON.stringify(descriptor)` and we deserialize on the Rust side. This
+# keeps the FFI surface small (one descriptor JSON string + a few handles
+# per call) and the TS surface obvious (the object literal is the
+# argument exactly as in the spec).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# On-screen surface (`GPUSurface` / `GPUCanvasContext`). We build a
+# native view per platform and hand its raw handle to wgpu's
+# `create_surface_unsafe`, so we depend on `raw-window-handle` directly
+# (the same 0.6 line wgpu 22 re-exports). The native view is then handed
+# to perry-ui's `perry_ui_embed_*` hook by the caller — see the
+# "On-screen surface" section in lib.rs.
+raw-window-handle = "0.6"
+
+# ─── Per-platform native-view creation ──────────────────────────────
+#
+# Versions track the `perry-ui-*` backends so the linked binary pulls a
+# single copy of each objc2 / windows / jni crate. Only the host
+# target's block compiles; wgpu's HAL turns the bare view handle into a
+# swapchain-capable layer (CAMetalLayer / DXGI / Vulkan surface).
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSGeometry"] }
+objc2-app-kit = { version = "0.3", features = ["NSView", "NSResponder"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSGeometry"] }
+objc2-ui-kit = { version = "0.3", features = ["UIView", "UIResponder"] }
+objc2-quartz-core = { version = "0.3", features = ["CAMetalLayer", "CALayer"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_LibraryLoader",
+    "Win32_Graphics_Gdi",
+] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+ndk = "0.9"
