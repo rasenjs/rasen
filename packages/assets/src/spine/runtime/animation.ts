@@ -879,8 +879,25 @@ function applyDrawOrder(skeleton: Skeleton, anim: AnimationData, time: number): 
   for (const off of offsets) {
     const slotIndex = slots.findIndex((s) => s.data.name === off.slot)
     if (slotIndex === -1) continue
-    while (originalIndex !== slotIndex) unchanged.push(originalIndex++)
-    order[slotIndex + off.offset] = slotIndex
+    // ASCENDING ONLY — `originalIndex < slotIndex`, never `!==`.
+    //
+    // Spine's own implementation writes `while (originalIndex != slotIndex)`,
+    // which terminates only because the exporter emits `offsets` sorted by
+    // ascending slot index. A re-serialized or hand-edited file can carry a
+    // descending pair (a later entry whose slot sits earlier in the skeleton),
+    // and then the inequality can never become true again: `originalIndex++`
+    // runs toward 2^53 while every step pushes into `unchanged`, spinning at
+    // 100% CPU with no output and allocating without bound.
+    while (originalIndex < slotIndex) unchanged.push(originalIndex++)
+    if (originalIndex > slotIndex) {
+      // The slot was already passed, so this offset cannot be applied without
+      // reordering what came before it. Skipping leaves the slot to be filled
+      // from `unchanged`, exactly as if it carried no offset.
+      continue
+    }
+    const target = slotIndex + off.offset
+    // The exponent can be any integer; write only inside the array.
+    if (target >= 0 && target < slotCount) order[target] = slotIndex
     originalIndex++
   }
   while (originalIndex < slotCount) unchanged.push(originalIndex++)
