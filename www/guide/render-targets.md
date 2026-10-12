@@ -21,18 +21,23 @@ This simple abstraction enables cross-platform rendering.
 
 The most common target. Components mount to `HTMLElement` hosts:
 
-```typescript
-import { div, button, span, mount } from '@rasenjs/dom'
+```tsx
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { mount } from '@rasenjs/dom'
+import { ref } from '@vue/reactivity'
 
-const Counter = () =>
-  div({
-    children: [
-      span({ textContent: () => `Count: ${count.value}` }),
-      button({ textContent: '+', on: { click: () => count.value++ } })
-    ]
-  })
+useReactiveRuntime()
 
-mount(Counter(), document.getElementById('app'))
+const count = ref(0)
+
+const Counter = () => (
+  <div>
+    <span>Count: {count}</span>
+    <button onClick={() => count.value++}>+</button>
+  </div>
+)
+
+mount(<Counter />, document.getElementById('app')!)
 ```
 
 [Learn more about DOM rendering →](/guide/targets/dom)
@@ -127,13 +132,13 @@ const useCounter = () => {
 // DOM version
 const DOMCounter = () => {
   const { count, increment, decrement } = useCounter()
-  return div({
-    children: [
-      span({ textContent: () => `${count.value}` }),
-      button({ textContent: '+', on: { click: increment } }),
-      button({ textContent: '-', on: { click: decrement } })
-    ]
-  })
+  return (
+    <div>
+      <span>{count}</span>
+      <button onClick={increment}>+</button>
+      <button onClick={decrement}>-</button>
+    </div>
+  )
 }
 
 // React Native version
@@ -141,7 +146,7 @@ const RNCounter = () => {
   const { count, increment, decrement } = useCounter()
   return view({
     children: [
-      text({ children: () => `${count.value}` }),
+      text({ children: count }),
       touchableOpacity({
         onPress: increment,
         children: text({ children: '+' })

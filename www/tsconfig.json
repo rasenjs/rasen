@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@rasenjs/dom",
+    "noEmit": true,
+    "noUnusedLocals": false,
+    "types": ["node"]
+  },
+  "include": ["snippets/**/*.ts", "snippets/**/*.tsx"],
+  "exclude": ["node_modules", ".vitepress"]
+}

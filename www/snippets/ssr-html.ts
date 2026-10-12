@@ -1,6 +1,6 @@
 import { renderToString, div, p, ul, li } from '@rasenjs/html'
 
-// No reactive runtime needed for SSR!
+// No DOM and no reactive runtime required: the string host renders once.
 const html = renderToString(
   div(
     { class: 'container' },
@@ -10,4 +10,4 @@ const html = renderToString(
 )
 
 console.log(html)
-// Output: <div class="container"><p class="title">Hello from SSR!</p><ul class="list"><li>Item 1</li>...</ul></div>
+// <div class="container"><p class="title">Hello from SSR!</p><ul class="list"><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul></div>

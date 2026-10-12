@@ -12,7 +12,7 @@
 
 - [📖 技术调研报告](RESEARCH.md)
 - [🤖 实施指引](AGENTS.md)
-- [🏗️ 示例代码](../examples/winui3-counter/)
+- [🏗️ 示例代码](https://github.com/rasenjs/rasen/tree/main/packages/examples/winui3-counter/)
 
 ## 🔧 技术栈
 

@@ -1,247 +1,167 @@
 # Reactive Runtime
 
-Rasen is designed to work with any reactive system. This guide explains how reactive runtimes integrate with Rasen.
+Rasen does not implement reactivity. It calls into whichever reactive system you
+already use through a small interface, so the same components can be driven by
+Vue refs, TC39 Signals, nanostores, or the zero-dependency runtime built into
+`@rasenjs/core`.
 
-## Overview
-
-Instead of building its own reactive system, Rasen provides a `ReactiveRuntime` interface that adapters implement:
+## The interface
 
 ```typescript
 interface ReactiveRuntime {
-  watch<T>(
-    source: () => T,
-    callback: (value: T, oldValue: T) => void,
-    options?: { immediate?: boolean; deep?: boolean }
-  ): () => void
+  /** The one binding primitive every renderer uses. */
+  subscribe<T>(getter: () => T, callback: (value: T, oldValue: T) => void): () => void
 
-  effectScope(): {
-    run<T>(fn: () => T): T | undefined
-    stop(): void
-  }
+  /** Component lifetime: com() collects subscriptions here and stops them. */
+  effectScope(): { run<T>(fn: () => T): T | undefined; stop(): void }
 
   ref<T>(value: T): Ref<T>
-  computed<T>(getter: () => T): ReadonlyRef<T>
   unref<T>(value: T | Ref<T>): T
+  setValue<T>(ref: Ref<T>, value: T): void
   isRef(value: unknown): boolean
 }
 ```
 
-## Setting Up a Runtime
+`subscribe` carries two guarantees the renderers rely on:
 
-Before using Rasen, you must set up a reactive runtime:
+1. **Static sources install nothing.** If the first evaluation of `getter`
+   collects no dependency, there is no subscription to maintain.
+2. **Equal values are skipped.** A change that evaluates to an `Object.is`-equal
+   result never calls back.
 
-```typescript
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+Together they let a binding treat static and dynamic input identically — a
+static binding degrades to a single write instead of a watcher.
 
-useReactiveRuntime()
-```
+## Built-in runtime
 
-This should be done once at app initialization, before mounting any components.
-
-## Available Adapters
-
-### Vue Reactivity
-
-The recommended adapter for most use cases:
+`getReactiveRuntime()` never throws. With no adapter installed it lazily creates
+a **zero-dependency runtime** whose refs are callable:
 
 ```typescript
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref, computed, watch } from '@vue/reactivity'
+import { ref, unref, computed } from '@rasenjs/core'
 
-useReactiveRuntime()
-
-// Use Vue's reactive primitives directly
 const count = ref(0)
-const doubled = computed(() => count.value * 2)
+count()            // read → 0
+count(5)           // write → 5
+const double = computed(() => count() * 2)
 ```
 
-### TC39 Signals
+This is enough to use Rasen with no reactive library at all, and it is what the
+element factories fall back to in tests and SSR.
 
-For projects preferring the emerging Signals standard:
+## Adapters
 
-```typescript
-import { createReactiveRuntime, ref } from '@rasenjs/reactive-signals'
+Install one adapter and activate it **once** before mounting:
 
-useReactiveRuntime()
+::: code-group
 
-// Use the adapter's ref
-const count = ref(0)
-```
-
-## Using Reactive State
-
-### With Vue Runtime
-
-```typescript
+```typescript [Vue]
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { ref, computed, reactive } from '@vue/reactivity'
 
-// Primitive values
-const count = ref(0)
-const name = ref('World')
-
-// Computed values
-const greeting = computed(() => `Hello, ${name.value}!`)
-const doubled = computed(() => count.value * 2)
-
-// Reactive objects
-const state = reactive({
-  items: [],
-  loading: false
-})
-
-// In components
-const Counter = () => div({
-  children: [
-    span({ textContent: () => `Count: ${count.value}` }),
-    span({ textContent: doubled }),  // Can pass computed directly
-    span({ textContent: greeting })
-  ]
-})
-```
-
-### With Signals Runtime
-
-```typescript
-import { ref, computed } from '@rasenjs/reactive-signals'
+useReactiveRuntime()
 
 const count = ref(0)
 const doubled = computed(() => count.value * 2)
-
-// Usage is the same
-const Counter = () => div({
-  children: [
-    span({ textContent: () => `Count: ${count.value}` }),
-    span({ textContent: doubled })
-  ]
-})
 ```
 
-## PropValue Type
+```typescript [Signals]
+import { useReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
+import { Signal } from 'signal-polyfill'
 
-Rasen components accept props that can be:
+useReactiveRuntime()
 
-1. **Static values** — Plain values that don't change
-2. **Ref values** — Reactive references (mutable)
-3. **Computed values** — Derived reactive values (readonly)
-4. **Getter functions** — Functions that return values
+// either the adapter's helpers…
+const count = ref(0)
+
+// …or signal-polyfill directly: Signal.State / Signal.Computed are recognized
+// as refs by the runtime
+const total = new Signal.State(0)
+const doubled = computed(() => count.value * 2)
+```
+
+```typescript [Nanostores]
+import { useReactiveRuntime } from '@rasenjs/reactive-nanostores'
+import { atom, computed } from 'nanostores'
+
+useReactiveRuntime()
+
+const count = atom(0)
+const doubled = computed(count, (n) => n * 2)
+```
+
+```typescript [Alien Signals]
+import { useReactiveRuntime, ref } from '@rasenjs/reactive-alien-signals'
+
+useReactiveRuntime()
+
+const count = ref(0)   // alien-signals signal, callable: count() / count(5)
+```
+
+:::
+
+`useReactiveRuntime()` is a thin wrapper over `createReactiveRuntime()` +
+`setReactiveRuntime()`; use the `create*` form when you want to build a runtime
+yourself (for testing, or to pick options).
+
+::: tip One adapter per page
+The adapter is global, and it also decides what counts as a ref
+(`runtime.isRef`). Two adapters at once means two incompatible ref flavors, so
+installing a second one replaces the first.
+:::
+
+## PropValue: value, ref or getter
+
+Host props accept `PropValue<T>` — a plain value, a ref, or a getter function:
 
 ```typescript
 import type { PropValue } from '@rasenjs/core'
 
-// All of these work:
-div({ textContent: 'Hello' })                    // Static
-div({ textContent: ref('Hello') })               // Ref
-div({ textContent: computed(() => 'Hello') })    // Computed  
-div({ textContent: () => 'Hello' })              // Getter
-```
-
-The component will automatically track dependencies and update when reactive values change.
-
-## Creating a Custom Runtime
-
-You can create adapters for any reactive library:
-
-```typescript
-import type { ReactiveRuntime } from '@rasenjs/core'
-import { createSignal, createEffect, createMemo } from 'solid-js'
-
-function createSolidRuntime(): ReactiveRuntime {
-  return {
-    watch(source, callback, options) {
-      let oldValue: any
-      let isFirst = true
-      
-      createEffect(() => {
-        const newValue = source()
-        if (!isFirst || options?.immediate) {
-          callback(newValue, oldValue)
-        }
-        oldValue = newValue
-        isFirst = false
-      })
-      
-      return () => {
-        // Solid handles cleanup automatically
-      }
-    },
-
-    effectScope() {
-      // Solid doesn't have explicit scopes
-      return {
-        run: (fn) => fn(),
-        stop: () => {}
-      }
-    },
-
-    ref(value) {
-      const [get, set] = createSignal(value)
-      return {
-        get value() { return get() },
-        set value(v) { set(v) }
-      }
-    },
-
-    computed(getter) {
-      const memo = createMemo(getter)
-      return {
-        get value() { return memo() }
-      }
-    },
-
-    unref(value) {
-      if (this.isRef(value)) {
-        return value.value
-      }
-      return value
-    },
-
-    isRef(value) {
-      return value && typeof value === 'object' && 'value' in value
-    }
-  }
+interface Props {
+  class: PropValue<string>
+  hidden: PropValue<boolean>
 }
 ```
 
-## Best Practices
-
-### 1. Initialize Early
-
-Set the reactive runtime before any components are created:
-
 ```typescript
-// main.ts
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-
-useReactiveRuntime()
-
-// Now safe to import and use components
-import { App } from './App'
-mount(App(), document.getElementById('app'))
+div({
+  class: 'card',                        // static: one write, no subscription
+  hidden: isHidden,                     // ref: subscribed
+  title: () => `Count: ${count()}`,     // getter: subscribed
+  style: { opacity: () => (open() ? '1' : '0') }
+})
 ```
 
-### 2. Use the Library Directly
+A getter re-evaluates whenever anything it read changes, so it is the most
+direct way to express a derived value without creating a computed.
 
-Don't import reactive primitives from Rasen — use the library directly:
+### Children are different
 
-```typescript
-// ✅ Good
-import { ref, computed } from '@vue/reactivity'
+A child position resolves **values, refs and mountables**, not getters:
 
-// ❌ Avoid
-import { ref } from '@rasenjs/core'  // Only for internal use
-```
+| Child | Result |
+| ----- | ------ |
+| `'text'` / `42` | static text node |
+| a ref | reactive text node, updated through the runtime |
+| a mountable (`when(…)`, a component, a JSX element) | mounted |
+| a plain getter | called once for its text — use `text({ content })` for a reactive text node |
 
-### 3. Prefer Getters for Simple Expressions
+In JSX, `{count}` on a ref compiles to that reactive text binding for you.
 
-For simple computed values, getter functions are often cleaner:
+## Reacting to one property
 
-```typescript
-// Both work, but getters are more concise for simple cases
-div({ textContent: () => `Count: ${count.value}` })
-div({ textContent: computed(() => `Count: ${count.value}`) })
-```
+`watchObjectProps` subscribes to the properties of a plain object that the
+runtime can track — used by hosts that accept a reactive *record* (a style
+object, a config object) rather than a single value.
+
+## Custom runtime
+
+An adapter is ~60 lines: implement the six members and call
+`setReactiveRuntime()`. See
+[Custom Reactive Runtime](/guide/advanced/custom-reactive) for a walkthrough.
 
 ## Next Steps
 
-- [Render Targets](/guide/render-targets) — Learn about different hosts
-- [Components](/guide/components) — Building reusable components
+- [Three-Phase Functions](/guide/three-phase-functions) — where state lives
+- [Render Targets](/guide/render-targets) — who consumes the bindings
+- [@rasenjs/core reference](/packages/core) — the exports in one place

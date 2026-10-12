@@ -88,17 +88,14 @@ import { div, button, mount } from '@rasenjs/dom'
 
 const count = atom(0)
 
-const Counter = () => div({
-  children: [
-    div({ textContent: computed(count, c => `Count: ${c}`) }),
-    button({
-      textContent: 'Increment',
-      on: {
-        click: () => count.set(count.get() + 1)
-      }
-    })
-  ]
-})
+const Counter = () => div(
+  {},
+  // an atom in a child position becomes a reactive text node
+  div({}, count),
+  // computed stores work the same way
+  div({}, computed(count, (c) => `Doubled: ${c * 2}`)),
+  button({ onClick: () => count.set(count.get() + 1) }, 'Increment')
+)
 
 mount(Counter(), document.body)
 ```
@@ -127,7 +124,7 @@ mount(Counter(), document.body)
 ## Learn More
 
 - [Nanostores Documentation](https://github.com/nanostores/nanostores)
-- [Rasen Core Documentation](../core/README.md)
+- [Rasen Core Documentation](https://github.com/rasenjs/rasen/tree/main/packages/core/README.md)
 
 ## License
 

@@ -1,83 +1,129 @@
-# JSX Support
+# JSX & the Compiler
 
-Rasen supports JSX/TSX syntax through the `@rasenjs/jsx` package.
+JSX is the recommended authoring syntax in Rasen, and the
+[`@rasenjs/compiler`](/packages/compiler) is what makes it cheap: it turns a
+static subtree into one `template()` clone and each dynamic slot into a single
+fine-grained binding. There is no virtual DOM in the output — you can read the
+generated code and see the DOM calls.
 
 ## Setup
 
-### 1. Install the package
-
 ```bash
-npm install @rasenjs/jsx
+npm install -D @rasenjs/compiler
 ```
 
-### 2. Configure TypeScript
+```typescript
+// vite.config.ts
+import { defineConfig } from 'vite'
+import { rasenCompile } from '@rasenjs/compiler'
 
-```json
+export default defineConfig({ plugins: [rasenCompile.vite()] })
+```
+
+```jsonc
+// tsconfig.json — pick the host whose JSX runtime you want
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "@rasenjs/dom"
+    "jsxImportSource": "@rasenjs/web" // "@rasenjs/dom", "@rasenjs/html", "@rasenjs/react-native", …
   }
 }
 ```
 
+Each host package exposes `jsx-runtime` / `jsx-dev-runtime` entries, so JSX
+works even without the compiler — the compiler only decides how much of it
+becomes a template.
+
 ## Usage
 
 ```tsx
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { Signal } from 'signal-polyfill'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { mount } from '@rasenjs/dom'
-import { ref } from 'vue'
 
 useReactiveRuntime()
 
 const App = () => {
-  const count = ref(0)
-  
+  const count = new Signal.State(0)
+
   return (
     <div class="app">
       <h1>Hello Rasen</h1>
+      {/* a bare ref interpolates directly — bound through renderText() */}
       <p>Count: {count}</p>
-      <button onClick={() => count.value++}>+</button>
+      <button onClick={() => count.set(count.get() + 1)}>+</button>
     </div>
   )
 }
 
-mount(<App />, document.getElementById('app'))
+mount(<App />, document.getElementById('app')!)
 ```
 
-## Reactive Values
+## What the compiler does with each shape
 
-Refs are automatically tracked:
+| You write | The compiler emits |
+| --------- | ------------------ |
+| `<div class="box"><span>hi</span></div>` | one `template('<div class="box"><span>hi</span></div>')` clone, no `createElement` chain |
+| `{refOrGetter}` as a child | `bindText(child(root, i), () => renderText(expr))` |
+| `class={expr}`, `class={cond ? 'a' : ''}` | `bindClass` / `bindClassToggle` |
+| `style={expr}` | `bindStyle` |
+| `value={expr}`, `disabled={expr}`, … | `bindProp` (DOM property) or `bindAttr` (attribute) |
+| `onClick={fn}` | `on(el, 'click', fn)` |
+| `ref={r}` | `setValue(r, el)` |
+| `<Component …/>` (PascalCase), `<>…</>`, spread props | left as JSX — the runtime factory path |
+
+Attributes are classified at compile time: an `a={expr}` attribute is wrapped in
+a getter so it stays lazy, while literals, identifiers and object/array literals
+are passed through untouched.
+
+::: tip Children are not wrapped
+Only **attribute** expressions are wrapped in getters. Children are resolved by
+the host's child contract instead, which is why a bare ref child is reactive and
+a bare getter child is not (see [DOM rendering](/guide/targets/dom#text)).
+:::
+
+## Reactivity in JSX
 
 ```tsx
-const name = ref('World')
+// a ref, unwrapped by the runtime
+<p>{count}</p>
 
-// Both work:
-<p>{name}</p>
-<p>{name.value}</p>
+// an explicitly read expression (also fine)
+<p>{double.get()}</p>
+
+// a derived value, recomputed by the binding
+<span class={isActive ? 'on' : 'off'}>{isActive ? 'Active' : 'Idle'}</span>
 ```
 
-## Event Handlers
+## Events
+
+`onX` in camelCase, with the DOM event name lowercased:
 
 ```tsx
-<button onClick={() => console.log('clicked')}>Click</button>
-<input onInput={(e) => text.value = e.target.value} />
+<button onClick={() => save()}>Save</button>
+<input onInput={(e) => (text.value = (e.target as HTMLInputElement).value)} />
 ```
 
-## Conditionals
+## Conditionals and lists
+
+These need the structural pass (`structural: true`); without it they are plain
+JS expressions that evaluate once per mount:
 
 ```tsx
-{isLoading.value ? <Spinner /> : <Content />}
-{showHeader && <Header />}
+{showHeader && <Header />}                  {/* → when({ condition, then }) */}
+{isLoading.get() ? <Spinner /> : <Content />} {/* → when({ condition, then, else }) */}
+{items.get().map((item) => <li>{item.name}</li>)} {/* → each({ of, children }) */}
 ```
 
-## Lists
-
-```tsx
-{items.value.map(item => (
-  <li key={item.id}>{item.name}</li>
-))}
+```typescript
+// vite.config.ts
+rasenCompile.vite({ structural: true })
 ```
+
+`each` matches items by object identity, so it moves existing nodes on reorder
+instead of rebuilding the list. The rewrite only happens in a **child**
+position — `items={items.map(…)}` (an attribute) is left alone, because there it
+is a value, not a mountable.
 
 ## Fragments
 
@@ -88,14 +134,41 @@ const name = ref('World')
 </>
 ```
 
-## Custom Tags
+`<>…</>` compiles to the host's `Fragment`, which mounts its children without a
+wrapper element and (in the DOM host) renders text children directly.
+
+## Custom tags
+
+Lowercase tags are looked up in the host's tag registry; register your own for
+custom elements or a third-party component library:
 
 ```typescript
-import { registerTag } from '@rasenjs/jsx'
+import { registerTag, configureTags } from '@rasenjs/core'
 
 registerTag('custom-button', CustomButton)
+
+// or in bulk, with a namespace prefix
+configureTags({ '': { div, span }, X: { Chart, Legend } }) // <XChart />, <XLegend />
 ```
 
-```tsx
-<custom-button onClick={handleClick}>Click me</custom-button>
+`@rasenjs/dom/jsx-runtime` registers every DOM tag at import time, so
+`registerTag` is for custom elements and third-party tag sets (canvas-2d and the
+GL target register their own). PascalCase tags never need registration — they are
+called directly.
+
+## Debugging the output
+
+```bash
+# per-module compiled / fallback counts from the Babel adapter
+RASEN_COMPILER_DEBUG=1 yarn build
 ```
+
+`compileModule()` returns those counters programmatically
+(`{ compiled, fellBack }`), which is the quickest way to check whether a
+component actually got hoisted.
+
+## Next Steps
+
+- [@rasenjs/compiler](/packages/compiler) — full pass and option reference
+- [Components](/guide/components) — the component model in JSX
+- [DOM rendering](/guide/targets/dom) — what the emitted bindings do

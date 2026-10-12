@@ -1,201 +1,192 @@
 # API Reference
 
-This section documents the core APIs of Rasen.
+The stable public surface, package by package. Deep dives live in the
+[guide](/guide/introduction); this page is the index you keep open while coding.
 
-## Core Package
+## `@rasenjs/core`
 
-### setReactiveRuntime
-
-Sets the global reactive runtime. Must be called before mounting any components.
-
-```typescript
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-
-useReactiveRuntime()
-```
-
-[Learn more →](/api/set-reactive-runtime)
-
-### getReactiveRuntime
-
-Returns the current reactive runtime. Throws if not set.
+### Paradigm
 
 ```typescript
-import { getReactiveRuntime } from '@rasenjs/core'
+type Mountable<Node = unknown> = (
+  node: Node,
+  hooks: HostHooks<Node> | undefined
+) => (() => void) | undefined
 
-const runtime = getReactiveRuntime()
-```
+type SyncComponent<Host, Props> = (props: Props) => Mountable<Host>
+type AsyncComponent<Host, Props> = (props: Props) => Promise<Mountable<Host>>
+type Component<Host, Props> = SyncComponent<Host, Props> | AsyncComponent<Host, Props>
 
-### Types
-
-```typescript
-// The core mount function type
-type MountFunction<Host = unknown> = (host: Host) => (() => void) | undefined
-
-// Component types
-type SyncComponent<Host, Props> = (props: Props) => MountFunction<Host>
-type AsyncComponent<Host, Props> = (
-  props: Props
-) => Promise<MountFunction<Host>>
-type Component<Host, Props> =
-  | SyncComponent<Host, Props>
-  | AsyncComponent<Host, Props>
-
-// Reactive value types
 type PropValue<T> = T | Ref<T> | ReadonlyRef<T>
+type Ref<T> = unknown            // opaque: only the active runtime may read it
 ```
 
-[Learn more →](/api/component-types)
+### Functions
 
-## DOM Package
+| Export | Description |
+| ------ | ----------- |
+| `com(component)` | wraps a component so each instance gets an effect scope; subscriptions made during setup and mount stop together |
+| `mount(mountable, node, hooks?)` | renderer-agnostic mount of a mountable |
+| `setReactiveRuntime(runtime)` / `getReactiveRuntime()` | install / read the active adapter; `getReactiveRuntime()` lazily creates the built-in runtime when none is installed |
+| `ref(value)` | built-in callable ref: `count()` reads, `count(v)` writes |
+| `computed(getter)` | built-in derived ref |
+| `unref(ref)` / `setValue(ref, v)` / `toValue(prop)` | unwrap a ref; write a ref; resolve `PropValue` (value / ref / getter) |
+| `watchObjectProps(obj, fn)` | subscribe to a tracked object's properties |
+| `rafSchedule()` | a `FrameSchedule` backed by `requestAnimationFrame` |
+| `collectHtml(mountable)` | render a mountable against a string host and return the markup |
 
-### mount
-
-Mounts a component to a DOM element.
+### Reactive runtime interface
 
 ```typescript
-import { mount } from '@rasenjs/dom'
-
-const unmount = mount(component, document.getElementById('app'))
+interface ReactiveRuntime {
+  subscribe<T>(getter: () => T, callback: (value: T, oldValue: T) => void): () => void
+  effectScope(): { run<T>(fn: () => T): T | undefined; stop(): void }
+  ref<T>(value: T): Ref<T>
+  unref<T>(value: T | Ref<T>): T
+  setValue<T>(ref: Ref<T>, value: T): void
+  isRef(value: unknown): boolean
+}
 ```
 
-### Element Components
+[Reactive Runtime →](/guide/reactive-runtime)
 
-All HTML elements are available as components:
+### Structural components
+
+| Export | Props |
+| ------ | ----- |
+| `each` | `{ of: T[] \| Ref<T[]> \| (() => T[]), children: (item, index) => Mountable }` |
+| `repeat` | `(count, render: (index) => Mountable)` |
+| `when` | `{ condition: PropValue<boolean>, then: () => Mountable, else?: () => Mountable }` |
+| `match` / `switchCase` | `{ value, cases: Record<K, (k) => Mountable> \| [condition, branch][], default? }` |
+| `fragment` / `f` | `{ children, hooks? }` — siblings without a wrapper |
+| `lazy` | `{ loader: () => Promise<Mountable>, loading?: () => Mountable }` |
+
+### JSX runtime
 
 ```typescript
-import {
-  div,
-  span,
-  button,
-  input,
-  a,
-  img,
-  p,
-  h1,
-  h2,
-  h3,
-  ul,
-  ol,
-  li,
-  form,
-  label,
-  textarea,
-  select,
-  option,
-  canvas,
-  svg,
-  section,
-  article,
-  header,
-  footer,
-  nav,
-  main,
-  aside
-} from '@rasenjs/dom'
+import { jsx, jsxs, jsxDEV, Fragment, registerTag, configureTags, clearTags } from '@rasenjs/core'
 ```
 
-### element
+Host packages re-export these from their own `jsx-runtime` entry.
+[JSX & the Compiler →](/guide/advanced/jsx)
 
-Generic element component for any tag:
+### Helpers
+
+`escapeHtml`, `escapeAttr`, `renderText`, `stringifyStyleInline`,
+`getAttrName`, `camelToKebab`, `isEventProp`, `getEventName`, `attrValue`,
+`MARKERS`, `REF_MARKER`.
+
+## `@rasenjs/dom`
+
+| Export | Description |
+| ------ | ----------- |
+| `mount(mountable, container)` | mount into an element |
+| `hydrate(component, container)` | claim server-rendered DOM |
+| `tag(name)`, `element({ tag, … })`, `h` | element factory (`el()`, `el(child)`, `el(props)`, `el(props, …children)`) |
+| every HTML tag | `div`, `span`, `button`, `input`, … plus `INTRINSIC_TAGS` |
+| `text({ content })`, `html({ content })` | reactive text node; raw HTML node |
+| `canvas({ width, height, contextType?, children, … })` | canvas bridged to canvas-2d (`'2d'`) or gfx (`'webgl'`, `'webgl2'`, `'webgpu'`) |
+| `each`, `repeat`, `when`, `match`, `show`, `transition`, `transitionGroup`, `lazy`, `fragment` | structural + animation components |
+| `bindText`, `bindClass`, `bindClassToggle`, `bindProp`, `bindAttr`, `bindStyle`, `on`, `setValue` | binding primitives (also at `@rasenjs/dom/bindings`) |
+| `template`, `child`, `mountSlot`, `collectHtml` | compiled-template entry (`@rasenjs/dom/template`) |
+| `configureEventDelegation` | switch events between delegated and direct listeners |
+| `hostHooks`, `isHydrating`, `getHydrationContext` | host capability set and hydration state |
+
+[@rasenjs/dom →](/packages/dom)
+
+## `@rasenjs/compiler`
 
 ```typescript
-import { element } from '@rasenjs/dom'
-
-element({
-  tag: 'custom-element',
-  attrs: { 'data-id': '123' }
-})
+import { rasenCompile, compileModule, transformModule, transformStructural } from '@rasenjs/compiler'
 ```
-
-## Canvas 2D Package
-
-### Components
 
 ```typescript
-import { rect, circle, line, text } from '@rasenjs/canvas-2d'
+rasenCompile.vite(options?)      // also: .webpack() .rspack() .esbuild()
+
+interface RasenCompilerPluginOptions {
+  templateSource?: string        // default '@rasenjs/dom/template'
+  intrinsicTags?: Set<string>    // host tags safe to hoist
+  enabled?: boolean
+  compile?: boolean              // static hoisting (default true)
+  jsxTransform?: boolean         // attribute getters (default true)
+  hmr?: boolean                  // dev-only remount boundaries (default true)
+  structural?: boolean           // .map()/&&/?: rewrites (default FALSE)
+  exclude?: string[]
+}
 ```
 
-### RenderContext
+`transformModule(code, filename, options)` runs the whole pipeline for one
+module; `compileModule(code, { filename })` returns `{ code, map, compiled,
+fellBack }` for the hoisting pass alone. Babel/Metro users add
+`@rasenjs/compiler/babel` and the `@rasen-compile` directive per file.
 
-Manages canvas rendering and batched updates:
+[@rasenjs/compiler →](/packages/compiler)
+
+## `@rasenjs/html`
+
+| Export | Description |
+| ------ | ----------- |
+| `renderToString(mountable)` | render to an HTML string |
+| `renderToStringMultiple(mountables)` | render several roots, concatenated |
+| HTML tags | `div`, `span`, `p`, `ul`, `li`, `form`, `table`, … (`el(props, …children)`; `attrs` is accepted here) |
+| `text`, `html`, `fragment`, `when`, `each`, `match`, `transition` | the same component set as DOM |
+
+[@rasenjs/html →](/packages/html)
+
+## `@rasenjs/web`
+
+Re-exports the DOM half (plus `@rasenjs/router-dom`) in the browser and the HTML
+half (plus `@rasenjs/router-html`) on the server, chosen by the
+`browser` / `ssr` / `node` export conditions. `@rasenjs/web/elements` is the
+routing-free subset for component libraries.
+
+## `@rasenjs/router`
 
 ```typescript
-import { RenderContext } from '@rasenjs/canvas-2d'
+const router = createRouter(routes, { history })
+
+router.current        // current RouteMatch
+router.push(route, { params })
+router.replace(route, { params })
+router.href(route, { params })
+router.beforeEach(cb) / afterEach(cb) / onError(cb)
 ```
 
-## React Native Package
+| Export | Description |
+| ------ | ----------- |
+| `route(path, options?)` | declare a route |
+| `template` / `tpl` | path template with typed params (zod peer dependency) |
+| `createRouter(routes, { history })` | create the router; `routes` may nest |
+| `createBrowserHistory()` / `createHashHistory()` / `createMemoryHistory()` | history adapters; memory history is what SSR uses |
+| `createRouterView(router, views, fallback?)` | route → component table (from `router-dom` / `router-html`) |
+| `createRouterLink(router)` (`createLink`) | link component |
+| `layout(config)` / `useScrollRestoration(router)` / `createLeaveGuard(router)` | shell layout, scroll restoration, leave guard |
 
-### registerApp
+[@rasenjs/router →](/packages/router)
 
-Registers the app with React Native:
+## Reactivity adapters
 
 ```typescript
-import { registerApp } from '@rasenjs/react-native'
-
-registerApp('MyApp', App)
+import { createReactiveRuntime, useReactiveRuntime } from '@rasenjs/reactive-vue'
+setReactiveRuntime(createReactiveRuntime())   // or simply useReactiveRuntime()
 ```
 
-### Components
+`reactive-vue` also exports `ref`, `unref`, `setValue`; `reactive-signals` and
+`reactive-alien-signals` export `ref`, `computed`, `unref`, `isRef`.
+[Reactive Runtime →](/guide/reactive-runtime)
 
-```typescript
-import {
-  view,
-  text,
-  image,
-  textInput,
-  touchableOpacity,
-  scrollView
-} from '@rasenjs/react-native'
-```
+## Animation, styling, UI
 
-## HTML Package
+| Package | Entry points |
+| ------- | ------------ |
+| `@rasenjs/animation` | `tween`, `spring`, `frame`, `all`, `getEasing`, easing functions |
+| `@rasenjs/tw` | `tw(...)`: Tailwind-style class string → style record (`@rasenjs/tw/perry` for the AOT path) |
+| `@rasenjs/rota` | headless UI components (`primitive`, dialog, popover, menu, …) |
 
-### renderToString
+## Targets
 
-Renders components to HTML string:
-
-```typescript
-import { renderToString } from '@rasenjs/html'
-
-const html = renderToString(component)
-```
-
-### Components
-
-```typescript
-import {
-  html,
-  head,
-  body,
-  div,
-  span,
-  p,
-  h1,
-  h2,
-  h3,
-  ul,
-  ol,
-  li,
-  a,
-  img
-} from '@rasenjs/html'
-```
-
-## Reactive Adapters
-
-### Vue Adapter
-
-```typescript
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-
-useReactiveRuntime()
-```
-
-### Signals Adapter
-
-```typescript
-import { createReactiveRuntime, ref, computed } from '@rasenjs/reactive-signals'
-
-useReactiveRuntime()
-```
+| Package | Entry points |
+| ------- | ------------ |
+| `@rasenjs/canvas-2d` | shape components (`rect`, `text`, `circle`, `path`, `group`, …), `createRoot`, `RenderContext`, `canvasHostHooks` |
+| `@rasenjs/rn-dom` | `RNDocument`, `RNNode`, `registerComponent`, `registerTagAlias`, Fabric node helpers |
+| `@rasenjs/react-native` | `element` / `tag`, RN components (`View`, `Text`, `Pressable`, `FlatList`, …), `registerApp`, `hostHooks` |

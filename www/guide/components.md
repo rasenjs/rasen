@@ -1,412 +1,269 @@
 # Components
 
-Components in Rasen are pure functions. This guide covers patterns for building reusable, composable components.
+A Rasen component is a plain function: it takes props and returns a mountable.
+There is no component class, no instance object and no virtual DOM — state lives
+in closures.
 
-## Basic Structure
+## Basic structure
 
-A component is a function that returns a `MountFunction`:
+```tsx
+import { com } from '@rasenjs/core'
 
-```typescript
-const MyComponent = () => {
-  // Setup phase: reactive state
-  const state = ref('initial')
-  
-  // Return mount function (usually via a primitive)
-  return div({
-    textContent: () => state.value
-  })
+export const Greeting = com((props: { name: string }) => (
+  <p>Hello, {props.name}!</p>
+))
+```
+
+`com()` is optional but recommended: it gives every instance its own effect
+scope, so subscriptions created during setup and mount are stopped together on
+unmount, and it is what the compiler's dev-only HMR pass wraps.
+
+The returned value can be:
+
+- a JSX element (or a plain mountable)
+- a function that receives the host, for hand-written DOM work
+- a `Promise` of the above (`AsyncComponent`) — great for `lazy()`
+
+```tsx
+// A component without com(): still valid, you own the cleanup
+const Clock = () => (host: HTMLElement) => {
+  const tick = setInterval(() => (host.textContent = new Date().toLocaleTimeString()), 1000)
+  return () => clearInterval(tick)
 }
 ```
 
-## With Reactive Effects
+## Reactive state
 
-When using `watch` or other reactive effects, wrap components with `com`:
+State comes from the reactivity library you chose, created inside the component
+so each instance gets its own copy:
 
-```typescript
-import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, span, button } from '@rasenjs/dom'
+```tsx
+import { Signal } from 'signal-polyfill'
+import { com } from '@rasenjs/core'
 
-const Counter = com(() => {
-  const runtime = getReactiveRuntime()
-  const count = runtime.ref(0)
-  
-  // Subscriptions are automatically tracked and cleaned up
-  runtime.subscribe(
-    () => count.value,
-    (value) => {
-      // Update UI using reactive values
-    }
+export const Counter = com(() => {
+  const count = new Signal.State(0)
+  const double = new Signal.Computed(() => count.get() * 2)
+
+  return (
+    <div class="counter">
+      <span>{count}</span>
+      <span>{double} when doubled</span>
+      <button onClick={() => count.set(count.get() + 1)}>+</button>
+    </div>
   )
-  
-  return div({
-    children: [
-      span({ textContent: () => `Count: ${count.value}` }),
-      button({ 
-        textContent: 'Increment',
-        on: { click: () => count.value++ }
-      })
-    ]
-  })
 })
 ```
 
-## With Props
+A **bare ref interpolates directly**: the compiler emits a `renderText()`
+binding that unwraps it through the active runtime. Expressions derived from a
+ref read explicitly (`isEven.get() ? 'Even' : 'Odd'`).
 
-Components can accept props:
+Without the compiler, use the same value in a child position (`<span>{count}</span>`
+becomes `span({}, count)`) or `text({ content })`.
 
-```typescript
-interface ButtonProps {
-  label: string | (() => string)
-  onClick: () => void
-  disabled?: boolean
+## Props and reactive props
+
+Props are ordinary arguments — type them with an interface:
+
+```tsx
+interface UserProps {
+  name: string
+  avatar: string
+  status?: () => string        // a PropValue: getter, ref or plain value
 }
 
-const Button = (props: ButtonProps) => {
-  return button({
-    textContent: props.label,
-    on: { click: props.onClick },
-    attrs: { disabled: props.disabled }
-  })
-}
+export const UserCard = com((props: UserProps) => (
+  <div class="user-card">
+    <img src={props.avatar} alt={props.name} />
+    <span>{props.name}</span>
+    <span class={props.status ? () => `status-${props.status!()}` : 'status-offline'} />
+  </div>
+))
 
-// Usage
-Button({
-  label: 'Click Me',
-  onClick: () => console.log('Clicked!')
-})
+// Any prop value can also be a ref or a static value: PropValue<T> = T | Ref<T> | ReadonlyRef<T>
 ```
 
-## Reactive Props
-
-Props can be reactive:
-
-```typescript
-import type { PropValue } from '@rasenjs/core'
-
-interface UserCardProps {
-  name: PropValue<string>
-  avatar: PropValue<string>
-  status?: PropValue<'online' | 'offline'>
-}
-
-const UserCard = (props: UserCardProps) => {
-  return div({
-    className: 'user-card',
-    children: [
-      img({ src: props.avatar, alt: props.name }),
-      span({ textContent: props.name }),
-      span({ 
-        className: () => `status-${unref(props.status) || 'offline'}` 
-      })
-    ]
-  })
-}
-
-// Usage with refs
-const userName = ref('Alice')
-const userAvatar = ref('/avatar.png')
-
-UserCard({
-  name: userName,        // Reactive
-  avatar: userAvatar,    // Reactive
-  status: 'online'       // Static
-})
-```
+Attributes accept a getter, a ref or a value; the binding layer decides at
+runtime whether to subscribe, so passing a static string costs one write and no
+watcher.
 
 ## Composition
 
-Components compose naturally through the `children` prop:
+Components compose by calling each other, and children are just props:
 
-```typescript
-const Card = (props: { 
-  title: string
-  children: MountFunction<HTMLElement>[]
-}) => {
-  return div({
-    className: 'card',
-    children: [
-      div({ className: 'card-title', textContent: props.title }),
-      div({ className: 'card-body', children: props.children })
-    ]
-  })
-}
-
-// Usage
-Card({
-  title: 'My Card',
-  children: [
-    p({ textContent: 'Card content here' }),
-    Button({ label: 'Action', onClick: () => {} })
-  ]
-})
+```tsx
+export const Layout = com((props: {
+  header?: Mountable<HTMLElement>
+  sidebar?: Mountable<HTMLElement>
+  content: Mountable<HTMLElement>
+  footer?: Mountable<HTMLElement>
+}) => (
+  <div class="layout">
+    {props.header && <div class="header">{props.header}</div>}
+    <div class="main">
+      {props.sidebar && <aside class="sidebar">{props.sidebar}</aside>}
+      <main class="content">{props.content}</main>
+    </div>
+    {props.footer && <div class="footer">{props.footer}</div>}
+  </div>
+))
 ```
 
-## Slots Pattern
+::: tip `&&` and `.map()` need the structural pass
+`{props.header && <div …/>}` and `{rows.map(…)}` compile to `when()` / `each()`
+only when the compiler's **structural** pass is enabled (`structural: true`).
+Without it they stay ordinary JSX expressions — still correct, just without
+reconciliation.
+:::
 
-For more flexible composition, use multiple child slots:
+## Slots
 
-```typescript
-interface LayoutProps {
-  header?: MountFunction<HTMLElement>
-  sidebar?: MountFunction<HTMLElement>
-  content: MountFunction<HTMLElement>
-  footer?: MountFunction<HTMLElement>
-}
+There is no slot syntax: pass mountables. Named slots are props, dynamic
+content is `children`:
 
-const Layout = (props: LayoutProps) => {
-  return div({
-    className: 'layout',
-    children: [
-      props.header && div({ className: 'header', children: [props.header] }),
-      div({
-        className: 'main',
-        children: [
-          props.sidebar && aside({ className: 'sidebar', children: [props.sidebar] }),
-          main({ className: 'content', children: [props.content] })
-        ]
-      }),
-      props.footer && div({ className: 'footer', children: [props.footer] })
-    ].filter(Boolean)
-  })
-}
+```tsx
+export const Card = com((props: { title: string; children?: Mountable<HTMLElement> }) => (
+  <div class="card">
+    <div class="card-title">{props.title}</div>
+    <div class="card-body">{props.children}</div>
+  </div>
+))
 ```
 
-## State Encapsulation
+## Instance state vs shared state
 
-Each component instance has its own state:
+State created inside a component belongs to that instance:
 
-```typescript
-const Counter = com(() => {
-  const count = ref(0)
-  
-  return div({
-    children: [
-      span({ textContent: () => `Count: ${count.value}` }),
-      button({ textContent: '+', on: { click: () => count.value++ } })
-    ]
-  })
-})
-
-// Two independent counters - each has its own state
-div({
-  children: [
-    Counter(),
-    Counter()
-  ]
-})
+```tsx
+<div>
+  <Counter />
+  <Counter />  {/* independent state */}
+</div>
 ```
 
-## Shared State
+State created at module scope is shared by every instance:
 
-For shared state across components, define it outside:
+```tsx
+const globalCount = new Signal.State(0)
 
-```typescript
-// Shared state
-const globalCount = ref(0)
-
-const CounterA = () => div({
-  children: [
-    span({ textContent: () => `A: ${globalCount.value}` }),
-    button({ textContent: '+', on: { click: () => globalCount.value++ } })
-  ]
-})
-
-const CounterB = () => div({
-  children: [
-    span({ textContent: () => `B: ${globalCount.value}` }),
-    button({ textContent: '+', on: { click: () => globalCount.value++ } })
-  ]
-})
+export const CounterA = () => <span>{globalCount}</span>
+export const CounterB = () => <span>{globalCount}</span>
 ```
 
-## Composable Functions
+## Composable functions
 
-Extract reusable logic into composable functions:
+Anything reusable can be a plain function that returns state — the Rasen
+equivalent of a composable:
 
-```typescript
-// Composable
+```tsx
 const useToggle = (initial = false) => {
-  const value = ref(initial)
-  const toggle = () => value.value = !value.value
-  const setTrue = () => value.value = true
-  const setFalse = () => value.value = false
-  return { value, toggle, setTrue, setFalse }
-}
-
-// Usage in components
-const Dropdown = com((props: { label: string; children: MountFunction[] }) => {
-  const { value: isOpen, toggle } = useToggle()
-  
-  return div({
-    className: 'dropdown',
-    children: [
-      button({ textContent: props.label, on: { click: toggle } }),
-      div({
-        className: 'dropdown-menu',
-        style: () => ({ display: isOpen.value ? 'block' : 'none' }),
-        children: props.children
-      })
-    ]
-  })
-})
-```
-
-## Lists with `each`
-
-For rendering lists, use the `each` component:
-
-```typescript
-import { each, com } from '@rasenjs/core'
-import { div, span, button } from '@rasenjs/dom'
-
-const TodoList = com(() => {
-  const todos = ref([
-    { id: 1, text: 'Learn Rasen', done: false },
-    { id: 2, text: 'Build something', done: false }
-  ])
-  
-  return div({
-    children: [
-      each(
-        todos,
-        (todo, index) => div({
-          className: () => todo.done ? 'done' : '',
-          children: [
-            span({ textContent: todo.text }),
-            button({
-              textContent: '✓',
-              on: { click: () => todo.done = true }
-            })
-          ]
-        })
-      )
-    ]
-  })
-})
-```
-
-## Async Components
-
-Components can be async:
-
-```typescript
-const AsyncUserProfile = async (props: { userId: string }) => {
-  // Async setup
-  const user = await fetchUser(props.userId)
-  
-  return div({
-    className: 'user-profile',
-    children: [
-      h1({ textContent: user.name }),
-      p({ textContent: user.bio }),
-      img({ src: user.avatar })
-    ]
-  })
-}
-```
-
-## Conditional Rendering
-
-Several patterns for conditional rendering:
-
-```typescript
-// Pattern 1: Ternary in children
-div({
-  children: [
-    isLoading.value 
-      ? span({ textContent: 'Loading...' })
-      : Content()
-  ]
-})
-
-// Pattern 2: Style-based
-div({
-  style: () => ({ display: isVisible.value ? 'block' : 'none' }),
-  children: [Content()]
-})
-
-// Pattern 3: Filter
-div({
-  children: [
-    showHeader.value && Header(),
-    Content(),
-    showFooter.value && Footer()
-  ].filter(Boolean)
-})
-```
-
-## Best Practices
-
-### 1. Keep Components Focused
-
-```typescript
-// ✅ Good: Single responsibility
-const Avatar = (props: { src: string; alt: string }) => 
-  img({ src: props.src, alt: props.alt, className: 'avatar' })
-
-const UserName = (props: { name: string }) =>
-  span({ textContent: props.name, className: 'user-name' })
-
-const UserBadge = (props: { user: User }) =>
-  div({
-    className: 'user-badge',
-    children: [
-      Avatar({ src: props.user.avatar, alt: props.user.name }),
-      UserName({ name: props.user.name })
-    ]
-  })
-```
-
-### 2. Use TypeScript for Props
-
-```typescript
-// ✅ Good: Well-typed props
-interface ModalProps {
-  isOpen: PropValue<boolean>
-  onClose: () => void
-  title: string
-  children: MountFunction<HTMLElement>[]
-}
-
-const Modal = (props: ModalProps) => { ... }
-```
-
-### 3. Extract Complex Logic
-
-```typescript
-// ✅ Good: Logic in composable
-const useForm = <T>(initial: T) => {
-  const values = reactive({ ...initial })
-  const errors = ref<Record<string, string>>({})
-  const isValid = computed(() => Object.keys(errors.value).length === 0)
-  
-  const validate = () => { ... }
-  const reset = () => { ... }
-  
-  return { values, errors, isValid, validate, reset }
-}
-
-// Usage in component
-const MyForm = com(() => {
-  const form = useForm({ username: '', email: '' })
-  
-  return (host: HTMLElement) => {
-    return div({
-      children: [
-        input({ attrs: { placeholder: 'Username', value: form.values.username } }),
-        input({ attrs: { placeholder: 'Email', value: form.values.email } }),
-        button({ 
-          textContent: 'Submit',
-          attrs: { disabled: !form.isValid.value },
-          on: { click: () => form.validate() }
-        })
-      ]
-    })(host)
+  const open = new Signal.State(initial)
+  return {
+    open,
+    toggle: () => open.set(!open.get()),
+    setTrue: () => open.set(true),
+    setFalse: () => open.set(false)
   }
+}
+
+export const Dropdown = com((props: { label: string; children?: Mountable<HTMLElement> }) => {
+  const { open, toggle } = useToggle()
+
+  return (
+    <div class="dropdown">
+      <button onClick={toggle}>{props.label}</button>
+      <div class="dropdown-menu" style={{ display: open.get() ? 'block' : 'none' }}>
+        {props.children}
+      </div>
+    </div>
+  )
 })
 ```
+
+## Lists
+
+With the structural pass, `.map()` in a child position becomes `each()` — keyed
+by object identity, so reordering and removal move nodes instead of rebuilding
+them:
+
+```tsx
+const TodoList = com((props: { todos: Signal.State<Todo[]> }) => (
+  <ul>
+    {props.todos.get().map((todo) => (
+      <li class={todo.done ? 'done' : ''} onClick={() => todo.done = true}>
+        {todo.text}
+      </li>
+    ))}
+  </ul>
+))
+```
+
+Explicitly, `each` takes `of` (array, ref or getter) and a render callback:
+
+```typescript
+import { each } from '@rasenjs/core'
+
+each({
+  of: () => todos.get(),          // getter → reads the dependency
+  children: (todo, index) => TodoRow(todo, index)
+})
+```
+
+Use `repeat(count, render)` when you need N identical rows rather than a list.
+
+## Conditionals
+
+`when` swaps a branch (mount/unmount); `show` toggles `display` and keeps the
+subtree alive:
+
+```typescript
+import { when, match, show } from '@rasenjs/core'
+
+when({ condition: () => isLoggedIn(), then: () => UserPanel(), else: () => LoginForm() })
+
+show({ when: isVisible, children: HeavyPanel() })   // stays mounted, hidden via CSS
+
+match({
+  value: () => currentTab(),
+  cases: { home: () => HomePage(), user: (key) => UserPage({ key }) },
+  default: () => NotFound()
+})
+```
+
+In JSX these are the `cond && <El/>` and `cond ? <A/> : <B/>` forms once the
+structural pass is on.
+
+## Async components
+
+`lazy()` mounts a placeholder while a component loads:
+
+```typescript
+import { lazy } from '@rasenjs/core'
+
+const HeavyChart = lazy({
+  loader: () => import('./HeavyChart').then((m) => m.HeavyChart()),
+  loading: () => spinner()
+})
+```
+
+## Best practices
+
+1. **Keep components focused** — one component, one responsibility; extract
+   reusable logic into composable functions.
+2. **Create state where it belongs** — inside `com()` for instance state, at
+   module scope for shared state. A ref created inside a component body
+   (outside the returned factory) is re-created on every call.
+3. **Type your props** — components are plain functions, so `interface` +
+   parameter types give full inference; there is no generic component type to
+   fight with.
+4. **Let props be getters when they are cheap** — `PropValue` covers value /
+   ref / getter, so the binding layer can stay lazy without the caller deciding.
+5. **Prefer `show` for cheap, frequently toggled subtrees** and `when` when the
+   subtree is expensive to keep alive.
 
 ## Next Steps
 
-- [JSX Support](/guide/advanced/jsx) — Using JSX syntax
-- [Custom Render Targets](/guide/advanced/custom-targets) — Building new targets
+- [Three-Phase Functions](/guide/three-phase-functions) — the lifecycle behind `com()`
+- [Reactive Runtime](/guide/reactive-runtime) — where state comes from
+- [JSX & the Compiler](/guide/advanced/jsx) — what the compiler does to this code

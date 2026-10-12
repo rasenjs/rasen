@@ -26,7 +26,7 @@ cd MyApp
 ### 2. Install Dependencies
 
 ```bash
-npm install @rasenjs/core @rasenjs/react-native @rasenjs/reactive-vue vue
+npm install @rasenjs/core @rasenjs/react-native @rasenjs/reactive-vue @vue/reactivity
 ```
 
 ### 3. Configure Entry Point
@@ -35,7 +35,7 @@ npm install @rasenjs/core @rasenjs/react-native @rasenjs/reactive-vue vue
 // index.js
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { registerApp, view, text } from '@rasenjs/react-native'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
 useReactiveRuntime()
 
@@ -133,7 +133,7 @@ image({
 ```typescript
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { view, text, touchableOpacity, registerApp } from '@rasenjs/react-native'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
 useReactiveRuntime()
 

@@ -83,15 +83,12 @@ import { div, button, mount } from '@rasenjs/dom'
 
 const count = ref(0)
 
-const Counter = () => div({
-  children: [
-    div({ textContent: computed(() => `Count: ${count.value}`) }),
-    button({
-      textContent: 'Increment',
-      on: { click: () => count.value++ }
-    })
-  ]
-})
+const Counter = () => div(
+  {},
+  // a ref or a computed in a child position becomes a reactive text node
+  div({}, computed(() => `Count: ${count.value}`)),
+  button({ onClick: () => count.value++ }, 'Increment')
+)
 
 mount(Counter(), document.getElementById('app'))
 ```

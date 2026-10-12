@@ -305,8 +305,8 @@ rasen-gpui build
 
 ## 📖 More Resources
 
-- [Rasen Design Document](../../docs/DESIGN.md)
-- [GPUI Examples](../../examples/gpui)
+- [Rasen Design Document](https://github.com/rasenjs/rasen/tree/main/docs/DESIGN.md)
+- [GPUI Examples](https://github.com/rasenjs/rasen/tree/main/examples/gpui)
 - [Zed GPUI Official Docs](https://zed.dev/blog/gpui)
 
 ---

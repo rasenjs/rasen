@@ -1,60 +1,101 @@
 <script setup>
 import counterDom from '../snippets/counter-dom.ts?raw'
-import counterRn from '../snippets/counter-rn.ts?raw'
+import counterRn from '../snippets/counter-rn.tsx?raw'
 import todoDom from '../snippets/todo-dom.ts?raw'
 import canvasAnimation from '../snippets/canvas-animation.ts?raw'
+import canvasBasic from '../snippets/canvas-basic.ts?raw'
+import ssrHtml from '../snippets/ssr-html.ts?raw'
+import jsxCounter from '../snippets/jsx-counter.tsx?raw'
+import basicDom from '../snippets/basic-dom.ts?raw'
 </script>
 
-# Examples
+# Code Playground
 
-Explore complete examples of Rasen in action.
+These files are the real sources under `www/snippets/` — the site renders them
+verbatim, so nothing here drifts from what the repository builds.
 
-::: tip 运行示例
-Clone 仓库后运行 `yarn examples:dev` 即可在本地查看完整可交互示例。
+::: tip Running them
+Clone the repository, `yarn install && yarn build`, then start an example (for
+instance `yarn examples:web:dev`). Every snippet assumes a bundler entry that
+gives you `document.getElementById('app')`.
 :::
 
-## Counter
+## Counter — one component, two hosts
 
-A simple counter demonstrating reactive state across different platforms:
+::: code-group
 
-<CodeTabs
-  :examples="{
-    dom: { label: 'DOM', code: counterDom },
-    rn: { label: 'React Native', code: counterRn }
-  }"
-/>
+```typescript [DOM]
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { div, button, p, mount } from '@rasenjs/dom'
+import { ref } from '@vue/reactivity'
 
-## Todo List
+useReactiveRuntime()
 
-A complete todo application with add, toggle, and remove functionality:
+const count = ref(0)
 
-<CodeBlock :code="todoDom" title="Todo App (DOM)" />
+const Counter = () =>
+  div(
+    { style: { textAlign: 'center', padding: '20px' } },
+    p({ style: { fontSize: '48px', margin: '20px' } }, count),
+    div(
+      {},
+      button({ onClick: () => count.value-- }, '-'),
+      button({ onClick: () => count.value++ }, '+')
+    )
+  )
 
-## Canvas Animation
-
-Animated graphics using Canvas 2D with reactive state:
-
-<CodeBlock :code="canvasAnimation" title="Canvas Animation" />
-
-## Running Examples Locally
-
-Clone the repository and run:
-
-```bash
-git clone https://github.com/rasenjs/rasen.git
-cd rasen
-yarn install
-yarn examples:dev
+mount(Counter(), document.getElementById('app')!)
 ```
 
-Visit `http://localhost:5173` to see the examples in action.
+```tsx [React Native]
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { View, Text, TouchableOpacity, registerApp } from '@rasenjs/react-native'
+import { ref } from '@vue/reactivity'
 
-## Example Files
+useReactiveRuntime()
 
-The example source files are located in:
+const count = ref(0)
 
-| Platform     | Location                                                                                     |
-| ------------ | -------------------------------------------------------------------------------------------- |
-| Web (DOM)    | [`examples/web/`](https://github.com/rasenjs/rasen/tree/main/examples/web)                   |
-| Canvas 2D    | [`examples/canvas-2d/`](https://github.com/rasenjs/rasen/tree/main/examples/canvas-2d)       |
-| React Native | [`examples/react-native/`](https://github.com/rasenjs/rasen/tree/main/examples/react-native) |
+registerApp('MyApp', () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <Text style={{ fontSize: 48, marginBottom: 20 }}>{count}</Text>
+    <View style={{ flexDirection: 'row', gap: 10 }}>
+      <TouchableOpacity onPress={() => count.value--}>
+        <Text>−</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => count.value++}>
+        <Text>+</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+))
+```
+
+:::
+
+<CodeBlock :code="basicDom" title="Minimal DOM component (www/snippets/basic-dom.ts)" />
+
+<CodeBlock :code="jsxCounter" title="The same counter in JSX (www/snippets/jsx-counter.tsx)" />
+
+## Todo list
+
+`each` for reconciliation, DOM properties for form state, a computed ref as a
+reactive text node.
+
+<CodeBlock :code="todoDom" title="Todo app (www/snippets/todo-dom.ts)" />
+
+## Canvas
+
+<CodeBlock :code="canvasBasic" title="Canvas + tween (www/snippets/canvas-basic.ts)" />
+
+<CodeBlock :code="canvasAnimation" title="Signals driving shapes (www/snippets/canvas-animation.ts)" />
+
+## Server-side rendering
+
+<CodeBlock :code="ssrHtml" title="renderToString (www/snippets/ssr-html.ts)" />
+
+## Next steps
+
+- [Examples overview](/examples/) — the full list of runnable demos
+- [Getting Started](/guide/getting-started) — project setup
+- [Components](/guide/components) — the model behind these snippets

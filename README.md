@@ -8,589 +8,346 @@
   <strong>らせん (Spiral)</strong><br>
   <em>One Reactive Core, Multiple Render Targets</em><br><br>
   A reactive rendering framework agnostic to both reactive systems and rendering targets.<br>
-  Write once, render to <b>DOM</b>, <b>Canvas 2D</b>, <b>React Native</b>, <b>SSR</b>, and more.
+  Write once, render to <b>DOM</b>, <b>Canvas 2D</b>, <b>React Native</b>, <b>HTML (SSR)</b>, <b>WebGL</b>, and more.
 </p>
 
 <p align="center">
   <a href="./docs/DESIGN.md"><strong>📖 Design Philosophy</strong></a> •
-  <a href="#features">Features</a> •
-  <a href="#packages">Packages</a> •
   <a href="#quick-start">Quick Start</a> •
-  <a href="#cross-platform-examples">Cross-Platform</a> •
+  <a href="#packages">Packages</a> •
+  <a href="#target-previews">Targets</a> •
+  <a href="#documentation">Documentation</a> •
   <a href="#roadmap">Roadmap</a>
 </p>
 
-> 🎉 **Early Preview Available!**
->
-> ✨ The **web-related packages** (@rasenjs/web, templates) have been published for early testing!
->
-> 🧪 **Try it now:**
-> ```bash
-> npx degit rasenjs/rasen/templates/rasen-ts my-rasen-app
-> cd my-rasen-app
-> yarn install
-> yarn dev
-> ```
->
-> ⚠️ **Important:** This framework is still in active development. Most packages are in alpha stage.
-> APIs are unstable and may change. Please do not use in production yet.
->
-> If you're interested in this project, feel free to ⭐ star and watch for updates!
+> ⚠️ **Alpha.** The framework is being prepared for its first public release:
+> most rendering and routing packages are on npm, the compiler and several
+> targets are still repo-only, and APIs may change between alpha releases.
 
-## Features
+## What is Rasen?
 
-- **Cross-Platform Rendering** - Same reactive logic, different render targets (DOM, Canvas, React Native)
-- **Reactive System Agnostic** - Works with Vue, Signals, or any reactive library
-- **Pure Function Components** - No virtual DOM, no component instances
-- **Self-Controlled Rendering** - Components control their own rendering via watchers
-- **JSX Support** - Optional JSX/TSX syntax with configurable tags
-- **TypeScript First** - Full type safety and inference
+One paradigm, two decouplings:
 
-## Packages
+- **Reactive decoupling** — bring your own reactivity (Vue refs, TC39 Signals,
+  nanostores, alien-signals) or use the zero-dependency runtime built into core.
+  Rasen calls into it through a six-member `ReactiveRuntime` interface.
+- **Render-target decoupling** — the same component renders to DOM, Canvas 2D,
+  React Native, an HTML string, or any host you write. A host only needs to
+  implement `Mountable` + `HostHooks`.
 
-| Package                                                  | Description                                  | Status |
-| -------------------------------------------------------- | -------------------------------------------- | ------ |
-| [@rasenjs/core](./packages/core)                         | Core runtime and type definitions            | 🧪 Alpha |
-| [@rasenjs/web](./packages/web)                           | **Web bundle (DOM + Router + SSR)**          | 🧪 Alpha |
-| [@rasenjs/dom](./packages/dom)                           | DOM rendering components                     | 🧪 Alpha |
-| [@rasenjs/router](./packages/router)                     | Framework-agnostic router core               | 🧪 Alpha |
-| [@rasenjs/router-dom](./packages/router-dom)             | DOM-specific router components               | 🧪 Alpha |
-| [@rasenjs/canvas-2d](./packages/canvas-2d)               | Canvas 2D rendering components               | 🧪 Alpha |
-| [@rasenjs/gfx](./packages/gfx)                       | WebGL rendering components                   | 🏗️ Under Construction |
-| [@rasenjs/react-native](./packages/react-native)         | React Native Fabric renderer                 | 🏗️ Under Construction |
-| [@rasenjs/gpui](./packages/gpui)                         | GPU-accelerated native desktop (Zed's GPUI)  | 🏗️ Under Construction |
-| [@rasenjs/lvgl](./packages/lvgl)                         | Embedded UI for ESP32/STM32 (LVGL + QuickJS) | 🏗️ Under Construction |
-| [@rasenjs/html](./packages/html)                         | HTML renderer for SSR/SSG                    | 🧪 Alpha |
-| [@rasenjs/jsx](./packages/jsx-runtime)           | JSX/TSX runtime support                      | 🧪 Alpha |
-| [@rasenjs/reactive-vue](./packages/reactive-vue)         | Vue 3 reactivity adapter                     | 🧪 Alpha |
-| [@rasenjs/reactive-signals](./packages/reactive-signals) | TC39 Signals adapter                         | 🧪 Alpha |
-| [@rasenjs/reactive-nanostores](./packages/reactive-nanostores) | Nanostores reactivity adapter          | 🧪 Alpha |
+Everything else follows from one type:
 
-### 🎉 Published Packages
-
-The **@rasenjs/web** package is now available for early testing! It bundles DOM rendering, router, and SSR capabilities in one convenient package.
-
-**Quick start with the template:**
-
-```bash
-# Use degit to clone the template
-npx degit rasenjs/rasen/templates/rasen-ts my-rasen-app
-cd my-rasen-app
-
-# Install dependencies
-yarn install
-
-# Start dev server (with HMR)
-yarn dev
-
-# Build for production
-yarn build
-
-# Preview production build
-yarn preview
-
-# Server-side rendering
-yarn ssr
+```typescript
+type Mountable<Node = unknown> = (
+  node: Node,
+  hooks: HostHooks<Node> | undefined
+) => (() => void) | undefined
 ```
 
-**Or install the package directly:**
+A component receives a host, mounts itself into it, and returns a cleanup
+function. No virtual DOM, no component instances, no re-render pass.
 
-```bash
-npm install @rasenjs/web @rasenjs/reactive-vue vue
+```mermaid
+flowchart TD
+  App["Your components (JSX or factories)"] --> Core["@rasenjs/core<br/>Mountable · com · each/when/match"]
+  Core --> RT["Reactive adapters<br/>vue · signals · nanostores"]
+  Core --> Targets["Render targets<br/>DOM · Canvas 2D · RN · HTML(SSR)"]
+  Compiler["@rasenjs/compiler<br/>hoisting · structural rewrites · HMR"] -.-> App
 ```
-
-The template includes:
-- ✅ Pre-configured TypeScript + Vite
-- ✅ DOM rendering with @rasenjs/web
-- ✅ File-based routing example
-- ✅ SSR/SSG support
-- ✅ Development server with HMR
-- ✅ Production build optimization
 
 ## Quick Start
 
-### Installation
+```bash
+npx degit rasenjs/rasen/templates/rasen-ts my-rasen-app
+cd my-rasen-app
+npm install
+npm run dev          # http://localhost:3000
+```
 
-> 🎉 **Try the published @rasenjs/web package!**
-> 
-> ```bash
-> # Quick start with the template (recommended)
-> npx degit rasenjs/rasen/templates/rasen-ts my-rasen-app
-> cd my-rasen-app
-> yarn install
-> yarn dev
-> ```
+The template is an SSR + hydration app with isomorphic routing, signals and the
+compiler already configured — see
+[Getting Started](./www/guide/getting-started.md) for the
+step-by-step path, or add Rasen to an existing Vite project:
 
 ```bash
-# Install published web bundle (DOM + Router + SSR)
-npm install @rasenjs/web @rasenjs/reactive-vue vue
-
-# Or install individual packages (not yet published)
-npm install @rasenjs/core @rasenjs/dom @rasenjs/reactive-vue vue
-
-# Or with Signals
-npm install @rasenjs/core @rasenjs/dom @rasenjs/reactive-signals signal-polyfill
-
-# Optional: JSX support
-npm install @rasenjs/jsx
+npm install @rasenjs/web @rasenjs/router @rasenjs/reactive-signals signal-polyfill
+npm install -D @rasenjs/compiler
 ```
 
-### Basic Example
 
-```typescript
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-import { div, button, mount } from '@rasenjs/dom'
-import { ref, computed } from '@vue/reactivity'
+## Example
 
-// 1. Setup reactive runtime
-useReactiveRuntime()
-
-// 2. Create reactive state
-const count = ref(0)
-
-// 3. Define component
-const Counter = () =>
-  div({
-    children: [
-      div({ textContent: computed(() => `Count: ${count.value}`) }),
-      button({
-        textContent: 'Increment',
-        on: { click: () => count.value++ }
-      })
-    ]
-  })
-
-// 4. Mount to DOM
-mount(Counter(), document.getElementById('app'))
-```
-
-### With Router
-
-```typescript
-import { setReactiveRuntime } from '@rasenjs/core'
+```tsx
+import { Signal } from 'signal-polyfill'
+import { com } from '@rasenjs/core'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { createRouter, createBrowserHistory, route } from '@rasenjs/router'
-import { createRouterView, createRouterLink } from '@rasenjs/router-dom'
-import { div, mount } from '@rasenjs/dom'
+import { mount } from '@rasenjs/dom'
 
-// Setup reactive runtime
 useReactiveRuntime()
 
-// Define routes
-const router = createRouter({
-  home: route('/'),
-  about: route('/about'),
-}, {
-  history: createBrowserHistory(),
+const Counter = com(() => {
+  const count = new Signal.State(0)
+  const double = new Signal.Computed(() => count.get() * 2)
+
+  return (
+    <div class="counter">
+      {/* a bare ref interpolates directly: the compiler emits a renderText()
+          binding that unwraps it through the active runtime */}
+      <p>Count: {count} (doubled: {double})</p>
+      <button onClick={() => count.set(count.get() + 1)}>+</button>
+    </div>
+  )
 })
 
-// Create router components
-const RouterView = createRouterView(router, {
-  home: () => div({ textContent: 'Home Page' }),
-  about: () => div({ textContent: 'About Page' }),
-})
-
-const Link = createRouterLink(router)
-
-// App with navigation
-const App = () => div({
-  children: [
-    Link({ to: router.routes.home, children: 'Home' }),
-    Link({ to: router.routes.about, children: 'About' }),
-    RouterView(),
-  ]
-})
-
-mount(App(), document.getElementById('app'))
+mount(<Counter />, document.getElementById('app')!)
 ```
 
-**🚀 Try it yourself:**
-```bash
-npx degit rasenjs/rasen/templates/rasen-ts my-app
-cd my-app
-yarn install
-yarn dev
-```
+No JSX? Every host also ships function factories with the same semantics —
+`div({ class: 'counter' }, p({}, 'Count: ', count), button({ onClick: inc }, '+'))`.
 
-## Cross-Platform Examples
+## Packages
 
-Rasen's power lies in its ability to render to **any host** with the same reactive model:
+Status legend: ✅ published on npm (alpha) · 🚧 in this repo, not yet published ·
+🏗️ work in progress.
 
-### 🖥️ DOM
+### Framework
 
-```typescript
-import { div, button, mount } from '@rasenjs/dom'
+| Package | Description | Status |
+| ------- | ----------- | ------ |
+| [`@rasenjs/core`](./packages/core) | Paradigm, structural components, reactive-runtime boundary, JSX runtime | ✅ alpha |
+| [`@rasenjs/compiler`](./packages/compiler) | JSX static hoisting, structural rewrites, HMR — Vite/webpack/Rspack/esbuild + Babel | 🚧 |
+| [`@rasenjs/dom`](./packages/dom) | DOM renderer: elements, bindings, hydration, compiled templates | ✅ alpha |
+| [`@rasenjs/html`](./packages/html) | HTML string renderer for SSR/SSG | ✅ alpha |
+| [`@rasenjs/web`](./packages/web) | Isomorphic bundle: DOM in the browser, HTML on the server | ✅ alpha |
 
-const count = ref(0)
+### Routing
 
-mount(
-  div({
-    children: [
-      div({ textContent: computed(() => `Count: ${count.value}`) }),
-      button({ textContent: '+', on: { click: () => count.value++ } })
-    ]
-  }),
-  document.getElementById('app')
-)
+| Package | Description | Status |
+| ------- | ----------- | ------ |
+| [`@rasenjs/router`](./packages/router) | Headless router: typed routes, params, guards, history adapters | ✅ alpha |
+| [`@rasenjs/router-dom`](./packages/router-dom) | Link + `RouterView` for the DOM, scroll restoration, layout | ✅ alpha |
+| [`@rasenjs/router-html`](./packages/router-html) | The same components for the SSR string host | ✅ alpha |
+
+### Reactivity adapters
+
+| Package | Description | Status |
+| ------- | ----------- | ------ |
+| [`@rasenjs/reactive-vue`](./packages/reactive-vue) | `@vue/reactivity` adapter | ✅ alpha |
+| [`@rasenjs/reactive-signals`](./packages/reactive-signals) | TC39 Signals (`signal-polyfill`) adapter | ✅ alpha |
+| [`@rasenjs/reactive-nanostores`](./packages/reactive-nanostores) | nanostores adapter | ✅ alpha |
+| [`@rasenjs/reactive-alien-signals`](./packages/reactive-alien-signals) | alien-signals adapter | 🚧 |
+
+### Render targets
+
+| Package | Description | Status |
+| ------- | ----------- | ------ |
+| [`@rasenjs/canvas-2d`](./packages/canvas-2d) | Canvas 2D shapes, text, paths, sprites, groups | ✅ alpha |
+| [`@rasenjs/rn-dom`](./packages/rn-dom) | DOM-like document abstraction over React Native Fabric | ✅ alpha |
+| [`@rasenjs/react-native`](./packages/react-native) | React Native components on `rn-dom` (no React) | 🚧 |
+| [`@rasenjs/rn-html`](./packages/rn-html) | HTML tag set for the RN targets | 🚧 |
+| [`@rasenjs/gfx`](./packages/gfx) | WebGL/WebGPU renderer sharing canvas-2d's shape API | 🏗️ |
+| [`@rasenjs/gpui`](./packages/gpui) | Native desktop through Zed's GPUI | 🏗️ |
+| [`@rasenjs/lvgl`](./packages/lvgl) | Embedded displays (LVGL + QuickJS) | 🏗️ |
+| [`@rasenjs/lynx`](./packages/lynx) | Lynx main-thread rendering | 🏗️ |
+| [`@rasenjs/winui3`](./packages/winui3) | WinUI 3 (research stage) | 🏗️ |
+
+### Utilities
+
+| Package | Description | Status |
+| ------- | ----------- | ------ |
+| [`@rasenjs/tw`](./packages/tw) | Tailwind-style class strings → style records | 🚧 |
+| [`@rasenjs/rota`](./packages/rota) | Headless UI component library | 🚧 |
+| [`@rasenjs/animation`](./packages/animation) | Tween, spring and frame animations as refs | ✅ alpha |
+| [`@rasenjs/math`](./packages/math) | `Vec2/3/4f`, `Mat3x3f`, `Mat4x4f`, `Quatf` | 🚧 |
+| [`@rasenjs/assets`](./packages/assets) | Spine + glTF/GLB parsing, host-injected image loading | 🚧 |
+
+Installing a 🚧 package means building it from this repository
+(`yarn install && yarn build`); the workspaces link everything together.
+
+## Target previews
+
+### 🖥️ Web (DOM + SSR)
+
+```tsx
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
+import { mount } from '@rasenjs/dom'
+
+useReactiveRuntime()
+mount(<App />, document.getElementById('app')!)
 ```
 
 ### 🎨 Canvas 2D
 
-```typescript
-import { canvas } from '@rasenjs/dom'
+```tsx
+import { canvas, mount } from '@rasenjs/dom'
 import { rect, text } from '@rasenjs/canvas-2d'
+import { tween } from '@rasenjs/animation'
 
-const x = ref(50)
+const x = tween(50)
 
 mount(
   canvas({
     width: 400,
     height: 200,
     children: [
-      rect({ x: x, y: 50, width: 100, height: 80, fill: '#4CAF50' }),
-      text({ text: computed(() => `X: ${x.value}`), x: 10, y: 20 })
+      rect({ x, y: 50, width: 100, height: 80, fill: '#4CAF50' }),
+      text({ text: 'Rasen', x: 12, y: 24 })
     ]
   }),
-  document.getElementById('app')
+  document.getElementById('app')!
 )
-
-// Animate
-setInterval(() => (x.value = 50 + Math.sin(Date.now() / 500) * 100), 16)
 ```
 
-### 📱 React Native (No React!)
-
-```typescript
-import { view, text, touchableOpacity } from '@rasenjs/react-native'
-
-const count = ref(0)
-
-view({
-  style: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  children: [
-    text({
-      style: { fontSize: 48 },
-      children: computed(() => `${count.value}`)
-    }),
-    touchableOpacity({
-      onPress: () => count.value++,
-      children: text({ children: '+' })
-    ]
-  })
-})
-```
-
-## Component Composition with `com`
-
-For more complex components, use the `com` wrapper for automatic memory management and effect scope handling:
-
-```typescript
-import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, button, input, ul, li, mount } from '@rasenjs/dom'
-
-const TodoApp = com(() => {
-  const runtime = getReactiveRuntime()
-  const todos = runtime.ref([])
-  const inputValue = runtime.ref('')
-  
-  return (host: HTMLElement) => {
-    const addTodo = () => {
-      if (inputValue.value.trim()) {
-        todos.value = [...todos.value, inputValue.value]
-        inputValue.value = ''
-      }
-    }
-    
-    // All watchers created here are automatically collected and cleaned up
-    div({
-      children: [
-        input({
-          placeholder: 'Enter task...',
-          value: inputValue,
-          on: { keypress: (e: KeyboardEvent) => e.key === 'Enter' && addTodo() }
-        }),
-        button({
-          textContent: 'Add',
-          on: { click: addTodo }
-        }),
-        ul({
-          children: runtime.computed(() =>
-            todos.value.map(todo =>
-              li({
-                textContent: todo,
-                style: { padding: '8px', borderBottom: '1px solid #ddd' }
-              })
-            )
-          )
-        })
-      ]
-    })(host)
-    
-    // Cleanup is automatic - no memory leaks!
-    return () => {}
-  }
-})
-
-mount(TodoApp(), document.getElementById('app'))
-```
-
-### Benefits of `com`:
-
-- **Memory Safety** - All effects are cleaned up automatically
-- **Leak Prevention** - Critical for SPAs and mobile apps
-- **Nested Components** - Proper cleanup order with parent/child relationships
-- **Works Across Platforms** - Same component logic for DOM, Canvas, React Native, etc.
-
-### 🖥️ Native Desktop (GPUI)
+### 📱 React Native (no React)
 
 <p align="center">
-  <img src="./packages/gpui/screenshot.png" alt="GPUI Demo" width="500" />
+  <img src="./examples/react-native/public/demo.webp" alt="React Native demo" width="360" />
+</p>
+
+```tsx
+import { View, Text, TouchableOpacity, registerApp } from '@rasenjs/react-native'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { ref } from '@vue/reactivity'
+
+useReactiveRuntime()
+const count = ref(0)
+
+registerApp('MyApp', () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <Text style={{ fontSize: 48 }}>{count}</Text>
+    <TouchableOpacity onPress={() => count.value++}>
+      <Text>+</Text>
+    </TouchableOpacity>
+  </View>
+))
+```
+
+### 🖥️ Native desktop (GPUI)
+
+<p align="center">
+  <img src="./packages/gpui/screenshot.png" alt="GPUI demo" width="500" />
 </p>
 
 ```typescript
 import { div, text, button, run } from '@rasenjs/gpui'
 import { ref } from '@rasenjs/reactive-signals'
+import { com } from '@rasenjs/core'
 
-const App = () => {
+const App = com(() => {
   const count = ref(0)
 
   return div({
-    class:
-      'flex flex-col gap-4 bg-[#1a1a2e] size-full justify-center items-center',
+    class: 'flex flex-col gap-4 size-full justify-center items-center bg-[#1a1a2e]',
     children: [
-      text({ class: 'text-4xl text-white', children: '🌀 Rasen GPUI' }),
-      text({ class: 'text-5xl text-white', children: count }), // reactive!
-      div({
-        class: 'flex gap-3',
-        children: [
-          button({
-            class: 'px-4 py-2 bg-[#e94560] rounded-lg',
-            onClick: () => count.value--,
-            children: [text({ children: '−' })]
-          }),
-          button({
-            class: 'px-4 py-2 bg-[#0f3460] rounded-lg',
-            onClick: () => count.value++,
-            children: [text({ children: '+' })]
-          })
-        ]
+      text({ class: 'text-4xl text-white font-bold', children: '🌀 Rasen' }),
+      // a ref in a child position is reactive
+      text({ class: 'text-5xl text-white', children: count }),
+      button({
+        class: 'px-4 py-2 bg-[#e94560] rounded-lg text-white',
+        onClick: () => count.value++,
+        children: [text({ children: '+' })]
       })
     ]
   })
-}
+})
 
-run(App) // GPU-accelerated native window!
+run(App)   // GPU-accelerated native window
 ```
 
-### 🔌 Embedded Devices (LVGL + QuickJS)
+Tailwind-style class strings are supported by the `gpui` and `lvgl` targets'
+own class parsing; [`@rasenjs/tw`](./packages/tw) provides the shared
+interpreter (`tw('flex gap-2')` → a camelCase style record) when you want to
+resolve them yourself or pre-generate them with the AOT CLI.
+
+### 🔌 Embedded (LVGL + QuickJS)
 
 <p align="center">
-  <img src="./packages/lvgl/screenshot.png" alt="LVGL Simulator Demo" width="400" />
+  <img src="./packages/lvgl/screenshot.png" alt="LVGL simulator demo" width="400" />
 </p>
 
-Run Rasen on ESP32, STM32 and other embedded devices with LVGL graphics library:
+`packages/lvgl` ships a desktop simulator for the embedded target (LVGL +
+QuickJS-ng + SDL2); see its [README](./packages/lvgl/README.md) for the native
+build steps.
 
-```typescript
-// Works on ESP32-C6, STM32, or desktop simulator!
-function App() {
-  var count = ref(0)
-  
-  return div({
-    class: 'flex flex-col items-center justify-center size-full bg-gray-900 gap-4',
-    children: [
-      label({
-        class: 'text-2xl text-white',
-        children: function() { return 'Count: ' + count.value }
-      }),
-      div({
-        class: 'flex flex-row gap-2',
-        children: [
-          button({
-            class: 'px-4 py-2 bg-blue-500 rounded-lg',
-            onClick: function() { count.value-- },
-            children: [label({ class: 'text-white', children: '-' })]
-          }),
-          button({
-            class: 'px-4 py-2 bg-blue-500 rounded-lg',
-            onClick: function() { count.value++ },
-            children: [label({ class: 'text-white', children: '+' })]
-          })
-        ]
-      })
-    ]
-  })
-}
-
-run(App)
-```
-
-**Setup for LVGL development:**
-
-```bash
-cd packages/lvgl
-
-# 1. Download dependencies (LVGL, QuickJS-ng, SDL2)
-pnpm setup
-
-# 2. Build simulator (Windows/macOS/Linux)
-cd native/simulator
-mkdir build && cd build
-cmake ..
-cmake --build . --config Release
-
-# 3. Run your app
-./Release/rasen_simulator your-app.js
-```
-
-### 📄 Server-Side Rendering (SSR)
+### 📄 HTML (SSR)
 
 ```typescript
 import { renderToString, div, p, ul, li } from '@rasenjs/html'
 
-// No reactive runtime needed for SSR!
 const html = renderToString(
-  div(
-    { class: 'container' },
-    p({ class: 'title' }, 'Hello from SSR!'),
-    ul({ class: 'list' }, li('Item 1'), li('Item 2'), li('Item 3'))
-  )
+  div({ class: 'container' }, p({ class: 'title' }, 'Hello from SSR!'), ul({}, li('One'), li('Two')))
 )
-// Output: <div class="container"><p class="title">Hello from SSR!</p><ul class="list"><li>Item 1</li>...</ul></div>
-```
-
-### With JSX
-
-```tsx
-// tsconfig.json: { "jsx": "react-jsx", "jsxImportSource": "@rasenjs/dom" }
-
-const Counter = () => {
-  const count = ref(0)
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => count.value++}>Increment</button>
-    </div>
-  )
-}
+// <div class="container"><p class="title">Hello from SSR!</p><ul><li>One</li><li>Two</li></ul></div>
 ```
 
 ## Examples
 
 ```bash
-# Run web examples
-yarn examples:dev
+yarn examples:web:dev          # DOM, canvas, JSX, transitions, HMR
+yarn examples:nikke-viewer:dev # game-style app with the GL target
+yarn examples:mario:dev        # sprite/animation driven by the frame scheduler
+yarn examples:ssr:dev          # server rendering + hydration
 ```
 
-See [examples/](./examples) for complete demos:
-
-- **Web** ([examples/web](./examples/web)) - DOM, Canvas 2D, JSX demos
-- **React Native** ([examples/react-native](./examples/react-native)) - Mobile app without React
-
-## Preview
-
-Here is an animated preview from the React Native demo:
-
-<p align="center">
-  <img src="./examples/react-native/public/demo.webp" alt="Rasen React Native Demo" width="360" />
-  <br/>
-  <em>If the animation doesn't play in your viewer, open it on GitHub or a browser.</em>
-</p>
-
-## Roadmap
-
-### Render Targets
-
-| Target         | Status         | Description                           |
-| -------------- | -------------- | ------------------------------------- |
-| DOM            | 🚧 In Progress | Browser DOM rendering                 |
-| Canvas 2D      | 🚧 In Progress | 2D graphics & animations              |
-| React Native   | 🚧 In Progress | Mobile apps via Fabric (no React)     |
-| HTML (SSR/SSG) | 🚧 In Progress | Server-side rendering to HTML strings |
-| Three.js       | 📋 Planned     | 3D graphics & WebGL                   |
-
-### Compilers & Tooling
-
-| Tool             | Status     | Description                                 |
-| ---------------- | ---------- | ------------------------------------------- |
-| SFC Compiler     | 📋 Planned | Single File Components with static hoisting |
-| Mini Program SFC | 📋 Planned | WeChat/Alipay mini program support          |
-
-### Legend
-
-- ✅ Complete
-- 🚧 In Progress
-- 📋 Planned
+| Example | What it shows |
+| ------- | ------------- |
+| [`examples/web`](./examples/web) | DOM, Canvas 2D, JSX, transitions, HMR |
+| [`examples/ssr`](./examples/ssr) | SSR + hydration |
+| [`examples/react-native`](./examples/react-native) | RN app without React |
+| [`examples/canvas-2d`](./examples/canvas-2d) | shape gallery and animation |
+| [`examples/gfx`](./examples/gfx) | WebGL rendering of the canvas-2d API |
+| [`examples/racing`](./examples/racing), [`examples/fps`](./examples/fps), [`examples/mario`](./examples/mario), [`examples/kenney-fps`](./examples/kenney-fps), [`examples/kenney-racing`](./examples/kenney-racing) | games |
+| [`examples/nikke-viewer`](./examples/nikke-viewer), [`examples/perry-nikke-viewer`](./examples/perry-nikke-viewer) | Spine/sprite viewers, incl. the Perry AOT build |
+| [`examples/craft`](./examples/craft) | voxel-style world |
+| [`examples/router-demo`](./examples/router-demo) | routing on both targets |
+| [`examples/lvgl`](./examples/lvgl), [`examples/gpui`](./examples/gpui) | embedded and native desktop |
 
 ## Documentation
 
-Each package has detailed documentation:
+- **[Website](./www)** — guide, API reference and examples; deployed from `www/` (see `vercel.json`)
+- **[DESIGN.md](./docs/DESIGN.md)** — why Rasen is built this way
+- **[COMPILE-DESIGN.md](./docs/COMPILE-DESIGN.md)** — the static-hoisting compiler
+- **[HMR-DESIGN.md](./docs/HMR-DESIGN.md)** — dev-time remounting and module boundaries
+- **[GPU-BACKEND-DESIGN.md](./docs/GPU-BACKEND-DESIGN.md)** — the WebGL/WebGPU backend
+- **[PERRY-AOT.md](./docs/PERRY-AOT.md)** — ahead-of-time compilation with Perry, and [PERRY-PITFALLS.md](./docs/PERRY-PITFALLS.md)
+- **[SPINE-PERF.md](./docs/SPINE-PERF.md)** — the Spine runtime's performance work
+- Package READMEs — [core](./packages/core), [compiler](./packages/compiler), [dom](./packages/dom), [html](./packages/html), [web](./packages/web), [router](./packages/router), [canvas-2d](./packages/canvas-2d), [rota](./packages/rota), [tw](./packages/tw)
 
-- **[Core Concepts](./packages/core/README.md)** - Component model, lifecycle, reactive runtime
-- **[DOM Rendering](./packages/dom/README.md)** - DOM components and mounting
-- **[Canvas 2D](./packages/canvas-2d/README.md)** - 2D graphics rendering
-- **[React Native](./packages/react-native/README.md)** - Fabric architecture binding
-- **[HTML/SSR](./packages/html/README.md)** - Server-side rendering to HTML strings
-- **[JSX Runtime](./packages/jsx-runtime/README.md)** - JSX configuration and usage
-- **[Vue Adapter](./packages/reactive-vue/README.md)** - Vue 3 reactivity integration
-- **[Signals Adapter](./packages/reactive-signals/README.md)** - TC39 Signals integration
+## Roadmap
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Your Application                            │
-├─────────────────────────────────────────────────────────────────────┤
-│                 @rasenjs/jsx (optional)                      │
-├───────────────┬────────────────┬──────────────────┬─────────────────┤
-│ @rasenjs/dom  │@rasenjs/canvas │@rasenjs/react-   │  @rasenjs/html  │
-│               │     -2d        │    native        │   (SSR/SSG)     │
-│               │                │                  │                 │
-├───────────────┴────────────────┴──────────────────┴─────────────────┤
-│                          @rasenjs/core                               │
-├─────────────────────────────────────────────────────────────────────┤
-│      @rasenjs/reactive-vue     |     @rasenjs/reactive-signals       │
-│                       (Reactive Adapters)                            │
-└─────────────────────────────────────────────────────────────────────┘
-```
+| Area | Status | Notes |
+| ---- | ------ | ----- |
+| DOM / HTML / SSR | ✅ alpha | published, used by the template |
+| Routing | ✅ alpha | typed routes, guards, isomorphic views |
+| Compiler | 🚧 | publish with the first release; opt-in structural rewrites |
+| Canvas 2D | ✅ alpha | shapes, text, paths, sprites, pointer delegation |
+| WebGL / WebGPU (`gfx`) | 🏗️ | shares the canvas-2d shape API |
+| React Native (`rn-dom`) | ✅ alpha | Fabric without React; components still landing |
+| Native desktop (GPUI) | 🏗️ | Tailwind-style classes, signals |
+| Embedded (LVGL) | 🏗️ | QuickJS + LVGL, desktop simulator included |
+| Lynx, WinUI 3 | 🏗️ | research / early |
+| Single-file components | 📋 planned | |
 
 ## Development
 
 ```bash
-# Install dependencies
-yarn install
+yarn install        # install workspaces
+yarn build          # build every package (tsup)
+yarn test           # vitest
+yarn typecheck      # tsc --noEmit per package
+yarn lint           # eslint
 
-# Build all packages
-yarn build
-
-# Run tests
-yarn test
-
-# Type check
-yarn typecheck
-
-# Lint
-yarn lint
+yarn www:dev        # documentation site (VitePress)
+yarn www:build
 ```
 
-## Project Structure
-
-```
-rasen/
-├── packages/
-│   ├── core/              # Core runtime
-│   ├── dom/               # DOM renderer
-│   ├── canvas-2d/         # Canvas 2D renderer
-│   ├── react-native/      # React Native renderer
-│   ├── html/              # HTML renderer (SSR/SSG)
-│   ├── jsx-runtime/       # JSX support
-│   ├── reactive-vue/      # Vue adapter
-│   └── reactive-signals/  # Signals adapter
-├── examples/
-│   ├── web/               # Web examples
-│   └── react-native/      # RN example app
-└── ...
-```
+`docs/` holds the design notes; `www/` is the website and guide; each package
+keeps its own README (the site includes them, so they stay in sync).
 
 ## License
 
-MIT © Rasen Contributors
+[MIT](./LICENSE)
+
+<p align="center">
+  <em>Rasen — らせん — one reactive core, many render targets.</em>
+</p>

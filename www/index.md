@@ -48,80 +48,88 @@ features:
 
 ::: code-group
 
-```typescript [DOM]
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-import { div, button, mount } from '@rasenjs/dom'
-import { ref } from 'vue'
+```tsx [DOM]
+import { Signal } from 'signal-polyfill'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
+import { mount } from '@rasenjs/dom'
+
+// Install the reactivity adapter once, at startup.
+useReactiveRuntime()
+
+const count = new Signal.State(0)
+
+mount(
+  <div class="counter">
+    {/* a bare ref interpolates directly — the compiler binds it reactively */}
+    <p>Count: {count}</p>
+    <button onClick={() => count.set(count.get() + 1)}>+</button>
+  </div>,
+  document.getElementById('app')!
+)
+```
+
+```tsx [Canvas 2D]
+import { Signal } from 'signal-polyfill'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
+import { canvas, mount } from '@rasenjs/dom'
+import { rect, text } from '@rasenjs/canvas-2d'
 
 useReactiveRuntime()
 
-const count = ref(0)
+const x = new Signal.State(50)
 
-const Counter = () =>
-  div({
-    children: [
-      div({ textContent: () => `Count: ${count.value}` }),
-      button({
-        textContent: '+',
-        on: { click: () => count.value++ }
-      })
-    ]
-  })
-
-mount(Counter(), document.getElementById('app'))
-```
-
-```typescript [Canvas 2D]
-import { canvas } from '@rasenjs/dom'
-import { rect, text } from '@rasenjs/canvas-2d'
-import { ref } from 'vue'
-
-const x = ref(50)
-
+// The canvas bridge lives in @rasenjs/dom; the shapes come from the target.
 mount(
   canvas({
     width: 400,
     height: 200,
     children: [
       rect({ x, y: 50, width: 100, height: 80, fill: '#4CAF50' }),
-      text({ text: () => `X: ${x.value}`, x: 10, y: 20 })
+      text({ text: 'Rasen', x: 12, y: 24, fill: '#333' })
     ]
   }),
-  document.getElementById('app')
+  document.getElementById('app')!
 )
+
+// Shape props are reactive: writing the signal marks the canvas dirty.
+const start = performance.now()
+const spin = (now: number) => {
+  x.set(150 + Math.sin((now - start) / 500) * 100)
+  requestAnimationFrame(spin)
+}
+requestAnimationFrame(spin)
 ```
 
-```typescript [React Native]
-import { view, text, touchableOpacity } from '@rasenjs/react-native'
-import { ref } from 'vue'
-
-const count = ref(0)
-
-view({
-  style: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  children: [
-    text({
-      style: { fontSize: 48 },
-      children: () => `${count.value}`
-    }),
-    touchableOpacity({
-      onPress: () => count.value++,
-      children: text({ children: '+' })
-    })
-  ]
-})
-```
-
-```typescript [HTML (SSR)]
+```tsx [HTML (SSR)]
 import { renderToString, div, p, ul, li } from '@rasenjs/html'
 
+// Same components, string host — no DOM required.
 const html = renderToString(
   div(
     { class: 'container' },
     p({ class: 'title' }, 'Hello from SSR!'),
-    ul({ class: 'list' }, li('Item 1'), li('Item 2'), li('Item 3'))
+    ul({ class: 'list' }, li('Item 1'), li('Item 2'))
   )
 )
+```
+
+```tsx [React Native]
+import { View, Text, TouchableOpacity, registerApp } from '@rasenjs/react-native'
+import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+import { ref } from '@vue/reactivity'
+
+useReactiveRuntime()
+
+const count = ref(0)
+
+registerApp('MyApp', () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <Text style={{ fontSize: 48 }}>{count}</Text>
+    <TouchableOpacity onPress={() => count.value++}>
+      <Text>+</Text>
+    </TouchableOpacity>
+  </View>
+))
 ```
 
 :::
@@ -131,10 +139,14 @@ const html = renderToString(
 Everything in Rasen comes down to one simple type:
 
 ```typescript
-type MountFunction<Host> = (host: Host) => (() => void) | undefined
+type Mountable<Node = unknown> = (
+  node: Node,
+  hooks: HostHooks<Node> | undefined
+) => (() => void) | undefined
 ```
 
-A component receives a host, mounts itself, and returns a cleanup function. That's it.
+A component receives a host, mounts itself into it, and returns a cleanup
+function. That's it — no virtual DOM, no component instances.
 
 <div style="text-align: center; margin: 3rem 0;">
   <a href="/guide/introduction" style="

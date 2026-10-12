@@ -34,11 +34,15 @@ export default defineConfig({
         items: [
           { text: '@rasenjs/core', link: '/packages/core' },
           { text: '@rasenjs/dom', link: '/packages/dom' },
-          { text: '@rasenjs/canvas-2d', link: '/packages/canvas-2d' },
-          { text: '@rasenjs/react-native', link: '/packages/react-native' },
+          { text: '@rasenjs/web', link: '/packages/web' },
           { text: '@rasenjs/html', link: '/packages/html' },
-          { text: '@rasenjs/jsx', link: '/packages/jsx-runtime' },
-          { text: '@rasenjs/tw', link: '/packages/tw' }
+          { text: '@rasenjs/router', link: '/packages/router' },
+          { text: '@rasenjs/compiler', link: '/packages/compiler' },
+          { text: '@rasenjs/canvas-2d', link: '/packages/canvas-2d' },
+          { text: '@rasenjs/rn-dom', link: '/packages/rn-dom' },
+          { text: '@rasenjs/rota', link: '/packages/rota' },
+          { text: '@rasenjs/tw', link: '/packages/tw' },
+          { text: 'All packages', link: '/packages/' }
         ]
       },
       {
@@ -46,8 +50,12 @@ export default defineConfig({
         items: [
           { text: 'GitHub', link: 'https://github.com/rasenjs/rasen' },
           {
+            text: 'npm',
+            link: 'https://www.npmjs.com/org/rasenjs'
+          },
+          {
             text: 'Changelog',
-            link: 'https://github.com/rasenjs/rasen/releases'
+            link: 'https://github.com/rasenjs/rasen/blob/main/CHANGELOG.md'
           }
         ]
       }
@@ -93,7 +101,7 @@ export default defineConfig({
         {
           text: 'Advanced',
           items: [
-            { text: 'JSX Support', link: '/guide/advanced/jsx' },
+            { text: 'JSX & the Compiler', link: '/guide/advanced/jsx' },
             {
               text: 'Custom Render Targets',
               link: '/guide/advanced/custom-targets'
@@ -107,31 +115,55 @@ export default defineConfig({
       ],
       '/api/': [
         {
-          text: 'Core API',
-          items: [
-            { text: 'Overview', link: '/api/' },
-            { text: 'setReactiveRuntime', link: '/api/set-reactive-runtime' },
-            { text: 'MountFunction', link: '/api/mount-function' },
-            { text: 'Component Types', link: '/api/component-types' }
-          ]
+          text: 'API Reference',
+          items: [{ text: 'Overview', link: '/api/' }]
         }
       ],
       '/packages/': [
         {
-          text: 'Packages',
+          text: 'Framework',
           items: [
             { text: '@rasenjs/core', link: '/packages/core' },
+            { text: '@rasenjs/compiler', link: '/packages/compiler' },
             { text: '@rasenjs/dom', link: '/packages/dom' },
-            { text: '@rasenjs/canvas-2d', link: '/packages/canvas-2d' },
-            { text: '@rasenjs/react-native', link: '/packages/react-native' },
             { text: '@rasenjs/html', link: '/packages/html' },
-            { text: '@rasenjs/jsx', link: '/packages/jsx-runtime' },
-            { text: '@rasenjs/tw', link: '/packages/tw' },
+            { text: '@rasenjs/web', link: '/packages/web' }
+          ]
+        },
+        {
+          text: 'Routing',
+          items: [{ text: '@rasenjs/router', link: '/packages/router' }]
+        },
+        {
+          text: 'Reactivity',
+          items: [
             { text: '@rasenjs/reactive-vue', link: '/packages/reactive-vue' },
             {
               text: '@rasenjs/reactive-signals',
               link: '/packages/reactive-signals'
+            },
+            {
+              text: '@rasenjs/reactive-nanostores',
+              link: '/packages/reactive-nanostores'
             }
+          ]
+        },
+        {
+          text: 'Rendering Targets',
+          items: [
+            { text: '@rasenjs/canvas-2d', link: '/packages/canvas-2d' },
+            { text: '@rasenjs/rn-dom', link: '/packages/rn-dom' },
+            { text: '@rasenjs/react-native', link: '/packages/react-native' }
+          ]
+        },
+        {
+          text: 'Utilities',
+          items: [
+            { text: '@rasenjs/tw', link: '/packages/tw' },
+            { text: '@rasenjs/rota', link: '/packages/rota' },
+            { text: '@rasenjs/animation', link: '/packages/animation' },
+            { text: '@rasenjs/math', link: '/packages/math' },
+            { text: '@rasenjs/assets', link: '/packages/assets' }
           ]
         }
       ],

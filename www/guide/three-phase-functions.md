@@ -8,13 +8,13 @@ The core of Rasen's component model is the **three-phase function** — a simple
 const Component = (props) => {        // 📦 Phase 1: Setup
   // Initialize reactive state
   const count = ref(0)
-  
+
   return (host) => {                  // 🔌 Phase 2: Mount
-    // Mount to host, establish watchers
-    const stop = watch(() => count.value, (val) => {
-      // Update rendering
+    // Mount to host, establish subscriptions
+    const stop = getReactiveRuntime().subscribe(count, (value) => {
+      // Update the host's representation
     })
-    
+
     return () => {                    // 🧹 Phase 3: Unmount
       // Cleanup resources
       stop()
@@ -22,6 +22,9 @@ const Component = (props) => {        // 📦 Phase 1: Setup
   }
 }
 ```
+
+Everything you build on top of the paradigm — the element factories, `when`,
+`each`, a compiled template — is just a `Mountable` with phases like these.
 
 ## Phase 1: Setup
 
@@ -61,38 +64,43 @@ The second function is called when the component is mounted to a host. This is w
 - Initialize side effects
 
 ```typescript
+import { getReactiveRuntime, ref } from '@rasenjs/core'
+
 const Counter = () => {
+  // core's built-in ref is callable: count() reads, count(v) writes
   const count = ref(0)
-  
+
   return (host: HTMLElement) => {
     // Create elements
     const container = document.createElement('div')
     const display = document.createElement('span')
     const button = document.createElement('button')
-    
+
     button.textContent = '+'
-    button.addEventListener('click', () => count.value++)
-    
-    // Setup reactive updates
-    const stopWatch = watch(
-      () => count.value,
-      (value) => {
-        display.textContent = `Count: ${value}`
-      },
-      { immediate: true }
-    )
-    
+    button.addEventListener('click', () => count(count() + 1))
+
+    // Setup reactive updates. subscribe() has no `immediate` option — the
+    // callback never fires for the initial value, so write it yourself.
+    display.textContent = `Count: ${count()}`
+    const stopWatch = getReactiveRuntime().subscribe(count, (value) => {
+      display.textContent = `Count: ${value}`
+    })
+
     // Mount to host
     container.appendChild(display)
     container.appendChild(button)
     host.appendChild(container)
-    
+
     return () => {
       // Unmount phase...
     }
   }
 }
 ```
+
+If the component is wrapped in `com()` you do not have to keep the stop
+function around: subscriptions created during mount are collected into the
+component's effect scope and stopped on unmount.
 
 ## Phase 3: Unmount
 
@@ -213,24 +221,26 @@ No need to remember which lifecycle hook to use or when it fires.
 Primitive components (like `div`, `button`) simplify this pattern by encapsulating the mount logic:
 
 ```typescript
-// Under the hood, div does something like:
+// Under the hood, div does roughly this — children are mounted, every other
+// prop goes through the shared binding layer (property/attribute dispatch):
 const div = (props) => (host: HTMLElement) => {
   const el = document.createElement('div')
-  
-  // Apply props, set up watchers
-  if (props.textContent) {
-    watchProp(() => unref(props.textContent), (v) => {
-      el.textContent = v
-    })
+  const stops = []
+
+  for (const [key, value] of Object.entries(props)) {
+    if (key === 'children') continue
+    if (isEventProp(key)) stops.push(on(el, getEventName(key), value))
+    else stops.push(bindKey(el, 'div', key, value))
   }
-  
-  // Mount children
-  const childUnmounts = props.children?.map(child => child(el))
-  
+
+  const childUnmounts = (Array.isArray(props.children) ? props.children : [props.children])
+    .map((child) => mountChild(el, child))
+
   host.appendChild(el)
-  
+
   return () => {
-    childUnmounts?.forEach(unmount => unmount?.())
+    stops.forEach((stop) => stop())
+    childUnmounts.forEach((unmount) => unmount?.())
     el.remove()
   }
 }
@@ -238,36 +248,66 @@ const div = (props) => (host: HTMLElement) => {
 
 This means your business components can look simpler:
 
-```typescript
-// Business component - just returns the mount function from div
-const Counter = () => {
-  const count = ref(0)
-  
-  return div({
-    children: [
-      span({ textContent: () => `Count: ${count.value}` }),
-      button({ textContent: '+', on: { click: () => count.value++ } })
-    ]
-  })
-}
+```tsx
+import { Signal } from 'signal-polyfill'
+import { com } from '@rasenjs/core'
+import { div, span, button } from '@rasenjs/dom'
+
+// Business component — just returns the mountable from div()
+const Counter = com(() => {
+  const count = new Signal.State(0)
+
+  return div(
+    {},
+    span({}, 'Count: ', count),                        // ref child → reactive text
+    button({ onClick: () => count.set(count.get() + 1) }, '+')
+  )
+})
 ```
 
-## Async Setup
+…and with JSX the same component reads:
 
-The setup phase can be async:
+```tsx
+const Counter = com(() => {
+  const count = new Signal.State(0)
+  return (
+    <div>
+      <span>Count: {count}</span>
+      <button onClick={() => count.set(count.get() + 1)}>+</button>
+    </div>
+  )
+})
+```
+
+## Async setup
+
+The setup phase may be async: `com()` detects a returned Promise and adapts the
+component into `Promise<Mountable>`. Hosts mount synchronously, so an async
+component is not mounted directly as a child — reach for `lazy()`, which owns
+the pending / error states:
 
 ```typescript
-const AsyncComponent = async (props: { url: string }) => {
-  // Async setup
-  const data = await fetch(props.url).then(r => r.json())
-  
-  return (host) => {
-    // Mount with fetched data
-    return div({
-      textContent: JSON.stringify(data)
-    })(host)
-  }
-}
+import { lazy } from '@rasenjs/core'
+
+// loader() resolves to the mountable to render
+const UserCard = lazy({
+  loader: () => import('./UserCard').then((m) => m.UserCard({ userId })),
+  loading: () => spinner()
+})
+```
+
+If your host drives its own async boundary (the SSR pipeline awaits before
+serializing), the raw form is available:
+
+```typescript
+const AsyncComponent = com(async (props: { url: string }) => {
+  const data = await fetch(props.url).then((r) => r.json())
+  return (host: HTMLElement) => div({}, JSON.stringify(data))(host)
+})
+
+// the caller awaits, then mounts
+const mountable = await AsyncComponent({ url: '/api/user' })
+mount(mountable, document.getElementById('app')!)
 ```
 
 ## Next Steps

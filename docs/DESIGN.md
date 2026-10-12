@@ -60,21 +60,25 @@ useReactiveRuntime()
 
 ### Render Target Decoupling
 
-Through the unified `MountFunction<Host>` pattern, the same component paradigm renders to any target:
+Through the unified `Mountable<Node>` contract, the same component paradigm renders to any target:
 
 ```typescript
 // DOM
-const Button = () => div({ children: [...] })
+const Button = () => div({}, 'Click me')
 
-// Canvas 2D  
+// Canvas 2D
 const Circle = () => circle({ x: 100, y: 100, radius: 50 })
 
 // React Native
-const Card = () => view({ style: {...}, children: [...] })
+const Card = () => view({ style: { … }, children: [text({ children: 'Hi' })] })
 
 // HTML (SSR/SSG)
-const Page = () => html({ children: [...] })
+const Page = () => div({}, h1({}, 'Hello'))
 ```
+
+JSX is the preferred spelling for all of them (`<div><span>{count}</span></div>`);
+the factories above are what JSX compiles to when the compiler cannot hoist a
+subtree.
 
 ---
 
@@ -86,13 +90,13 @@ A Rasen component is a **three-phase function**, each phase corresponding to a l
 const Component = (props) => {        // 📦 Phase 1: Setup
   // Initialize reactive state
   const count = ref(0)
-  
+
   return (host) => {                  // 🔌 Phase 2: Mount
-    // Mount to host, establish watchers
-    const stop = watch(() => count.value, (val) => {
-      // Update rendering
+    // Mount to host, establish subscriptions
+    const stop = getReactiveRuntime().subscribe(count, (val) => {
+      // Update the host's representation
     })
-    
+
     return () => {                    // 🧹 Phase 3: Unmount
       // Cleanup resources
       stop()
@@ -145,12 +149,11 @@ const div = (props) => (host: HTMLElement) => {
 }
 
 // Business component: appears as a single-layer function
-const Counter = () => div({
-  children: [
-    span({ textContent: count }),
-    button({ onClick: increment, children: '+' })
-  ]
-})
+const Counter = () => div(
+  {},
+  span({}, count),                       // a ref child → reactive text node
+  button({ onClick: increment }, '+')
+)
 ```
 
 ### The `com` Wrapper: Automatic EffectScope Management
@@ -186,17 +189,13 @@ const Counter = (props) => {
 const Counter = com(() => {
   const runtime = getReactiveRuntime()
   const count = runtime.ref(0)
-  
-  // Return MountFunction directly - scope is automatically managed
-  return div({
-    children: [
-      span({ textContent: () => `Count: ${count.value}` }),
-      button({
-        textContent: 'Increment',
-        on: { click: () => count.value++ }
-      })
-    ]
-  })
+
+  // Return the mountable directly — the scope is managed for you
+  return div(
+    {},
+    span({}, count),
+    button({ onClick: () => count(count() + 1) }, 'Increment')
+  )
   
   // Scope is automatically stopped when component unmounts
 })
@@ -230,8 +229,15 @@ Rasen's core code is extremely small — **nearly zero**. Because what it delive
 ### The Essence of the Paradigm
 
 ```typescript
-type MountFunction<Host> = (host: Host) => (() => void) | undefined
+type Mountable<Node = unknown> = (
+  node: Node,
+  hooks: HostHooks<Node> | undefined
+) => (() => void) | undefined
 ```
+
+`hooks` is the host's capability set (markers, insertion, batching, text
+creation) — passed explicitly down the tree, so there is no global "current
+host" and components stay testable in isolation.
 
 Anything with a concept of "mount" and "unmount" can use Rasen's pattern:
 

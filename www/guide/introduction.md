@@ -49,29 +49,40 @@ Rasen provides **dual decoupling**:
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| [@rasenjs/core](/packages/core) | Core runtime and type definitions |
-| [@rasenjs/dom](/packages/dom) | DOM rendering components |
-| [@rasenjs/canvas-2d](/packages/canvas-2d) | Canvas 2D rendering components |
-| [@rasenjs/react-native](/packages/react-native) | React Native Fabric renderer |
-| [@rasenjs/html](/packages/html) | HTML renderer for SSR/SSG |
-| [@rasenjs/jsx](/packages/jsx-runtime) | JSX/TSX runtime support |
-| [@rasenjs/reactive-vue](/packages/reactive-vue) | Vue 3 reactivity adapter |
-| [@rasenjs/reactive-signals](/packages/reactive-signals) | TC39 Signals adapter |
+Rasen is a monorepo. The packages below are the ones you are most likely to
+install; the full list lives in [Packages](/packages/).
+
+| Package | Description | Status |
+| ------- | ----------- | ------ |
+| [`@rasenjs/core`](/packages/core) | Paradigm, types and the component primitives | ✅ Alpha |
+| [`@rasenjs/compiler`](/packages/compiler) | JSX transform, static hoisting, HMR (Vite/webpack/Rspack/esbuild/Babel) | ✅ Alpha |
+| [`@rasenjs/dom`](/packages/dom) | DOM renderer | ✅ Alpha |
+| [`@rasenjs/html`](/packages/html) | HTML string renderer for SSR/SSG | ✅ Alpha |
+| [`@rasenjs/web`](/packages/web) | Isomorphic bundle — DOM in the browser, HTML on the server | ✅ Alpha |
+| [`@rasenjs/router`](/packages/router) | Headless router, plus DOM and SSR bindings | ✅ Alpha |
+| [`@rasenjs/reactive-vue`](/packages/reactive-vue) | Vue 3 reactivity adapter (`@vue/reactivity`) | ✅ Alpha |
+| [`@rasenjs/reactive-signals`](/packages/reactive-signals) | TC39 Signals adapter (`signal-polyfill`) | ✅ Alpha |
+| [`@rasenjs/reactive-nanostores`](/packages/reactive-nanostores) | Nanostores adapter | ✅ Alpha |
+| [`@rasenjs/canvas-2d`](/packages/canvas-2d) | Canvas 2D renderer | ✅ Alpha |
+| [`@rasenjs/rn-dom`](/packages/rn-dom) | DOM-like document abstraction over React Native Fabric | ✅ Alpha |
+| [`@rasenjs/tw`](/packages/tw) | Tailwind-style class interpreter | 🚧 In repo |
+| [`@rasenjs/rota`](/packages/rota) | Headless UI component library | 🚧 In repo |
+| `@rasenjs/gfx`, `@rasenjs/gpui`, `@rasenjs/lvgl`, `@rasenjs/lynx`, `@rasenjs/react-native` | WebGL, native desktop, embedded and RN targets | 🏗️ In progress |
+
+"Alpha" means the package is published and usable, but the API may still change
+before 1.0.
 
 ## Status
 
 ::: warning Work In Progress
-This framework is still under active development and has **NOT been published to npm**.
-
-**Please do not use this in production.** APIs are unstable and may change at any time.
-
-If you're interested in this project, feel free to ⭐ star and watch for updates!
+The framework is in **alpha** and is closing in on its first public release.
+Most rendering and routing packages are published on npm; the compiler and
+several targets are still repo-only. Expect breaking changes between alpha
+releases.
 :::
 
 ## Next Steps
 
-- [Design Philosophy](/guide/design-philosophy) — Understand the core ideas
-- [Getting Started](/guide/getting-started) — Set up your first project
-- [Three-Phase Functions](/guide/three-phase-functions) — Learn the component model
+- [Design Philosophy](/guide/design-philosophy) — understand the core ideas
+- [Getting Started](/guide/getting-started) — set up your first project
+- [Three-Phase Functions](/guide/three-phase-functions) — learn the component model

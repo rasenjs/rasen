@@ -12,7 +12,7 @@
 
 // Counter Examples
 export { default as counterDom } from './counter-dom.ts?raw'
-export { default as counterRn } from './counter-rn.ts?raw'
+export { default as counterRn } from './counter-rn.tsx?raw'
 
 // Todo Examples
 export { default as todoDom } from './todo-dom.ts?raw'

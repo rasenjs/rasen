@@ -58,7 +58,7 @@ mount(App(), document.getElementById('app'))
 
 ## API
 
-The API is identical to `@rasenjs/canvas-2d`. See the [canvas-2d documentation](../canvas-2d/README.md) for details.
+The API is identical to `@rasenjs/canvas-2d`. See the [canvas-2d documentation](https://github.com/rasenjs/rasen/tree/main/packages/canvas-2d/README.md) for details.
 
 ## Performance Comparison
 

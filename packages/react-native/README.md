@@ -577,7 +577,7 @@ This allows Rasen to drive native UI updates using **Signal-based reactivity** i
 - This package uses `AppRegistry.registerRunnable()` instead of `registerComponent()`
 - UI rendering is managed by Rasen's render context
 - The current implementation requires native module support for full Fabric integration
-- See [examples/react-native](../../examples/react-native) for a complete example
+- See [examples/react-native](https://github.com/rasenjs/rasen/tree/main/examples/react-native) for a complete example
 
 ## License
 

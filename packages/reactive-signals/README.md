@@ -148,15 +148,11 @@ const MyComponent = com(() => {
   const count = runtime.ref(0)
   
   // All watchers are automatically collected
-  return div({
-    children: [
-      span({ textContent: () => `Count: ${count.value}` }),
-      button({
-        textContent: 'Increment',
-        on: { click: () => count.value++ }
-      })
-    ]
-  })
+  return div(
+    {},
+    span({}, count),
+    button({ onClick: () => count.value++ }, 'Increment')
+  )
 })
 ```
 
@@ -170,15 +166,11 @@ useReactiveRuntime()
 
 const count = ref(0)
 
-const Counter = () => div({
-  children: [
-    div({ textContent: computed(() => `Count: ${count.value}`) }),
-    button({
-      textContent: 'Increment',
-      on: { click: () => count.value++ }
-    })
-  ]
-})
+const Counter = () => div(
+  {},
+  div({}, computed(() => `Count: ${count.value}`)),
+  button({ onClick: () => count.value++ }, 'Increment')
+)
 
 mount(Counter(), document.getElementById('app'))
 ```
@@ -204,6 +196,14 @@ interface ReactiveRuntime {
 - **Minimal Bundle** - Smaller than full reactive libraries
 - **Framework Agnostic** - Standard across all frameworks
 - **Performance** - Optimized for modern JavaScript engines
+
+## One adapter per program
+
+Each adapter augments core's opaque `Ref<T>` placeholder with *its* ref type, and
+those augmentations merge within one TypeScript program — so a project that
+imports two adapters (say `reactive-vue` and `reactive-signals`) ends up with an
+impossible intersection type. Pick one adapter per application; the runtime has
+the same rule (the last `useReactiveRuntime()` wins).
 
 ## About signal-polyfill
 

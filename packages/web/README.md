@@ -54,12 +54,12 @@ export const Counter = () => {
   const count = ref(0)
   const increment = () => count.value++
 
-  return div({
-    children: [
-      p(() => `Count: ${count.value}`),
-      button({ onClick: increment }, 'Increment')
-    ]
-  })
+  return div(
+    {},
+    // a ref in a child position becomes a reactive text node on both targets
+    p({}, 'Count: ', count),
+    button({ onClick: increment }, 'Increment')
+  )
 }
 ```
 
@@ -129,17 +129,23 @@ button({ on: { click: handler } }, 'Click me')
 
 **Best Practice**: Use `onClick`, `onInput`, etc. (not `on: { click }` object).
 
-### 2. Reactive Text Functions
+### 2. Reactive Text
 
-Reactive text functions work in both environments:
+Pass a **ref** to a child position and both renderers keep it updated:
 
 ```typescript
-// ✅ Works in both SSR and browser
-p(() => `Count: ${count.value}`)
+// ✅ Works in both SSR and browser — one text node, updated through the runtime
+p({}, count)
+p({}, 'Count: ', count)
 ```
 
-- **SSR**: Evaluates once and renders the initial value
-- **Browser**: Sets up reactivity and updates on changes
+- **SSR**: the current value is written into the markup
+- **Browser**: the same ref drives a subscription, so later writes update the node
+
+A plain getter child — `p(() => \`Count: ${count.value}\`)` — does **not**
+subscribe in the DOM renderer, it is invoked once. Use a ref,
+`text({ content: () => … })`, or JSX (`<p>Count: {count}</p>`, which the compiler
+binds for you).
 
 ### 3. Import Path
 
@@ -171,22 +177,32 @@ export const { routes } = router
 ### Use Router Components
 
 ```typescript
-import { RouterView, RouterLink, div, nav } from '@rasenjs/web'
+import { createRouterView, createRouterLink, div, nav } from '@rasenjs/web'
 import { router, routes } from './router'
 
-export const App = () => div({},
-  nav({},
-    RouterLink({ to: routes.home }, 'Home'),
-    RouterLink({ to: routes.about }, 'About'),
-    RouterLink({ to: 'user', params: { id: 'alice' } }, 'User')
-  ),
-  RouterView(router, {
-    [routes.home]: () => Home(),
-    [routes.about]: () => About(),
-    [routes.user]: (params) => User(params)
-  })
+// One view table + one link factory; both resolve to the DOM or the HTML
+// implementation depending on the environment.
+const RouterView = createRouterView(
+  router,
+  {
+    home: () => Home(),
+    about: () => About(),
+    user: (params) => User(params)
+  },
+  { default: () => NotFound() }
+)
+
+const Link = createRouterLink(router)
+
+export const App = () => div(
+  {},
+  nav({}, Link({ to: routes.home }, 'Home'), Link({ to: routes.about }, 'About')),
+  RouterView()
 )
 ```
+
+In JSX the same components are written as `<RouterView />` and
+`<Link to={routes.home}>Home</Link>`.
 
 ## Use Cases
 
@@ -200,11 +216,11 @@ Build full-featured apps that work in any environment:
 
 ## Related Packages
 
-- [`@rasenjs/router`](../router) - Core headless router
-- [`@rasenjs/dom`](../dom) - DOM renderer (browser)
-- [`@rasenjs/html`](../html) - HTML renderer (SSR)
-- [`@rasenjs/router-dom`](../router-dom) - DOM router components (internal)
-- [`@rasenjs/router-html`](../router-html) - HTML router components (internal)
+- [`@rasenjs/router`](https://github.com/rasenjs/rasen/tree/main/packages/router) - Core headless router
+- [`@rasenjs/dom`](https://github.com/rasenjs/rasen/tree/main/packages/dom) - DOM renderer (browser)
+- [`@rasenjs/html`](https://github.com/rasenjs/rasen/tree/main/packages/html) - HTML renderer (SSR)
+- [`@rasenjs/router-dom`](https://github.com/rasenjs/rasen/tree/main/packages/router-dom) - DOM router components (internal)
+- [`@rasenjs/router-html`](https://github.com/rasenjs/rasen/tree/main/packages/router-html) - HTML router components (internal)
 
 ### SSR with Client Hydration and Routing
 
@@ -241,7 +257,7 @@ mount(App(), document.getElementById('app'))
 
 ## Complete Example
 
-See the [SSR example](../../examples/ssr) for a full implementation with:
+See the [SSR example](https://github.com/rasenjs/rasen/tree/main/examples/ssr) for a full implementation with:
 
 - Server-side rendering
 - Client-side hydration
@@ -251,11 +267,11 @@ See the [SSR example](../../examples/ssr) for a full implementation with:
 
 ## Related Packages
 
-- [`@rasenjs/router`](../router) - Core headless router
-- [`@rasenjs/dom`](../dom) - DOM renderer (browser)
-- [`@rasenjs/html`](../html) - HTML renderer (SSR)
-- [`@rasenjs/router-dom`](../router-dom) - DOM router components (internal)
-- [`@rasenjs/router-html`](../router-html) - HTML router components (internal)
+- [`@rasenjs/router`](https://github.com/rasenjs/rasen/tree/main/packages/router) - Core headless router
+- [`@rasenjs/dom`](https://github.com/rasenjs/rasen/tree/main/packages/dom) - DOM renderer (browser)
+- [`@rasenjs/html`](https://github.com/rasenjs/rasen/tree/main/packages/html) - HTML renderer (SSR)
+- [`@rasenjs/router-dom`](https://github.com/rasenjs/rasen/tree/main/packages/router-dom) - DOM router components (internal)
+- [`@rasenjs/router-html`](https://github.com/rasenjs/rasen/tree/main/packages/router-html) - HTML router components (internal)
 
 ## License
 

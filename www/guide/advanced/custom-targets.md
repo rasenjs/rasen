@@ -113,7 +113,7 @@ export function mount(
 
 ```typescript
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 import * as THREE from 'three'
 import { mesh, group, mount } from './three-adapter'
 

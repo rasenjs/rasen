@@ -1,387 +1,166 @@
 # @rasenjs/dom
 
-DOM rendering components for the Rasen reactive rendering framework.
+The DOM renderer for [Rasen](https://github.com/rasenjs/rasen): typed element
+factories, fine-grained bindings, structural components, SSR-aware template
+cloning and hydration.
 
 ## Installation
 
 ```bash
 npm install @rasenjs/dom @rasenjs/core
+# pick one reactivity adapter
+npm install @rasenjs/reactive-vue @vue/reactivity
 ```
 
-## Overview
+## Quick start
 
-`@rasenjs/dom` provides reactive DOM components that automatically update when reactive state changes.
+```tsx
+import { Signal } from 'signal-polyfill'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
+import { mount } from '@rasenjs/dom'
 
-## Quick Start
-
-```typescript
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-import { div, button, input, mount } from '@rasenjs/dom'
-import { ref, computed } from '@vue/reactivity'
-
-// Setup reactive runtime
 useReactiveRuntime()
 
-// Create reactive state
+const name = new Signal.State('World')
+
+mount(
+  <div class="app">
+    <input
+      value={name}
+      onInput={(e) => name.set((e.target as HTMLInputElement).value)}
+    />
+    <p>Hello, {name}!</p>
+  </div>,
+  document.getElementById('app')!
+)
+```
+
+The JSX runtime lives at `@rasenjs/dom/jsx-runtime`; point
+`compilerOptions.jsxImportSource` at `@rasenjs/dom` and the
+[compiler](https://github.com/rasenjs/rasen/tree/main/packages/compiler) hoists the static parts into a single `template()`
+clone.
+
+## Without JSX
+
+Every tag is also a function with four call forms:
+
+```typescript
+import { div, p, input, button, mount } from '@rasenjs/dom'
+import { ref } from '@rasenjs/core'
+
 const name = ref('World')
 
-// Create component
-const App = () => div({
-  children: [
-    input({
-      value: name,
-      on: { input: (e) => name.value = e.target.value }
-    }),
-    div({
-      textContent: computed(() => `Hello, ${name.value}!`)
-    })
-  ]
-})
+const App = () =>
+  div(
+    { class: 'app' },
+    input({ value: name, onInput: (e) => name(e.target.value) }),
+    // a ref in a child position becomes a reactive text node
+    p({}, 'Hello, ', name, '!')
+  )
 
-// Mount to DOM
 mount(App(), document.getElementById('app'))
 ```
 
+```typescript
+el()               // empty element
+el(child)          // single child
+el(props)          // props only
+el(props, ...kids) // props + extra children
+```
+
+Use `tag('my-element')` (or `element({ tag: 'my-element' })`) for a tag that has
+no named export.
+
+### Props
+
+| Kind | Examples | Behaviour |
+| ---- | -------- | --------- |
+| class | `class` | written through `bindClass`; a static string subscribes to nothing. In JSX, `className` is accepted too — the JSX runtime and the compiler normalize it to `class` |
+| style | a record (`{ fontSize: 16 }`) or a string | object → per-declaration write, each declaration may itself be a `PropValue` |
+| events | `onClick`, `onInput`, `onPointerDown`, … | `onX` in camelCase; the listener name is lowercased (`onClick` → `click`) |
+| DOM properties | `value`, `checked`, `indeterminate` (input), `value` (textarea/select), `selected` (option), `selectedIndex`, plus the common `disabled`, `readOnly`, `multiple`, `hidden` | assigned on the element, not through `setAttribute` |
+| everything else | `id`, `title`, `href`, `tabIndex`, … | attribute, written as given — attribute names are case-insensitive in HTML, so `tabIndex` and `tabindex` address the same attribute |
+| `data-*` / `aria-*` | `dataState`, `ariaChecked` | kebab-cased to `data-state` / `aria-checked` |
+| `ref` | `ref={myRef}` | receives the element on mount, `null` on unmount |
+
+::: warning Not props
+`textContent` and `innerHTML` are not special props — they would be written as
+`text-content` / `inner-html` attributes. Use a child, the
+[`text`](#text) component, or JSX. Event objects (`on: { click }`) are no longer
+supported either; pass `onClick`.
+:::
+
+### Reactive values
+
+Any prop value can be a `PropValue<T>` — a plain value, a ref, or a getter
+function:
+
+```typescript
+div({
+  class: () => (active() ? 'box box--active' : 'box'), // getter → subscribed
+  style: { opacity: () => (visible() ? '1' : '0') },
+  onClick: handleClick
+})
+```
+
+Child positions are different: a **ref** child is reactive, a **mountable**
+child is mounted, and a plain getter child is invoked once for its text (it is
+not re-evaluated). Use `text()` when you want a getter-driven text node:
+
+```typescript
+import { text } from '@rasenjs/dom'
+
+p({}, text({ content: () => `Count: ${count()}` }))
+```
+
+### Children
+
+Accepted child kinds: `string`, `number`, a ref, a getter returning
+`string | number`, and a `Mountable`. Pass a **flat** array — the factory does
+not flatten nested arrays (the JSX runtime does).
+
 ## Components
 
-All standard HTML elements are available as components:
+| Export | Description |
+| ------ | ----------- |
+| `tag(name)` / `element({ tag, … })` / `h` | element factory |
+| `text({ content })` | reactive text node |
+| `html({ content })` | raw HTML node (escapes nothing) |
+| `canvas({ width, height, contextType?, children })` | `<canvas>` bridged to a renderer — `'2d'` (default) reaches `@rasenjs/canvas-2d`, `'webgl'`/`'webgl2'`/`'webgpu'` reach `@rasenjs/gfx`; the bridge also re-exports that target's `createRoot` |
+| `each`, `repeat`, `when`, `match`, `show`, `fragment`/`f`, `lazy` | re-exported from core |
+| `transition({ when, children, name? })` (`fade`, `slide`, `scale`) | enter/leave CSS transitions |
+| `transitionGroup` (`listFade`, `listSlide`) | transitions for list items |
+| `mount(mountable, container)` | mount into an element |
+| `hydrate(component, container)` | claim server-rendered DOM instead of creating it |
+| `mountSlot` / `collectHtml` / `template` / `child` | primitives the compiler emits |
+
+`show` keeps the element in the DOM and toggles `display`; `when` mounts and
+unmounts. Use `show` for frequently toggled panels and `when` when the subtree
+is expensive to keep alive.
+
+## SSR and hydration
+
+The same component tree renders on the server through
+[`@rasenjs/html`](https://github.com/rasenjs/rasen/tree/main/packages/html); on the client `hydrate()` walks the existing DOM and
+attaches bindings instead of recreating nodes:
 
 ```typescript
-import {
-  // Layout
-  div, span, section, article, header, footer, main, nav, aside,
-  
-  // Text
-  h1, h2, h3, h4, h5, h6, p, a, strong, em, code, pre,
-  
-  // Forms
-  form, input, button, textarea, select, option, label,
-  
-  // Lists
-  ul, ol, li,
-  
-  // Media
-  img, video, audio, canvas,
-  
-  // Table
-  table, thead, tbody, tr, th, td,
-  
-  // Other
-  br, hr, iframe
-} from '@rasenjs/dom'
+import { hydrate } from '@rasenjs/dom'
+
+hydrate(App(), document.getElementById('app'))
 ```
 
-## Component Props
+Hydration state is a module-level singleton, so `hydrate()` cannot be nested —
+mount each root from its own entry point. Compiled templates claim their
+server-rendered counterpart through the same cursor, which is why text nodes and
+slot anchors only need to line up between the two renderers, not be identical.
 
-### Common Props
+## Host hooks
 
-```typescript
-interface CommonProps {
-  // Content
-  textContent?: PropValue<string>
-  innerHTML?: PropValue<string>
-  
-  // Styling
-  style?: PropValue<CSSStyleDeclaration | string>
-  class?: PropValue<string>
-  className?: PropValue<string>
-  
-  // Attributes
-  id?: PropValue<string>
-  title?: PropValue<string>
-  
-  // Children
-  children?: MountFunction<HTMLElement> | MountFunction<HTMLElement>[]
-  
-  // Event handlers
-  on?: {
-    click?: (e: MouseEvent) => void
-    input?: (e: InputEvent) => void
-    change?: (e: Event) => void
-    // ... all DOM events
-  }
-}
-```
-
-### Input Props
-
-```typescript
-const textInput = input({
-  type: 'text',
-  value: ref(''),
-  placeholder: 'Enter text...',
-  disabled: computed(() => isLoading.value),
-  on: {
-    input: (e) => console.log(e.target.value)
-  }
-})
-```
-
-### Link Props
-
-```typescript
-const link = a({
-  href: 'https://example.com',
-  target: '_blank',
-  textContent: 'Visit Example'
-})
-```
-
-## Reactive Props
-
-Props can be reactive values:
-
-```typescript
-import { ref, computed } from '@vue/reactivity'
-
-const isActive = ref(false)
-const count = ref(0)
-
-div({
-  // Static value
-  id: 'container',
-  
-  // Ref - auto-unwrapped
-  textContent: count,
-  
-  // Computed - reactive
-  class: computed(() => isActive.value ? 'active' : 'inactive'),
-  
-  // Getter function
-  title: () => `Current count: ${count.value}`
-})
-```
-
-## Building Components with `com`
-
-Use the `com` wrapper for automatic effect scope management and memory safety:
-
-```typescript
-import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, button } from '@rasenjs/dom'
-
-const Counter = com(() => {
-  const runtime = getReactiveRuntime()
-  const count = runtime.ref(0)
-  
-  return (host: HTMLElement) => {
-    // All watchers are automatically collected by the component's scope
-    const textDiv = div({
-      textContent: computed(() => `Count: ${count.value}`)
-    })
-    
-    const incrementBtn = button({
-      textContent: 'Increment',
-      on: {
-        click: () => count.value++
-      }
-    })
-    
-    // Mount children
-    textDiv(host)
-    incrementBtn(host)
-    
-    // Cleanup is automatic - scope stops all watchers
-    return () => {
-      // Any additional cleanup
-    }
-  }
-})
-
-mount(Counter(), document.getElementById('app'))
-```
-
-#### Why use `com`?
-
-- **Memory Safety**: All watchers are cleaned up on unmount
-- **Prevents Leaks**: Critical for long-lived apps and SPAs
-- **Works with Nested Components**: Proper cleanup order
-- **No Manual Scope Management**: Automatic scope lifecycle
-
-## Example: Todo App
-
-```typescript
-import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, input, button, ul, li, mount } from '@rasenjs/dom'
-
-const TodoApp = com(() => {
-  const runtime = getReactiveRuntime()
-  const todos = runtime.ref([])
-  const inputValue = runtime.ref('')
-  
-  return (host: HTMLElement) => {
-    const addTodo = () => {
-      if (inputValue.value.trim()) {
-        todos.value = [...todos.value, inputValue.value]
-        inputValue.value = ''
-      }
-    }
-    
-    // UI setup with automatic watcher management
-    div({
-      children: [
-        input({
-          placeholder: 'Add a todo...',
-          value: inputValue,
-          on: { change: addTodo }
-        }),
-        button({
-          textContent: 'Add',
-          on: { click: addTodo }
-        }),
-        ul({
-          children: computed(() =>
-            todos.value.map(todo =>
-              li({ textContent: todo })
-            )
-          )
-        })
-      ]
-    })(host)
-    
-    return () => {} // Cleanup automatic
-  }
-})
-
-mount(TodoApp(), document.getElementById('app'))
-```
-  // Getter function - reactive
-  style: () => ({ opacity: isActive.value ? 1 : 0.5 })
-})
-```
-
-## Mounting
-
-### `mount(component, container)`
-
-Mount a component to a DOM element:
-
-```typescript
-import { mount, div } from '@rasenjs/dom'
-
-const App = () => div({ textContent: 'Hello' })
-
-const unmount = mount(App(), document.getElementById('app'))
-
-// Later, cleanup
-unmount?.()
-```
-
-### Direct Mounting
-
-Components return mount functions that can be called directly:
-
-```typescript
-const container = document.getElementById('app')
-const unmount = App()(container)
-```
-
-## Children
-
-### Single Child
-
-```typescript
-div({
-  children: span({ textContent: 'Child' })
-})
-```
-
-### Multiple Children
-
-```typescript
-div({
-  children: [
-    h1({ textContent: 'Title' }),
-    p({ textContent: 'Paragraph 1' }),
-    p({ textContent: 'Paragraph 2' })
-  ]
-})
-```
-
-### Dynamic Children
-
-```typescript
-const items = ref(['A', 'B', 'C'])
-
-ul({
-  children: computed(() => 
-    items.value.map(item => 
-      li({ textContent: item })
-    )
-  )
-})
-```
-
-## Event Handling
-
-```typescript
-button({
-  textContent: 'Click me',
-  on: {
-    click: (e) => {
-      console.log('Clicked!', e)
-    },
-    mouseenter: () => console.log('Hovered'),
-    mouseleave: () => console.log('Left')
-  }
-})
-```
-
-## Styling
-
-### Inline Styles
-
-```typescript
-div({
-  style: {
-    display: 'flex',
-    justifyContent: 'center',
-    padding: '20px'
-  }
-})
-```
-
-### Reactive Styles
-
-```typescript
-const isVisible = ref(true)
-
-div({
-  style: computed(() => ({
-    display: isVisible.value ? 'block' : 'none',
-    opacity: isVisible.value ? 1 : 0
-  }))
-})
-```
-
-### CSS Classes
-
-```typescript
-div({
-  class: 'container',
-  // or
-  className: computed(() => `btn ${isActive.value ? 'btn-active' : ''}`)
-})
-```
-
-## Utilities
-
-### `watchProp`
-
-Watch a prop value and react to changes:
-
-```typescript
-import { watchProp } from '@rasenjs/dom'
-
-const MyComponent = (props: { value: PropValue<string> }) => {
-  return div({
-    textContent: props.value,
-    children: [
-      p({ textContent: () => `Current: ${unref(props.value)}` })
-    ]
-  })
-}```
-```
+`mount()` passes `hostHooks` to every mountable: marker creation, insertion,
+detachment, batching and bounded hosts. Structural components
+(`each` / `when` / `match`) degrade gracefully when a hook is missing — the
+contract per hook is documented in `host-hooks.ts`.
 
 ## License
 

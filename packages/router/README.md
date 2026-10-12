@@ -233,7 +233,7 @@ import {
 The `/components` subpath provides platform-agnostic router components that work with any rendering target.
 
 ```typescript
-import { createRouterLink, createRouterView, type ViewsMap } from '@rasenjs/router/components'
+import { createRouterLink, createRouterView, type ViewsConfig } from '@rasenjs/router/components'
 ```
 
 ### Building Route Views with `com`
@@ -241,8 +241,8 @@ import { createRouterLink, createRouterView, type ViewsMap } from '@rasenjs/rout
 For route views with reactive logic and side effects, wrap with `com`:
 
 ```typescript
-import { com, getReactiveRuntime } from '@rasenjs/core'
-import { div, h1, mount } from '@rasenjs/dom'
+import { com, when } from '@rasenjs/core'
+import { div, h1, p, mount } from '@rasenjs/dom'
 
 // Simple route view
 const UserView = ({ id }) => div(
@@ -266,16 +266,14 @@ const PostDetailView = com(({ id }: { id: string }) => {
     { immediate: true }
   )
   
-  return div(
-    {
-      children: [
-        () => loading.value 
-          ? p({ textContent: 'Loading...' })
-          : post.value
-            ? h1({ textContent: post.value.title })
-            : p({ textContent: 'Not found' })
-      ]
-    }
+  // `when` swaps branches reactively; JSX would be
+  //   {loading.value ? <p>Loading…</p> : <h1>{post.value.title}</h1>}
+  return div({},
+    when({
+      condition: () => loading.value,
+      then: () => p({}, 'Loading...'),
+      else: () => (post.value ? h1({}, post.value.title) : p({}, 'Not found'))
+    })
   )
 })
 ```

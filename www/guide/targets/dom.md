@@ -1,39 +1,33 @@
 # DOM Rendering
 
-This guide covers DOM rendering with `@rasenjs/dom`.
+`@rasenjs/dom` renders the same components to real DOM nodes. Its full reference
+lives in the [package page](/packages/dom); this guide focuses on how bindings
+behave.
 
 ## Overview
 
-The DOM adapter provides components that render to `HTMLElement` hosts:
-
-```typescript
-import { div, button, span, mount } from '@rasenjs/dom'
-```
-
-## Basic Usage
-
-```typescript
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-import { div, button, span, mount } from '@rasenjs/dom'
-import { ref } from 'vue'
+```tsx
+import { Signal } from 'signal-polyfill'
+import { useReactiveRuntime } from '@rasenjs/reactive-signals'
+import { mount } from '@rasenjs/dom'
 
 useReactiveRuntime()
 
-const count = ref(0)
+const count = new Signal.State(0)
 
-const Counter = () => div({
-  children: [
-    span({ textContent: () => `Count: ${count.value}` }),
-    button({ textContent: '+', on: { click: () => count.value++ } })
-  ]
-})
-
-mount(Counter(), document.getElementById('app'))
+mount(
+  <div class="counter">
+    <span>Count: {count}</span>
+    <button onClick={() => count.set(count.get() + 1)}>+</button>
+  </div>,
+  document.getElementById('app')!
+)
 ```
 
-## Element Components
+## Element components
 
-All standard HTML elements are available:
+All standard HTML tags have named exports, plus `tag(name)` / `element({ tag })`
+for anything else:
 
 ```typescript
 import {
@@ -43,186 +37,120 @@ import {
   ul, ol, li, dl, dt, dd,
   table, thead, tbody, tr, th, td,
   header, footer, main, nav, section, article, aside,
-  canvas, svg
+  details, summary, dialog, canvas
 } from '@rasenjs/dom'
 ```
 
+Each factory takes `el()`, `el(child)`, `el(props)` or `el(props, ...children)`.
+
 ## Props
 
-### Basic Props
+### Attributes and properties
+
+```typescript
+div({ id: 'my-div', class: 'container', title: 'Hello' })
+input({ type: 'checkbox', checked: isChecked, disabled: isDisabled })
+```
+
+Props are classified per tag: `value` / `checked` / `indeterminate` /
+`selectedIndex` / `selected` and the common `disabled` / `readOnly` /
+`multiple` / `hidden` are written as DOM **properties**; everything else goes
+through `setAttribute`. `data*` and `aria*` keys are kebab-cased
+(`ariaChecked` → `aria-checked`); other keys are written as-is, and HTML
+attribute names are case-insensitive.
+
+::: warning Two props that do not exist
+- `textContent` / `innerHTML` — pass a child or use `text()` / `html()`.
+- `attrs` (an object of attributes) — that form belongs to the HTML renderer;
+  in the DOM renderer pass the attributes as top-level props.
+:::
+
+### Reactive values
+
+Every prop accepts a `PropValue` — a plain value, a ref, or a getter:
 
 ```typescript
 div({
-  id: 'my-div',
-  className: 'container',
-  textContent: 'Hello World'
+  // getter: subscribed, re-evaluated only when a dependency changes
+  class: () => (isActive() ? 'active' : 'inactive'),
+  style: {
+    backgroundColor: () => (isHovered() ? 'blue' : 'gray'),
+    transform: () => `scale(${scale()})`
+  },
+  hidden: !open()
 })
 ```
 
-### Reactive Props
+A binding whose source reads no reactive dependency installs no subscription at
+all, and an equal value never re-triggers a write — so static props cost one
+assignment.
 
-All props can be reactive:
+### Text
 
 ```typescript
-const isActive = ref(false)
+// a ref child → reactive text node
+span({}, count)
 
-div({
-  className: () => isActive.value ? 'active' : 'inactive',
-  textContent: computed(() => isActive.value ? 'ON' : 'OFF')
-})
+// a getter-driven text node (imported from @rasenjs/dom, not @rasenjs/core)
+text({ content: () => `Count: ${count()}` })
+
+// JSX: a bare ref interpolates directly
+// <span>Count: {count}</span>
 ```
 
-### Styles
+A **plain getter child** (`div({}, () => 'text')`) is invoked once and is not
+re-evaluated later — it is treated as a child factory, not a getter binding.
 
-```typescript
-// Static style
-div({ style: { color: 'red', fontSize: '16px' } })
-
-// Reactive style
-div({
-  style: () => ({
-    backgroundColor: isHovered.value ? 'blue' : 'gray',
-    transform: `scale(${scale.value})`
-  })
-})
-```
-
-### Attributes
-
-```typescript
-div({
-  attrs: {
-    'data-id': '123',
-    'aria-label': 'Description',
-    disabled: isDisabled.value
-  }
-})
-```
-
-### Event Handlers
+### Events
 
 ```typescript
 button({
-  on: {
-    click: (e) => console.log('Clicked!', e),
-    mouseenter: () => isHovered.value = true,
-    mouseleave: () => isHovered.value = false
-  }
+  onClick: (e) => console.log('clicked', e),
+  onMouseEnter: () => (hovered = true),
+  onMouseLeave: () => (hovered = false)
 })
 ```
+
+`onX` is camelCase; the listener is registered for the lowercased name
+(`onClick` → `click`). Bubbling event types are delegated to a single document
+listener — see `configureEventDelegation` if a host needs direct listeners.
 
 ### Children
 
 ```typescript
-div({
-  children: [
-    h1({ textContent: 'Title' }),
-    p({ textContent: 'Paragraph 1' }),
-    p({ textContent: 'Paragraph 2' })
-  ]
-})
+ul({}, li('One'), li('Two'), li('Three'))
+
+// arrays are supported, but must be flat
+div({ children: [span({}, 'a'), span({}, 'b')] })
 ```
 
-## Form Inputs
+Accepted children: `string`, `number`, a ref, a getter returning text, and a
+mountable (a component, `when(...)`, `each(...)`, a JSX element, …).
 
-### Text Input
+## Hydration
 
 ```typescript
-const text = ref('')
+import { hydrate } from '@rasenjs/dom'
 
-input({
-  value: text,
-  attrs: { type: 'text', placeholder: 'Enter text...' },
-  on: {
-    input: (e) => text.value = (e.target as HTMLInputElement).value
-  }
-})
+hydrate(App(), document.getElementById('app'))
 ```
 
-### Checkbox
+`hydrate()` walks the server-rendered DOM and attaches bindings instead of
+recreating nodes, then removes anything left unconsumed. It is a module-level
+singleton cursor, so roots cannot be hydrated concurrently or nested — mount
+each root from its own entry point.
 
-```typescript
-const checked = ref(false)
+## Compiled templates
 
-input({
-  attrs: { type: 'checkbox', checked: checked.value },
-  on: {
-    change: (e) => checked.value = (e.target as HTMLInputElement).checked
-  }
-})
-```
+When the [compiler](/packages/compiler) hoists a subtree it emits code against
+`@rasenjs/dom/template`: `template(html)` clones a `<template>` once and caches
+it, `child(parent, index)` walks to a slot, `mountSlot` / `collectHtml` bridge
+component children, and the binding helpers (`bindText`, `bindClass`,
+`bindProp`, `bindAttr`, `bindStyle`, `on`, `setValue`) are re-exported from the
+same entry so compiled output has a single import source.
 
-### Select
+## Next Steps
 
-```typescript
-const selected = ref('option1')
-
-select({
-  value: selected,
-  on: {
-    change: (e) => selected.value = (e.target as HTMLSelectElement).value
-  },
-  children: [
-    option({ attrs: { value: 'option1' }, textContent: 'Option 1' }),
-    option({ attrs: { value: 'option2' }, textContent: 'Option 2' })
-  ]
-})
-```
-
-## Generic Element
-
-For non-standard elements or web components:
-
-```typescript
-import { element } from '@rasenjs/dom'
-
-element({
-  tag: 'custom-element',
-  attrs: { 'custom-attr': 'value' },
-  children: [...]
-})
-```
-
-## Mount/Unmount
-
-```typescript
-// Mount returns unmount function
-const unmount = mount(component, container)
-
-// Later, to unmount:
-unmount?.()
-```
-
-## Best Practices
-
-### 1. Use Getters for Computed Strings
-
-```typescript
-// ✅ Good
-span({ textContent: () => `Count: ${count.value}` })
-
-// ❌ Avoid (creates new computed every render)
-span({ textContent: computed(() => `Count: ${count.value}`) })
-```
-
-### 2. Extract Event Handlers
-
-```typescript
-// ✅ Good
-const handleClick = () => count.value++
-
-button({ on: { click: handleClick } })
-```
-
-### 3. Batch Style Updates
-
-```typescript
-// ✅ Good - single reactive object
-div({
-  style: () => ({
-    width: `${width.value}px`,
-    height: `${height.value}px`,
-    opacity: opacity.value
-  })
-})
-```
+- [@rasenjs/dom package reference](/packages/dom)
+- [Canvas 2D](/guide/targets/canvas-2d) — the same reactive model on a canvas
+- [HTML (SSR)](/guide/targets/html-ssr) — the string host, for hydration

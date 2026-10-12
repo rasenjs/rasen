@@ -35,7 +35,7 @@ import {
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { canvas, mount } from '@rasenjs/dom'
 import { rect, circle } from '@rasenjs/canvas-2d'
-import { ref } from 'vue'
+import { ref } from '@vue/reactivity'
 
 useReactiveRuntime()
 
@@ -332,12 +332,14 @@ line({
 
 ## Animation
 
-```typescript
-const time = ref(0)
-const x = computed(() => 200 + Math.sin(time.value * 0.02) * 150)
+Writing a reactive prop marks the canvas dirty, so any state source can drive
+an animation. `@rasenjs/animation` gives you tween/spring refs that write to the runtime for
+you — hand one to a shape prop and it animates:
 
-// Animation loop
-setInterval(() => time.value++, 16)
+```typescript
+import { tween } from '@rasenjs/animation'
+
+const x = tween(100)
 
 const Animation = () =>
   canvas({
@@ -345,35 +347,71 @@ const Animation = () =>
     height: 300,
     children: [
       rect({ x: 0, y: 0, width: 400, height: 300, fill: '#1a1a2e' }),
-      circle({ x, y: 150, radius: 30, fill: '#e94560' })
+      // an animated ref is read through `.value` — hand the prop a getter so it
+      // re-evaluates as the animation advances
+      circle({ x: () => x.value, y: 150, radius: 30, fill: '#e94560' })
     ]
   })
+
+// `to()` resolves when the tween settles
+x.to(300, { duration: 600, easing: 'easeOutCubic' })
 ```
 
-## Interactive Graphics
+For a hand-written loop, drive a ref from `requestAnimationFrame` (or a
+`FrameSchedule` if the host provides one) — the canvas repaints when the value
+changes, not once per frame:
+
+```typescript
+const time = ref(0)
+const x = computed(() => 200 + Math.sin(time.value * 0.02) * 150)
+
+const tick = (now: number) => {
+  time.value = now
+  requestAnimationFrame(tick)
+}
+requestAnimationFrame(tick)
+```
+
+## Interactive graphics
+
+Shapes take delegated pointer handlers — `onClick`, `onPointerDown`,
+`onPointerUp`, `onPointerMove`. The host binds one listener per event type on the
+canvas and dispatches to the topmost shape under the point, and the handler
+receives canvas-local CSS pixel coordinates (no `getBoundingClientRect` math):
 
 ```typescript
 const mouseX = ref(0)
 const mouseY = ref(0)
+const hovering = ref(false)
 
 const Interactive = () =>
   canvas({
     width: 400,
     height: 300,
-    on: {
-      mousemove: (e) => {
-        const rect = (e.target as HTMLCanvasElement).getBoundingClientRect()
-        mouseX.value = e.clientX - rect.left
-        mouseY.value = e.clientY - rect.top
-      }
-    },
     children: [
-      rect({ x: 0, y: 0, width: 400, height: 300, fill: '#1a1a2e' }),
-      circle({ x: mouseX, y: mouseY, radius: 20, fill: '#4ecdc4' }),
+      rect({
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 300,
+        fill: '#1a1a2e',
+        onPointerMove: (e) => {
+          mouseX.value = e.x
+          mouseY.value = e.y
+        }
+      }),
+      circle({
+        x: mouseX,
+        y: mouseY,
+        radius: hovering.value ? 28 : 20,
+        fill: '#4ecdc4',
+        onPointerDown: () => (hovering.value = true),
+        onPointerUp: () => (hovering.value = false)
+      }),
       text({
-        text: () => `(${mouseX.value}, ${mouseY.value})`,
+        text: () => `(${Math.round(mouseX.value)}, ${Math.round(mouseY.value)})`,
         x: 10,
-        y: 20,
+        y: 24,
         fill: 'white'
       })
     ]

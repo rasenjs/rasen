@@ -1,6 +1,8 @@
 # @rasenjs/core
 
-Core runtime and type definitions for the Rasen reactive rendering framework.
+The paradigm and the primitives of [Rasen](https://github.com/rasenjs/rasen):
+one `Mountable` contract, host-agnostic structural components, and the reactive
+runtime boundary. It has **no dependencies** and does no rendering of its own.
 
 ## Installation
 
@@ -8,182 +10,158 @@ Core runtime and type definitions for the Rasen reactive rendering framework.
 npm install @rasenjs/core
 ```
 
-## Overview
-
-\`@rasenjs/core\` provides:
-
-- **Reactive Runtime Interface** - Abstract interface for reactive systems
-- **Component Types** - Type definitions for components and mount functions
-- **Runtime Management** - Global reactive runtime configuration
-
-## Reactive Runtime
-
-Rasen is reactive-system agnostic. You need to configure a reactive runtime before using components:
+## The contract
 
 ```typescript
-import { setReactiveRuntime, getReactiveRuntime } from '@rasenjs/core'
-import { useReactiveRuntime } from '@rasenjs/reactive-vue'
+type Mountable<Node = unknown> = (
+  node: Node,
+  hooks: HostHooks<Node> | undefined
+) => (() => void) | undefined
 
-// Set the runtime (do this once at app startup)
-useReactiveRuntime()
-
-// Or manually with createReactiveRuntime if needed:
-// import { createReactiveRuntime } from '@rasenjs/reactive-vue'
-// setReactiveRuntime(createReactiveRuntime())
-
-// Get the runtime (used internally by renderers)
-const runtime = getReactiveRuntime()
-```
-
-## Component Model
-
-### Component Types
-
-```typescript
-// Sync component - returns mount function immediately
-type SyncComponent<Host, Props> = (props: Props) => (host: Host) => (() => void) | undefined
-
-// Async component - returns mount function via Promise
-type AsyncComponent<Host, Props> = (props: Props) => Promise<(host: Host) => (() => void) | undefined>
-
-// Component can be either sync or async
+type SyncComponent<Host, Props> = (props: Props) => Mountable<Host>
+type AsyncComponent<Host, Props> = (props: Props) => Promise<Mountable<Host>>
 type Component<Host, Props> = SyncComponent<Host, Props> | AsyncComponent<Host, Props>
-
-// Mount function type
-type MountFunction<Host> = (host: Host) => (() => void) | undefined
 ```
 
-### The `com` Wrapper Function
+A component takes props and returns a `Mountable`. Mounting receives the host
+plus the host's capability set (`HostHooks`) and returns a cleanup function.
+Closures hold the state — there is no component instance, no virtual DOM and no
+re-render pass.
 
-The `com` function wraps your setup logic with automatic effect scope management. It ensures that all reactive watchers created during component setup are properly cleaned up on unmount, preventing memory leaks.
+## `com` — effect-scoped components
+
+`com()` gives each instance its own effect scope: subscriptions created during
+setup **and** during mount are collected and stopped together on unmount.
 
 ```typescript
-import { com, getReactiveRuntime } from '@rasenjs/core'
+import { com, getReactiveRuntime, ref } from '@rasenjs/core'
 
-// Usage: com(setupFunction)
-// - setupFunction: returns a mount function
-// - Automatically manages an effectScope for the component
-// - All watchers created in setup are auto-cleaned on unmount
+const Counter = com((initial: number) => {
+  // The built-in runtime's refs are callable: count() reads, count(v) writes.
+  const count = ref(initial)
+  const increment = () => count(count() + 1)
 
-const MyComponent = com(() => {
-  const runtime = getReactiveRuntime()
-  const count = runtime.ref(0)
-  
-  // Mount function - return MountFunction directly
-  return div({
-    children: [
-      span({ textContent: () => `Count: ${count.value}` }),
-      button({
-        textContent: 'Increment',
-        on: { click: () => count.value++ }
-      })
-    ]
-  })
+  return (host: HTMLElement) => {
+    const el = document.createElement('button')
+    el.textContent = `Count: ${count()}`
+    host.appendChild(el)
+
+    const stop = getReactiveRuntime().subscribe(count, (v) => {
+      el.textContent = `Count: ${v}`
+    })
+
+    return () => {
+      stop()
+      el.remove()
+    }
+  }
 })
-
-// Use the component
-const cleanup = MyComponent()({} as HTMLElement)
-cleanup?.() // All watchers are cleaned up
 ```
 
-#### Benefits of `com`:
+`com` is what the compiler's dev-only HMR pass wraps, so a component declared
+with it remounts cleanly when its module is edited.
 
-- **Memory Safety**: Automatic cleanup of all effects in the scope
-- **Simplified Code**: No need to manually manage effectScope lifecycle
-- **Leak Prevention**: Watchers are guaranteed to be disposed on unmount
-- **Works with Nested Components**: Proper cleanup order for component trees
+## Reactive runtime
 
-### Component Lifecycle
-
-1. **Setup Phase** - Component function is called, reactive state is initialized
-2. **Mount Phase** - Mount function is called with host, watchers are set up
-3. **Update Phase** - Watchers trigger updates when reactive state changes
-4. **Unmount Phase** - Cleanup function is called, watchers are disposed
-
-### Example Component
-
-```typescript
-import { getReactiveRuntime } from '@rasenjs/core'
-
-const Counter = (props: { initial: number }) => {
-  const runtime = getReactiveRuntime()
-  
-  // Setup: create reactive state
-  const count = runtime.ref(props.initial)
-  
-  // Return mount function
-  return div({
-    children: [
-      span({ textContent: () => `Count: ${count.value}` }),
-      button({
-        textContent: 'Increment',
-        on: { click: () => count.value++ }
-      })
-    ]
-  })
-}
-```
-
-## Reactive Runtime Interface
+Rasen never implements reactivity itself — it calls into the active adapter
+through this interface:
 
 ```typescript
 interface ReactiveRuntime {
-  // Watch a reactive source and call callback on changes
-  watch: <T>(
-    source: () => T,
-    callback: (value: T, oldValue: T) => void,
-    options?: { immediate?: boolean }
-  ) => () => void
-
-  // Create an effect scope for cleanup
-  effectScope: () => { run: (fn: () => void) => void; stop: () => void }
-
-  // Create a reactive ref
-  ref: <T>(value: T) => Ref<T>
-
-  // Create a computed ref
-  computed: <T>(getter: () => T) => ReadonlyRef<T>
-
-  // Unwrap a ref value
-  unref: <T>(value: T | Ref<T>) => T
-
-  // Check if value is a ref
-  isRef: (value: unknown) => boolean
+  /** Unified binding primitive. A source that reads no dependency installs no
+   *  subscription; equal values skip the callback. */
+  subscribe<T>(getter: () => T, callback: (value: T, oldValue: T) => void): () => void
+  /** Component lifetime: com() collects subscriptions here and stops them. */
+  effectScope(): { run<T>(fn: () => T): T | undefined; stop(): void }
+  ref<T>(value: T): Ref<T>
+  unref<T>(value: T | Ref<T>): T
+  setValue<T>(ref: Ref<T>, value: T): void
+  isRef(value: unknown): boolean
 }
 ```
-
-## PropValue Type
-
-For reactive props, use the \`PropValue\` type:
 
 ```typescript
-import type { PropValue } from '@rasenjs/core'
+import { setReactiveRuntime, getReactiveRuntime, toValue } from '@rasenjs/core'
+import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 
-interface MyProps {
-  // Can be static value, ref, or getter function
-  text: PropValue<string>
-  count: PropValue<number>
-}
+setReactiveRuntime(createReactiveRuntime())  // usually via useReactiveRuntime()
+const runtime = getReactiveRuntime()
 ```
 
-## Available Adapters
+`getReactiveRuntime()` never throws: with no adapter installed it lazily creates
+a **built-in zero-dependency runtime** whose refs are callable
+(`count()` / `count(v)`), so a project can start with no reactivity library at
+all. Install an adapter when you want your own reactive primitives to drive the
+UI — see [Available adapters](#available-adapters).
 
-- **[@rasenjs/reactive-vue](../reactive-vue)** - Vue 3 Composition API
-- **[@rasenjs/reactive-signals](../reactive-signals)** - TC39 Signals proposal
+`PropValue<T> = T | Ref<T> | ReadonlyRef<T>` is the type every host prop accepts:
+a plain value, a ref, or a getter function. `toValue()` resolves any of the three.
 
-## API Reference
+## Structural components
 
-### \`setReactiveRuntime(runtime)\`
+Host-agnostic components that any target can mount — they only need
+`HostHooks`:
 
-Set the global reactive runtime.
+| Component | Purpose |
+| --------- | ------- |
+| `each({ of, children })` | keyed list reconciliation by object identity (`of` may be an array, a ref, or a getter — a getter is what keeps it subscribed) |
+| `repeat(count, render)` | index-based repetition |
+| `when({ condition, then, else? })` | conditional subtree; both branches are getters |
+| `match({ value, cases, default? })` (alias `switchCase`) | multi-way branch; `cases` maps keys to branches, or is a list of `[condition, branch]` pairs |
+| `fragment({ children, hooks? })` | siblings with no wrapper; needs `createText` hooks for text children |
+| `lazy({ loader, loading? })` | async component boundary with a loading placeholder while the promise resolves |
 
-### \`getReactiveRuntime()\`
+```typescript
+import { each, when, ref } from '@rasenjs/core'
 
-Get the current reactive runtime. Throws if not set.
+each({
+  of: () => rows(),                     // getter → reads the dependency
+  children: (row) => Row(row)
+})
 
-### \`hasReactiveRuntime()\`
+when({
+  condition: () => visible(),
+  then: () => Panel(),
+  else: () => null
+})
+```
 
-Check if a reactive runtime has been set.
+The compiler can emit these for you: `.map()` → `each`, `cond && <El/>` and
+`cond ? <A/> : <B/>` → `when` (see
+[`@rasenjs/compiler`](https://github.com/rasenjs/rasen/tree/main/packages/compiler), `structural: true`).
+
+## JSX runtime
+
+`@rasenjs/core` provides the host-agnostic JSX runtime that host packages
+re-export and extend with their own tag table:
+
+```typescript
+import { jsx, jsxs, Fragment, registerTag, configureTags } from '@rasenjs/core'
+
+configureTags({ '': { div: myDivComponent, span: mySpanComponent } })
+```
+
+Lowercase tags are looked up in the registry (`configureTags` / `registerTag`),
+PascalCase tags are called directly as components, and `Fragment` is `<>…</>`.
+
+## SSR emission
+
+`collectHtml()` mounts a component against a string host and returns the markup
+— it is what a compiled component's SSR branch calls when a child is a
+component rather than a template.
+
+## Available adapters
+
+| Adapter | Reactivity | Notes |
+| ------- | ---------- | ----- |
+| [`@rasenjs/reactive-vue`](https://github.com/rasenjs/rasen/tree/main/packages/reactive-vue) | `@vue/reactivity` | `useReactiveRuntime()`; refs are `.value` objects |
+| [`@rasenjs/reactive-signals`](https://github.com/rasenjs/rasen/tree/main/packages/reactive-signals) | TC39 Signals (`signal-polyfill`) | `useReactiveRuntime()`; `Signal.State` / `Signal.Computed` act as refs |
+| [`@rasenjs/reactive-nanostores`](https://github.com/rasenjs/rasen/tree/main/packages/reactive-nanostores) | [nanostores](https://github.com/nanostores/nanostores) | atoms + computed |
+| [`@rasenjs/reactive-alien-signals`](https://github.com/rasenjs/rasen/tree/main/packages/reactive-alien-signals) | [alien-signals](https://github.com/stackblitz/alien-signals) | signal core used by Vue Language Tools |
+
+The public helpers `ref`, `computed`, `unref`, `setValue`, `toValue`,
+`watchObjectProps` and `rafSchedule` come from core itself so no adapter is
+needed for basic use.
 
 ## License
 
