@@ -1,37 +1,37 @@
-import { Signal } from 'signal-polyfill'
 import { com } from '@rasenjs/core'
+import { ref, computed } from '@rasenjs/reactive-signals'
 
 export const Timer = com(() => {
-  const seconds = new Signal.State(0)
-  const isRunning = new Signal.State(false)
+  const seconds = ref(0)
+  const isRunning = ref(false)
   // The interval handle is not rendered — a closure variable is enough.
   let interval: number | null = null
 
-  const formattedTime = new Signal.Computed(() => {
-    const mins = Math.floor(seconds.get() / 60)
-    const secs = seconds.get() % 60
+  const formattedTime = computed(() => {
+    const mins = Math.floor(seconds.value / 60)
+    const secs = seconds.value % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   })
 
-  const progress = new Signal.Computed(() => {
+  const progress = computed(() => {
     // Progress bar cycles every 60 seconds
-    return (seconds.get() % 60) / 60 * 100
+    return ((seconds.value % 60) / 60) * 100
   })
 
   const start = () => {
-    if (isRunning.get()) return
+    if (isRunning.value) return
     // Timers only exist in the browser — during SSR this is a no-op.
     if (typeof window === 'undefined') return
 
-    isRunning.set(true)
+    isRunning.value = true
     interval = window.setInterval(() => {
-      seconds.set(seconds.get() + 1)
+      seconds.value = seconds.value + 1
     }, 1000)
   }
 
   const pause = () => {
-    if (!isRunning.get()) return
-    isRunning.set(false)
+    if (!isRunning.value) return
+    isRunning.value = false
     if (interval !== null) {
       clearInterval(interval)
       interval = null
@@ -40,11 +40,11 @@ export const Timer = com(() => {
 
   const reset = () => {
     pause()
-    seconds.set(0)
+    seconds.value = 0
   }
 
   const addMinute = () => {
-    seconds.set(seconds.get() + 60)
+    seconds.value = seconds.value + 60
   }
 
   return (
@@ -59,17 +59,17 @@ export const Timer = com(() => {
         ></div>
         <div class="timer-display">
           <span class="timer-time">{formattedTime}</span>
-          <span class="timer-status">{isRunning.get() ? 'Running' : 'Paused'}</span>
+          <span class="timer-status">{isRunning.value ? 'Running' : 'Paused'}</span>
         </div>
       </div>
 
       {/* Controls */}
       <div class="timer-controls">
         <button
-          onClick={() => (isRunning.get() ? pause() : start())}
+          onClick={() => (isRunning.value ? pause() : start())}
           class="btn btn-primary btn-large"
         >
-          {isRunning.get() ? '⏸ Pause' : '▶ Start'}
+          {isRunning.value ? '⏸ Pause' : '▶ Start'}
         </button>
         <button onClick={reset} class="btn btn-secondary">
           ↺ Reset
@@ -82,11 +82,11 @@ export const Timer = com(() => {
       {/* Lap Times / Stats */}
       <div class="timer-stats">
         <div class="timer-stat">
-          <span class="timer-stat-value">{Math.floor(seconds.get() / 60)}</span>
+          <span class="timer-stat-value">{Math.floor(seconds.value / 60)}</span>
           <span class="timer-stat-label">Minutes</span>
         </div>
         <div class="timer-stat">
-          <span class="timer-stat-value">{seconds.get() % 60}</span>
+          <span class="timer-stat-value">{seconds.value % 60}</span>
           <span class="timer-stat-label">Seconds</span>
         </div>
         <div class="timer-stat">

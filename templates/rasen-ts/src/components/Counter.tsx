@@ -1,17 +1,18 @@
-import { Signal } from 'signal-polyfill'
 import { com } from '@rasenjs/core'
+// The adapter's helpers are the typed state primitives: `.value` reads/writes,
+// and the signals behind them are what the renderer subscribes to.
+import { ref, computed } from '@rasenjs/reactive-signals'
 
 export const Counter = com(() => {
-  // Signals are the state primitive: read with get(), write with set().
-  const count = new Signal.State(0)
-  const double = new Signal.Computed(() => count.get() * 2)
-  const square = new Signal.Computed(() => count.get() * count.get())
-  const isEven = new Signal.Computed(() => count.get() % 2 === 0)
+  const count = ref(0)
+  const double = computed(() => count.value * 2)
+  const square = computed(() => count.value * count.value)
+  const isEven = computed(() => count.value % 2 === 0)
 
-  const increment = () => count.set(count.get() + 1)
-  const decrement = () => count.set(count.get() - 1)
-  const reset = () => count.set(0)
-  const addTen = () => count.set(count.get() + 10)
+  const increment = () => (count.value += 1)
+  const decrement = () => (count.value -= 1)
+  const reset = () => (count.value = 0)
+  const addTen = () => (count.value += 10)
 
   return (
     <div class="counter-demo">
@@ -33,7 +34,7 @@ export const Counter = com(() => {
             <span class="stat-label">Square</span>
           </div>
           <div class="stat">
-            <span class="stat-value">{isEven.get() ? 'Even' : 'Odd'}</span>
+            <span class="stat-value">{isEven.value ? 'Even' : 'Odd'}</span>
             <span class="stat-label">Parity</span>
           </div>
         </div>
