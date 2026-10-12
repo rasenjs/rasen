@@ -25,19 +25,17 @@
  * ```
  */
 
-import type { Mountable, Ref } from '@rasenjs/core'
+import type { Mountable, Ref, ReadonlyRef } from '@rasenjs/core'
 import { getReactiveRuntime } from '@rasenjs/core'
 import type { RNNode } from '@rasenjs/rn-dom'
 import type { RNElementPropMap } from '@rasenjs/rn-dom/elements'
 import { getDevtoolsHook } from './devtools/instrument'
+import type { StyleRecord } from './utils/style'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
 export interface ElementProps {
-  style?:
-    | Record<string, unknown>
-    | Array<Record<string, unknown>>
-    | (() => Record<string, unknown>)
+  style?: StyleRecord | StyleRecord[] | (() => StyleRecord)
   class?: string
   children?: Child | Child[]
   [key: string]: unknown
@@ -48,6 +46,10 @@ export type Child =
   | number
   | Mountable<RNNode>
   | Ref<unknown>
+  // readonly placeholder: adapter refs are invariant in their type argument
+  // (Vue's `Ref<T>` declares a setter), so a computed needs this arm to be
+  // usable in a child position
+  | ReadonlyRef<unknown>
   | (() => string | number)
   | null
   | undefined
@@ -217,7 +219,7 @@ type TagElementProps<K extends keyof RNElementPropMap> = Omit<
   'children' | 'style'
 > & {
   children?: Child | Child[]
-  style?: Record<string, unknown> | (() => Record<string, unknown>)
+  style?: StyleRecord | (() => StyleRecord)
   [key: string]: unknown
 }
 

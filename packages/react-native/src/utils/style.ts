@@ -9,7 +9,17 @@
 import { getReactiveRuntime } from '@rasenjs/core'
 import type { RNNode } from '@rasenjs/rn-dom'
 
-export type StyleValue = Record<string, unknown> | null | undefined
+/**
+ * A style record.
+ *
+ * `object` rather than `Record<string, unknown>`: render targets build styles
+ * as interfaces with known keys (`@rasenjs/tw`'s `TwStyle`), and TS refuses to
+ * assign an interface without an index signature to an index-signature type —
+ * so the stricter spelling rejected the framework's own style objects.
+ */
+export type StyleRecord = object
+
+export type StyleValue = StyleRecord | null | undefined
 
 /**
  * Style prop: plain style object, array of them, or a function receiving the
@@ -19,9 +29,9 @@ export type StyleValue = Record<string, unknown> | null | undefined
  * always `Record<string, unknown>` so any RN style object is accepted.
  */
 export type StyleProp<S extends object = Record<string, unknown>> =
-  | Record<string, unknown>
+  | StyleRecord
   | ((state: S) => StyleValue)
-  | Array<Record<string, unknown> | ((state: S) => StyleValue)>
+  | Array<StyleRecord | ((state: S) => StyleValue)>
   | null
   | undefined
 
