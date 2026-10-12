@@ -94,10 +94,20 @@ export {
  */
 export function mount<T extends Element>(
   mountable: Mountable<T>,
-  container: T
+  // The mountable's node type is its own; any element is a valid container, so
+  // the two type arguments must not be unified (that rejected a mountable typed
+  // `Mountable<HTMLElement>` mounted into a `HTMLDivElement` variable).
+  container: Element
 ): (() => void) | undefined {
-  // DOM hooks 显式传入——hooks 即上下文，无全局栈
-  return coreMount(mountable, container, hostHooks as unknown as HostHooks<T>)
+  // DOM hooks 显式传入——hooks 即上下文，无全局栈。
+  // The cast is the flip side of not unifying T with the container: core's
+  // mount() is generic over one node type, and Unmount carries `node?: Node`,
+  // so the two spellings are invariant even though the runtime never cares.
+  return coreMount(
+    mountable as unknown as Mountable<Element>,
+    container,
+    hostHooks as unknown as HostHooks<Element>
+  )
 }
 
 /**

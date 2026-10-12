@@ -29,7 +29,7 @@ export function stringContext(props: {
  *
  * 这是 SSR 的主要入口
  */
-export function renderToString(component: Mountable<SSRNode>): string {
+export function renderToString(component: Mountable<any>): string {
   const host = createStringHost()
   component(host, htmlHostHooks)
   return host.toString()

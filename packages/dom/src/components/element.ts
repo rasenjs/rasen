@@ -317,6 +317,10 @@ type TagChild = ElementChild
 export function tag<T extends HTMLTagName>(name: T) {
   function el(): Mountable<HTMLElement>
   function el(child: TagChild): Mountable<HTMLElement>
+  // Children without a props object — `div(h1('t'), p('x'))` — is a form the
+  // implementation has always accepted (and apps write); it needs its own
+  // overload or the call resolves against the props signature and fails.
+  function el(child: TagChild, ...children: TagChild[]): Mountable<HTMLElement>
   function el(props: TagProps<T>): Mountable<HTMLElement>
   function el(props: TagProps<T>, ...children: TagChild[]): Mountable<HTMLElement>
 

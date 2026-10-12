@@ -4,7 +4,12 @@
  */
 
 import { Signal } from 'signal-polyfill'
-import { setReactiveRuntime, type ReactiveRuntime, type Ref } from '@rasenjs/core'
+import {
+  setReactiveRuntime,
+  type ReactiveRuntime,
+  type Ref,
+  type ReadonlyRef,
+} from '@rasenjs/core'
 
 // The Signal itself IS the ref — a TC39 Signal.State / Signal.Computed
 // subclass that ALSO exposes a `.value` accessor (delegating to get()/set()).
@@ -228,16 +233,29 @@ function getRuntime(): ReactiveRuntime {
  * alias — see the `declare module` below), so `.value` / `.get()` / `.set()`
  * all work directly.
  */
-export function ref<T>(value: T): Ref<T> & { value: T } {
-  return getRuntime().ref(value) as Ref<T> & { value: T }
+/**
+ * The ref `ref()` hands out: readable through the shared `Ref` contract, plus
+ * the signal's own writable surface (`.value` alias and `set()`).
+ *
+ * The augmented `Ref<T>` itself stays *read-only* — that is what lets a
+ * `Signal.Computed` be passed to a prop or a child position — so the writable
+ * half is named here, where it is produced.
+ */
+export type SignalRef<T> = Ref<T> & { value: T; set(value: T): void }
+
+export function ref<T>(value: T): SignalRef<T> {
+  return getRuntime().ref(value) as SignalRef<T>
 }
 
 /**
  * Convenient computed function — returns the REAL Signal type
  * (`ComputedRef<T>`, a `Signal.Computed` subclass with a `.value` alias).
  */
-export function computed<T>(getter: () => T): ComputedRef<T> {
-  return new ComputedRef(getter)
+/** The read-only ref `computed()` hands out: a signal plus a `.value` alias. */
+export type SignalComputed<T> = ReadonlyRef<T> & { value: T }
+
+export function computed<T>(getter: () => T): SignalComputed<T> {
+  return new ComputedRef(getter) as SignalComputed<T>
 }
 
 /**
@@ -275,4 +293,6 @@ interface ValueRef<T> {
 
 declare module '@rasenjs/core' {
   interface Ref<T> extends ValueRef<T> {}
+  /** `computed()` hands out the read-only half. */
+  interface ReadonlyRef<T> extends Signal.Computed<T> {}
 }
