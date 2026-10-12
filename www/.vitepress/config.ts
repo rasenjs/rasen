@@ -15,6 +15,11 @@ export default defineConfig({
   // The production domain, so every page gets a canonical sitemap entry
   sitemap: { hostname: 'https://rasenjs.com' },
 
+  // Links without `.html` (`/guide/getting-started`). Vercel serves those from
+  // the generated `getting-started.html` because `cleanUrls` is on there too —
+  // keep the two settings in sync or every deep link 404s.
+  cleanUrls: true,
+
   head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }]],
 
   vite: {
