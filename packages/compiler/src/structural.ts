@@ -166,10 +166,17 @@ function isChildPosition(path: any): boolean {
 }
 
 /** `each({ of, children })` */
+/** `each({ of, children })` — `of` MUST stay a getter (mirrors `buildWhen`'s
+ *  condition): `list.value.map(…)` would otherwise hand `each` a snapshot, which
+ *  reads no dependency, so the subscription installs nothing and the list never
+ *  updates. */
 function buildEach(list: any, callback: any): any {
   return t.callExpression(t.identifier('each'), [
     t.objectExpression([
-      t.objectProperty(t.identifier('of'), list),
+      t.objectProperty(
+        t.identifier('of'),
+        t.arrowFunctionExpression([], list)
+      ),
       t.objectProperty(t.identifier('children'), callback),
     ]),
   ])

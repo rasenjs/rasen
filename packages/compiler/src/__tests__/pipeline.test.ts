@@ -91,7 +91,7 @@ describe('transformModule pipeline — structural pass', () => {
   it('rewrites when enabled and forwards the flag through', () => {
     const out = transformModule(MAP_CODE, 'test.tsx', { structural: true })!
     expect(out).toContain('each({')
-    expect(out).toContain('of: rows')
+    expect(out).toContain('of: () => rows')
     expect(out).not.toContain('.map(')
   })
 

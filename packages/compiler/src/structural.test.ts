@@ -26,7 +26,11 @@ describe('each — .map() in child position', () => {
   return <div>{rows.map((r) => <Row item={r} />)}</div>
 }`)
     expect(out).toContain('each({')
-    expect(out).toContain('of: rows')
+    // `of` is a getter, not the array itself: `each` subscribes to
+    // `config.items` (see core's each), and a snapshot array reads no
+    // dependency — the subscription would install nothing and the list would
+    // never update after the first render.
+    expect(out).toContain('of: () => rows')
     // The generator drops the redundant parens around a single arrow param,
     // so the callback is `r => …`, not `(r) => …`. Same function.
     expect(out).toContain('children: r => <Row item={r} />')
@@ -42,7 +46,7 @@ describe('each — .map() in child position', () => {
 
   it('handles a member-expression receiver', () => {
     const out = run(`const L = () => <div>{props.rows.map((r) => <Row item={r} />)}</div>`)
-    expect(out).toContain('of: props.rows')
+    expect(out).toContain('of: () => props.rows')
   })
 
   it('rewrites a nested list without touching the outer call', () => {
