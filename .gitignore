@@ -12,6 +12,8 @@ node_modules
 # Build outputs
 dist
 *.tsbuildinfo
+# Extracted markdown examples (scripts/check-doc-examples.mjs)
+.doccheck
 
 # Testing
 coverage
@@ -106,6 +108,20 @@ examples/react-native/android/build/
 examples/react-native/android/local.properties
 examples/react-native/bundle*.js
 examples/react-native/*.jsbundle
+
+# React Native — native build output for ANY package/example (rn-html, rn-dom-test, …)
+# Per-path rules above only covered one example; these cover the general case so
+# a new package with android/ or ios/ does not dirty the tree after a build.
+**/android/build/
+**/android/.gradle/
+**/android/.cxx/
+**/android/local.properties
+**/android/captures/
+**/android/.idea/
+**/ios/build/
+**/ios/Pods/
+**/ios/Podfile.lock
+**/*.xcworkspace/xcuserdata/
 
 # Rust / Native
 **/target/

@@ -17,6 +17,7 @@
     "test": "yarn workspaces foreach -Apt run test",
     "lint": "yarn workspaces foreach -Apt run lint",
     "typecheck": "yarn workspaces foreach -Apt run typecheck",
+    "check:docs": "node scripts/check-doc-examples.mjs",
     "clean": "yarn workspaces foreach -Apt run clean && rm -rf node_modules",
     "sync-snippets": "node scripts/sync-snippets.mjs",
     "perf:analyze": "tsx scripts/analyze-trace.ts",

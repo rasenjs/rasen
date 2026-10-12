@@ -336,6 +336,7 @@ yarn build          # build every package (tsup)
 yarn test           # vitest
 yarn typecheck      # tsc --noEmit per package
 yarn lint           # eslint
+yarn check:docs     # type-check the code examples embedded in markdown
 
 yarn www:dev        # documentation site (VitePress)
 yarn www:build
