@@ -49,9 +49,16 @@ function processChildren(
   children: JSXChild | JSXChild[] | undefined,
 ): Mountable<unknown>[] {
   if (children == null) return []
-  const arr = Array.isArray(children) ? children : [children]
   const result: Mountable<unknown>[] = []
-  for (const child of arr) {
+  // Nested arrays appear whenever a fragment mixes literal children with a
+  // mapped list (`<>{label}{rows.map(…)}</>`); they used to be dropped.
+  const flat: unknown[] = []
+  const flatten = (list: unknown[]) => {
+    for (const c of list) Array.isArray(c) ? flatten(c) : flat.push(c)
+  }
+  flatten(Array.isArray(children) ? (children as unknown[]) : [children])
+
+  for (const child of flat) {
     if (child == null || typeof child === 'boolean') continue
     if (typeof child === 'string' || typeof child === 'number') {
       result.push(child as unknown as Mountable<unknown>)
@@ -118,13 +125,34 @@ export function jsxs(
  */
 export { jsx as jsxDEV }
 
+let warnedTextChild = false
+
 /**
  * Fragment — mounts children in parallel without a wrapper element.
+ *
+ * `processChildren` keeps string / number / Ref children (intrinsic tags turn
+ * them into text nodes), which only a host that can create text nodes can
+ * render. Host adapters override this (see `@rasenjs/dom`); where they don't,
+ * non-mountable children are skipped with a warning instead of being invoked as
+ * functions — a `TypeError` there would take down the whole tree.
  */
 export function Fragment(props: { children?: unknown }): Mountable<unknown> {
   const childMounts = processChildren(props.children as JSXChild | JSXChild[] | undefined)
   return ((host: unknown) => {
-    const cleanups = childMounts.map(c => (c as (h: unknown) => (() => void) | undefined)(host))
+    const cleanups: Array<(() => void) | undefined> = []
+    for (const c of childMounts) {
+      if (typeof c !== 'function') {
+        if (!warnedTextChild) {
+          warnedTextChild = true
+          console.warn(
+            '[Rasen] Fragment child is a text/ref value but this host does not ' +
+            'provide a Fragment that can render text nodes; the child was skipped.',
+          )
+        }
+        continue
+      }
+      cleanups.push((c as (h: unknown) => (() => void) | undefined)(host))
+    }
     return () => { for (const u of cleanups) if (u) u() }
   }) as unknown as Mountable<unknown>
 }
