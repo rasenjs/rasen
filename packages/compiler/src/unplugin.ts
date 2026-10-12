@@ -107,7 +107,10 @@ export function transformModule(
 }
 
 export const rasenCompile = createUnplugin(
-  (options: RasenCompilerPluginOptions = {}) => {
+  // `| undefined` matters: unplugin derives whether the bundler entry points
+  // (`rasenCompile.vite()`, …) may be called without options from the factory's
+  // parameter type, and every pass here has a default.
+  (options: RasenCompilerPluginOptions | undefined = {}) => {
     const enabled = options.enabled ?? true
     const jsxTransform = options.jsxTransform ?? true
     const compile = options.compile ?? true
