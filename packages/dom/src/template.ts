@@ -100,8 +100,12 @@ export function template(html: string): (host?: HTMLElement) => HTMLElement {
  *  benchmark's ~2-3% noise floor, and the same-session A/B could not resolve it
  *  (01_run1k moved -0.5%/-1.6% between min and median). Reverted: not worth the
  *  out-of-range difference (walk yields `null`, this yields `undefined`). */
-export function child(parent: ParentNode, index: number): ChildNode {
-  return parent.childNodes[index]
+export function child(parent: ParentNode | ChildNode, index: number): ChildNode {
+  // Generated navigation nests: `child(child(root, 0), 1)`. The intermediate is
+  // a ChildNode, so the parameter has to accept one too — otherwise every
+  // compiled module fails `tsc` in a project that type-checks its build output.
+  // (At runtime the argument is always an element in the compiler's use.)
+  return (parent as ParentNode).childNodes[index]
 }
 
 
