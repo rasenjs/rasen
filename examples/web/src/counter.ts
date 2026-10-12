@@ -14,6 +14,7 @@ const app = div(
     span({ children: () => `${count.value}` })
   ),
   div(
+    {},
     button(
       {
         class: 'decrement',
@@ -30,6 +31,7 @@ const app = div(
     )
   ),
   div(
+    {},
     button(
       {
         class: 'reset',

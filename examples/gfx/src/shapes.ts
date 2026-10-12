@@ -130,13 +130,13 @@ const examplesGrid = div({
           outerRadius: 80,
           fill: '#74b9ff'
         }),
+        // gfx's ring is fill-only today (canvas-2d additionally strokes it)
         ring({
           x: 150,
           y: 100,
           innerRadius: 50,
           outerRadius: 70,
-          stroke: '#ff7675',
-          lineWidth: 2
+          fill: '#ff7675'
         })
       ]
     ),
@@ -216,7 +216,13 @@ const examplesGrid = div({
       300,
       200,
       polygon({
-        points: [150, 30, 220, 100, 190, 170, 110, 170, 80, 100],
+        points: [
+          { x: 150, y: 30 },
+          { x: 220, y: 100 },
+          { x: 190, y: 170 },
+          { x: 110, y: 170 },
+          { x: 80, y: 100 }
+        ],
         fill: '#a29bfe',
         stroke: '#6c5ce7',
         lineWidth: 2

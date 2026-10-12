@@ -110,7 +110,7 @@ const examplesGrid = div({
         x2: 250,
         y2: 100,
         fill: '#fd79a8',
-        headSize: 15
+        arrowSize: 15
       }),
       arrow({
         x1: 150,
@@ -118,7 +118,7 @@ const examplesGrid = div({
         x2: 150,
         y2: 150,
         fill: '#74b9ff',
-        headSize: 12
+        arrowSize: 12
       })
     ]),
 

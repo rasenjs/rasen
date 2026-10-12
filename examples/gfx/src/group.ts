@@ -1,6 +1,6 @@
 import { getReactiveRuntime } from '@rasenjs/core'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
-import { div, h1, h2, p, button, canvas, mount } from '@rasenjs/dom'
+import { div, h1, h2, p, canvas, mount } from '@rasenjs/dom'
 import { group, circle, rect } from '@rasenjs/gfx'
 
 useReactiveRuntime()

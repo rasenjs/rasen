@@ -77,17 +77,15 @@ const examplesGrid = div({
       circle({ x: 150, y: 100, radius: 50, fill: '#ffd93d', opacity: 0.7 })
     ]),
 
-    createExample('Shadow', 'Drop shadows with blur', 300, 200, [
+    createExample('Outline', 'Stroked rect (gfx shapes fill and stroke)', 300, 200, [
       rect({
         x: 80,
         y: 50,
         width: 140,
         height: 100,
         fill: '#a29bfe',
-        shadowColor: 'rgba(0, 0, 0, 0.5)',
-        shadowBlur: 15,
-        shadowOffsetX: 5,
-        shadowOffsetY: 5
+        stroke: '#6c5ce7',
+        lineWidth: 4
       })
     ])
   ]

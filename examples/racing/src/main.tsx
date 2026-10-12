@@ -5,12 +5,13 @@
  * drift through corners, and watch the camera pull back as you speed up.
  * Ported from the Godot starter kit (vehicle.gd / view.gd / main.tscn).
  */
-import { configureTags, com, type Mountable } from '@rasenjs/core'
+import { configureTags, com, getReactiveRuntime, type Mountable } from '@rasenjs/core'
 import { mount, when } from '@rasenjs/dom'
-import { ref, computed } from '@rasenjs/reactive-signals'
+import { ref, computed, type SignalComputed } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { group, mesh, billboard, each, getRenderContext, type CameraConfig } from '@rasenjs/gfx'
+import { group, mesh, billboard, each, getRenderContext, type CameraConfig, type GfxNode } from '@rasenjs/gfx'
 import { Mat4x4f, vec3f } from '@rasenjs/math'
+import type { Ref } from '@rasenjs/core'
 import { loadRacingAssets, type RacingAssets } from './assets'
 import { trackPieces, aiTrucks, trackCenterline } from './level-data'
 import { Vehicle } from './vehicle'
@@ -151,12 +152,18 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
   // Front wheels steer around their own Y axis: yaw + frontSteer.
   const frontRotY = computed(() => vyaw.value + frontYaw.value)
 
+  const readAngle = (r: Ref<number> | SignalComputed<number>): number =>
+    getReactiveRuntime().unref(r as Ref<number>)
+
   // A wheel's rotation = Ry(yaw)·Rx(spin) — roll around the body's local X
   // axis. Decompose into mesh-compatible Rx·Ry·Rz Euler angles.
-  const wheelRot = (yawRef: typeof vyaw) => ({
-    rotationX: computed(() => decomposeYawRoll(yawRef.value, wheelSpin.value).X),
-    rotationY: computed(() => decomposeYawRoll(yawRef.value, wheelSpin.value).Y),
-    rotationZ: computed(() => decomposeYawRoll(yawRef.value, wheelSpin.value).Z),
+  // `YawSource` is whatever can be read as an angle: a writable ref, or the
+  // computed the front pair uses. Read it through the runtime rather than
+  // `.value`, so both satisfy it.
+  const wheelRot = (yawRef: Ref<number> | SignalComputed<number>) => ({
+    rotationX: computed(() => decomposeYawRoll(readAngle(yawRef), wheelSpin.value).X),
+    rotationY: computed(() => decomposeYawRoll(readAngle(yawRef), wheelSpin.value).Y),
+    rotationZ: computed(() => decomposeYawRoll(readAngle(yawRef), wheelSpin.value).Z),
   })
 
   const bodyMesh = body ? (
@@ -184,11 +191,11 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
       rotationX={rot.rotationX} rotationY={rot.rotationY} rotationZ={rot.rotationZ} />
   ) : null
 
-  const vehicleChildren: Mountable<any>[] = [
+  const vehicleChildren: Mountable<GfxNode>[] = [
     bodyMesh, underMesh,
     wheelMesh(bl, blPos, wheelRot(vyaw)), wheelMesh(br, brPos, wheelRot(vyaw)),
     steerWheelMesh(fl, flPos, wheelRot(frontRotY)), steerWheelMesh(fr, frPos, wheelRot(frontRotY)),
-  ].filter((c): c is Mountable<any> => c != null)
+  ].filter((c): c is Mountable<GfxNode> => c != null)
 
   // Debug: expose wheel world positions to verify they follow the body yaw.
   ;(window as unknown as { __wheels?: { bl: typeof blPos; br: typeof brPos; fl: typeof flPos; fr: typeof frPos; body: typeof bodyPos } }).__wheels = {
@@ -198,15 +205,15 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
   // Collect all WebGL scene children into one array. The DOM canvas children
   // type is `Mountable<HTMLElement>`; WebGL components are `Mountable<WebGL…>`,
   // so we widen to `Mountable<any>[]` (the JSX.Element type) to satisfy it.
-  const sceneChildren: Mountable<any>[] = [
-    <group children={trackMeshes as Mountable[]} />,
-    <group children={truckMeshes as Mountable[]} />,
+  const sceneChildren: Mountable<GfxNode>[] = [
+    <group children={trackMeshes as Mountable<GfxNode>[]} />,
+    <group children={truckMeshes as Mountable<GfxNode>[]} />,
     ...vehicleChildren,
     // Skid smoke trails
     each(() => trails.value, (p) => (
       <billboard x={p.x} y={p.y} z={p.z} width={p.size} height={p.size} opacity={p.opacity} texture={assets.textures.get('smoke')!} mode="full" />
     )),
-  ].filter((c): c is Mountable<any> => c != null)
+  ].filter((c): c is Mountable<GfxNode> => c != null)
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>

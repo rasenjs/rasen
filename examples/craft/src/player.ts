@@ -8,7 +8,7 @@
  */
 
 import { computed, ref } from '@rasenjs/reactive-signals'
-import type { Ref } from '@rasenjs/core'
+import type { SignalComputed } from '@rasenjs/reactive-signals'
 import { aabb, overlapsAabb, type Aabb } from '@rasenjs/math'
 import { forwardVector, rightVector } from '@rasenjs/gfx'
 import type { World } from './world'
@@ -28,7 +28,7 @@ export class Player {
   readonly yaw = ref(0)
   readonly pitch = ref(0)
   /** Camera eye position (feet + eye height). */
-  readonly eye: Ref<{ x: number; y: number; z: number }>
+  readonly eye: SignalComputed<{ x: number; y: number; z: number }>
 
   private vel = { x: 0, y: 0, z: 0 }
   private onGround = false

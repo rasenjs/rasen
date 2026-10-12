@@ -10,7 +10,7 @@
 import type { HistoryAdapter } from '@rasenjs/router'
 import { createRouter } from '@rasenjs/router'
 import { createRouterView, createRouterLink } from '@rasenjs/web'
-import { div, nav, h1, p, a } from '@rasenjs/web'
+import { div, nav, p } from '@rasenjs/web'
 import { routes } from './routes'
 import { HomeView } from './views/Home'
 import { AboutView } from './views/About'

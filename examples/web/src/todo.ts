@@ -29,6 +29,7 @@ function removeTodo(id: number) {
 
 const createApp = com(() => {
   return div(
+    {},
     h1('📝 Todo List'),
     div(
       { class: 'input-group' },

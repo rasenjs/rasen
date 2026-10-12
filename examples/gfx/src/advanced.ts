@@ -1,5 +1,4 @@
 import type { Mountable } from '@rasenjs/core'
-import type { GlNode } from '@rasenjs/gfx'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { ref } from '@vue/reactivity'
 import { div, h1, p, a, button, canvas, mount } from '@rasenjs/dom'
@@ -28,19 +27,17 @@ const pageHeader = div({
 function createExample(
   title: string,
   description: string,
-  width: number,
-  height: number,
-  children: Mountable<GlNode>[]
+  _width: number,
+  _height: number,
+  // Each card passes its own <canvas> (a DOM mountable); it belongs next to the
+  // heading, not inside another canvas.
+  children: Mountable<HTMLElement>[]
 ) {
   return div({
     class: 'example-card',
     children: [
       h1({ children: [title] }),
-      canvas({
-        width,
-        height,
-        children
-      }),
+      ...children,
       p({ class: 'example-description', children: [description] })
     ]
   })

@@ -274,7 +274,7 @@ const app = div(
       transitionGroup({
         items,
         name: 'list',
-        children: (item, index) => div({
+        children: (item) => div({
           style: {
             padding: '0.75rem 1.25rem',
             background: item.color,

@@ -7,7 +7,8 @@
  */
 
 import type { GfxNode, LoadedGLTF } from '@rasenjs/gfx'
-import { element, unref } from '@rasenjs/gfx'
+import { element } from '@rasenjs/gfx'
+import { toValue, type PropValue } from '@rasenjs/core'
 import { Mat4x4f } from '@rasenjs/math'
 import type { Player } from './player'
 
@@ -15,7 +16,7 @@ export interface WeaponProps {
   player: Player
   geometry: LoadedGLTF
   /** Recoil offset (0 = rest, >0 = kicked back toward camera). */
-  recoil?: { value: number }
+  recoil?: PropValue<number>
   /** Muzzle flash visibility (true while firing). */
   muzzleFlash?: { value: boolean }
   /** burst.png texture for the muzzle flash sprite. */
@@ -46,7 +47,7 @@ export const weapon = (props: WeaponProps) => {
 
     draw: (node: GfxNode) => {
       const texture = node.createTexture(geometry.texture!)
-      const recoil = unref(props.recoil) ?? 0
+      const recoil = toValue(props.recoil) ?? 0
 
       // Weapon world matrix = viewInverse · R_Y(π) · T(offset) · S
       // Using the inverse of the camera view matrix guarantees the weapon is
@@ -83,8 +84,8 @@ export const weapon = (props: WeaponProps) => {
 
       // Muzzle flash — burst sprite at the gun muzzle (Godot Muzzle at
       // (1.5, -0.75, -6) in CameraItem space, AnimatedSprite3D burst.png).
-      const muzzleFlash = unref(props.muzzleFlash)
-      const burstTexture = unref(props.burstTexture)
+      const muzzleFlash = toValue(props.muzzleFlash)
+      const burstTexture = toValue(props.burstTexture)
       if (muzzleFlash && burstTexture) {
         const burst = node.createTexture(burstTexture)
         const muzzleMatrix = view.invert()

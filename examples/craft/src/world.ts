@@ -11,7 +11,7 @@
  */
 
 import { ref } from '@rasenjs/reactive-signals'
-import type { Ref } from '@rasenjs/core'
+import type { SignalRef } from '@rasenjs/reactive-signals'
 import { SimplexNoise, fbm2 } from '@rasenjs/math'
 import { buildVoxelMesh, type MeshGeometry } from '@rasenjs/gfx'
 import { ATLAS_COLS, ATLAS_ROWS, BLOCK_TILES, Blocks } from './blocks'
@@ -24,7 +24,7 @@ const TREE_CELL = 6
 export interface VoxelChunk {
   p: number
   q: number
-  geo: Ref<MeshGeometry>
+  geo: SignalRef<MeshGeometry>
 }
 
 function chunkKey(p: number, q: number): string {

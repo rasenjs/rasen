@@ -17,8 +17,7 @@ import {
 } from '@rasenjs/gfx'
 import { forwardVector } from '@rasenjs/math'
 import { Blocks } from './blocks'
-import { bindLookControls, setupKeyboard } from './input'
-import type { BoundLookControls } from '@rasenjs/dom'
+import { bindLookControls, setupKeyboard, type MouseControls } from './input'
 import { Player } from './player'
 import { createApp } from './render'
 import { World } from './world'
@@ -139,7 +138,7 @@ function main() {
   // Mouse controls are created before the canvas exists; inject refs so the
   // scene can react to lock state immediately, then wire events after mount.
   const locked = ref(false)
-  const mouse: BoundLookControls = {
+  const mouse: MouseControls = {
     yaw: player.yaw,
     pitch: player.pitch,
     locked,

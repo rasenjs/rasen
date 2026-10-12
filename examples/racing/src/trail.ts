@@ -5,7 +5,7 @@
  * fade over ~0.5s (matching the particle lifetime). Rendered as camera-facing
  * billboards with the smoke.png texture.
  */
-import { ref } from '@rasenjs/reactive-signals'
+import { ref, type SignalRef } from '@rasenjs/reactive-signals'
 import type { Ref } from '@rasenjs/core'
 import type { Vehicle } from './vehicle'
 
@@ -13,8 +13,8 @@ export interface SmokePuff {
   x: Ref<number>
   y: Ref<number>
   z: Ref<number>
-  size: Ref<number>
-  opacity: Ref<number>
+  size: SignalRef<number>
+  opacity: SignalRef<number>
   age: number
   life: number
 }

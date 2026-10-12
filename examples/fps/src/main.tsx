@@ -2,7 +2,7 @@ import { configureTags, com, type Mountable } from '@rasenjs/core'
 import { mount, when } from '@rasenjs/dom'
 import { ref } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { group, mesh, skybox, billboard, each, getRenderContext, type CameraConfig } from '@rasenjs/gfx'
+import { group, mesh, skybox, billboard, each, getRenderContext, type CameraConfig, type GfxNode } from '@rasenjs/gfx'
 import { Mat4x4f, vec3f, forwardVector, rightVector } from '@rasenjs/math'
 import { loadFPSAssets } from './assets'
 import { getLevelObjects, getEnemySpawns, getLevelWalls } from './level'
@@ -49,13 +49,13 @@ interface AppProps {
   levelObjs: ReturnType<typeof getLevelObjects>
   muzzleFlash: { value: boolean }
   locked: { value: boolean }
-  impacts: Impact[]
+  impacts: { value: Impact[] }
   muzzleFlashes: { value: Array<{ x: number; y: number; z: number; tex: HTMLImageElement }> }
   hitFrames: HTMLCanvasElement[]
 }
 
 const App = com((p: AppProps): Mountable<HTMLElement> => {
-  const { player, enemies, assets, levelObjs, muzzleFlash: mf, locked: lk, impacts, muzzleFlashes, hitFrames } = p
+  const { player, enemies, assets, levelObjs, muzzleFlash: mf, locked: lk, impacts, muzzleFlashes } = p
   // Main camera — flat CameraConfig consumed by <canvas camera={...}>. The
   // lookAt target is the eye plus the yaw/pitch forward vector. A plain
   // getter keeps the config reactive (re-evaluated on every dep change)
@@ -120,10 +120,10 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
         style={{ width: '100%', height: '100%', display: 'block' }}>
         {/* Skybox FIRST so it renders as background (before scene geometry) */}
         <skybox texture={assets.textures.get('skybox')} radius={150} position={player.eye} />
-        <group children={levelMeshes as Mountable[]} />
-        <group children={enemyMeshes as Mountable[]} />
-        <group children={cloudMeshes as Mountable[]} />
-        <group children={plantMeshes as Mountable[]} />
+        <group children={levelMeshes as Mountable<GfxNode>[]} />
+        <group children={enemyMeshes as Mountable<GfxNode>[]} />
+        <group children={cloudMeshes as Mountable<GfxNode>[]} />
+        <group children={plantMeshes as Mountable<GfxNode>[]} />
         {/* Hit impacts — camera-facing sprites at raycast collision points */}
         {each(() => impacts.value.filter(i => i.alive.value), (i) => (
           <billboard x={i.x} y={i.y} z={i.z} width={0.32} height={0.32} texture={i.texture} mode="vertical" />

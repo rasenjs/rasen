@@ -34,6 +34,7 @@ function shrink() {
 }
 
 const app = div(
+  {},
   h1('🎨 Canvas 2D Example'),
   canvas({
     width: 400,

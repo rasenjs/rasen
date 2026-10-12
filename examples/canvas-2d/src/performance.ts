@@ -9,8 +9,7 @@ import {
   star,
   polygon,
   ring,
-  wedge,
-  text
+  wedge
 } from '@rasenjs/canvas-2d'
 
 useReactiveRuntime()

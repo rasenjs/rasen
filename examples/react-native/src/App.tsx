@@ -5,7 +5,8 @@
  * which Metro resolves to `@rasenjs/react-native/jsx-runtime` via extraNodeModules.
  */
 
-import { View, Text, TouchableOpacity, Pressable, Button, FlatList, each, when } from '@rasenjs/react-native'
+import { each, when } from '@rasenjs/core'
+import { View, Text, TouchableOpacity, Pressable, Button, FlatList } from '@rasenjs/react-native'
 import { ref, computed } from '@vue/reactivity'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
