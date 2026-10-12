@@ -4181,25 +4181,25 @@ __metadata:
 
 "@rasenjs/core@file:../../packages/core::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
   version: 0.1.8
-  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=c2dfce&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=720446&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   peerDependencies:
     zod: ^3.0.0
   peerDependenciesMeta:
     zod:
       optional: true
-  checksum: 10c0/7662e6076563c2e3c7f4110d50e2836a4a66814c85d236cea7038a324f97eb77a8cb9ef9e8d4dd83fce507450d3cc0de512732823bdb8816a39de2ef45dba012
+  checksum: 10c0/aca7096e8300238ddae80024b1154bd515536a97b1f6e21b8905d8aa1238b530e15babc012eddfefcb87be06738feee1c907fa5a2b6de587ef3bba3f8c59ae01
   languageName: node
   linkType: hard
 
 "@rasenjs/core@file:../../packages/core::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=c2dfce&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=720446&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   peerDependencies:
     zod: ^3.0.0
   peerDependenciesMeta:
     zod:
       optional: true
-  checksum: 10c0/7662e6076563c2e3c7f4110d50e2836a4a66814c85d236cea7038a324f97eb77a8cb9ef9e8d4dd83fce507450d3cc0de512732823bdb8816a39de2ef45dba012
+  checksum: 10c0/aca7096e8300238ddae80024b1154bd515536a97b1f6e21b8905d8aa1238b530e15babc012eddfefcb87be06738feee1c907fa5a2b6de587ef3bba3f8c59ae01
   languageName: node
   linkType: hard
 
@@ -4216,13 +4216,13 @@ __metadata:
 
 "@rasenjs/dom@file:../../packages/dom::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=518b0d&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=2c7a44&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/gfx": "workspace:*"
-  checksum: 10c0/bb2303061f218240c1ab1e548f47d95988e97b3b69d1620b4ca1f637010919c664cb67668dc73ef7a08e871547f1c9dae780d108cbbcb2518f36543dc8133189
+  checksum: 10c0/b496abed218bcf2ad2d550554400ebc4f152bb2d883505ae301138f48886449adf38aa2a8e882b27163a923d87a1d08a937f297f3ad0a2bcfcce7f219d583bc9
   languageName: node
   linkType: hard
 
@@ -4442,23 +4442,23 @@ __metadata:
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=fcc64a&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=17ad31&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/ee424ce592c7b5d80a60ccc3493fcb63741741652623ba97e60e6b3960958aae5ff5ef8abaf56b80644c2d4a312461cc78e06100449c694012c0b8a8fe17996b
+  checksum: 10c0/6e116a33403da22effc70f997a0a802f498d91c8d5691600032015bb560d108d45cb7d49f9825c8e0b0eee642c17b339225f094e9cc3ed8d65708bb7887553b8
   languageName: node
   linkType: hard
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=fcc64a&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=17ad31&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/ee424ce592c7b5d80a60ccc3493fcb63741741652623ba97e60e6b3960958aae5ff5ef8abaf56b80644c2d4a312461cc78e06100449c694012c0b8a8fe17996b
+  checksum: 10c0/6e116a33403da22effc70f997a0a802f498d91c8d5691600032015bb560d108d45cb7d49f9825c8e0b0eee642c17b339225f094e9cc3ed8d65708bb7887553b8
   languageName: node
   linkType: hard
 
@@ -13656,6 +13656,11 @@ __metadata:
     typescript: "npm:^5.3.2"
     vitest: "npm:^1.0.4"
     vue-router: "npm:^5.2.0"
+  dependenciesMeta:
+    canvas:
+      built: false
+    puppeteer:
+      built: false
   languageName: unknown
   linkType: soft
 

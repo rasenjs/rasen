@@ -83,5 +83,16 @@
     "url": "https://github.com/rasenjs/rasen/issues"
   },
   "author": "Rasen Contributors",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": "20.x"
+  },
+  "dependenciesMeta": {
+    "canvas": {
+      "built": false
+    },
+    "puppeteer": {
+      "built": false
+    }
+  }
 }
