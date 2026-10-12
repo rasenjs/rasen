@@ -35,12 +35,28 @@ type TagToElement<T extends HTMLTagName> = HTMLElementTagNameMap[T]
 /**
  * 基础 Props（所有元素共享）
  */
+/**
+ * A child the element factory can mount.
+ *
+ * Mirrors the runtime contract exactly:
+ *  - text — `string` / `number`
+ *  - a ref — bound as a reactive text node
+ *  - a getter returning text — invoked once for its value
+ *  - a mountable — a component, `when(…)`, `each(…)`, or a JSX element
+ *    (`JSXElement` is `Mountable<any>`, so that has to be in the union)
+ *  - nothing — `null` / `undefined` / `false` are skipped
+ *
+ * Arrays are accepted as-is and are **not** flattened by the factory (the JSX
+ * runtime flattens), so nested arrays are deliberately not part of the type.
+ */
+type TextChild = PropValue<string | number>
+type MountableChild = Mountable<HTMLElement> | Mountable<any> // eslint-disable-line @typescript-eslint/no-explicit-any
+type SkippedChild = null | undefined | false
+type ElementChild = TextChild | MountableChild | SkippedChild
+
 interface BaseElementProps {
   ref?: unknown
-  children?:
-    | PropValue<string>
-    | Mountable<HTMLElement>
-    | Array<string | (() => string | number) | Mountable<HTMLElement>>
+  children?: ElementChild | Array<ElementChild>
 }
 
 /**
@@ -75,7 +91,7 @@ type ElementProps<T extends HTMLTagName> = {
 type AnyElementProps = {
   tag: string
   ref?: Ref<HTMLElement | null>
-  children?: PropValue<string> | Array<string | (() => string | number) | Mountable<HTMLElement>>
+  children?: ElementChild | Array<ElementChild>
   class?: PropValue<string>
   style?: PropValue<string | Record<string, string | number>>
   [key: string]: unknown
@@ -281,8 +297,8 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
 /** 元素组件的 Props 类型（不含 tag） */
 type TagProps<T extends HTMLTagName> = Omit<ElementProps<T>, 'tag'>
 
-/** Child 类型 - 支持字符串、响应式函数、响应式值、Mountable 组件 */
-type TagChild = string | (() => string | number) | { value: unknown } | Mountable<HTMLElement>
+/** Child type accepted by the factories: text, a ref, a getter, a mountable, or nothing. */
+type TagChild = ElementChild
 
 /**
  * Tag factory — create a typed element function for any HTML tag.
