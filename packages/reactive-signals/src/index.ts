@@ -228,8 +228,8 @@ function getRuntime(): ReactiveRuntime {
  * alias — see the `declare module` below), so `.value` / `.get()` / `.set()`
  * all work directly.
  */
-export function ref<T>(value: T): Ref<T> {
-  return getRuntime().ref(value)
+export function ref<T>(value: T): Ref<T> & { value: T } {
+  return getRuntime().ref(value) as Ref<T> & { value: T }
 }
 
 /**
@@ -261,6 +261,18 @@ export function isRef(value: unknown): boolean {
  * 子类 + `.value` 别名），`.value` / `.get()` / `.set()` 直接可用，
  * 且与组件 props 期望的 core `Ref<T>` 完全一致。
  */
+/**
+ * What a ref has to satisfy for the component APIs: the signal read primitive.
+ *
+ * Naming the *structural* shape rather than a class is what lets every signal
+ * the runtime accepts be passed to a prop or a child position —
+ * `Signal.State`, `Signal.Computed`, and this package's `.value`-carrying
+ * wrappers (whose `.value` comes from the `ref()` / `computed()` signatures).
+ */
+interface ValueRef<T> {
+  get(): T
+}
+
 declare module '@rasenjs/core' {
-  interface Ref<T> extends StateRef<T> {}
+  interface Ref<T> extends ValueRef<T> {}
 }
