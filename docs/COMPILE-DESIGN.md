@@ -58,7 +58,7 @@ function Row(item: RowData) {
 Compiler output:
 
 ```ts
-import { template, child, next, txt, bindClass, bindText, on } from '@rasenjs/dom/template'
+import { template, child, bindClass, bindText, renderText, on } from '@rasenjs/dom/template'
 
 const t0 = template('<tr class=row><td class=col-md-1> </td><td class=col-md-4><a class=lbl> </a></td><td class=col-md-6></td></tr>')
 
@@ -69,12 +69,15 @@ function Row(item: RowData) {
     // otherwise → clone + appendChild.
     const n = t0(host)
 
-    const td0 = child(n, 0)
-    const td1 = next(td0)
-    const a1 = child(td1, 0)
+    // Child positions are addressed by index from the nearest known parent.
+    // (The compiler emits the same calls; the casts only annotate what the
+    // template guarantees — the navigated nodes are elements.)
+    const td0 = child(n, 0) as HTMLElement
+    const td1 = child(n, 1) as HTMLElement
+    const a1 = child(td1, 0) as HTMLElement
 
-    bindText(txt(td0), () => String(item.id))   // non-reactive expr: set once
-    bindText(txt(a1), () => item.label)
+    bindText(child(td0, 0), () => renderText(String(item.id)))
+    bindText(child(a1, 0), () => renderText(item.label))
     bindClass(n, () => selected.value === item.id ? 'danger' : '')
     on(a1, 'click', () => select(item.id))
 
@@ -99,9 +102,10 @@ Implemented in `packages/dom/src/template.ts`:
 | Primitive | Role |
 |---|---|
 | `template(html)` | Parse once (lazy, SSR-safe init); `t0(host)` = full acquisition policy (claim+adopt while hydrating / clone+append in CSR), `t0()` = pure clone |
-| `child(parent, i)` / `next(node, offset)` | Baked navigation over childNodes |
-| `txt(el)` | Text placeholder handle |
-| `adopt(el)` | Hydration root marker (identity; shares all downstream code) |
+| `child(parent, i)` | Baked navigation over childNodes (index from a known parent) |
+| `mountSlot(...)` / `collectHtml(...)` | Component children: mount at a marker anchor / serialize for SSR |
+| `renderText(v)` | Child-to-string with the runtime's text semantics (refs unwrap, falsy → '') |
+| `escapeHtml` / `escapeAttr` | Attribute/text escaping for the SSR branch |
 | `bindClass(el, g)` | Reactive className |
 | `bindText(node, g)` | Reactive text content |
 | `bindStyle(el, g)` | css string or camelCase object; object updates clear removed keys |

@@ -42,20 +42,22 @@ const Card = () => (
 )
 ```
 
-For function styles (e.g. `Pressable`'s `({ pressed }) => style`), merge the
-record with the existing `resolveStyle` helper:
+`Pressable` and the `Touchable*` components accept a function style
+(`(state) => style`) — spread the record and add the state-dependent bits:
 
 ```tsx
 import { tw } from '@rasenjs/tw'
-import { resolveStyle } from '@rasenjs/react-native/utils/style'
+import { Pressable, Text } from '@rasenjs/react-native'
 
 const PressableCard = () => (
   <Pressable
     style={({ pressed }) => ({
-      ...tw('p-4 rounded-lg'),
+      ...tw('p-4 rounded-lg bg-white'),
       opacity: pressed ? 0.7 : 1
     })}
-  />
+  >
+    <Text style={tw('text-gray-900')}>Press me</Text>
+  </Pressable>
 )
 ```
 

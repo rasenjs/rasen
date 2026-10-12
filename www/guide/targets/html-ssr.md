@@ -50,118 +50,59 @@ console.log(page)
 // <div class="container"><p class="intro">Welcome to my site!</p>...</div>
 ```
 
-## Full Page
+## Document shell
+
+`@rasenjs/html` renders the *content* elements. There are no `html` / `head` /
+`body` / `title` / `meta` / `link` exports, because the document shell is not a
+component tree — it is a string, assembled once per response:
 
 ```typescript
-import { 
-  renderToString, 
-  html, head, body, title, meta, link, 
-  div, h1, p 
-} from '@rasenjs/html'
+import { renderToString } from '@rasenjs/html'
 
-const page = renderToString(
-  html(
-    head(
-      meta({ charset: 'utf-8' }),
-      meta({ name: 'viewport', content: 'width=device-width, initial-scale=1' }),
-      title('My Page'),
-      link({ rel: 'stylesheet', href: '/styles.css' })
-    ),
-    body(
-      div(
-        { class: 'app' },
-        h1('Welcome'),
-        p('Server-rendered content.')
-      )
-    )
-  )
-)
+const appHtml = renderToString(App())
 
-// Add doctype
-const fullHtml = '<!DOCTYPE html>' + page
+const page = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>My Page</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="app">${appHtml}</div>
+  </body>
+</html>`
 ```
 
-## Element Syntax
+If a shell tag really has to come from the component tree, the generic factory
+takes any tag name:
 
 ```typescript
-// Props + children
-div({ class: 'container', id: 'main' }, 'Content')
+import { element } from '@rasenjs/html'
 
-// Children only
-p('Simple paragraph')
-
-// Nested children
-ul(
-  li('Item 1'),
-  li('Item 2'),
-  li('Item 3')
-)
-
-// Self-closing
-img({ src: '/logo.png', alt: 'Logo' })
-br()
-hr()
+// <title>My Page</title>
+element({ tag: 'title', children: 'My Page' })
 ```
 
-## Dynamic Content
-
-Pass data to generate dynamic HTML:
-
-```typescript
-interface User {
-  name: string
-  email: string
-}
-
-function renderUserCard(user: User) {
-  return renderToString(
-    div(
-      { class: 'user-card' },
-      h2(user.name),
-      p(user.email)
-    )
-  )
-}
-
-const users = await fetchUsers()
-const cards = users.map(renderUserCard).join('')
-```
-
-## Lists
-
-```typescript
-const items = ['Apple', 'Banana', 'Cherry']
-
-const list = renderToString(
-  ul(
-    { class: 'fruit-list' },
-    ...items.map(item => li(item))
-  )
-)
-```
-
-## Express.js Example
+## Express.js example
 
 ```typescript
 import express from 'express'
-import { renderToString, html, head, body, title, div, h1 } from '@rasenjs/html'
+import { renderToString, div, h1, p } from '@rasenjs/html'
 
 const app = express()
 
-app.get('/', (req, res) => {
-  const page = '<!DOCTYPE html>' + renderToString(
-    html(
-      head(title('Home')),
-      body(
-        div(
-          { class: 'container' },
-          h1('Welcome!')
-        )
-      )
-    )
+app.get('/', (_req, res) => {
+  const appHtml = renderToString(
+    div({ class: 'container' }, h1('Welcome!'), p('Server-rendered.'))
   )
-  
-  res.send(page)
+
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Home</title></head>
+  <body><div id="app">${appHtml}</div></body>
+</html>`)
 })
 
 app.listen(3000)
@@ -191,7 +132,7 @@ const html = renderToString(App({ data }))
 
 // Client  
 import { mount } from '@rasenjs/dom'
-mount(App({ data }), document.getElementById('app'))
+mount(App({ data }), document.getElementById('app')!)
 ```
 
 ::: tip Future Feature

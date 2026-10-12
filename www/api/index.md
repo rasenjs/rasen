@@ -167,8 +167,11 @@ router.beforeEach(cb) / afterEach(cb) / onError(cb)
 ## Reactivity adapters
 
 ```typescript
+import { setReactiveRuntime } from '@rasenjs/core'
 import { createReactiveRuntime, useReactiveRuntime } from '@rasenjs/reactive-vue'
-setReactiveRuntime(createReactiveRuntime())   // or simply useReactiveRuntime()
+
+useReactiveRuntime()                            // the usual entry point
+setReactiveRuntime(createReactiveRuntime())     // or wire the adapter up yourself
 ```
 
 `reactive-vue` also exports `ref`, `unref`, `setValue`; `reactive-signals` and

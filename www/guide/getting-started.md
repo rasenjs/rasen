@@ -189,7 +189,7 @@ const Counter = com(() => {
   )
 })
 
-mount(Counter(), document.getElementById('app'))
+mount(Counter(), document.getElementById('app')!)
 ```
 
 ::: warning `textContent` is not a prop

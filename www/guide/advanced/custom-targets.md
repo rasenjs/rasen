@@ -19,8 +19,8 @@ Let's create a simple Three.js adapter:
 
 ```typescript
 import * as THREE from 'three'
-import { watchProp, unref } from '@rasenjs/dom'
-import type { PropValue, MountFunction } from '@rasenjs/core'
+import { watchProp } from '@rasenjs/dom'
+import { toValue, type PropValue, type Mountable } from '@rasenjs/core'
 
 // Host type
 type ThreeHost = THREE.Object3D
@@ -37,8 +37,9 @@ export const mesh = (props: {
   const stops: (() => void)[] = []
   
   if (props.position) {
+    // A prop is a PropValue (value | ref | getter) — toValue resolves all three
     stops.push(watchProp(
-      () => unref(props.position),
+      () => toValue(props.position),
       (pos) => {
         if (pos) mesh.position.set(pos.x, pos.y, pos.z)
       }
@@ -47,7 +48,7 @@ export const mesh = (props: {
   
   if (props.rotation) {
     stops.push(watchProp(
-      () => unref(props.rotation),
+      () => toValue(props.rotation),
       (rot) => {
         if (rot) mesh.rotation.set(rot.x, rot.y, rot.z)
       }
@@ -78,7 +79,7 @@ export const group = (props: {
   
   if (props.position) {
     stops.push(watchProp(
-      () => unref(props.position),
+      () => toValue(props.position),
       (pos) => {
         if (pos) grp.position.set(pos.x, pos.y, pos.z)
       }

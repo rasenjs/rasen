@@ -119,6 +119,7 @@ State lives **inside closures** — it is not externally accessible. There is no
 Key insight: **`com()` is the single entry point for ALL Rasen components.** If we make `com()`'s implementation swappable at runtime, we can switch between production and development behavior transparently—no new API, no user-facing changes.
 
 ```
+// @planned — not shipped yet; the status note above says what exists today.
 User code (unchanged):
   const Counter = com(() => { ... })
                    ^^^
@@ -145,6 +146,7 @@ The parent component holds a **stable Mountable reference** (returned by `com()`
 ## 4. Architecture Overview
 
 ```
+// @planned — not shipped yet; the status note above says what exists today.
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Bundler Layer                            │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌───────────────┐  │
@@ -199,6 +201,7 @@ The parent component holds a **stable Mountable reference** (returned by `com()`
 ### HMR Flow (Detailed)
 
 ```
+// @planned — not shipped yet; the status note above says what exists today.
 1. User edits src/Counter.tsx
 2. Vite re-compiles and sends WebSocket update:
    { type: 'update', path: '/src/Counter.tsx' }
@@ -229,6 +232,7 @@ This is the core HMR runtime. It lives in `@rasenjs/core` as a subpath export (`
 The `com()` function in `@rasenjs/core` is backed by a mutable implementation reference. Production mode uses the existing `prodCom`. Development mode swaps it to `devCom`:
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 // packages/core/src/com.ts
 
 let comImpl: typeof prodCom = prodCom
@@ -334,6 +338,7 @@ export function getRegistrySize(): number {
 This is swapped in as `comImpl` when HMR is active. It handles both first-time component creation and HMR updates:
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 // packages/core/src/hot/com.ts
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -414,6 +419,7 @@ export function devCom(component: (...args: any[]) => any): typeof component {
 Opt-in mechanism for preserving `ref` values across HMR cycles:
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 // packages/core/src/hot/ref.ts
 
 // Boundary context stack — set by devCom before calling impl(), read by hotRef
@@ -467,6 +473,7 @@ export function hotRef<T>(key: string, initialValue: T): Ref<T> {
 In `devCom`, push/pop the preservation context:
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 // Inside devCom's wrapper:
 const wrapper = function(this: unknown, ...args: unknown[]) {
   // ...
@@ -486,6 +493,7 @@ const wrapper = function(this: unknown, ...args: unknown[]) {
 ### 5.6 Activation Entry Point
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 // packages/core/src/hot/activate.ts
 
 import { __setComImpl } from '../com'
@@ -514,6 +522,7 @@ activateHMR()
 ### 5.7 Package Structure
 
 ```
+// @planned — not shipped yet; the status note above says what exists today.
 packages/core/src/hot/
 ├── index.ts       # Public API: enterHmrModule, exitHmrModule, acceptHmr, hotRef
 ├── activate.ts    # Auto-activates HMR on import
@@ -546,6 +555,7 @@ Subpath export in `packages/core/package.json`:
 ### 5.8 Package Structure
 
 ```
+// @planned — not shipped yet; the status note above says what exists today.
 packages/core/src/hot/
 ├── index.ts       # Public API: enterHmrModule, exitHmrModule, acceptHmr, hotRef
 ├── activate.ts    # Auto-activates HMR on import (import '@rasenjs/core/hot/activate')
@@ -592,16 +602,18 @@ For each `.ts`/`.tsx`/`.jsx` file that exports component functions:
 **Input:**
 ```tsx
 // src/components/Counter.tsx
-import { com, ref } from '@rasenjs/core'
+import { com, getReactiveRuntime, ref } from '@rasenjs/core'
 
 const Counter = com((props: { initial: number }) => {
-  const count = ref(props.initial)
+  const count = ref(props.initial)          // built-in runtime: count() / count(v)
   return (host) => {
     const el = document.createElement('div')
-    el.textContent = String(count.value)
+    el.textContent = String(count())
     host.appendChild(el)
-    watch(count, (v) => el.textContent = String(v))
-    return () => el.remove()
+    const stop = getReactiveRuntime().subscribe(count, (v) => {
+      el.textContent = String(v)
+    })
+    return () => { stop(); el.remove() }
   }
 })
 
@@ -610,42 +622,36 @@ export const Label = com(() => { /* ... */ })
 ```
 
 **Output:**
+
 ```tsx
 // src/components/Counter.tsx (transformed)
-import { com, ref } from '@rasenjs/core'
-import { createHotContext, hotBoundary, isHotEnabled } from '@rasenjs/core/hot'
+import { enterHmrModule, exitHmrModule } from '@rasenjs/core';
+enterHmrModule('src/components/Counter.tsx');
 
-const __hmrId__ = 'src/components/Counter.tsx'
-const __hot__ = createHotContext(__hmrId__)
+import { com, getReactiveRuntime, ref } from '@rasenjs/core'
 
-const Counter = hotBoundary(__hmrId__, com((props: { initial: number }) => {
-  const count = ref(props.initial)
-  return (host) => {
-    const el = document.createElement('div')
-    el.textContent = String(count.value)
-    host.appendChild(el)
-    watch(count, (v) => el.textContent = String(v))
-    return () => el.remove()
-  }
-}))
+const Counter = com((props: { initial: number }) => {
+  // …unchanged…
+})
 
 export default Counter
+export const Label = com(() => { /* ... */ })
 
-const Label = hotBoundary(__hmrId__, com(() => { /* ... */ }))
-export { Label }
-
-// HMR acceptance — injected by plugin
-if (import.meta.hot && isHotEnabled()) {
-  import.meta.hot.accept((newModule) => {
-    __hot__.invalidate()
-    // HotContext handles the actual component swap
-  })
-}
+exitHmrModule();
+/* rasen-hmr */
 ```
+
+That is the whole transform (`injectHmr` in `@rasenjs/compiler`): the module
+announces itself to core's registry, and `com()` looks up its instance by
+`module id + call site` so a reload can remount it. Two deliberate non-features:
+the wrapper does not touch the bundler (`import.meta.hot.accept()` stays the
+bundler's job, so the plugin is bundler-agnostic), and it does not preserve
+state — see §9.
 
 ### 6.3 Plugin Implementation Sketch
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 // packages/vite-plugin-rasen/src/index.ts
 
 import type { Plugin } from 'vite'
@@ -706,23 +712,24 @@ function getHmrId(filePath: string): string {
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import { rasenHMR } from '@rasenjs/vite-plugin-rasen'
+import { rasenCompile } from '@rasenjs/compiler'
 
 export default defineConfig({
   plugins: [
-    rasenHMR({
-      // Options
-      include: ['src/**/*.tsx', 'src/**/*.jsx'],
+    rasenCompile.vite({
+      // `hmr` is on by default and only injects the wrapper in a dev build
+      hmr: true,
+      // module ids to skip (defaults: node_modules, /dist/, /.yarn/)
       exclude: ['node_modules'],
-      // Auto-wrap all com() calls? (default: true)
-      autoWrap: true,
+      // everything else is a compile option: structural, compile, jsxTransform,
+      // templateSource, intrinsicTags, enabled
     })
-  ],
-  define: {
-    __DEV__: 'true'
-  }
+  ]
 })
 ```
+
+(`@rasenjs/vite-plugin-rasen` still exists, but only as a deprecated shim over
+`@rasenjs/compiler`'s `rasenCompile`.)
 
 ### 6.5 Package Structure
 
@@ -746,6 +753,7 @@ The existing `jsx-dev-runtime` is a placeholder that re-exports production code.
 ### 7.1 Enhanced `jsxDEV`
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 // packages/jsx-runtime/src/jsx-dev-runtime.ts
 
 import { jsx } from './index'
@@ -833,6 +841,7 @@ With `react-jsxdev`, TypeScript automatically uses `jsxDEV` from `jsx-dev-runtim
 The DOM renderer (most common) integrates seamlessly with the Vite-based HMR:
 
 ```
+// @planned — not shipped yet; the status note above says what exists today.
 User edits .tsx file
   → Vite rebuilds module
   → Vite sends update to browser
@@ -850,19 +859,20 @@ The `mount()` function in `@rasenjs/dom` needs no changes — it just calls `Mou
 For **root-level HMR** (when the app root component changes):
 
 ```typescript
+/// <reference types="vite/client" />
 // src/main.tsx
 import { mount } from '@rasenjs/dom'
 import App from './App'
 
 const container = document.getElementById('app')!
-const unmount = mount(App(), container)
+let unmount = mount(App(), container)
 
-// Root-level HMR
+// Root-level HMR — the entry is the one place the module itself has to re-run
 if (import.meta.hot) {
-  import.meta.hot.accept('./App', (newApp) => {
-    unmount?.()           // Unmount old
-    App = newApp.default  // Update reference
-    mount(App(), container)  // Mount new
+  import.meta.hot.accept('./App', (newModule) => {
+    unmount?.()
+    const next = (newModule as { default: typeof App } | undefined)?.default ?? App
+    unmount = mount(next(), container)
   })
 }
 ```
@@ -870,6 +880,7 @@ if (import.meta.hot) {
 For simpler ergonomics, we can provide a `mountHot()` helper:
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 // packages/dom/src/hot-mount.ts
 
 import { mount } from './index'
@@ -917,6 +928,7 @@ However, the `hotBoundary` wrapper is **agnostic to the render target** — it w
 - Integration with RN's `module.hot.accept()` API (already partially done in vue-rn)
 
 ```javascript
+// @planned — not shipped yet; the status note above says what exists today.
 // packages/babel-plugin-rasen-hmr/src/index.js
 module.exports = function rasenHMRBabelPlugin() {
   return {
@@ -965,6 +977,7 @@ Acceptable for many components (static displays, lists). Best for correctness.
 Explicit state preservation using `hotRef()`:
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 const Form = hotBoundary('Form.tsx', com(() => {
   const name = hotRef('name', '')      // preserved
   const email = hotRef('email', '')    // preserved
@@ -979,6 +992,7 @@ const Form = hotBoundary('Form.tsx', com(() => {
 ### 9.3 State Preservation Lifecycle
 
 ```
+// @planned — not shipped yet; the status note above says what exists today.
 1. HMR triggered
 2. For each instance:
    a. captureState() → snapshot of all hotRef values
@@ -1061,6 +1075,7 @@ const Form = hotBoundary('Form.tsx', com(() => {
 
 **Input:**
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 const Counter = hotBoundary('id', com(() => {
   const renderCount = moduleLevelCounter++  // Captured at setup time
   return (host) => {
@@ -1109,35 +1124,30 @@ const Counter = hotBoundary('id', com(() => {
 
 ```tsx
 // Counter.tsx
-import { com, ref, watch } from '@rasenjs/core'
+import { com, ref } from '@rasenjs/core'
 import { div, button } from '@rasenjs/web'
 
-// No HMR-specific code needed in most cases!
-// The Vite plugin handles wrapping automatically.
+// No HMR-specific code needed in most cases — the compiler injects the
+// `com()` wrapper for you (`hmr: true`, dev builds only).
 
 export default com((props: { label: string }) => {
+  // core's refs are callable: count() reads, count(v) writes
   const count = ref(0)
 
-  return (host) => {
-    const el = (
-      div({ class: 'counter' },
-        button({
-          onClick: () => count.value++,
-          class: 'btn'
-        }, `Count: ${count.value}`)
-      )
-    )
-
-    return () => {
-      // cleanup
-    }
-  }
+  return (
+    <div class="counter">
+      <button class="btn" onClick={() => count(count() + 1)}>
+        {`Count: ${count()}`}
+      </button>
+    </div>
+  )
 })
 ```
 
 ### 12.2 With State Preservation
 
 ```tsx
+// @planned — not shipped yet; the status note above says what exists today.
 // Form.tsx
 import { com, watch } from '@rasenjs/core'
 import { hotRef } from '@rasenjs/core/hot'
@@ -1159,6 +1169,7 @@ export default com(() => {
 If not using the Vite plugin, developers can manually set up HMR:
 
 ```tsx
+// @planned — not shipped yet; the status note above says what exists today.
 // App.tsx
 import { com, ref } from '@rasenjs/core'
 import { createHotContext, hotBoundary } from '@rasenjs/core/hot'
@@ -1180,6 +1191,7 @@ if (import.meta.hot) {
 ### 12.4 Root-Level HMR in `main.tsx`
 
 ```tsx
+// @planned — not shipped yet; the status note above says what exists today.
 // main.tsx
 import { mount } from '@rasenjs/dom'
 import App from './App'
@@ -1199,6 +1211,7 @@ const unmount = mountHot(
 ### 12.5 Vite Plugin Options
 
 ```typescript
+// @planned — not shipped yet; the status note above says what exists today.
 interface RasenHMRPluginOptions {
   /** File patterns to transform (default: ['src/**\/*.{tsx,jsx}']) */
   include?: string[]

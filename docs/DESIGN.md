@@ -52,11 +52,16 @@ We don't create a new reactive system. Through the `ReactiveRuntime` interface, 
 // Use Vue's reactivity
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 useReactiveRuntime()
+```
 
-// Or use TC39 Signals
+```typescript
+// Or TC39 Signals
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 useReactiveRuntime()
 ```
+
+One adapter per application: the runtime is global, and each adapter decides what
+counts as a ref.
 
 ### Render Target Decoupling
 

@@ -101,6 +101,13 @@ text({ content: () => `Count: ${count()}` })
 A **plain getter child** (`div({}, () => 'text')`) is invoked once and is not
 re-evaluated later — it is treated as a child factory, not a getter binding.
 
+::: tip Readonly refs
+`PropValue` accepts a value, a ref or a getter. A *readonly* ref (Vue's
+`ComputedRef`, whose type has no setter) is assignable from an adapter that types
+its refs as readable — with Vue, pass the writable ref in a child position, or
+`text({ content: () => computed.value })`, which subscribes to the read.
+:::
+
 ### Events
 
 ```typescript

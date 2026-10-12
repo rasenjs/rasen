@@ -6,10 +6,9 @@ Rasen can work with any reactive system. This guide shows how to create custom a
 
 ```typescript
 interface ReactiveRuntime {
-  watch<T>(
-    source: () => T,
-    callback: (value: T, oldValue: T) => void,
-    options?: { immediate?: boolean; deep?: boolean }
+  subscribe<T>(
+    getter: () => T,
+    callback: (value: T, oldValue: T) => void
   ): () => void
 
   effectScope(): {
@@ -18,8 +17,8 @@ interface ReactiveRuntime {
   }
 
   ref<T>(value: T): Ref<T>
-  computed<T>(getter: () => T): ReadonlyRef<T>
   unref<T>(value: T | Ref<T>): T
+  setValue<T>(ref: Ref<T>, value: T): void
   isRef(value: unknown): boolean
 }
 ```
@@ -27,26 +26,26 @@ interface ReactiveRuntime {
 ## Example: Solid.js Adapter
 
 ```typescript
-import type { ReactiveRuntime } from '@rasenjs/core'
-import { createSignal, createEffect, createMemo, onCleanup } from 'solid-js'
+import type { ReactiveRuntime, Ref } from '@rasenjs/core'
+import { createSignal, createEffect, createRoot } from 'solid-js'
 
 export function createSolidRuntime(): ReactiveRuntime {
   return {
-    watch(source, callback, options) {
-      let oldValue: any
-      let isFirst = true
-      
-      createEffect(() => {
-        const newValue = source()
-        if (!isFirst || options?.immediate) {
-          callback(newValue, oldValue)
-        }
-        oldValue = newValue
-        isFirst = false
+    subscribe<T>(getter: () => T, callback: (value: T, oldValue: T) => void): () => void {
+      let current = getter()
+      const dispose = createRoot((dispose) => {
+        createEffect(() => {
+          const next = getter()
+          if (!Object.is(next, current)) {
+            const previous = current
+            current = next
+            callback(next, previous)
+          }
+        })
+        return dispose
       })
-      
-      // Solid handles cleanup automatically via onCleanup
-      return () => {}
+      // subscribe() never fires with the initial value, and disposes the effect
+      return dispose
     },
 
     effectScope() {
@@ -73,14 +72,11 @@ export function createSolidRuntime(): ReactiveRuntime {
       }
     },
 
-    computed<T>(getter: () => T) {
-      const memo = createMemo(getter)
-      return {
-        get value() { return memo() }
-      }
+    setValue<T>(ref: Ref<T>, value: T): void {
+      ;(ref as { value: T }).value = value
     },
 
-    unref<T>(value: T | { value: T }): T {
+    unref<T>(value: T | Ref<T>): T {
       if (this.isRef(value)) {
         return (value as { value: T }).value
       }
@@ -99,25 +95,21 @@ export function createSolidRuntime(): ReactiveRuntime {
 ## Example: MobX Adapter
 
 ```typescript
-import type { ReactiveRuntime } from '@rasenjs/core'
-import { observable, computed as mobxComputed, autorun, runInAction } from 'mobx'
+import type { ReactiveRuntime, Ref } from '@rasenjs/core'
+import { observable, autorun, runInAction } from 'mobx'
 
 export function createMobXRuntime(): ReactiveRuntime {
   return {
-    watch(source, callback, options) {
-      let oldValue: any
-      let isFirst = true
-      
-      const disposer = autorun(() => {
-        const newValue = source()
-        if (!isFirst || options?.immediate) {
-          callback(newValue, oldValue)
+    subscribe<T>(getter: () => T, callback: (value: T, oldValue: T) => void): () => void {
+      let current = getter()
+      return autorun(() => {
+        const next = getter()
+        if (!Object.is(next, current)) {
+          const previous = current
+          current = next
+          callback(next, previous)
         }
-        oldValue = newValue
-        isFirst = false
       })
-      
-      return disposer
     },
 
     effectScope() {
@@ -136,6 +128,10 @@ export function createMobXRuntime(): ReactiveRuntime {
       }
     },
 
+    setValue<T>(ref: Ref<T>, value: T): void {
+      ;(ref as { value: T }).value = value
+    },
+
     ref<T>(value: T) {
       const box = observable.box(value)
       return {
@@ -144,14 +140,7 @@ export function createMobXRuntime(): ReactiveRuntime {
       }
     },
 
-    computed<T>(getter: () => T) {
-      const comp = mobxComputed(getter)
-      return {
-        get value() { return comp.get() }
-      }
-    },
-
-    unref<T>(value: T | { value: T }): T {
+    unref<T>(value: T | Ref<T>): T {
       if (this.isRef(value)) {
         return (value as { value: T }).value
       }
@@ -177,21 +166,45 @@ setReactiveRuntime(createSolidRuntime())
 
 ## Implementation Tips
 
-### 1. Handle `immediate` Option
+### 1. The initial value is the caller's business
+
+`subscribe()` only reports *changes* — it must not fire with the value current at
+Subscribe time. The contract exists so a binding can treat a static source as
+a one-off write:
 
 ```typescript
-watch(source, callback, options) {
-  if (options?.immediate) {
-    callback(source(), undefined)
+subscribe<T>(getter: () => T, callback: (value: T, oldValue: T) => void): () => void {
+  let current = getter()   // first evaluation collects the dependencies
+  if (/* nothing was tracked */ false) return () => {}
+
+  const stop = watchSource(() => {
+    const next = getter()
+    if (Object.is(next, current)) return   // equal values are skipped
+    const previous = current
+    current = next
+    callback(next, previous)
+  })
+
+  return () => {
+    stop()
+    /* release whatever tracked `getter` */ 
   }
-  // Set up watching...
+}
+```
+
+Refs are written through `setValue`, not by writing `.value` directly — the ref
+shape belongs to the adapter:
+
+```typescript
+setValue<T>(ref: Ref<T>, value: T): void {
+  ;(ref as { value: T }).value = value
 }
 ```
 
 ### 2. Return Stop Handle
 
 ```typescript
-watch(source, callback) {
+subscribe(getter, callback) {
   const cleanup = setupEffect(...)
   return () => cleanup()
 }

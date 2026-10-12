@@ -93,6 +93,8 @@ watcher.
 Components compose by calling each other, and children are just props:
 
 ```tsx
+import { com, when } from '@rasenjs/core'
+
 export const Layout = com((props: {
   header?: Mountable<HTMLElement>
   sidebar?: Mountable<HTMLElement>
@@ -100,21 +102,23 @@ export const Layout = com((props: {
   footer?: Mountable<HTMLElement>
 }) => (
   <div class="layout">
-    {props.header && <div class="header">{props.header}</div>}
+    {when({ condition: !!props.header, then: () => <div class="header">{props.header}</div> })}
     <div class="main">
-      {props.sidebar && <aside class="sidebar">{props.sidebar}</aside>}
+      {when({ condition: !!props.sidebar, then: () => <aside class="sidebar">{props.sidebar}</aside> })}
       <main class="content">{props.content}</main>
     </div>
-    {props.footer && <div class="footer">{props.footer}</div>}
+    {when({ condition: !!props.footer, then: () => <div class="footer">{props.footer}</div> })}
   </div>
 ))
 ```
 
-::: tip `&&` and `.map()` need the structural pass
-`{props.header && <div …/>}` and `{rows.map(…)}` compile to `when()` / `each()`
-only when the compiler's **structural** pass is enabled (`structural: true`).
-Without it they stay ordinary JSX expressions — still correct, just without
-reconciliation.
+::: tip `when` / `each` are the reactive forms
+A conditional written as plain JS in a child position — `{cond && <El/>}`,
+`{cond ? <A/> : <B/>}` — is **evaluated once**, when the component runs. Write
+`{when({ condition: () => cond, then: () => <El/> })}` to keep it reactive, or
+enable the compiler's structural pass (`structural: true`), which rewrites those
+expressions into `when()` / `each()` for you. Props themselves are fine either
+way: a getter prop (`class={() => …}`) is always subscribed.
 :::
 
 ## Slots
@@ -183,23 +187,31 @@ export const Dropdown = com((props: { label: string; children?: Mountable<HTMLEl
 
 ## Lists
 
-With the structural pass, `.map()` in a child position becomes `each()` — keyed
-by object identity, so reordering and removal move nodes instead of rebuilding
-them:
+Lists are reactive through `each()`. A bare `{rows.map(…)}` in a child position is
+evaluated once, at mount — the compiler's structural pass is what turns it into
+`each()`:
 
 ```tsx
-const TodoList = com((props: { todos: Signal.State<Todo[]> }) => (
+import { com, each, type Ref } from '@rasenjs/core'
+
+// `Ref<Todo[]>` is the adapter-agnostic spelling: whichever runtime is active
+// decides how the ref is read.
+const TodoList = com((props: { todos: Ref<Todo[]> }) => (
   <ul>
-    {props.todos.get().map((todo) => (
-      <li class={todo.done ? 'done' : ''} onClick={() => todo.done = true}>
-        {todo.text}
-      </li>
-    ))}
+    {each({
+      of: () => props.todos,            // getter → the list stays subscribed
+      children: (todo: Todo) => (
+        <li class={todo.done ? 'done' : ''} onClick={() => (todo.done = true)}>
+          {todo.text}
+        </li>
+      )
+    })}
   </ul>
 ))
 ```
 
-Explicitly, `each` takes `of` (array, ref or getter) and a render callback:
+`each` reconciles by object identity, so rows move instead of being rebuilt. It
+takes `of` (array, ref or getter) and a render callback:
 
 ```typescript
 import { each } from '@rasenjs/core'
@@ -218,7 +230,8 @@ Use `repeat(count, render)` when you need N identical rows rather than a list.
 subtree alive:
 
 ```typescript
-import { when, match, show } from '@rasenjs/core'
+import { when, match } from '@rasenjs/core'
+import { show } from '@rasenjs/dom'   // `show` is a DOM host component
 
 when({ condition: () => isLoggedIn(), then: () => UserPanel(), else: () => LoginForm() })
 

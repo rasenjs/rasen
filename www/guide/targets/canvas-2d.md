@@ -51,7 +51,7 @@ const Visualization = () =>
     ]
   })
 
-mount(Visualization(), document.getElementById('app'))
+mount(Visualization(), document.getElementById('app')!)
 ```
 
 ## Components
@@ -525,6 +525,13 @@ const BarChart = () =>
     ]
   })
 ```
+
+::: tip Spreading fixes the shape of the scene
+`...data.value.map(…)` runs once, when the component builds the scene: the
+**number** of bars is fixed, while the per-bar getters (`height: () => …`) stay
+reactive, because the canvas subscribes to every prop it reads. For a list whose
+length changes, build the bars with `each()`.
+:::
 
 ## Performance Tips
 
