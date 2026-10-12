@@ -11,7 +11,6 @@
 import {
   jsx,
   jsxs,
-  Fragment,
   configureTags,
   type TagComponent,
   type JSXElement,
@@ -20,6 +19,9 @@ import {
 } from '@rasenjs/core'
 import type { Mountable, PropValue } from '@rasenjs/core'
 import * as tags from './components'
+// The DOM host overrides core's Fragment: text children need a host that can
+// create text nodes, and core's Fragment never receives host hooks.
+import { Fragment } from './components/fragment'
 import type { ElementProps, HTMLTagName } from './components'
 
 configureTags({ '': tags as unknown as Record<string, TagComponent> })
