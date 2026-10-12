@@ -94,6 +94,8 @@ interface GenContext {
   source: string
   /** 可静态提升的宿主内置标签集合 */
   intrinsicTags: Set<string>
+  /** Scope-bound names that hold an array (see collectArrayBindings). */
+  arrayBindings: Set<string>
 }
 
 /**
@@ -270,6 +272,133 @@ function isFunctionChild(node: any): boolean {
 }
 
 /**
+ * Array-producing methods. A child expression calling one of these hands the
+ * run an ARRAY, not a value, so it must not be hoisted as text: `renderText`
+ * only unwraps refs, and `String()` on an array of mountables prints every
+ * element's *source* into the page.
+ *
+ * Deliberately narrow. `map` / `filter` / `flatMap` are the element-producing
+ * shapes; `slice` / `concat` are NOT listed because they are equally common on
+ * strings (`<p>{name.slice(0, 8)}</p>`), where text hoisting is correct.
+ */
+const ELEMENT_LIST_METHODS = new Set(['map', 'filter', 'flatMap'])
+
+/**
+ * Peel wrapper nodes off an expression until the node that actually runs.
+ *
+ * Optional chaining parses to dedicated node types (`OptionalCallExpression` /
+ * `OptionalMemberExpression`, or a `ChainExpression` wrapper in ESTree), so a
+ * walk that handles only the plain shapes would see `xs?.map(f)` as an unknown
+ * node and lose the array-method check on it.
+ */
+function unwrapExpr(node: any): any {
+  let current = node
+  for (let i = 0; i < 8 && current; i++) {
+    switch (current.type) {
+      case 'TSAsExpression':
+      case 'TSNonNullExpression':
+      case 'TSSatisfiesExpression':
+      case 'ParenthesizedExpression':
+      case 'ChainExpression':
+        current = current.expression
+        continue
+      case 'AwaitExpression':
+        current = current.argument
+        continue
+      default:
+        return current
+    }
+  }
+  return current
+}
+
+/** True when evaluating `node` yields an array (statically knowable shapes). */
+function isArrayProducing(node: any): boolean {
+  const expr = unwrapExpr(node)
+  if (!expr) return false
+  switch (expr.type) {
+    case 'ArrayExpression':
+      return true
+    case 'CallExpression':
+    case 'OptionalCallExpression': {
+      const callee = unwrapExpr(expr.callee)
+      if (!callee) return false
+      const isMember =
+        callee.type === 'MemberExpression' ||
+        callee.type === 'OptionalMemberExpression'
+      return (
+        isMember &&
+        !callee.computed &&
+        callee.property?.type === 'Identifier' &&
+        ELEMENT_LIST_METHODS.has(callee.property.name)
+      )
+    }
+    // `cond ? list : []` and `list || []` keep the array through the branch.
+    case 'ConditionalExpression':
+      return isArrayProducing(expr.consequent) || isArrayProducing(expr.alternate)
+    case 'LogicalExpression':
+      return isArrayProducing(expr.left) || isArrayProducing(expr.right)
+    default:
+      return false
+  }
+}
+
+/**
+ * Names the enclosing scopes bind to an array-producing initializer.
+ *
+ * `const kids = [<Row />]; … <div>{kids}</div>` is the shape a compiler cannot
+ * see through structurally: a call returning mountables (`{items.map(f)}`) is
+ * caught by the method check above, but the same array parked in a variable
+ * reaches the child position as a bare `Identifier`. `containsJsxOrArray`
+ * cannot follow it, so the name has to be resolved against the scope chain.
+ *
+ * Inner scopes win: a name is classified by its nearest binding, so an outer
+ * `const rows = []` cannot make an inner `{rows}` (a string prop) fall back.
+ */
+function collectArrayBindings(scope: any): Set<string> {
+  const names = new Set<string>()
+  const seen = new Set<string>()
+  for (let current = scope; current; current = current.parent) {
+    const bindings = current.bindings ?? {}
+    for (const name of Object.keys(bindings)) {
+      if (seen.has(name)) continue
+      seen.add(name)
+      const decl = bindings[name]?.path
+      if (
+        decl?.node?.type === 'VariableDeclarator' &&
+        decl.node.id?.type === 'Identifier' &&
+        isArrayProducing(decl.node.init)
+      ) {
+        names.add(name)
+      }
+    }
+  }
+  return names
+}
+
+/**
+ * True when the child expression MIGHT evaluate to an array of mountables.
+ *
+ * Text runs can only safely stringify string / number / ref-of-string; a
+ * collection must instead reach the factory chain, which flattens it and mounts
+ * each element. Kept narrow on purpose: an unconditional identifier fallback
+ * would disable hoisting for every `<td>{item.label}</td>`, which is the
+ * pattern static hoisting exists for (`renderText` already handles the falsy
+ * cases those runs depend on).
+ */
+function isPotentialMountableCollection(
+  node: any,
+  arrayBindings: Set<string>
+): boolean {
+  const expr = unwrapExpr(node)
+  if (!expr) return false
+  if (isArrayProducing(expr)) return true
+  // Only names the scope proves to hold an array — a prop or an undeclared
+  // global keeps the previous text path.
+  return expr.type === 'Identifier' && arrayBindings.has(expr.name)
+}
+
+/**
  * Compile one JSX element subtree.
  *
  * Returns the serialized HTML for this subtree; navigation statements and
@@ -331,7 +460,10 @@ function compileElement(
       continue
     }
     if (value.type === 'StringLiteral') {
-      const chunk = ` ${name}="${escapeAttr(value.value)}"`
+      // className is React spelling; the DOM attribute is `class` (camelToKebab
+      // maps it, but className → classname is wrong — normalize explicitly)
+      const attrName = name === 'className' ? 'class' : name
+      const chunk = ` ${attrName}="${escapeAttr(value.value)}"`
       html += chunk
       ctx.ssrParts.push(escapeTemplateLiteral(chunk))
       continue
@@ -411,6 +543,8 @@ function compileElement(
       return null // raw-HTML/text props → factory path (explicit, not silent)
     }
 
+    // `class` / `className` never reach here — both spellings are handled
+    // above (bindClass + the SSR class attribute).
     if (isDOMProperty(tag, name)) {
       ctx.wireStatements.push(
         `offs.push(bindProp(${self}, '${name}', () => (${exprSrcOf(exprAst)})))`
@@ -528,6 +662,13 @@ function compileElement(
       // chain can honour it. Hoisting would emit `renderText(() => …)` and the
       // page would show the arrow function's source text.
       if (isFunctionChild(c.expression)) return null
+      // An array of mountables built earlier in the component (`const kids =
+      // [<Row />]; … <div>{kids}</div>`, or `{items.map(renderItem)}`) is not
+      // text: `containsJsxOrArray` cannot see through an identifier, and
+      // hoisting would emit `renderText(kids)` — String()-ing the array prints
+      // every element's source into the page. Falls back to the factory chain,
+      // which flattens the collection and mounts real elements.
+      if (isPotentialMountableCollection(c.expression, ctx.arrayBindings)) return null
       run.push({
         kind: 'expr',
         src: ctx.source.slice(c.expression.start!, c.expression.end!)
@@ -651,6 +792,7 @@ export function transformProgram(
     navCache: new Map<string, string>(),
     source,
     intrinsicTags: options.intrinsicTags ?? DEFAULT_INTRINSIC_TAGS,
+    arrayBindings: new Set<string>(),
   }
 
   let compiled = 0
@@ -670,6 +812,10 @@ export function transformProgram(
       }
 
       const rootVar = `_r${ctx.counter++}`
+      // Resolved per JSX root: the names an inner scope binds shadow the outer
+      // ones, so the same identifier can be a string in one component and an
+      // array in the next.
+      ctx.arrayBindings = collectArrayBindings(path.scope)
       const html = compileElement(path.node, ctx, rootVar, [])
       if (html === null) {
         fellBack++

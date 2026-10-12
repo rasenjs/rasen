@@ -327,4 +327,64 @@ const b = <span class="t">{y}</span>`
     const r = compileModule(code)!
     expect(r.code).toContain("${(v => v ? ' checked' : '')(ok)}")
   })
+
+  // ── className → class（React 拼写）──────────────────────────
+  it('静态 className 归一化为 class 属性', () => {
+    const r = compileModule(`const el = <div className="box">x</div>`)!
+    expect(r.compiled).toBe(1)
+    expect(r.code).toContain(`template('<div class="box">x</div>')`)
+    // camelToKebab 会把 className 映射成 classname —— 那是另一个属性
+    expect(r.code).not.toContain('classname')
+  })
+
+  it('动态 className 走 bindClass（SSR 用 class 属性名）', () => {
+    const r = compileModule(`const el = <div className={cls}>x</div>`)!
+    expect(r.compiled).toBe(1)
+    expect(r.code).toContain(`bindClass(_r0, () => cls)`)
+    expect(r.code).toContain(`class="\${escapeAttr(String(cls))}"`)
+  })
+
+  // ── 集合子节点：必须回退到工厂链（String() 会打印元素源码）────
+  it('数组变量作子节点：回退，不字符串化', () => {
+    // 空数组看着无害，但同一个变量一旦被 push 进 mountable，
+    // renderText 会 String() 出每个元素的源码。
+    const r = compileModule(`const kids = []; const el = <div>{kids}</div>`)!
+    expect(r.fellBack).toBe(1)
+    expect(r.compiled).toBe(0)
+    expect(r.code).not.toContain('renderText(kids)')
+  })
+
+  it('数组方法调用作子节点：回退（map / filter / flatMap）', () => {
+    for (const method of ['map', 'filter', 'flatMap']) {
+      const r = compileModule(
+        `const el = <ul>{items.${method}(renderItem)}</ul>`
+      )!
+      expect(r.fellBack).toBe(1)
+      expect(r.code).not.toContain('renderText(')
+    }
+  })
+
+  it('可选链上的数组方法：回退（xs?.map(f) 走专用 AST 节点）', () => {
+    const r = compileModule(`const el = <ul>{items?.map(renderItem)}</ul>`)!
+    expect(r.fellBack).toBe(1)
+    expect(r.code).not.toContain('renderText(')
+  })
+
+  it('普通标识符与成员表达式仍静态提升（不被集合启发式误伤）', () => {
+    // 作用域分析只把「初始化表达式能证明是数组」的名字算作集合；
+    // 参数、props、未声明的全局以及 `item.label` 这类标量读取保持文本路径。
+    const local = compileModule(`const name = 'x'; const el = <div>{name}</div>`)!
+    expect(local.compiled).toBe(1)
+    expect(local.code).toContain('renderText(name)')
+
+    const member = compileModule(`const el = <td class="c">{item.label}</td>`)!
+    expect(member.compiled).toBe(1)
+    expect(member.code).toContain('renderText(item.label)')
+
+    // 内层作用域把名字重新绑定成字符串 → 内层优先，不回退
+    const shadowed = compileModule(
+      `const rows = []; function Row(rows) { return <span>{rows}</span> }`
+    )!
+    expect(shadowed.compiled).toBe(1)
+  })
 })
