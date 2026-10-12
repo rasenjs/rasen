@@ -7,7 +7,9 @@ React Native Fabric renderer for the Rasen reactive rendering framework.
 ## Preview
 
 <p align="center">
-  <img src="../../examples/react-native/public/demo.webp" alt="React Native Demo" width="360" />
+  <!-- absolute URL: this file is rendered both on GitHub and inside the docs
+       site, where a relative path would resolve against the page instead -->
+  <img src="https://raw.githubusercontent.com/rasenjs/rasen/main/examples/react-native/public/demo.webp" alt="React Native Demo" width="360" />
   <br/>
   <em>If the animation doesn't play in your viewer, open it on GitHub or a browser.</em>
 </p>
