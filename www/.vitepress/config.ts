@@ -12,6 +12,9 @@ export default defineConfig({
   // Ignore dead links from included README files (they use relative paths for the monorepo)
   ignoreDeadLinks: true,
 
+  // The production domain, so every page gets a canonical sitemap entry
+  sitemap: { hostname: 'https://rasenjs.com' },
+
   head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }]],
 
   vite: {

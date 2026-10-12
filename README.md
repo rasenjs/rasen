@@ -66,7 +66,7 @@ npm run dev          # http://localhost:3000
 
 The template is an SSR + hydration app with isomorphic routing, signals and the
 compiler already configured — see
-[Getting Started](./www/guide/getting-started.md) for the
+[Getting Started](https://rasenjs.com/guide/getting-started) for the
 step-by-step path, or add Rasen to an existing Vite project:
 
 ```bash
@@ -304,7 +304,7 @@ yarn examples:ssr:dev          # server rendering + hydration
 
 ## Documentation
 
-- **[Website](./www)** — guide, API reference and examples; deployed from `www/` (see `vercel.json`)
+- **[Website](https://rasenjs.com)** — guide, API reference and examples (`www/`, deployed by Vercel per `vercel.json`)
 - **[DESIGN.md](./docs/DESIGN.md)** — why Rasen is built this way
 - **[COMPILE-DESIGN.md](./docs/COMPILE-DESIGN.md)** — the static-hoisting compiler
 - **[HMR-DESIGN.md](./docs/HMR-DESIGN.md)** — dev-time remounting and module boundaries
