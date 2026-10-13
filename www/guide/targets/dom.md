@@ -119,8 +119,7 @@ button({
 ```
 
 `onX` is camelCase; the listener is registered for the lowercased name
-(`onClick` → `click`). Bubbling event types are delegated to a single document
-listener — see `configureEventDelegation` if a host needs direct listeners.
+(`onClick` → `click`).
 
 ### Children
 
@@ -147,14 +146,13 @@ recreating nodes, then removes anything left unconsumed. It is a module-level
 singleton cursor, so roots cannot be hydrated concurrently or nested — mount
 each root from its own entry point.
 
-## Compiled templates
+## Static hoisting
 
-When the [compiler](/packages/compiler) hoists a subtree it emits code against
-`@rasenjs/dom/template`: `template(html)` clones a `<template>` once and caches
-it, `child(parent, index)` walks to a slot, `mountSlot` / `collectHtml` bridge
-component children, and the binding helpers (`bindText`, `bindClass`,
-`bindProp`, `bindAttr`, `bindStyle`, `on`, `setValue`) are re-exported from the
-same entry so compiled output has a single import source.
+When the [compiler](/packages/compiler) is enabled, a fully static subtree is
+reduced to a single cloned template instead of a `createElement` chain, and each
+dynamic slot gets one binding. Nothing about the component changes — it is the
+same element factory output, produced ahead of time, which is why a compiled
+project and a plain one behave identically.
 
 ## Next Steps
 

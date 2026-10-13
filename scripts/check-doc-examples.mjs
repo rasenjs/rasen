@@ -22,6 +22,64 @@ import { dirname } from 'node:path'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = join(ROOT, '.doccheck')
 const LANGS = new Set(['ts', 'tsx', 'typescript', 'javascript', 'js', 'jsx'])
+
+/**
+ * Names the user-facing docs must not use.
+ *
+ * Two kinds: APIs that were renamed (`MountFunction`, `RNMountFunction`,
+ * `@rasenjs/jsx`), and implementation detail that is exported but not part of
+ * the surface an application or host author writes against — binding helpers,
+ * template primitives, host hooks, marker constants, compiler internals, native
+ * command helpers. Design notes under `docs/` are for contributors and may use
+ * them freely; a line can opt out with a `docs-internal` comment.
+ */
+const DENY = [
+  'MountFunction',
+  'RNMountFunction',
+  '@rasenjs/jsx',
+  'bindText',
+  'bindClassToggle',
+  'bindClass(',
+  'bindProp',
+  'bindAttr',
+  'bindStyle',
+  'bindKey',
+  'mountSlot',
+  'collectHtml',
+  'hostHooks',
+  'isHydrating',
+  'getHydrationContext',
+  'configureEventDelegation',
+  'watchProp',
+  'watchObjectProps',
+  'rafSchedule',
+  'INTRINSIC_TAGS',
+  'MARKERS',
+  'REF_MARKER',
+  'MARKER_DEBUG_MAP',
+  'isMarkerMatch',
+  'dispatchCommand',
+  'sendAccessibilityEvent',
+  'findNodeHandle',
+  'resetTagCounter',
+  'FABRIC_NODE',
+  'compileModule',
+  'transformModule',
+  'transformStructural',
+  'transformProgram',
+  'injectHmr',
+  'usesCom',
+  'hasHmrWrapping',
+  'enterHmrModule',
+  'exitHmrModule',
+  'stringifyStyleInline',
+  'getAttrName',
+  'camelToKebab',
+  'isEventProp',
+  'getEventName',
+  'domImageAdapter',
+  'parseFragment'
+]
 const verbose = process.argv.includes('--verbose')
 
 function walk(p, out = []) {
@@ -66,6 +124,19 @@ function jsxSourceOf(src) {
   if (/@rasenjs\/web/.test(src)) return '@rasenjs/web'
   if (/@rasenjs\/html/.test(src) && !/@rasenjs\/dom/.test(src)) return '@rasenjs/html'
   return '@rasenjs/dom'
+}
+
+// ---- internal/renamed API in user-facing prose -------------------------------
+const userFacing = files.filter((f) => /\/(www|packages)\//.test(f) || f.endsWith('/README.md'))
+const leaks = []
+for (const file of userFacing) {
+  const lines = readFileSync(file, 'utf8').split('\n')
+  lines.forEach((line, i) => {
+    if (line.includes('docs-internal')) return
+    for (const name of DENY) {
+      if (line.includes(name)) leaks.push(`${relative(ROOT, file)}:${i + 1}  ${name}`)
+    }
+  })
 }
 
 const groups = new Map()
@@ -140,6 +211,12 @@ for (const [key, group] of groups) {
   )
 }
 
+if (leaks.length) {
+  console.log(`### internal / renamed API in user-facing docs — ${leaks.length}`)
+  for (const l of leaks) console.log('  ' + l)
+  console.log('  (a deliberate mention can opt out with a `docs-internal` comment on the line)\n')
+}
+
 console.log(`extracted ${blocks} example blocks into ${groups.size} programs (${skipped} skipped: fragments/opt-outs)\n`)
 
 let failures = 0
@@ -206,10 +283,11 @@ for (const key of groups.keys()) {
   console.log()
 }
 
-if (failures === 0) {
+if (failures === 0 && leaks.length === 0) {
   rmSync(OUT, { recursive: true, force: true })
   console.log('all extracted examples type-check')
   process.exit(0)
 }
-console.log(`${failures} error(s) across the extracted examples (see .doccheck for the sources)`)
+if (failures) console.log(`${failures} error(s) across the extracted examples (see .doccheck for the sources)`)
+if (leaks.length) console.log(`${leaks.length} internal-API mention(s) in user-facing docs`)
 process.exit(1)

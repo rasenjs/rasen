@@ -144,12 +144,6 @@ configureTags({ '': { div: myDivComponent, span: mySpanComponent } })
 Lowercase tags are looked up in the registry (`configureTags` / `registerTag`),
 PascalCase tags are called directly as components, and `Fragment` is `<>…</>`.
 
-## SSR emission
-
-`collectHtml()` mounts a component against a string host and returns the markup
-— it is what a compiled component's SSR branch calls when a child is a
-component rather than a template.
-
 ## Available adapters
 
 | Adapter | Reactivity | Notes |
@@ -159,9 +153,8 @@ component rather than a template.
 | [`@rasenjs/reactive-nanostores`](https://github.com/rasenjs/rasen/tree/main/packages/reactive-nanostores) | [nanostores](https://github.com/nanostores/nanostores) | atoms + computed |
 | [`@rasenjs/reactive-alien-signals`](https://github.com/rasenjs/rasen/tree/main/packages/reactive-alien-signals) | [alien-signals](https://github.com/stackblitz/alien-signals) | signal core used by Vue Language Tools |
 
-The public helpers `ref`, `computed`, `unref`, `setValue`, `toValue`,
-`watchObjectProps` and `rafSchedule` come from core itself so no adapter is
-needed for basic use.
+The public helpers `ref`, `computed`, `unref`, `setValue` and `toValue` come
+from core itself, so the built-in runtime needs no adapter at all.
 
 ## License
 

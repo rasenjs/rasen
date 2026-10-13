@@ -63,24 +63,17 @@ mount(<App />, document.getElementById('app')!)
 
 | You write | The compiler emits |
 | --------- | ------------------ |
-| `<div class="box"><span>hi</span></div>` | one `template('<div class="box"><span>hi</span></div>')` clone, no `createElement` chain |
-| `{refOrGetter}` as a child | `bindText(child(root, i), () => renderText(expr))` |
-| `class={expr}`, `class={cond ? 'a' : ''}` | `bindClass` / `bindClassToggle` |
-| `style={expr}` | `bindStyle` |
-| `value={expr}`, `disabled={expr}`, … | `bindProp` (DOM property) or `bindAttr` (attribute) |
-| `onClick={fn}` | `on(el, 'click', fn)` |
-| `ref={r}` | `setValue(r, el)` |
-| `<Component …/>` (PascalCase), `<>…</>`, spread props | left as JSX — the runtime factory path |
+| `<div class="box"><span>hi</span></div>` | one clone of a template, instead of a `createElement` chain |
+| `{refOrGetter}` as a child | one text binding, re-evaluated when its dependencies change |
+| `class={expr}`, `class={cond ? 'a' : ''}` | one class binding (a condition collapses to a `classList.toggle`) |
+| `style={expr}`, `value={expr}`, `disabled={expr}` | one property or attribute binding |
+| `onClick={fn}` | one delegated listener |
+| `ref={r}` | the element is written into the ref |
+| `<Component …/>`, `<>…</>`, spread props | left as JSX — the runtime factory path |
 
 Attributes are classified at compile time: an `a={expr}` attribute is wrapped in
 a getter so it stays lazy, while literals, identifiers and object/array literals
 are passed through untouched.
-
-::: tip Children are not wrapped
-Only **attribute** expressions are wrapped in getters. Children are resolved by
-the host's child contract instead, which is why a bare ref child is reactive and
-a bare getter child is not (see [DOM rendering](/guide/targets/dom#text)).
-:::
 
 ## Reactivity in JSX
 
@@ -159,13 +152,9 @@ called directly.
 ## Debugging the output
 
 ```bash
-# per-module compiled / fallback counts from the Babel adapter
+# per-module compiled / fallback counts (Babel adapter)
 RASEN_COMPILER_DEBUG=1 yarn build
 ```
-
-`compileModule()` returns those counters programmatically
-(`{ compiled, fellBack }`), which is the quickest way to check whether a
-component actually got hoisted.
 
 ## Next Steps
 

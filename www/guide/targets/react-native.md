@@ -62,7 +62,7 @@ The fundamental container:
 ```typescript
 view({
   style?: ViewStyle,
-  children?: RNMountFunction[]
+  children?: Mountable<RNNode>[]
 })
 ```
 

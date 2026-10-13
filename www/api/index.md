@@ -31,9 +31,7 @@ type Ref<T> = unknown            // opaque: only the active runtime may read it
 | `ref(value)` | built-in callable ref: `count()` reads, `count(v)` writes |
 | `computed(getter)` | built-in derived ref |
 | `unref(ref)` / `setValue(ref, v)` / `toValue(prop)` | unwrap a ref; write a ref; resolve `PropValue` (value / ref / getter) |
-| `watchObjectProps(obj, fn)` | subscribe to a tracked object's properties |
-| `rafSchedule()` | a `FrameSchedule` backed by `requestAnimationFrame` |
-| `collectHtml(mountable)` | render a mountable against a string host and return the markup |
+| `toValue(prop)` | resolve a `PropValue` — value, ref or getter — to a value (used when you write a host) |
 
 ### Reactive runtime interface
 
@@ -64,17 +62,13 @@ interface ReactiveRuntime {
 ### JSX runtime
 
 ```typescript
-import { jsx, jsxs, jsxDEV, Fragment, registerTag, configureTags, clearTags } from '@rasenjs/core'
+import { Fragment, registerTag, configureTags } from '@rasenjs/core'
 ```
 
-Host packages re-export these from their own `jsx-runtime` entry.
+`registerTag(name, component)` / `configureTags({ prefix: tags })` teach the
+runtime what a lowercase tag means (PascalCase tags need no registration). Host
+packages register their own tags in their `jsx-runtime` entry.
 [JSX & the Compiler →](/guide/advanced/jsx)
-
-### Helpers
-
-`escapeHtml`, `escapeAttr`, `renderText`, `stringifyStyleInline`,
-`getAttrName`, `camelToKebab`, `isEventProp`, `getEventName`, `attrValue`,
-`MARKERS`, `REF_MARKER`.
 
 ## `@rasenjs/dom`
 
@@ -83,21 +77,20 @@ Host packages re-export these from their own `jsx-runtime` entry.
 | `mount(mountable, container)` | mount into an element |
 | `hydrate(component, container)` | claim server-rendered DOM |
 | `tag(name)`, `element({ tag, … })`, `h` | element factory (`el()`, `el(child)`, `el(props)`, `el(props, …children)`) |
-| every HTML tag | `div`, `span`, `button`, `input`, … plus `INTRINSIC_TAGS` |
+| every HTML tag | `div`, `span`, `button`, `input`, `label`, `details`, … |
 | `text({ content })`, `html({ content })` | reactive text node; raw HTML node |
 | `canvas({ width, height, contextType?, children, … })` | canvas bridged to canvas-2d (`'2d'`) or gfx (`'webgl'`, `'webgl2'`, `'webgpu'`) |
 | `each`, `repeat`, `when`, `match`, `show`, `transition`, `transitionGroup`, `lazy`, `fragment` | structural + animation components |
-| `bindText`, `bindClass`, `bindClassToggle`, `bindProp`, `bindAttr`, `bindStyle`, `on`, `setValue` | binding primitives (also at `@rasenjs/dom/bindings`) |
-| `template`, `child`, `mountSlot`, `collectHtml` | compiled-template entry (`@rasenjs/dom/template`) |
-| `configureEventDelegation` | switch events between delegated and direct listeners |
-| `hostHooks`, `isHydrating`, `getHydrationContext` | host capability set and hydration state |
+| `bindLookControls(canvas, { yaw, pitch, locked })` | pointer-lock look controls (yaw/pitch refs, clamped pitch) |
+| `setupKeyboard(map)` | keyboard shortcuts bound to handlers |
+| `mod`, `prevent`, `stop`, `once`, `self`, `key`, `enter`, `esc`, `tab`, `space` | event-handler modifiers (`onClick={mod(prevent(fn))}`) |
 
 [@rasenjs/dom →](/packages/dom)
 
 ## `@rasenjs/compiler`
 
 ```typescript
-import { rasenCompile, compileModule, transformModule, transformStructural } from '@rasenjs/compiler'
+import { rasenCompile } from '@rasenjs/compiler'
 ```
 
 ```typescript
@@ -115,10 +108,9 @@ interface RasenCompilerPluginOptions {
 }
 ```
 
-`transformModule(code, filename, options)` runs the whole pipeline for one
-module; `compileModule(code, { filename })` returns `{ code, map, compiled,
-fellBack }` for the hoisting pass alone. Babel/Metro users add
-`@rasenjs/compiler/babel` and the `@rasen-compile` directive per file.
+Metro / React Native and other Babel pipelines use
+`@rasenjs/compiler/babel` instead, and that adapter compiles only modules that
+carry the `@rasen-compile` directive.
 
 [@rasenjs/compiler →](/packages/compiler)
 
@@ -129,6 +121,7 @@ fellBack }` for the hoisting pass alone. Babel/Metro users add
 | `renderToString(mountable)` | render to an HTML string |
 | `renderToStringMultiple(mountables)` | render several roots, concatenated |
 | HTML tags | `div`, `span`, `p`, `ul`, `li`, `form`, `table`, … (`el(props, …children)`; `attrs` is accepted here) |
+| `element({ tag, … })` | any tag name, including a document-shell tag (`title`, `meta`, …) |
 | `text`, `html`, `fragment`, `when`, `each`, `match`, `transition` | the same component set as DOM |
 
 [@rasenjs/html →](/packages/html)
@@ -190,6 +183,6 @@ setReactiveRuntime(createReactiveRuntime())     // or wire the adapter up yourse
 
 | Package | Entry points |
 | ------- | ------------ |
-| `@rasenjs/canvas-2d` | shape components (`rect`, `text`, `circle`, `path`, `group`, …), `createRoot`, `RenderContext`, `canvasHostHooks` |
-| `@rasenjs/rn-dom` | `RNDocument`, `RNNode`, `registerComponent`, `registerTagAlias`, Fabric node helpers |
-| `@rasenjs/react-native` | `element` / `tag`, RN components (`View`, `Text`, `Pressable`, `FlatList`, …), `registerApp`, `hostHooks` |
+| `@rasenjs/canvas-2d` | shape components: `rect`, `text`, `circle`, `path`, `group`, `sprite`, `spine`, … |
+| `@rasenjs/react-native` | RN components (`View`, `Text`, `Pressable`, `FlatList`, …) and `registerApp(appName, App)` to mount |
+| `@rasenjs/rn-dom` | the DOM-like document/reactor layer under `@rasenjs/react-native` — see its [package page](/packages/rn-dom) |

@@ -148,12 +148,6 @@ A child position resolves **values, refs and mountables**, not getters:
 
 In JSX, `{count}` on a ref compiles to that reactive text binding for you.
 
-## Reacting to one property
-
-`watchObjectProps` subscribes to the properties of a plain object that the
-runtime can track — used by hosts that accept a reactive *record* (a style
-object, a config object) rather than a single value.
-
 ## Custom runtime
 
 An adapter is ~60 lines: implement the six members and call

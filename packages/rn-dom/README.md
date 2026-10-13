@@ -312,13 +312,9 @@ mountToContainer(root, 1)
 | Export | Description |
 |--------|-------------|
 | `RNDocument` | Create and manage the node tree |
-| `registerComponent()` | Register custom native components |
-| `mountToContainer()` | Mount root node to native surface |
-| `dispatchCommand()` | Send imperative commands to native |
-| `sendAccessibilityEvent()` | Fire accessibility events |
-| `findNodeHandle()` | Resolve native tag from node |
+| `registerComponent()` | Register a custom native component |
+| `mountToContainer()` | Mount a root node to the native surface |
 | `StyleSheet` | Style creation utility |
-| `resetTagCounter()` | Reset tag counter (testing) |
 
 ---
 

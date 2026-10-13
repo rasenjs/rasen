@@ -28,7 +28,7 @@ features:
     details: Direct manipulation without VDOM overhead. Components control their own rendering via watchers for maximum efficiency.
   - icon: 📦
     title: Minimal Core
-    details: The core is nearly zero — it's just a paradigm. MountFunction is all you need to understand.
+    details: The core is nearly zero — it's just a paradigm. `Mountable` is all you need to understand.
   - icon: 🔄
     title: Three-Phase Functions
     details: Setup → Mount → Unmount. Closures naturally isolate state, avoiding React's stale closure problems.
@@ -50,22 +50,28 @@ features:
 
 ```tsx [DOM]
 import { Signal } from 'signal-polyfill'
+import { com } from '@rasenjs/core'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { mount } from '@rasenjs/dom'
 
 // Install the reactivity adapter once, at startup.
 useReactiveRuntime()
 
-const count = new Signal.State(0)
+// A component is a function that returns a mountable. `com()` gives each
+// instance its own effect scope, so its subscriptions stop on unmount.
+const Counter = com(() => {
+  const count = new Signal.State(0)
 
-mount(
-  <div class="counter">
-    {/* a bare ref interpolates directly — the compiler binds it reactively */}
-    <p>Count: {count}</p>
-    <button onClick={() => count.set(count.get() + 1)}>+</button>
-  </div>,
-  document.getElementById('app')!
-)
+  return (
+    <div class="counter">
+      {/* a bare ref child is bound by the host as a reactive text node */}
+      <p>Count: {count}</p>
+      <button onClick={() => count.set(count.get() + 1)}>+</button>
+    </div>
+  )
+})
+
+mount(<Counter />, document.getElementById('app')!)
 ```
 
 ```tsx [Canvas 2D]
@@ -132,6 +138,14 @@ registerApp('MyApp', () => (
 ))
 ```
 
+:::
+
+::: tip What this needs
+`jsxImportSource` in `tsconfig.json` (`"@rasenjs/dom"` here) and the three
+packages above — the whole example is JSX, `com()` and TC39 signals. Adding
+`@rasenjs/compiler` is optional: it hoists static subtrees and turns `.map()` /
+`cond && <El/>` in a child position into `each()` / `when()`
+([JSX & the Compiler](/guide/advanced/jsx)).
 :::
 
 ## The Paradigm

@@ -268,7 +268,7 @@ group({
   scaleY?: PropValue<number>,
   opacity?: PropValue<number>,
   clip?: PropValue<{ x: number, y: number, width: number, height: number }>,
-  children: MountFunction[]
+  children: Mountable<CanvasNode>[]
 })
 ```
 

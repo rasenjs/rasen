@@ -63,7 +63,7 @@ expressions, so it goes before the attribute transform:
 | # | Pass | Default | Description |
 | - | ---- | ------- | ----------- |
 | 0 | Structural rewrite | `structural: false` | `.map(cb)` → `each({ of, children })`, `cond && <El/>` and `cond ? <A/> : <B/>` → `when({…})` |
-| 1 | Static hoisting | `compile: true` | a fully static subtree becomes one `template('<div …/>')` clone instead of a `createElement` chain; dynamic slots become `bindText` / `bindClass` / `bindProp` / `bindAttr` / `on` / `setValue` calls |
+| 1 | Static hoisting | `compile: true` | a fully static subtree is cloned from one template instead of built with `createElement`; each dynamic slot becomes a single binding |
 | 2 | JSX attribute transform | `jsxTransform: true` | non-trivial attribute expressions are wrapped in `() => expr` so bindings stay lazy |
 | 3 | HMR | `hmr: true` | injects `com()` remount boundaries into dev builds |
 
@@ -108,22 +108,6 @@ interface RasenCompilerPluginOptions {
   exclude?: string[]
 }
 ```
-
-## Programmatic API
-
-```typescript
-import { compileModule, transformModule, transformStructural } from '@rasenjs/compiler'
-
-// Single-file pipeline (no bundler)
-const out = transformModule(code, 'App.tsx', { structural: true })
-
-// Static hoisting only — returns null when nothing was compiled
-const result = compileModule(code, { filename: 'App.tsx' })
-// → { code, map, compiled, fellBack }
-```
-
-`RASEN_COMPILER_DEBUG=1` logs per-module `compiled` / `fellBack` counts from the
-Babel adapter.
 
 ## License
 

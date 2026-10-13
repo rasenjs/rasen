@@ -220,31 +220,10 @@ No need to remember which lifecycle hook to use or when it fires.
 
 Primitive components (like `div`, `button`) simplify this pattern by encapsulating the mount logic:
 
-```typescript
-// Under the hood, div does roughly this — children are mounted, every other
-// prop goes through the shared binding layer (property/attribute dispatch):
-const div = (props) => (host: HTMLElement) => {
-  const el = document.createElement('div')
-  const stops = []
-
-  for (const [key, value] of Object.entries(props)) {
-    if (key === 'children') continue
-    if (isEventProp(key)) stops.push(on(el, getEventName(key), value))
-    else stops.push(bindKey(el, 'div', key, value))
-  }
-
-  const childUnmounts = (Array.isArray(props.children) ? props.children : [props.children])
-    .map((child) => mountChild(el, child))
-
-  host.appendChild(el)
-
-  return () => {
-    stops.forEach((stop) => stop())
-    childUnmounts.forEach((unmount) => unmount?.())
-    el.remove()
-  }
-}
-```
+Under the hood a factory is doing exactly what Phase 2 describes: create the
+element, apply every prop through the host's binding layer (a static value is
+written once, a ref or getter becomes a subscription), mount its children, and
+return a cleanup that stops the bindings and removes the element.
 
 This means your business components can look simpler:
 

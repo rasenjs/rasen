@@ -37,7 +37,7 @@ mount(
 
 The JSX runtime lives at `@rasenjs/dom/jsx-runtime`; point
 `compilerOptions.jsxImportSource` at `@rasenjs/dom` and the
-[compiler](https://github.com/rasenjs/rasen/tree/main/packages/compiler) hoists the static parts into a single `template()`
+[compiler](https://github.com/rasenjs/rasen/tree/main/packages/compiler) hoists the static parts into a single cloned template
 clone.
 
 ## Without JSX
@@ -119,6 +119,12 @@ Accepted child kinds: `string`, `number`, a ref, a getter returning
 `string | number`, and a `Mountable`. Pass a **flat** array — the factory does
 not flatten nested arrays (the JSX runtime does).
 
+## Registration and delegation
+
+`registerTag('custom-button', CustomButton)` teaches the runtime what a
+lowercase tag means; PascalCase tags need no registration. See
+[JSX & the Compiler](https://github.com/rasenjs/rasen/tree/main/www/guide/advanced/jsx).
+
 ## Components
 
 | Export | Description |
@@ -132,7 +138,6 @@ not flatten nested arrays (the JSX runtime does).
 | `transitionGroup` (`listFade`, `listSlide`) | transitions for list items |
 | `mount(mountable, container)` | mount into an element |
 | `hydrate(component, container)` | claim server-rendered DOM instead of creating it |
-| `mountSlot` / `collectHtml` / `template` / `child` | primitives the compiler emits |
 
 `show` keeps the element in the DOM and toggles `display`; `when` mounts and
 unmounts. Use `show` for frequently toggled panels and `when` when the subtree
@@ -154,13 +159,6 @@ Hydration state is a module-level singleton, so `hydrate()` cannot be nested —
 mount each root from its own entry point. Compiled templates claim their
 server-rendered counterpart through the same cursor, which is why text nodes and
 slot anchors only need to line up between the two renderers, not be identical.
-
-## Host hooks
-
-`mount()` passes `hostHooks` to every mountable: marker creation, insertion,
-detachment, batching and bounded hosts. Structural components
-(`each` / `when` / `match`) degrade gracefully when a hook is missing — the
-contract per hook is documented in `host-hooks.ts`.
 
 ## License
 

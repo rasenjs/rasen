@@ -108,20 +108,6 @@ app.get('/', (_req, res) => {
 app.listen(3000)
 ```
 
-## Utilities
-
-```typescript
-import { escapeHtml, escapeAttr, isVoidElement } from '@rasenjs/html'
-
-// Escape HTML content
-escapeHtml('<script>alert("xss")</script>')
-// &lt;script&gt;alert("xss")&lt;/script&gt;
-
-// Check void elements
-isVoidElement('img')   // true
-isVoidElement('div')   // false
-```
-
 ## Hydration
 
 For client-side hydration, render the same component tree:

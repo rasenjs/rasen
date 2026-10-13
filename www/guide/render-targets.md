@@ -2,12 +2,12 @@
 
 One of Rasen's core features is the ability to render to multiple targets using the same component paradigm.
 
-## The MountFunction Pattern
+## The Mountable Pattern
 
 Every render target in Rasen follows the same pattern:
 
 ```typescript
-type MountFunction<Host> = (host: Host) => (() => void) | undefined
+type Mountable<Node = unknown> = (node: Node, hooks: HostHooks<Node> | undefined) => (() => void) | undefined
 ```
 
 - Receives a **host** (the render target)
@@ -165,7 +165,7 @@ const RNCounter = () => {
 ```
                     ┌───────────────────┐
                     │  Rasen Paradigm   │
-                    │  MountFunction<T> │
+                    │  Mountable<T>     │
                     └────────┬──────────┘
            ┌─────────────────┼─────────────────┐
            ▼                 ▼                 ▼
@@ -183,7 +183,9 @@ const RNCounter = () => {
 
 ## Creating Custom Targets
 
-The `MountFunction` pattern makes it easy to create new render targets:
+A host is just a mountable: write into the host, subscribe to the props you read,
+and return a cleanup. (The [custom target guide](/guide/advanced/custom-targets)
+walks through a complete one.)
 
 ```typescript
 // Three.js example
@@ -197,8 +199,8 @@ const mesh =
     const mesh = new THREE.Mesh(props.geometry, props.material)
 
     if (props.position) {
-      watchProp(
-        () => unref(props.position),
+      getReactiveRuntime().subscribe(
+        () => toValue(props.position),
         (pos) => {
           if (pos) mesh.position.set(pos.x, pos.y, pos.z)
         }

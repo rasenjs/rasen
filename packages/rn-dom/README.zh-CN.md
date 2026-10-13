@@ -310,11 +310,7 @@ mountToContainer(root, 1)
 | `RNDocument` | 创建和管理节点树 |
 | `registerComponent()` | 注册自定义原生组件 |
 | `mountToContainer()` | 将根节点挂载到原生表面 |
-| `dispatchCommand()` | 向原生发送命令式指令 |
-| `sendAccessibilityEvent()` | 触发无障碍事件 |
-| `findNodeHandle()` | 从节点解析原生标签 |
 | `StyleSheet` | 样式创建工具 |
-| `resetTagCounter()` | 重置标签计数器（测试用） |
 
 ---
 
