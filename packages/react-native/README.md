@@ -347,31 +347,6 @@ flatList({
 })
 ```
 
-## Testing
-
-The package ships a Vitest-based test infrastructure (mirroring `rn-dom` and
-`vue-rn`):
-
-```bash
-yarn workspace @rasenjs/react-native test
-```
-
-- `vitest.config.ts` — aliases `@rasenjs/rn-dom` to its source
-- `src/__tests__/setup.ts` — mocks `react-native`, `ReactNativePrivateInterface`,
-  `@rasenjs/rn-dom/elements`, and the Fabric UIManager; installs the Vue
-  reactive runtime
-- `src/__tests__/render-helper.ts` — `mountComponent()` + press-event helpers
-  (`firePress`, `firePressIn`, `firePressOut`) for asserting on the Fabric
-  node tree
-
-```typescript
-import { mountComponent, nodeProps, firePress } from '../__tests__/render-helper'
-
-const { root } = mountComponent((p) => Pressable({ onPress, ...p }))
-firePress(root)
-expect(onPress).toHaveBeenCalledTimes(1)
-```
-
 ## Metro Plugin
 
 `@rasenjs/react-native/metro` wraps all the Metro config a Rasen RN app needs

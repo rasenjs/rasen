@@ -2,6 +2,9 @@
 
 Canvas 2D 测试辅助工具集。
 
+> **Internal.** 本目录不对外导出（`package.json` 的 `exports` 只有包根入口）；
+> 这里的所有示例都按**包内相对路径**导入，供本仓库的测试与视觉快照使用。
+
 ## 📁 文件结构
 
 ```
@@ -23,7 +26,7 @@ test-utils/
 创建模拟的 `CanvasRenderingContext2D`，用于单元测试。
 
 ```typescript
-import { createMockContext } from '@rasenjs/canvas-2d/test-utils'
+import { createMockContext } from './test-utils'
 
 const ctx = createMockContext()
 ```
@@ -33,7 +36,7 @@ const ctx = createMockContext()
 创建简单的模拟响应式运行时。
 
 ```typescript
-import { createMockReactiveRuntime } from '@rasenjs/canvas-2d/test-utils'
+import { createMockReactiveRuntime } from './test-utils'
 
 setReactiveRuntime(createMockReactiveRuntime())
 ```
@@ -54,7 +57,7 @@ setReactiveRuntime(createMockReactiveRuntime())
 定义测试场景，包含基准渲染和测试渲染。
 
 ```typescript
-import type { VisualTestScene } from '@rasenjs/canvas-2d/test-utils'
+import type { VisualTestScene } from './test-utils'
 
 const scene: VisualTestScene = {
   name: 'rect-fill',
@@ -92,7 +95,7 @@ const result = await compareWithSnapshot(canvas, snapshotPath, {
 获取 canvas 上某个区域的像素数据。
 
 ```typescript
-import { getPixelData } from '@rasenjs/canvas-2d/test-utils'
+import { getPixelData } from './test-utils'
 
 const pixels = getPixelData(ctx, x, y, width, height)
 ```
@@ -102,7 +105,7 @@ const pixels = getPixelData(ctx, x, y, width, height)
 检查某个区域是否为空（全部透明）。
 
 ```typescript
-import { isRegionEmpty } from '@rasenjs/canvas-2d/test-utils'
+import { isRegionEmpty } from './test-utils'
 
 const isEmpty = isRegionEmpty(ctx, 50, 50, 100, 100)
 expect(isEmpty).toBe(true)
@@ -113,7 +116,7 @@ expect(isEmpty).toBe(true)
 检查某个区域是否有内容。
 
 ```typescript
-import { hasContent } from '@rasenjs/canvas-2d/test-utils'
+import { hasContent } from './test-utils'
 
 expect(hasContent(ctx, 50, 50, 100, 100)).toBe(true)
 ```
@@ -123,7 +126,7 @@ expect(hasContent(ctx, 50, 50, 100, 100)).toBe(true)
 等待响应式更新并刷新渲染。
 
 ```typescript
-import { waitForUpdate } from '@rasenjs/canvas-2d/test-utils'
+import { waitForUpdate } from './test-utils'
 
 const x = ref(50)
 x.value = 100
@@ -195,5 +198,5 @@ import {
   createMockContext,
   isRegionEmpty,
   compareWithSnapshot
-} from '@rasenjs/canvas-2d/test-utils'
+} from './test-utils'
 ```

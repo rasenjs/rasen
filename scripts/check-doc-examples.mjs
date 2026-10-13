@@ -139,6 +139,41 @@ for (const file of userFacing) {
   })
 }
 
+// ---- documented imports must resolve to a published entry point -------------
+// A doc that teaches `@rasenjs/x/internal-thing` sends readers to a path their
+// package manager cannot resolve. `docs-internal` opts a line out.
+const exportsByPackage = new Map()
+for (const dir of readdirSync(join(ROOT, 'packages'))) {
+  try {
+    const pkg = JSON.parse(readFileSync(join(ROOT, 'packages', dir, 'package.json'), 'utf8'))
+    exportsByPackage.set(pkg.name, new Set(Object.keys(pkg.exports ?? { '.': null })))
+  } catch {
+    /* not a package directory */
+  }
+}
+
+const badImports = []
+// Same scope as the denylist: design notes under `docs/` may discuss an entry
+// point that is planned rather than shipped.
+for (const file of userFacing) {
+  const lines = readFileSync(file, 'utf8').split('\n')
+  lines.forEach((line, i) => {
+    if (line.includes('docs-internal')) return
+    for (const m of line.matchAll(/['"](@rasenjs\/[^'"]+)['"]/g)) {
+      const spec = m[1]
+      const owners = [...exportsByPackage.keys()]
+        .filter((name) => spec === name || spec.startsWith(name + '/'))
+        .sort((a, b) => b.length - a.length)
+      if (!owners.length) continue
+      const owner = owners[0]
+      const sub = spec === owner ? '.' : './' + spec.slice(owner.length + 1)
+      if (!exportsByPackage.get(owner).has(sub)) {
+        badImports.push(`${relative(ROOT, file)}:${i + 1}  ${spec} (not exported by ${owner})`)
+      }
+    }
+  })
+}
+
 const groups = new Map()
 let blocks = 0
 let skipped = 0
@@ -217,6 +252,12 @@ if (leaks.length) {
   console.log('  (a deliberate mention can opt out with a `docs-internal` comment on the line)\n')
 }
 
+if (badImports.length) {
+  console.log(`### imports that are not exported — ${badImports.length}`)
+  for (const l of badImports) console.log('  ' + l)
+  console.log()
+}
+
 console.log(`extracted ${blocks} example blocks into ${groups.size} programs (${skipped} skipped: fragments/opt-outs)\n`)
 
 let failures = 0
@@ -283,11 +324,12 @@ for (const key of groups.keys()) {
   console.log()
 }
 
-if (failures === 0 && leaks.length === 0) {
+if (failures === 0 && leaks.length === 0 && badImports.length === 0) {
   rmSync(OUT, { recursive: true, force: true })
   console.log('all extracted examples type-check')
   process.exit(0)
 }
 if (failures) console.log(`${failures} error(s) across the extracted examples (see .doccheck for the sources)`)
 if (leaks.length) console.log(`${leaks.length} internal-API mention(s) in user-facing docs`)
+if (badImports.length) console.log(`${badImports.length} non-exported import(s) in the docs`)
 process.exit(1)
