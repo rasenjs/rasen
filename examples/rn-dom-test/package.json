@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@rasenjs/rn-dom": "workspace:*",
-    "@rasenjs/rn-html": "workspace:*",
     "react-native": "0.86.0"
   },
   "devDependencies": {
