@@ -17,8 +17,6 @@ export { transition, fade, slide, scale } from './transition'
 export type { TransitionConfig } from './transition'
 export { transitionGroup, listFade, listSlide } from './transition-group'
 export type { TransitionGroupConfig } from './transition-group'
-export { canvas } from './canvas'
-export type { CanvasProps } from './canvas'
 export { lazy, createLazy } from './lazy'
 export type { LazyConfig, CreateLazy } from './lazy'
 export {

@@ -26,6 +26,11 @@ import generatorModule from '@babel/generator'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const generate: any = (generatorModule as any).default || generatorModule
 import * as BabelTypes from '@babel/types'
+import {
+  type ComponentTagSpec,
+  type TagManifest,
+  resolveComponentTags,
+} from './component-tags'
 
 // @babel/traverse ESM/CJS interop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,25 +44,20 @@ export const COMPILE_DIRECTIVE = '@rasen-compile'
  * compiler 不依赖 @rasenjs/dom 运行时，故内置一份与 DOM 的
  * `INTRINSIC_TAGS` 一致的默认清单；宿主可通过 `intrinsicTags` 覆盖。
  */
-export const DEFAULT_INTRINSIC_TAGS = new Set([
-  // 结构性元素
+export const DEFAULT_INTRINSIC_TAGS = new Set<string>([
+  // Mirrors @rasenjs/core/html-tags (the canonical list). Kept inline because the
+  // compiler has no runtime dependency on core — a test compares the two so
+  // drift fails loudly instead of silently splitting element/component handling
+  // between the compiler and the hosts.
   'div', 'span', 'p', 'br', 'hr',
-  // 标题
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  // 文本格式
   'strong', 'em', 'small', 'code', 'pre', 'mark', 'del', 'ins', 'sub', 'sup', 'b', 'i', 'u',
-  // 列表
   'ul', 'ol', 'li', 'dl', 'dt', 'dd',
-  // 链接和媒体
   'a', 'img', 'picture', 'source', 'audio', 'video', 'track',
-  // 表单
   'form', 'input', 'label', 'button', 'textarea', 'select', 'option', 'optgroup',
   'fieldset', 'legend', 'datalist', 'output',
-  // 表格
   'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
-  // 语义化元素
   'section', 'article', 'header', 'footer', 'nav', 'main', 'aside', 'details', 'summary', 'dialog',
-  // 其他元素
   'blockquote', 'figure', 'figcaption', 'address', 'time',
 ])
 
@@ -68,6 +68,19 @@ export interface CompilerOptions {
   enabled?: boolean
   /** 可静态提升的宿主内置标签集合（默认 DOM 标签清单）。 */
   intrinsicTags?: Set<string>
+  /**
+   * 小写标签 → 模块导入（见 component-tags.ts）。
+   *
+   * 默认把 `canvas` 解析为 `@rasenjs/dom` 的导入，于是 `<canvas>` 不再变成
+   * 字符串、不需要全局 tag registry。宿主可覆盖/扩展；传 `{}` 可关闭。
+   */
+  componentTags?: Record<string, ComponentTagSpec>
+  /**
+   * 宿主导出的标签清单（`@rasenjs/dom/tags` 导出 `TAG_MANIFEST`）。
+   * `elements` 覆盖默认元素集，`components` 覆盖默认组件映射 —— 传它就等于
+   * 一次性拿到宿主的默认值再自行扩展。
+   */
+  tagManifest?: TagManifest
 }
 
 interface GenContext {
@@ -96,6 +109,15 @@ interface GenContext {
   intrinsicTags: Set<string>
   /** Scope-bound names that hold an array (see collectArrayBindings). */
   arrayBindings: Set<string>
+  /** Names imported from a Rasen host that RETURN a Mountable
+   *  (see collectMountableFactoryImports). */
+  mountableFactories: Set<string>
+  /** Namespace-imported Rasen hosts, whose members are checked by name
+   *  (`import * as dom from '@rasenjs/dom'` → `dom.text(...)`). */
+  mountableNamespaces: Set<string>
+  /** Scope-bound functions that return JSX or an array
+   *  (see collectMountableBindings). */
+  mountableBindings: Set<string>
 }
 
 /**
@@ -399,6 +421,289 @@ function isPotentialMountableCollection(
 }
 
 /**
+ * Names a Rasen host exports that RETURN a Mountable — an element, never text.
+ *
+ * A child expression is hoisted into a text run when it is not visibly an
+ * element (`containsJsxOrArray`), not a function (`isFunctionChild`) and not an
+ * array (`isPotentialMountableCollection`). A *call* passes all three checks,
+ * so `<span>{text({ content: () => x })}</span>` compiled to
+ * `bindText(el, () => renderText(text({ … })))` — and `renderText` stringifies
+ * the Mountable, printing its source into the page.
+ *
+ * Resolved through the file's imports, so `text as textNode` is matched while a
+ * *local* function that happens to be called `text` is not. Deliberately limited
+ * to factories that return elements: `toValue` / `renderText` / `escapeHtml`
+ * live in the same packages and DO return text, and bailing on those would drop
+ * the reactive `bindText` binding silently — a worse failure than the one this
+ * guard prevents.
+ */
+const MOUNTABLE_FACTORY_NAMES = new Set([
+  // @rasenjs/dom — element factories and the DOM component barrel
+  'element', 'h', 'tag', 'html', 'text', 'domContext',
+  'fragment', 'f', 'Fragment', 'each', 'repeat', 'when', 'match', 'switchCase',
+  'show', 'transition', 'fade', 'slide', 'scale', 'transitionGroup',
+  'listFade', 'listSlide', 'canvas', 'lazy', 'createLazy',
+  // @rasenjs/core — structural helpers
+  'com',
+])
+
+/** True when `name` names an element factory in this host. */
+function isMountableFactoryName(
+  name: string,
+  ctx: Pick<GenContext, 'intrinsicTags'>
+): boolean {
+  return ctx.intrinsicTags.has(name) || MOUNTABLE_FACTORY_NAMES.has(name)
+}
+
+/** Local names bound to a mountable factory by the file's import statements. */
+interface MountableImports {
+  /** `import { text as textNode } from '@rasenjs/dom'` → `textNode` */
+  names: Set<string>
+  /** `import * as dom from '@rasenjs/dom'` → `dom` */
+  namespaces: Set<string>
+}
+
+/**
+ * Collect the file's Rasen imports that name a mountable factory.
+ *
+ * Only `@rasenjs/*` sources are inspected: an app's own `./format` helper can
+ * also return a Mountable, but nothing in an import statement says so, and
+ * guessing would silently switch reactive text bindings to one-shot mounts.
+ * Those cases surface through `renderText`'s runtime error instead.
+ */
+function collectMountableFactoryImports(
+  ast: any,
+  isFactoryName: (name: string) => boolean
+): MountableImports {
+  const names = new Set<string>()
+  const namespaces = new Set<string>()
+  for (const node of ast?.program?.body ?? []) {
+    if (node?.type !== 'ImportDeclaration') continue
+    const source = node.source?.value
+    if (typeof source !== 'string' || !source.startsWith('@rasenjs/')) continue
+    for (const spec of node.specifiers ?? []) {
+      if (spec.type === 'ImportSpecifier') {
+        const imported = spec.imported?.name ?? spec.imported?.value
+        if (typeof imported === 'string' && isFactoryName(imported)) {
+          names.add(spec.local?.name)
+        }
+      } else if (spec.type === 'ImportNamespaceSpecifier') {
+        namespaces.add(spec.local?.name)
+      }
+    }
+  }
+  return { names, namespaces }
+}
+
+/**
+ * Walk a function body without descending into nested functions.
+ *
+ * Return values and array declarations belong to the function whose signature
+ * the caller is classifying; a nested closure's `return <Lazy />` says nothing
+ * about what the outer call yields.
+ */
+function walkOwnStatements(node: any, visit: (n: any) => void): void {
+  if (!node || typeof node !== 'object') return
+  if (
+    node.type === 'FunctionDeclaration' ||
+    node.type === 'FunctionExpression' ||
+    node.type === 'ArrowFunctionExpression'
+  ) {
+    return
+  }
+  visit(node)
+  for (const key of Object.keys(node)) {
+    if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') continue
+    const value = (node as any)[key]
+    if (Array.isArray(value)) {
+      for (const child of value) walkOwnStatements(child, visit)
+    } else if (value && typeof value === 'object' && typeof value.type === 'string') {
+      walkOwnStatements(value, visit)
+    }
+  }
+}
+
+/**
+ * True when a function value yields elements (JSX) or a collection.
+ *
+ * Only the *returned* values count: a helper that builds an internal array of
+ * strings and returns one is text, and hoisting it keeps the binding reactive.
+ * `const out: any[] = []; out.push(<b/>); return out` is the shape this has to
+ * catch — the array is reachable only through a name bound inside the function.
+ */
+function returnsJsxOrArray(fnNode: any): boolean {
+  const body = fnNode?.body
+  if (!body) return false
+  // `() => <div/>` / `() => [a, b]`
+  if (body.type !== 'BlockStatement') return containsJsxOrArray(body) || isArrayProducing(body)
+  const arrays = new Set<string>()
+  const returns: any[] = []
+  walkOwnStatements(body, (node) => {
+    if (
+      node.type === 'VariableDeclarator' &&
+      node.id?.type === 'Identifier' &&
+      isArrayProducing(node.init)
+    ) {
+      arrays.add(node.id.name)
+    }
+    if (node.type === 'ReturnStatement') returns.push(node.argument)
+  })
+  return returns.some((arg) => {
+    if (!arg) return false
+    if (containsJsxOrArray(arg) || isArrayProducing(arg)) return true
+    const expr = unwrapExpr(arg)
+    return expr?.type === 'Identifier' && arrays.has(expr.name)
+  })
+}
+
+/**
+ * Names the enclosing scopes bind to a function that returns JSX or an array.
+ *
+ * Closes the same hole as `collectArrayBindings`, one indirection further:
+ * `function inline(tokens) { const out = []; out.push(<code/>); return out }`
+ * is a mountable factory the import table cannot describe, because it is
+ * declared in this very file.
+ */
+function collectMountableBindings(scope: any): Set<string> {
+  const names = new Set<string>()
+  const seen = new Set<string>()
+  for (let current = scope; current; current = current.parent) {
+    for (const name of Object.keys(current.bindings ?? {})) {
+      if (seen.has(name)) continue
+      seen.add(name)
+      const node = current.bindings[name]?.path?.node
+      const fn =
+        node?.type === 'FunctionDeclaration'
+          ? node
+          : node?.type === 'VariableDeclarator' &&
+              (node.init?.type === 'ArrowFunctionExpression' ||
+                node.init?.type === 'FunctionExpression')
+            ? node.init
+            : null
+      if (fn && returnsJsxOrArray(fn)) names.add(name)
+    }
+  }
+  return names
+}
+
+/**
+ * True when the child expression CONTAINS a call that yields a Mountable.
+ *
+ * The check has to be recursive, not top-level: `{cond ? inline(t) : t.text}`
+ * hands the run either a collection or a string, and the text path would
+ * `String()` the collection. Any mountable call anywhere in the expression
+ * means the run is not safely text.
+ */
+function containsMountableCall(
+  node: any,
+  ctx: Pick<GenContext, 'mountableFactories' | 'mountableNamespaces' | 'mountableBindings'>,
+  isFactoryName: (name: string) => boolean
+): boolean {
+  if (!node || typeof node.type !== 'string') return false
+  if (isMountableChildCall(node, ctx, isFactoryName)) return true
+  for (const key of Object.keys(node)) {
+    if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') continue
+    const value = (node as any)[key]
+    if (Array.isArray(value)) {
+      if (value.some((child) => containsMountableCall(child, ctx, isFactoryName))) return true
+    } else if (
+      value &&
+      typeof value === 'object' &&
+      typeof value.type === 'string' &&
+      containsMountableCall(value, ctx, isFactoryName)
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * True when the child expression is a CALL that yields a Mountable.
+ *
+ * Covers the two shapes the compiler can see: a call to a factory imported from
+ * a Rasen host (alias- and namespace-aware), and a call to a function declared
+ * in this file whose returns are elements or a collection.
+ */
+function isMountableChildCall(
+  node: any,
+  ctx: Pick<GenContext, 'mountableFactories' | 'mountableNamespaces' | 'mountableBindings'>,
+  isFactoryName: (name: string) => boolean
+): boolean {
+  const expr = unwrapExpr(node)
+  if (!expr || (expr.type !== 'CallExpression' && expr.type !== 'OptionalCallExpression')) {
+    return false
+  }
+  const callee = unwrapExpr(expr.callee)
+  if (!callee) return false
+  if (callee.type === 'Identifier') {
+    return ctx.mountableFactories.has(callee.name) || ctx.mountableBindings.has(callee.name)
+  }
+  const isMember =
+    callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression'
+  if (!isMember) return false
+  const object = unwrapExpr(callee.object)
+  if (!object || object.type !== 'Identifier') return false
+  if (!ctx.mountableNamespaces.has(object.name)) return false
+  const property = callee.property
+  if (!property) return false
+  if (callee.computed) {
+    return typeof property.value === 'string' && isFactoryName(property.value)
+  }
+  return property.type === 'Identifier' && isFactoryName(property.name)
+}
+
+/**
+ * Serialize a ROOT component tag into a call expression, or null.
+ *
+ * `<canvas width={400} />` → `canvas({ width: 400 })`
+ * `<canvas>{kids}</canvas>` → `canvas({ children: <>{kids}</> })`
+ *
+ * Only the shapes the compiler can prove are handled (simple attributes, no
+ * spread); anything else returns null so the JSX is left for the bundler, where
+ * the component-tag rewrite turns the tag into an identifier first.
+ */
+function rootComponentCall(
+  node: BabelTypes.JSXElement,
+  options: CompilerOptions,
+  ctx: GenContext
+): string | null {
+  const nameNode = node.openingElement.name
+  if (nameNode.type !== 'JSXIdentifier') return null
+  const tag = nameNode.name
+  const spec = resolveComponentTags(options)[tag]
+  if (!spec) return null
+
+  let props = ''
+  for (const attr of node.openingElement.attributes) {
+    if (attr.type !== 'JSXAttribute' || attr.name.type !== 'JSXIdentifier') return null
+    const v = attr.value
+    if (v === null || v === undefined) props += `${attr.name.name}: true, `
+    else if (v.type === 'StringLiteral') props += `${attr.name.name}: ${JSON.stringify(v.value)}, `
+    else if (v.type === 'JSXExpressionContainer' && v.expression.type !== 'JSXEmptyExpression') {
+      props += `${attr.name.name}: ${ctx.source.slice(v.expression.start!, v.expression.end!)}, `
+    } else return null
+  }
+
+  const hasChildren = node.children.some(
+    (c) => c.type !== 'JSXText' || /\S/.test((c as BabelTypes.JSXText).value ?? '')
+  )
+  if (hasChildren) {
+    // The children stay JSX (a fragment) so the bundler compiles whatever is
+    // inside them — attributes, spreads, nested components, all of it.
+    if (!node.closingElement) return null
+    const inner = ctx.source.slice(
+      node.openingElement.end!,
+      node.closingElement.start!
+    )
+    props += `children: <>{${inner}}</>, `
+  }
+
+  const callee = spec.export ?? tag
+  return `${callee}({ ${props.trim()} })`
+}
+
+/**
  * Compile one JSX element subtree.
  *
  * Returns the serialized HTML for this subtree; navigation statements and
@@ -669,6 +974,14 @@ function compileElement(
       // every element's source into the page. Falls back to the factory chain,
       // which flattens the collection and mounts real elements.
       if (isPotentialMountableCollection(c.expression, ctx.arrayBindings)) return null
+      // A CALL that returns a Mountable (`{text({ content })}`, a local helper
+      // that returns JSX, `{items.map(...)}` through a factory) is an element.
+      // Hoisting would emit `renderText(<call>)`, and `renderText` stringifies
+      // the Mountable — the page then shows the function's source. See
+      // isMountableChildCall for what the compiler can resolve.
+      if (containsMountableCall(c.expression, ctx, (name) => isMountableFactoryName(name, ctx))) {
+        return null
+      }
       run.push({
         kind: 'expr',
         src: ctx.source.slice(c.expression.start!, c.expression.end!)
@@ -712,26 +1025,35 @@ function compileElement(
         // Anchor comment occupies one childNode slot → indices stay stable
         const anchorChunk = '<!--rasen-slot-->'
         html += anchorChunk
-        // Markers are positional literals here (symmetric with the template
-        // anchor); ssrSlot only collects the child's HTML between them.
-        ctx.ssrParts.push(anchorChunk)
-        ctx.ssrParts.push(
-          `\${collectHtml(${nameNode.name}({ ${propsSrc.trim()} }))}`
-        )
-        ctx.ssrParts.push('<!--/rasen-slot-->')
-        ctx.helpers.add('collectHtml')
-
+        // ONE instance, shared by the SSR collection and the runtime mount.
+        // Creating two (one for `collectHtml`, one for `mountSlot`) ran the
+        // component's setup twice: a component that owns reactive state (a
+        // `when` over a signal) then had its first instance consumed by the
+        // collector, and the second never saw the signal change — the panel
+        // simply never appeared.
         const holder = pathSoFar.length === 0 ? rootVar : selfRef()
+        const inst = `_c${ctx.counter++}`
         const s = `_s${ctx.counter++}`
         ctx.helpers.add('child')
         ctx.helpers.add('mountSlot')
+        // The instance is created where the template is built, so both paths
+        // below use the same object.
+        ctx.navStatements.push(
+          `const ${inst} = ${nameNode.name}({ ${propsSrc.trim()} })`
+        )
+        // Markers are positional literals here (symmetric with the template
+        // anchor); ssrSlot only collects the child's HTML between them.
+        ctx.ssrParts.push(anchorChunk)
+        ctx.ssrParts.push(`\${collectHtml(${inst})}`)
+        ctx.ssrParts.push('<!--/rasen-slot-->')
+        ctx.helpers.add('collectHtml')
         // Slot content is dynamic — the mounted region's node set changes at
         // runtime, so node-pair bounds would go stale. Disqualifies the
         // template from the static-region (marker-free) fast path.
         ctx.navStatements.push(`const ${s} = child(${holder}, ${childIndex})`)
-        ctx.wireStatements.push(
-          `offs.push(mountSlot(${s}, ${nameNode.name}({ ${propsSrc.trim()} })))`
-        )
+        // The host hooks travel with the component: a structural one
+        // (`when`/`each`/`match`) places its branch with them.
+        ctx.wireStatements.push(`offs.push(mountSlot(${s}, ${inst}, hooks))`)
         childIndex++
         continue
       }
@@ -791,9 +1113,22 @@ export function transformProgram(
     ssrParts: [],
     navCache: new Map<string, string>(),
     source,
-    intrinsicTags: options.intrinsicTags ?? DEFAULT_INTRINSIC_TAGS,
+    intrinsicTags:
+      options.intrinsicTags ??
+      (options.tagManifest?.elements
+        ? new Set<string>(options.tagManifest.elements)
+        : DEFAULT_INTRINSIC_TAGS),
     arrayBindings: new Set<string>(),
+    mountableFactories: new Set<string>(),
+    mountableNamespaces: new Set<string>(),
+    mountableBindings: new Set<string>(),
   }
+
+  const mountableImports = collectMountableFactoryImports(ast, (name) =>
+    isMountableFactoryName(name, ctx)
+  )
+  ctx.mountableFactories = mountableImports.names
+  ctx.mountableNamespaces = mountableImports.namespaces
 
   let compiled = 0
   let fellBack = 0
@@ -816,6 +1151,22 @@ export function transformProgram(
       // ones, so the same identifier can be a string in one component and an
       // array in the next.
       ctx.arrayBindings = collectArrayBindings(path.scope)
+      // Same per-root rule as the array names: an inner scope's binding shadows
+      // the outer one, so a helper name is classified where it is used.
+      ctx.mountableBindings = collectMountableBindings(path.scope)
+      // A ROOT component tag is an expression, not a subtree: `<canvas/>` at the
+      // top is `canvas({...})`. Letting the bundler's JSX transform do it would
+      // turn the lowercase tag into a host-element STRING (`jsx('canvas', …)`),
+      // whose only resolution is the global tag registry — which is also what
+      // pins everything the registering module imports. Emitting the call here
+      // keeps the author's spelling and never produces a string.
+      const rootCall = rootComponentCall(path.node, options, ctx)
+      if (rootCall !== null) {
+        path.replaceWith(parseExpression(rootCall))
+        path.skip()
+        compiled++
+        return
+      }
       const html = compileElement(path.node, ctx, rootVar, [])
       if (html === null) {
         fellBack++

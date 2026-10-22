@@ -18,6 +18,12 @@ export {
   transformModule,
   type RasenCompilerPluginOptions,
 } from './unplugin'
+export {
+  rewriteComponentTags,
+  DEFAULT_COMPONENT_TAGS,
+  componentTagsForHost,
+  type ComponentTagSpec,
+} from './component-tags'
 export { transformJsxExpressions } from './jsx-transform'
 export { transformStructural, type StructuralTransformOptions } from './structural'
 export { injectHmr, usesCom, hasHmrWrapping } from './hmr'

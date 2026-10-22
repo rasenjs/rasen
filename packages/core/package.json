@@ -26,6 +26,11 @@
       "types": "./dist/test-utils.d.ts",
       "import": "./dist/test-utils.js",
       "require": "./dist/test-utils.cjs"
+    },
+    "./html-tags": {
+      "types": "./dist/html-tags.d.ts",
+      "import": "./dist/html-tags.js",
+      "require": "./dist/html-tags.cjs"
     }
   },
   "files": [

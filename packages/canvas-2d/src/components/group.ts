@@ -31,9 +31,10 @@ export interface GroupProps
  * - 裁剪区域
  * - 共享阴影效果
  *
- * 层级即挂载：子组件收到的宿主是 group 节点本身，
- * 子节点自然挂进 group.children；绘制时 group 先应用
- * 变换/裁剪，再前序递归 children。
+ * Host = hierarchy: the children receive the group node itself as their host, so
+ * they land in `group.children`; when drawing, `group` saves, applies its own
+ * transform/clip, then calls `drawChildren()` inside it — the subtree renders
+ * there and nowhere else.
  */
 export const group = com(
   (props: GroupProps): Mountable<CanvasNode> => {
@@ -41,7 +42,7 @@ export const group = com(
       const childUnmounts: (Unmount | undefined)[] = []
 
       const groupNode = createNode(parentNode, {
-        draw: (ctx) => {
+        draw: (ctx, drawChildren) => {
           ctx.save()
 
           // 应用位置偏移
@@ -66,9 +67,11 @@ export const group = com(
               ctx.clip()
             }
 
-            for (const child of groupNode.children) {
-              child.draw(ctx)
-            }
+            // The subtree renders here — inside this group's transform, alpha and
+            // clip — and nowhere else. The node does not recurse the children on
+            // top of this: that second recursion is what used to paint every
+            // nested descendant once per ancestor, at four different offsets.
+            drawChildren()
           })
 
           ctx.restore()

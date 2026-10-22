@@ -6,7 +6,12 @@
 
 // Re-export shared utilities so framework adapters (Vue, etc.)
 // can consume them from a single package.
-export { parseCSS, normalizeEventName, isEvent, applyStylePatch } from './utils'
+import { parseCSS, normalizeEventName, isEvent, applyStylePatch } from './utils'
+
+// Generic tag-alias mechanism (see elements/shared.ts). Third-party tag packages
+// use it to point their tags at an existing tag — e.g. HTML `<span>` → `Text`,
+// because RN can only render text through its own text component.
+export { registerTagAlias, resolveTagAlias } from './elements/shared'
 
 // Element types and runtime values are available from @rasenjs/rn-dom/elements.
 // Re-exported here so framework adapters can import everything from one package.
@@ -75,6 +80,7 @@ export { RNNode, RNTextNode, RNCommentNode, RNDocumentFragment, FABRIC_NODE, FAB
 // component tag. This gives us lazy registration with eager bundling.
 // ────────────────────────────────────────────────────────────────────────────
 import { ensure } from '@rasenjs/rn-dom/elements'
+import { resolveTagAlias } from './elements/shared'
 
 /**
  * Shape of a partial view config — matches React Native's PartialViewConfig
@@ -213,6 +219,15 @@ export class RNDocument {
     const cached = RNDocument.__RN_nativeNameCache.get(tagName)
     if (cached) return cached
 
+    // Aliased tag (e.g. 'span' → 'Text'): resolve the canonical tag instead.
+    // Recursion is safe — resolveTagAlias() walks chains with a bound.
+    const canonical = resolveTagAlias(tagName)
+    if (canonical !== tagName) {
+      const aliased = this.___RN_resolveNativeName(canonical)
+      RNDocument.__RN_nativeNameCache.set(tagName, aliased)
+      return aliased
+    }
+
     const registry = ReactNativePrivateInterface.ReactNativeViewConfigRegistry
     const result = (() => {
       // 1. As-is: third-party components (RNCSafeAreaView, AIRMap…) and tags
@@ -221,6 +236,19 @@ export class RNDocument {
       if (!isPlatformAmbiguous(tagName)) {
         try { const c = registry.get(tagName); return { name: tagName, config: c } } catch { /* not found */ }
       }
+
+      // 1.5 HTML tag fallback: `HTML` + Capitalized tag + `Element`
+      //     (div → HTMLDivElement, span → HTMLSpanElement).
+      //     @rasenjs/rn-html ships its Fabric components under those names, so
+      //     rn-dom resolves HTML tags without owning any HTML tag table — it
+      //     only needs the host to have registered the component (typically via
+      //     requireNativeComponent('HTMLDivElement') in the entry file).
+      const htmlName =
+        'HTML' + tagName.charAt(0).toUpperCase() + tagName.slice(1) + 'Element'
+      try {
+        const c = registry.get(htmlName)
+        return { name: htmlName, config: c }
+      } catch { /* not an HTML tag either */ }
 
       // 2. Lazy auto-registration: ensure() knows the exact Fabric name for
       //    every built-in RN component. No guessing with RCT prefixes needed.

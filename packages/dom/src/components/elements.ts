@@ -1,4 +1,5 @@
 import { tag } from './element'
+import { HTML_TAGS } from '@rasenjs/core/html-tags'
 
 // ============================================================================
 // 通用元素组件
@@ -103,26 +104,9 @@ export const time = tag('time')
 // 标签名 ∈ INTRINSIC_TAGS → 宿主内置标签 → 可提升为 template；
 // 否则 → 组件（div/rect/自定义元素都走组件路径，不靠大小写区分）。
 // ============================================================================
-export const INTRINSIC_TAGS = [
-  // 结构性元素
-  'div', 'span', 'p', 'br', 'hr',
-  // 标题
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  // 文本格式
-  'strong', 'em', 'small', 'code', 'pre', 'mark', 'del', 'ins', 'sub', 'sup', 'b', 'i', 'u',
-  // 列表
-  'ul', 'ol', 'li', 'dl', 'dt', 'dd',
-  // 链接和媒体
-  'a', 'img', 'picture', 'source', 'audio', 'video', 'track',
-  // 表单
-  'form', 'input', 'label', 'button', 'textarea', 'select', 'option', 'optgroup',
-  'fieldset', 'legend', 'datalist', 'output',
-  // 表格
-  'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
-  // 语义化元素
-  'section', 'article', 'header', 'footer', 'nav', 'main', 'aside', 'details', 'summary', 'dialog',
-  // 其他元素
-  'blockquote', 'figure', 'figcaption', 'address', 'time',
-] as const
+// The tag list lives in @rasenjs/core: the compiler and the JSX runtimes need
+// the same set to agree on what a `template()` element is, and three copies
+// drift. Re-exported here so existing imports keep working.
+export { HTML_TAGS as INTRINSIC_TAGS } from '@rasenjs/core/html-tags'
 
-export type IntrinsicTag = (typeof INTRINSIC_TAGS)[number]
+export type IntrinsicTag = (typeof HTML_TAGS)[number]

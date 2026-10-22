@@ -122,6 +122,21 @@ export function canvas<T extends keyof HostTypes = '2d'>(
       }
     }
 
+    // A lost WebGL context is not the end of the canvas: the browser restores it
+    // only if the event is handled. Without this the layer stays dead for the
+    // rest of the session -- the scene simply stops drawing (models freeze, which
+    // reads as "the animations broke") after the GPU drops the context, which a
+    // large map bake can provoke.
+    if (props.contextType === 'webgl' || props.contextType === 'webgl2') {
+      canvasEl.addEventListener('webglcontextlost', (event) => {
+        event.preventDefault()
+        console.warn('rasen: WebGL context lost; waiting for the browser to restore it')
+      })
+      canvasEl.addEventListener('webglcontextrestored', () => {
+        console.warn('rasen: WebGL context restored')
+      })
+    }
+
     // 挂载到 DOM
     domHost.appendChild(canvasEl)
 
@@ -201,6 +216,14 @@ export function canvas<T extends keyof HostTypes = '2d'>(
         : contextType === '2d'
         ? createCanvas2DRoot(ctx as Parameters<typeof createCanvas2DRoot>[0], {
             schedule,
+            // The backing store above is `cssSize * dpr`, and every 2D component
+            // draws in CSS pixels. Without telling the renderer the ratio it
+            // draws CSS coordinates into a dpr-scaled buffer, so the whole scene
+            // lands at 1/dpr size in the top-left corner — on a Retina screen
+            // that is every sprite and every tile at half scale, which reads as
+            // the world being offset from the character's collision.
+            resolution: dpr,
+            ...toValue(props.renderOptions ?? {}),
           })
         : createGlRoot(ctx as GlContext, glOptions)
     // 两个渲染包的 createRoot 都返回带 requestRedraw 的根节点

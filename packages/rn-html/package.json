@@ -1,0 +1,59 @@
+{
+  "name": "@rasenjs/rn-html",
+  "version": "0.1.0",
+  "description": "Native HTML-like tags for React Native (div, span, p, img) — consumed by @rasenjs/rn-dom",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "android",
+    "ios",
+    "src",
+    "react-native.config.js",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "yarn clean && yarn build"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.76.0 <0.87.0"
+  },
+  "keywords": [
+    "rasen",
+    "react-native",
+    "html",
+    "div",
+    "fabric"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasenjs/rasen.git",
+    "directory": "packages/rn-html"
+  },
+  "homepage": "https://github.com/rasenjs/rasen/tree/main/packages/rn-html",
+  "bugs": {
+    "url": "https://github.com/rasenjs/rasen/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "author": "Rasen Contributors",
+  "license": "MIT"
+}

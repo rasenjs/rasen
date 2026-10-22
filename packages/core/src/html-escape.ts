@@ -48,6 +48,27 @@ export function renderText(value: unknown): string {
     if (runtime.isRef(value)) return renderText(runtime.unref(value))
   }
   if (value == null || typeof value === 'boolean') return ''
+  // A function here can only be a bug: `String(fn)` prints the function's
+  // SOURCE, and the compiler only reaches this call for children it believes
+  // are text. Fail loudly instead of painting the page with code — the value
+  // is either a Mountable the compiler could not see (a cross-module helper
+  // that returns JSX, a factory the guard does not know) or a getter written
+  // where a value belongs.
+  if (typeof value === 'function') {
+    throw new TypeError(
+      '[rasen] renderText() received a function — a function in a child ' +
+        'position is a mountable, not text, and stringifying it would print ' +
+        'its source into the page.\n' +
+        `  value: ${String(value).slice(0, 120)}\n` +
+        '  • a call that returns elements (`{markdownBlock(x)}`, `{text({ ' +
+        'content })}`) must not be hoisted as text — the compiler falls back to ' +
+        'the factory chain for factories it can resolve, so hoist the call ' +
+        'through JSX (`<Markdown source={x} />`) or expose the helper to the ' +
+        'compiler.\n' +
+        '  • a getter written where a value belongs: write `{value}` / ' +
+        '`{value()}` instead of `{() => value}`.'
+    )
+  }
   return String(value)
 }
 

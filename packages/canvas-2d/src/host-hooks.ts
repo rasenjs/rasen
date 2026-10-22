@@ -33,7 +33,9 @@ function markDirty(node: CanvasNode): void {
  */
 function createMarker(parent: CanvasNode, kind: string): CanvasNode {
   void kind
-  return createNode(parent, { draw: () => {} })
+  // Draws nothing, but stays transparent to the traversal: a marker is a
+  // position, not a boundary — whatever ended up under it must still render.
+  return createNode(parent, { draw: (_ctx, drawChildren) => drawChildren() })
 }
 
 /**
@@ -114,7 +116,7 @@ function createText(
   content: string
 ): TextHandle<CanvasNode> {
   void content
-  const node = createNode(parent, { draw: () => {} })
+  const node = createNode(parent, { draw: (_ctx, drawChildren) => drawChildren() })
   return { node, update: () => {} }
 }
 

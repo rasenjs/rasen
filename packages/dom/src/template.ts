@@ -132,7 +132,8 @@ function adopt<N extends Element>(el: N): N {
 /** Mount a component at a slot anchor (CSR or hydration). */
 export function mountSlot(
   anchor: ChildNode,
-  m: (host: unknown) => unknown
+  m: (host: unknown, hooks?: unknown) => unknown,
+  hooks?: unknown
 ): () => void {
   const parent = anchor.parentNode!
   if (isHydrating()) {
@@ -148,8 +149,14 @@ export function mountSlot(
   }
   // CSR: fragment as host keeps the Mountable protocol untouched, then all
   // children splice in before the anchor in one insertion.
+  //
+  // The host hooks go along: a structural child (`when`/`each`/`match`)
+  // needs them to place its branch, and without them it has no marker and
+  // no batch — it would mount its content into THIS fragment, which the
+  // insertion below immediately empties. The content would then live in an
+  // orphaned shell forever, and the panel would never open.
   const frag = document.createDocumentFragment()
-  const un = m(frag)
+  const un = m(frag, hooks)
   parent.insertBefore(frag, anchor)
   return un as () => void
 }

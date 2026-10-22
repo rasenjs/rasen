@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { compileModule } from '../core'
+import { transformModule } from '../unplugin'
 
 describe('compileModule', () => {
   it('无 JSX 的文件返回 null', () => {
@@ -274,9 +275,19 @@ const b = <span class="t">{y}</span>`
     expect(r.code).toContain(`template('<div class="box"><!--rasen-slot--><span>tail</span></div>')`)
     // CSR：mountSlot 定位锚点挂载组件（props 原样传递）
     expect(r.code).toContain('child(_r0, 0)')
-    expect(r.code).toMatch(/offs\.push\(mountSlot\(_s\d+, Header\(\{\s*id: id,\s*title: "hi",?\s*\}\)\)\)/)
-    // SSR：collectHtml 插值同一组件调用
-    expect(r.code).toMatch(/\$\{collectHtml\(Header\(\{\s*id: id,\s*title: "hi",?\s*\}\)\)\}/)
+    // ONE instance, shared by the runtime mount and the SSR collection.
+    // Two instances ran the component's setup twice, and a component that
+    // owns reactive state (a `when` over a signal) then had its first
+    // instance consumed by the collector while the second never saw the
+    // signal change.
+    expect(r.code).toMatch(/const _c\d+ = Header\(\{\s*id: id,\s*title: "hi",?\s*\}\)/)
+    // The host hooks travel with the component: a structural child
+    // (`when`/`each`/`match`) places its branch with them, and without them
+    // it mounts into the fragment `mountSlot` empties right after — the
+    // content then lives in an orphaned shell and never reaches the page.
+    expect(r.code).toMatch(/offs\.push\(mountSlot\(_s\d+, _c\d+, hooks\)\)/)
+    // SSR：collectHtml 插值同一个实例
+    expect(r.code).toMatch(/\$\{collectHtml\(_c\d+\)\}/)
     // helpers 进入 import
     expect(r.code).toMatch(/import \{[^}]*mountSlot[^}]*\}/)
     expect(r.code).toMatch(/import \{[^}]*collectHtml[^}]*\}/)
@@ -291,8 +302,8 @@ const b = <span class="t">{y}</span>`
     // 模板锚点
     expect(r.code).toContain(`template('<div><!--rasen-slot--></div>')`)
     // SSR：开标记 + collectHtml 内容 + 闭标记，三者相邻
-    expect(r.code).toContain(
-      '`<div><!--rasen-slot-->${collectHtml(Header({}))}<!--/rasen-slot--></div>`'
+    expect(r.code).toMatch(
+      /`<div><!--rasen-slot-->\$\{collectHtml\(_c\d+\)\}<!--\/rasen-slot--><\/div>`/
     )
   })
 
@@ -386,5 +397,205 @@ const b = <span class="t">{y}</span>`
       `const rows = []; function Row(rows) { return <span>{rows}</span> }`
     )!
     expect(shadowed.compiled).toBe(1)
+  })
+})
+/**
+ * A call in a child position may RETURN a Mountable. The text path stringifies
+ * whatever it is given, so hoisting such a call prints the mountable's source
+ * into the page — the compiler has to fall back to the factory chain, which
+ * mounts it instead.
+ */
+describe('renderText 守卫：返回元素的调用不当文本', () => {
+  it('Rasen 工厂调用回退（别名解析）', () => {
+    const code = `import { text as textNode } from '@rasenjs/dom'
+const el = <span class="t">{textNode({ content: () => label.value })}</span>`
+    const r = compileModule(code)!
+    expect(r.fellBack).toBe(1)
+    expect(r.compiled).toBe(0)
+    expect(r.code).not.toContain('renderText(')
+  })
+
+  it('命名空间导入的工厂成员调用回退', () => {
+    const code = `import * as dom from '@rasenjs/dom'
+const el = <span class="t">{dom.text({ content: () => label.value })}</span>`
+    const r = compileModule(code)!
+    expect(r.compiled).toBe(0)
+    expect(r.code).not.toContain('renderText(')
+  })
+
+  it('本文件里返回 JSX / 集合的 helper 回退', () => {
+    // `const out = []; out.push(<b/>); return out` — 数组只能通过函数内的名字
+    // 追溯到，imports 表里没有它。
+    const code = `function inline(list) {
+  const out = []
+  out.push(<b>hi</b>)
+  return out
+}
+const el = <p>{inline(list)}</p>`
+    const r = compileModule(code)!
+    // `compiled` is already 1: the helper's own `<b>hi</b>` is a JSX root of its
+    // own. What matters is that the call site was NOT hoisted into a text run —
+    // it stays JSX for the factory chain to mount.
+    expect(r.fellBack).toBe(1)
+    expect(r.code).toContain('{inline(list)}')
+    expect(r.code).not.toContain('renderText(')
+  })
+
+  it('三元 / 逻辑表达式里夹着工厂调用也回退', () => {
+    const code = `import { text } from '@rasenjs/dom'
+const el = <p class="t">{cond ? text({ content: () => x }) : fallback}</p>`
+    const r = compileModule(code)!
+    expect(r.compiled).toBe(0)
+    expect(r.code).not.toContain('renderText(')
+  })
+
+  it('返回字符串的 helper 仍走文本通道（绑定保持响应式）', () => {
+    // 退一步就不是文本了：`textOf` 返回 string，提升成 bindText 绑定才让它随
+    // ref 更新。守卫必须窄到不碰它。
+    const code = `function textOf(v) {
+  const parts = [v]
+  return parts.join(', ')
+}
+const el = <td class="c">{textOf(item.label)}</td>`
+    const r = compileModule(code)!
+    expect(r.compiled).toBe(1)
+    expect(r.code).toContain('renderText(textOf(item.label))')
+    expect(r.code).toContain('bindText(')
+  })
+
+  it('普通表达式文本不受影响', () => {
+    const r = compileModule(`const el = <td class="c">{item.label}</td>`)!
+    expect(r.compiled).toBe(1)
+    expect(r.code).toContain('renderText(item.label)')
+    const call = compileModule(`const el = <td class="c">{fmt(item.label)}</td>`)!
+    expect(call.compiled).toBe(1)
+    expect(call.code).toContain('renderText(fmt(item.label))')
+  })
+})
+
+/**
+ * Component tags — lowercase tags that are module imports, not host-element
+ * strings. A string can only be resolved through the global tag registry, which
+ * is also what pins everything the registering module imports (the DOM canvas
+ * bridge pulls the whole GL stack that way).
+ *
+ * The author's spelling is kept: a compilable `<canvas/>` becomes a plain
+ * `canvas({...})` CALL, and the import is injected. Only JSX the compiler has to
+ * leave behind is renamed, because the bundler's JSX transform reads a lowercase
+ * tag as a string.
+ */
+describe('组件标签：小写标签自动引入', () => {
+  /** Full pipeline (compile + rewrite): the tag becomes a call. */
+  const compile = (code: string, options: any = {}) =>
+    transformModule(code, 'C.tsx', { structural: true, ...options })
+  /** Rewrite only: nothing to rename or import means null. */
+  const isolated = (code: string, options: any = {}) =>
+    transformModule(code, 'C.tsx', { compile: false, jsxTransform: false, ...options })
+
+  it('根 <canvas> 编译成调用并注入 import（不改名）', () => {
+    const out = compile(`export const C = () => <canvas width={400} />`)!
+    expect(out).toContain("import { canvas } from '@rasenjs/dom'")
+    expect(out).toContain('canvas(')
+    expect(out).not.toContain('_rasenCanvas')
+    expect(out).not.toContain('<canvas')
+  })
+
+  it('子 <canvas> 同样编译成调用', () => {
+    const out = compile(`export const C = () => <div class="w"><canvas width={400} /></div>`)!
+    expect(out).toContain("import { canvas } from '@rasenjs/dom'")
+    expect(out).toContain('mountSlot(')
+    expect(out).not.toContain('<canvas')
+  })
+
+  it('编译器处理不了的 JSX 才改名（小写标签在 bundler 眼里是字符串）', () => {
+    const out = compile(`export const C = () => <canvas {...rest} />`)!
+    expect(out).toContain("import { canvas as _rasenCanvas } from '@rasenjs/dom'")
+    expect(out).toContain('<_rasenCanvas')
+    expect(out).not.toMatch(/<canvas[\s/>]/)
+  })
+
+  it('同一文件里多个 <canvas> 都拿到 import（别名不互相覆盖）', () => {
+    // Two leftover <canvas> mounts in one file: each needs its own local
+    // name, and BOTH must be imported. Importing only the last one left the
+    // first as an undefined binding at runtime ("_rasenCanvas is not
+    // defined").
+    const out = compile(
+      `export const C = () => <div><canvas {...a} /><canvas {...b} /></div>`,
+    )!
+    expect(out).toContain("import { canvas as _rasenCanvas } from '@rasenjs/dom'")
+    expect(out).toContain("import { canvas as _rasenCanvas2 } from '@rasenjs/dom'")
+    expect(out).toContain('<_rasenCanvas')
+    expect(out).toContain('<_rasenCanvas2')
+  })
+
+  it('作者已 import 时不重复注入', () => {
+    const out = compile(`import { canvas } from '@rasenjs/dom'\nexport const C = () => <canvas width={400} />`)!
+    expect(out.match(/import \{ canvas \} from '@rasenjs\/dom'/g)).toHaveLength(1)
+  })
+
+  it('无关文件零改动', () => {
+    expect(isolated(`export const C = () => <div class="w">hi</div>`)).toBeNull()
+  })
+
+  it('内置元素不受影响', () => {
+    expect(isolated(`export const C = () => <div class="w"><span>hi</span></div>`)).toBeNull()
+  })
+
+  it('非 DOM 宿主不被注入 DOM 的 canvas（html 里 canvas 是元素）', () => {
+    expect(
+      transformModule(`export const C = () => <canvas width={400} />`, 'C.tsx', {
+        compile: false,
+        jsxTransform: false,
+        templateSource: '@rasenjs/html/template',
+      })
+    ).toBeNull()
+  })
+
+  it('componentTags 可覆盖与关闭', () => {
+    const on = compile(`export const C = () => <widget x={1} />`, {
+      componentTags: { widget: { module: '@rasenjs/widgets' } },
+    })!
+    expect(on).toContain("import { widget } from '@rasenjs/widgets'")
+    expect(on).toContain('widget({')
+
+    expect(isolated(`export const C = () => <widget x={1} />`, { componentTags: {} })).toBeNull()
+  })
+
+  it('export 名可与标签名不同', () => {
+    const out = compile(`export const C = () => <stage />`, {
+      componentTags: { stage: { module: '@rasenjs/dom', export: 'canvas' } },
+    })!
+    expect(out).toContain("import { canvas } from '@rasenjs/dom'")
+    expect(out).toContain('canvas({')
+  })
+})
+
+describe('组件标签：tagManifest（宿主导出的数据）', () => {
+  const manifest = {
+    elements: ['div', 'span', 'widget'],
+    components: { canvas: { module: '@rasenjs/dom' }, stage: { module: '@rasenjs/dom' } },
+  }
+
+  it('components 决定哪些标签走导入', () => {
+    const out = transformModule(`export const C = () => <div class="w"><stage a={1} /></div>`, 'C.tsx', {
+      structural: true, tagManifest: manifest,
+    })!
+    expect(out).toContain("import { stage } from '@rasenjs/dom'")
+    expect(out).toContain('stage({')
+  })
+
+  it('elements 决定哪些标签编译成 template（可覆盖默认集）', () => {
+    // `widget` 不在默认元素表里，manifest 把它声明成元素后即走 template 路径。
+    const out = transformModule(`export const C = () => <widget class="w">hi</widget>`, 'C.tsx', {
+      structural: true, tagManifest: manifest,
+    })!
+    expect(out).toContain("template('<widget class=\"w\">hi</widget>')")
+  })
+
+  it('manifest 未列出的标签既不编译也不导入', () => {
+    const out = transformModule(`export const C = () => <marquee>hi</marquee>`, 'C.tsx', {
+      compile: false, jsxTransform: false, tagManifest: manifest,
+    })
+    expect(out).toBeNull()
   })
 })

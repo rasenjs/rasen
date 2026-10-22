@@ -3,6 +3,12 @@
  */
 
 export * from './components'
+// NOT part of ./components: that barrel is namespace-imported by the JSX
+// runtime, and a member that imports @rasenjs/gfx pins the whole GPU stack
+// into every app. This re-export stays droppable (the module is pure), and
+// `<canvas>` reaches it through the compiler's component-tag rewrite
+// (packages/compiler/src/component-tags.ts) rather than the tag registry.
+export { canvas, type CanvasProps } from './components/canvas'
 export { watchProp } from './utils'
 export { hostHooks, type HostHooks } from './host-hooks'
 // Side-effect import: registers the browser image adapter with

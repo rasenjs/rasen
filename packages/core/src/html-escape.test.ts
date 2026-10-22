@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useReactiveRuntime, createReactiveRuntime } from '@rasenjs/reactive-vue'
-import { stringifyStyleInline } from './html-escape'
+import { renderText, stringifyStyleInline } from './html-escape'
 
 describe('@rasenjs/core - stringifyStyleInline', () => {
   it('should convert camelCase keys to kebab-case', () => {
@@ -52,5 +52,23 @@ describe('@rasenjs/core - stringifyStyleInline', () => {
         stringifyStyleInline({ opacity, position: 'absolute' })
       ).toBe('opacity: 0; position: absolute')
     })
+  })
+})
+
+describe('@rasenjs/core - renderText', () => {
+  it('stringifies values and drops nullish / boolean noise', () => {
+    expect(renderText('hi')).toBe('hi')
+    expect(renderText(42)).toBe('42')
+    expect(renderText(null)).toBe('')
+    expect(renderText(undefined)).toBe('')
+    expect(renderText(false)).toBe('')
+  })
+
+  it('throws on a function instead of printing its source', () => {
+    // A function in a child position is a mountable. `String(fn)` would paint
+    // the function's source into the page, which is how a hoisted
+    // `{text({ content })}` / `{markdownBlock(x)}` used to look.
+    const mountable = (host: unknown) => host
+    expect(() => renderText(mountable)).toThrow(/renderText\(\) received a function/)
   })
 })

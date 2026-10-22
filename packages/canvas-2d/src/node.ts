@@ -8,8 +8,11 @@
  * 层级模型：
  *  - 组件挂载时通过 createNode 创建自己的节点，挂到收到的宿主下
  *    （宿主是 group 节点则成为其子节点；顶层裸宿主则注册为渲染根）
- *  - 绘制顺序 = 树的前序遍历；group 节点在自身绘制中包裹变换/裁剪后
- *    递归 children，子树变换层级天然成立
+ *  - Draw order = pre-order traversal of the tree, and the node owns that single
+ *    recursion: it hands the subtree to `draw`'s `drawChildren` callback, which
+ *    decides where inside its own state it renders — `group` calls it between its
+ *    transform/clip save and restore, so the subtree's transforms compose.
+ *    There is no second recursion after `draw`: one recursion, one owner.
  */
 
 import { getReactiveRuntime } from '@rasenjs/core'
@@ -54,15 +57,29 @@ export interface CanvasNode {
   hit?: (x: number, y: number) => boolean
   /** Pointer handlers dispatched when this node is the hit target. */
   on?: CanvasEventHandlers
-  /** 绘制：叶子只画自身；容器先应用自身状态再递归 children */
+  /**
+   * Draw: a leaf paints only itself; a container paints its children at the
+   * position it chooses (see `CanvasNodeOptions.draw`). Either way the children
+   * are reached once — by this one pre-order pass.
+   */
   draw(ctx: Context2D): void
   /** 从树上摘除并停止自身的响应式订阅 */
   remove(): void
 }
 
 export interface CanvasNodeOptions {
-  /** 绘制自身（不含 children 递归——容器由工厂自动追加递归） */
-  draw: (ctx: Context2D) => void
+  /**
+   * Draws this node. A container calls `drawChildren()` wherever its subtree
+   * must render (the usual shape: save → own transform → `drawChildren()` →
+   * restore); a leaf ignores the argument.
+   *
+   * One authority per recursion: when `draw` is given, the node does **not**
+   * recurse `children` on its own. It used to, unconditionally, while `group`
+   * recursed its own children to place them inside its transform — so a leaf
+   * under N nested groups was drawn 2^N times, once per subset of its
+   * ancestors' transforms, and the transform-less copy was painted last.
+   */
+  draw: (ctx: Context2D, drawChildren: () => void) => void
   /** 可选包围盒（预留：脏区优化）；可接收 ctx 用于 measureText 等 */
   bounds?: (ctx: Context2D) => Bounds | null
   /**
@@ -97,7 +114,9 @@ function attachNode(
 ): CanvasNode {
   const children: CanvasNode[] = []
   // 根节点自身无绘制逻辑 —— 纯容器，直接递归子树
-  const drawSelf = opts?.draw ?? (() => {})
+  // The root has no drawing of its own: its default draw *is* the recursion.
+  const drawSelf: (ctx: Context2D, drawChildren: () => void) => void =
+    opts?.draw ?? ((_ctx, drawChildren) => drawChildren())
 
   const node: CanvasNode = {
     ctx,
@@ -108,8 +127,14 @@ function attachNode(
     hit: opts?.hit ?? undefined,
     on: opts?.on ?? undefined,
     draw(ctx2: Context2D) {
-      drawSelf(ctx2)
-      for (const c of children) c.draw(ctx2)
+      // The node owns the recursion and hands it to `drawSelf`, which decides
+      // *where* in its own state the subtree renders. Calling `drawSelf` and
+      // then recursing again here would draw every child twice.
+      drawSelf(ctx2, () => {
+        for (let i = 0; i < children.length; i++) {
+          children[i].draw(ctx2)
+        }
+      })
     },
     remove() {
       stop?.()

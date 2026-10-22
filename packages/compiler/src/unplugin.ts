@@ -31,6 +31,7 @@ import { createUnplugin } from 'unplugin'
 import { compileModule, type CompilerOptions } from './core'
 import { transformJsxExpressions } from './jsx-transform'
 import { transformStructural } from './structural'
+import { rewriteComponentTags, resolveComponentTags } from './component-tags'
 import { injectHmr, usesCom, hasHmrWrapping } from './hmr'
 
 export interface RasenCompilerPluginOptions extends CompilerOptions {
@@ -78,7 +79,7 @@ export function transformModule(
     options
   let out = code
 
-  // 0. Structural rewrite — must see raw JSX children, and the freed
+  // 1. Structural rewrite — must see raw JSX children, and the freed
   //    `.map()`/`&&` shapes are what the hoisting pass wants to leave alone
   //    anyway. Opt-in: it emits `each`/`when` calls that only a Rasen host
   //    provides.
@@ -86,19 +87,29 @@ export function transformModule(
     out = transformStructural(out)
   }
 
-  // 1. Static hoisting — consumes raw JSX.
+  // 2. Static hoisting — consumes raw JSX.
   if (compile) {
     const result = compileModule(out, { ...options, filename })
     if (result) out = result.code
   }
 
-  // 2. JSX attribute handling for whatever hoisting left behind (fallbacks,
+  // 2b. Component tags — lowercase tags that are module imports, not
+  //     host-element strings. Runs AFTER compilation so only what the
+  //     compiler left as JSX needs renaming: a compiled `<canvas/>` is
+  //     already a `canvas({...})` call, while leftover JSX would reach the
+  //     bundler as `jsx('canvas', …)` — a string only the global tag registry
+  //     can resolve (and the reason a heavy component behind that registry
+  //     ships in apps that never render it).
+  const tagged = rewriteComponentTags(out, filename, resolveComponentTags(options))
+  if (tagged) out = tagged
+
+  // 3. JSX attribute handling for whatever hoisting left behind (fallbacks,
   //    component subtrees).
   if (jsxTransform) {
     out = transformJsxExpressions(out)
   }
 
-  // 3. HMR wrapping — modules using com().
+  // 4. HMR wrapping — modules using com().
   if (hmr && usesCom(out) && !hasHmrWrapping(out)) {
     out = injectHmr(out, filename)
   }

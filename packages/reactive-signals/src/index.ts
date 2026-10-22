@@ -4,7 +4,24 @@
  */
 
 import { Signal } from 'signal-polyfill'
+
+/**
+ * Report an error without breaking the caller.
+ *
+ * The polyfill exposes the proposal's own reporting hook; fall back to the
+ * platform's `reportError` so a failed watcher is visible instead of
+ * swallowed.
+ */
+function reportError(error: unknown): void {
+  const report = (globalThis as { reportError?: (e: unknown) => void }).reportError
+  if (typeof report === 'function') {
+    report(error)
+    return
+  }
+  console.error('[rasen] a reactive watcher failed', error)
+}
 import {
+  getReactiveRuntime,
   setReactiveRuntime,
   type ReactiveRuntime,
   type Ref,
@@ -62,7 +79,17 @@ export function createReactiveRuntime(): ReactiveRuntime {
       flushScheduled = false
       const jobs = Array.from(pending)
       pending.clear()
-      for (const job of jobs) job()
+      for (const job of jobs) {
+        // One watcher's failure must not starve the others: the batch runs
+        // them in one go, and a throw used to end the loop, so every watcher
+        // after the failing one missed its change. A component that mounts
+        // DOM (and cannot) was enough to silence a panel.
+        try {
+          job()
+        } catch (error) {
+          reportError(error)
+        }
+      }
     })
   }
 
@@ -214,7 +241,11 @@ export function createReactiveRuntime(): ReactiveRuntime {
  * ```
  */
 export function useReactiveRuntime(): void {
-  setReactiveRuntime(createReactiveRuntime())
+  // The SAME runtime the signals are created with: a second instance here
+  // would leave every `when()` (and every other core component that
+  // subscribes) watching a runtime that never sees the signals' changes, so
+  // nothing a signal drives would ever appear.
+  setReactiveRuntime(getRuntime())
 }
 
 // Get or create singleton runtime
@@ -244,7 +275,15 @@ function getRuntime(): ReactiveRuntime {
 export type SignalRef<T> = Ref<T> & { value: T; set(value: T): void }
 
 export function ref<T>(value: T): SignalRef<T> {
-  return getRuntime().ref(value) as SignalRef<T>
+  // The core's CURRENT runtime, when it is one of ours: a ref and the
+  // structural components that subscribe to it have to share a runtime, or
+  // a signal change never reaches the component. The core falls back to its
+  // own built-in runtime (whose refs are callables, not signals), so that
+  // case keeps this package's own runtime.
+  const core = getReactiveRuntime()
+  const created = core.ref(value) as unknown
+  if (typeof created === 'function') return getRuntime().ref(value) as SignalRef<T>
+  return created as SignalRef<T>
 }
 
 /**

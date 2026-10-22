@@ -132,8 +132,46 @@ wrapper element and (in the DOM host) renders text children directly.
 
 ## Custom tags
 
-Lowercase tags are looked up in the host's tag registry; register your own for
-custom elements or a third-party component library:
+Two ways a lowercase tag can resolve.
+
+**By import (compile time, preferred).** `<canvas />` compiles to a **call** —
+`canvas({ … })` — with the import injected, so nothing reaches the bundler as a
+string and nothing needs the registry. A tag nobody uses is never imported.
+
+Hosts export the defaults as data, so an app can extend rather than restate them:
+
+```typescript
+import { TAG_MANIFEST } from '@rasenjs/dom/tags'
+
+// vite.config.ts — `canvas` already maps to @rasenjs/dom
+rasenCompile.vite({
+  tagManifest: {
+    elements: [...TAG_MANIFEST.elements, 'marquee'],       // still template()
+    components: { ...TAG_MANIFEST.components, widget: { module: '@rasenjs/ui' } },
+  },
+})
+```
+
+`elements` compile to template HTML and never call a component; `components`
+resolve to an import. Pass `componentTags: {}` (or an empty `components`) to turn
+the mapping off. JSX the compiler cannot compile is renamed to an identifier
+first, since the bundler reads an unlisted lowercase tag as a host-element
+string.
+
+Because `canvas` resolves this way, it is **not** in the runtime registry: the
+DOM JSX runtime registers the element tags only, which is what keeps the GL stack
+out of every app that imports anything from `@rasenjs/dom`. A project that uses
+`<canvas>` **without** the compiler (plain `jsxImportSource`, no plugin) has to
+register it itself:
+
+```typescript
+import { canvas } from '@rasenjs/dom'
+registerTag('canvas', canvas)
+```
+
+**By registration (runtime).** A tag the compiler does not know — a string held
+in a variable, or a library that registers itself — is looked up in the host's
+tag registry:
 
 ```typescript
 import { registerTag, configureTags } from '@rasenjs/core'
@@ -148,6 +186,11 @@ configureTags({ '': { div, span }, X: { Chart, Legend } }) // <XChart />, <XLege
 `registerTag` is for custom elements and third-party tag sets (canvas-2d and the
 GL target register their own). PascalCase tags never need registration — they are
 called directly.
+
+Prefer the import form: the registry is a global that the build graph has to
+feed, so a heavy component behind it gets pulled into every app whose graph
+includes the registering module — which is how the DOM `canvas` bridge used to
+drag the whole GL stack into apps that never render one.
 
 ## Debugging the output
 

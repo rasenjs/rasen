@@ -11,6 +11,8 @@ import {
   isEventProp,
   getEventName,
 } from '../bindings'
+import type { HostHooks as DomHostHooks } from '../host-hooks'
+import type { HostHooks as CoreHostHooks } from '@rasenjs/core'
 
 /**
  * 特殊 props 列表（框架层面处理）
@@ -124,7 +126,7 @@ export function element(props: AnyElementProps): Mountable<HTMLElement>
 
 // 实现
 export function element(props: AnyElementProps): Mountable<HTMLElement> {
-  return (host: HTMLElement) => {
+  return (host: HTMLElement, hooks?: CoreHostHooks<HTMLElement>) => {
     const ctx = getHydrationContext()
 
     // 节点获取：水合时认领服务端元素（共享逻辑见 hydration-context），
@@ -213,8 +215,12 @@ export function element(props: AnyElementProps): Mountable<HTMLElement> {
           )
           ;(childUnmounts ??= []).push(() => textNode.remove())
         } else if (typeof child === 'function') {
-          type ChildFn = (host: HTMLElement) => unknown
-          const result = (child as ChildFn)(el)
+          // The host hooks go down with the child: a structural child
+          // (`when`/`each`/`match`) places its content with them, and the
+          // ambient context (`current`) is not a reliable stand-in — it is
+          // whatever the last com-managed mount left behind.
+          type ChildFn = (host: HTMLElement, hooks?: DomHostHooks) => unknown
+          const result = (child as ChildFn)(el, hooks as unknown as DomHostHooks)
           if (typeof result === 'string' || typeof result === 'number') {
             const textNode = (host.ownerDocument || document).createTextNode(String(result))
             el.appendChild(textNode)

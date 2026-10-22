@@ -12,6 +12,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./tags": {
+      "types": "./dist/tags.d.ts",
+      "import": "./dist/tags.js",
+      "require": "./dist/tags.cjs"
+    },
     "./jsx-runtime": {
       "types": "./dist/jsx-runtime.d.ts",
       "import": "./dist/jsx-runtime.js",
@@ -72,5 +77,11 @@
     "@rasenjs/reactive-vue": "workspace:*",
     "@vue/reactivity": "^3.5.25",
     "@webgpu/types": "^0.1.72"
-  }
+  },
+  "sideEffects": [
+    "./dist/index.js",
+    "./dist/index.cjs",
+    "./dist/jsx-runtime.js",
+    "./dist/jsx-runtime.cjs"
+  ]
 }

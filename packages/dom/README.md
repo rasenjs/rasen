@@ -122,7 +122,11 @@ not flatten nested arrays (the JSX runtime does).
 ## Registration and delegation
 
 `registerTag('custom-button', CustomButton)` teaches the runtime what a
-lowercase tag means; PascalCase tags need no registration. See
+lowercase tag means; PascalCase tags need no registration. The compiler resolves
+lowercase tags it knows first — `<canvas />` compiles to a `canvas({ … })` call
+with the import injected, so no registration and no string reach the output. The
+mapping is data: `@rasenjs/dom/tags` exports `TAG_MANIFEST` (`elements` +
+`components`) for a build tool to extend. See
 [JSX & the Compiler](https://github.com/rasenjs/rasen/tree/main/www/guide/advanced/jsx).
 
 ## Components

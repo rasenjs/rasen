@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     components: 'src/components/index.ts',
     utils: 'src/utils/index.ts',
+    'html-tags': 'src/html-tags.ts',
     'test-utils': 'src/test-utils.ts'
   },
   format: ['esm', 'cjs'],

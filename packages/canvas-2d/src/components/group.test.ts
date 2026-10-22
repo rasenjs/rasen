@@ -16,6 +16,7 @@ import type { CanvasNode, Context2D } from '../node'
 import { group } from './group'
 import { rect } from './rect'
 import { circle } from './circle'
+import { sprite } from './sprite'
 
 describe('group', () => {
   let ctx: Context2D
@@ -168,6 +169,134 @@ describe('group', () => {
       // 验证两个形状都被绘制
       expect(ctx.fillRect).toHaveBeenCalledWith(10, 10, 20, 20)
       expect(ctx.arc).toHaveBeenCalled()
+    })
+  })
+
+  /**
+   * A nested subtree used to be drawn once per ancestor.
+   *
+   * `attachNode`'s `draw` recursed `children` unconditionally *and* `group`
+   * recursed its own children to place them inside its transform, so a leaf
+   * inside N nested groups reached the leaf's `draw` 2^N times — once per subset
+   * of its ancestors' transforms — and the transform-less copy was painted last,
+   * on top. `examples/arpg` measured four `drawImage` calls per frame for one
+   * sprite inside a camera group + a slot group.
+   *
+   * The contract these lock down: a component's children are mounted exactly
+   * once, into the host the component chooses, and drawn once, by the one
+   * authority that owns the recursion (`drawChildren`).
+   */
+  describe('a nested subtree is drawn once', () => {
+    /**
+     * Reassigns the transform/draw members of the mock context so every call of
+     * `drawCall` records the world offset in effect at that moment. Only
+     * `translate` is tracked — that is all `group` applies for `x`/`y`.
+     *
+     * Installed *after* mounting: the frames the mount scheduled are not part of
+     * the measurement.
+     */
+    function trackWorldOffsets(
+      target: Context2D,
+      drawCall: 'drawImage' | 'fillRect'
+    ): Array<[number, number]> {
+      let x = 0
+      let y = 0
+      const stack: Array<[number, number]> = []
+      const positions: Array<[number, number]> = []
+      const assign = (name: string, fn: (...args: never[]) => unknown): void => {
+        ;(target as unknown as Record<string, unknown>)[name] = vi.fn(fn)
+      }
+
+      assign('translate', (tx: number, ty: number) => {
+        x += tx
+        y += ty
+      })
+      assign('save', () => {
+        stack.push([x, y])
+      })
+      assign('restore', () => {
+        const restored = stack.pop()
+        if (restored) {
+          x = restored[0]
+          y = restored[1]
+        }
+      })
+      assign(drawCall, () => {
+        positions.push([x, y])
+      })
+
+      return positions
+    }
+
+    it('mounts a child inside two nested groups exactly once', async () => {
+      let leafMounts = 0
+      const leaf = (): ReturnType<typeof sprite> => {
+        leafMounts++
+        return sprite({
+          image: {} as CanvasImageSource,
+          x: 0,
+          y: 0,
+          frameWidth: 8,
+          frameHeight: 8,
+          frame: 0
+        })
+      }
+
+      const mountable = group({
+        x: 100,
+        y: 100,
+        children: [group({ x: 1, y: 1, children: [leaf()] })]
+      })
+      cleanupFns.push(mountable(root, undefined))
+      await waitForAsync()
+
+      expect(leafMounts).toBe(1)
+    })
+
+    it('draws a leaf inside two nested groups once, with both offsets applied', async () => {
+      const mountable = group({
+        x: 100,
+        y: 100,
+        children: [
+          group({
+            x: 1,
+            y: 1,
+            children: [
+              sprite({
+                image: {} as CanvasImageSource,
+                x: 0,
+                y: 0,
+                frameWidth: 8,
+                frameHeight: 8,
+                frame: 0
+              })
+            ]
+          })
+        ]
+      })
+      cleanupFns.push(mountable(root, undefined))
+      await waitForAsync()
+
+      // One pass over the tree: the single leaf draws once, at 100 + 1.
+      const positions = trackWorldOffsets(ctx, 'drawImage')
+      root.draw(ctx)
+
+      expect(positions).toEqual([[101, 101]])
+    })
+
+    it('draws a leaf inside one group once, with its offset applied', async () => {
+      const mountable = group({
+        x: 30,
+        y: 40,
+        children: [rect({ x: 0, y: 0, width: 8, height: 8, fill: 'red' })]
+      })
+      cleanupFns.push(mountable(root, undefined))
+      await waitForAsync()
+
+      const positions = trackWorldOffsets(ctx, 'fillRect')
+      root.draw(ctx)
+
+      expect(positions).toEqual([[30, 40]])
     })
   })
 

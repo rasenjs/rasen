@@ -12,6 +12,10 @@ export default defineConfig({
         __dirname,
         'packages/core/src/utils/index.ts'
       ),
+      '@rasenjs/core/html-tags': path.resolve(
+        __dirname,
+        'packages/core/src/html-tags.ts'
+      ),
       '@rasenjs/core': path.resolve(__dirname, 'packages/core/src/index.ts'),
       '@rasenjs/dom': path.resolve(__dirname, 'packages/dom/src/index.ts'),
       '@rasenjs/reactive-vue': path.resolve(
@@ -40,7 +44,16 @@ export default defineConfig({
         __dirname,
         'packages/rn-dom/src/__tests__/react-native-mock.ts'
       ),
-      '@rasenjs/html': path.resolve(__dirname, 'packages/html/src/index.ts')
+      '@rasenjs/html': path.resolve(__dirname, 'packages/html/src/index.ts'),
+      // The isomorphic entry resolves by condition; the jsdom suite is the
+      // browser target, so it points at the DOM renderer. The SSR suite has its
+      // own config (vitest.ssr.config.ts) pointing the other way — same
+      // component source, two targets, no build step.
+      //
+      // Order matters: aliases match by prefix, so the subpath has to come
+      // before the bare specifier it starts with.
+      '@rasenjs/web/elements': path.resolve(__dirname, 'packages/dom/src/index.ts'),
+      '@rasenjs/web': path.resolve(__dirname, 'packages/dom/src/index.ts')
     }
   },
   test: {

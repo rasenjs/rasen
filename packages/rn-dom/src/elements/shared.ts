@@ -98,6 +98,37 @@ export function applyAria(props: Record<string, unknown>): Record<string, unknow
   return next
 }
 
+// ── Tag aliases ──────────────────────────────────────────────────────
+//
+// A generic indirection owned by rn-dom and populated by third-party tag
+// packages (e.g. @rasenjs/rn-html). rn-dom holds no knowledge of *which* tags
+// exist — it only needs to know that some names are equivalent to another tag
+// it already understands.
+//
+// Why this exists: RN can only render text through its own text component. A
+// custom-named native component gets a generic shadow node, so raw text
+// children are never folded into a paragraph and nothing shows up. Mapping a
+// text-ish tag onto `Text` (RCTText) is the only way that works, and it works
+// on both platforms.
+const TAG_ALIASES = new Map<string, string>()
+
+/** Register `tag` as an alias of `target` (e.g. 'span' → 'Text'). */
+export function registerTagAlias(tag: string, target: string): void {
+  TAG_ALIASES.set(tag, target)
+}
+
+/** Resolve a tag to its canonical form (identity when not aliased). */
+export function resolveTagAlias(tag: string): string {
+  let current = tag
+  // Bounded walk: tolerates alias chains, never loops on a cycle.
+  for (let i = 0; i < 8; i++) {
+    const next = TAG_ALIASES.get(current)
+    if (next == null || next === current) break
+    current = next
+  }
+  return current
+}
+
 export const SCROLL_BASE_VERTICAL = {
   flexGrow: 1,
   flexShrink: 1,

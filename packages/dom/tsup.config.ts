@@ -3,6 +3,8 @@ import { defineConfig } from 'tsup'
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
+    // Data-only: the tag manifest a build tool reads (no runtime imports).
+    tags: 'src/tags.ts',
     'jsx-runtime': 'src/jsx-runtime.ts',
     template: 'src/template.ts',
     bindings: 'src/bindings.ts',

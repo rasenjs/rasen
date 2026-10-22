@@ -24,6 +24,7 @@ import { RNDrawerLayoutAndroidElement } from './DrawerLayoutAndroidElement'
 // RN_BUILT_IN_TAGS 是唯一权威的内置标签列表(transformer 也用它)。
 // registry 从它派生默认映射,避免两份 tag 表重复登记。
 import { RN_BUILT_IN_TAGS } from '@rasenjs/rn-dom/elements'
+import { resolveTagAlias } from './shared'
 
 /** 元素类构造签名 —— 与 RNNode 构造函数一致(子类继承)。 */
 type ElementCtor = new (...args: ConstructorParameters<typeof RNNode>) => RNNode
@@ -58,5 +59,5 @@ Object.assign(TAG_TO_CLASS, SPECIAL_CLASSES)
  * third-party tags).
  */
 export function getElementClass(tagName: string): ElementCtor {
-  return TAG_TO_CLASS[tagName] ?? RNNode
+  return TAG_TO_CLASS[resolveTagAlias(tagName)] ?? RNNode
 }

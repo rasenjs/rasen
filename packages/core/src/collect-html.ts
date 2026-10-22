@@ -9,14 +9,23 @@
 
 export function collectHtml(m: (host: unknown) => unknown): string {
   const fragments: string[] = []
-  m({
-    fragments,
-    append(s: string) {
-      fragments.push(s)
-    },
-    toString() {
-      return fragments.join('')
-    },
-  })
+  try {
+    m({
+      fragments,
+      append(s: string) {
+        fragments.push(s)
+      },
+      toString() {
+        return fragments.join('')
+      },
+    })
+  } catch {
+    // Collecting is best-effort: a component that mounts DOM (or anything
+    // else the collector cannot host) throws here. The runtime mount of the
+    // same component is the one that matters, and a throw in this pass used
+    // to abort the whole reactive flush — the batched watchers stop at the
+    // first throwing job, so the component's own instance never received the
+    // signal change it was waiting for (a panel that never opened).
+  }
   return fragments.join('')
 }

@@ -27,7 +27,7 @@ import { getReactiveRuntime, type PropValue } from '@rasenjs/core'
 // onto elements in the browser, so a rule that lives in two places drifts. This
 // module re-exports the event helpers because it is the DOM renderer's import
 // source for them.
-import { getAttrName, isEventProp, getEventName } from '@rasenjs/core'
+import { getAttrName, isEventProp, getEventName, camelToKebab } from '@rasenjs/core'
 export { isEventProp, getEventName }
 
 // Re-exported for the compiler's single import source
@@ -38,7 +38,7 @@ export {
   renderText,
 } from '@rasenjs/core'
 export { configureEventDelegation } from './event-delegation'
-import { setAttribute, watchProp, unref, watchObjectProps, setStyle } from './utils'
+import { setAttribute, watchProp, unref } from './utils'
 import { isHydrating } from './hydration-context'
 import { attachEvent } from './event-delegation'
 
@@ -202,14 +202,47 @@ export function bindStyle(
       return noop
     }
     if (value && typeof value === 'object') {
-      return watchObjectProps(
-        value as Record<string, unknown>,
-        (key, v) => {
-          // setStyle converts camelCase keys and removes null values
-          setStyle(el, { [key]: v } as Record<string, string | number>)
-        },
-        !isHydrating()
-      )
+      // A style object is the element's **whole** style, so it is written as a whole:
+      // every key it carries, and nothing else. `watchObjectProps` could not say that —
+      // it applies each key on its own, so a key a later object no longer mentions kept
+      // its old value for the life of the element, and a renderer that builds its style
+      // fresh on every pass (which is what the JSX compiler produces for a runtime
+      // object) leaves a stale `pointer-events`, a stale crop or a stale offset behind.
+      //
+      // The reactive branch below had this right all along through `applyStyle` and its
+      // `prev`; this is the same contract for the plain-object case. Inside the object,
+      // a ref or a getter is still subscribed to individually, so the mixed case a
+      // renderer produces works: static keys cost one write, and a getter re-writes the
+      // whole object when what it reads changes.
+      const record = value as Record<string, unknown>
+      const runtime = getReactiveRuntime()
+      const read = (): Record<string, StyleValue> => {
+        const out: Record<string, StyleValue> = {}
+        for (const [key, entry] of Object.entries(record)) {
+          out[key] = toGetter(entry)() as unknown as StyleValue
+        }
+        return out
+      }
+      // A *fresh* binding writes a whole style, so declarations the element already
+      // carried and this object does not mention are cleared first. Without this the two
+      // bindings' keys are unioned, which no renderer wants: a rebuild that drops a key
+      // leaves the old one in place, and the element ends up with a crop, an offset or a
+      // `pointer-events` from a render that no longer applies. Only keys this object
+      // does not carry are removed, so a key another binding legitimately set survives.
+      const carried = new Set(Object.keys(record).map((key) => camelToKebab(key)))
+      for (let i = el.style.length - 1; i >= 0; i -= 1) {
+        const name = el.style.item(i)
+        if (!carried.has(name)) el.style.removeProperty(name)
+      }
+      let prev: Record<string, unknown> | null = null
+      const write = (): void => {
+        prev = applyStyle(el, read(), prev)
+      }
+      if (!isHydrating()) write()
+      // `subscribe` drops a source that collects no dependencies, so a static key costs
+      // one call and no subscription.
+      const stops = Object.values(record).map((entry) => runtime.subscribe(toGetter(entry), write))
+      return () => stops.forEach((stop) => stop())
     }
     return noop
   }

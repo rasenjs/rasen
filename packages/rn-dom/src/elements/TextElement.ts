@@ -10,7 +10,7 @@
 
 import { Platform } from 'react-native'
 import { RNNode } from '../node'
-import { flatStyle, appendStyleOverride, appendStylePrefix, VERTICAL_ALIGN_MAP, USER_SELECT_TO_SELECTABLE, applyAria } from './shared'
+import { flatStyle, appendStyleOverride, appendStylePrefix, VERTICAL_ALIGN_MAP, USER_SELECT_TO_SELECTABLE, applyAria, resolveTagAlias } from './shared'
 
 /**
  * RN feature flags:selectable Text 是否走 RCTSelectableText(默认 false → RCTText),
@@ -40,7 +40,9 @@ export class RNTextElement extends RNNode {
    */
   __RN_resolveNativeName(): string | null {
     if (Platform.OS !== 'ios') return null
-    if (this.parentNode?.tagName === 'Text') return 'RCTVirtualText'
+    // Aliased tags must count too: an HTML `<span>` inside another `<span>` is
+    // aliased to Text, so the inner one has to become a virtual text node.
+    if (this.parentNode && resolveTagAlias(this.parentNode.tagName) === 'Text') return 'RCTVirtualText'
     // selectable:prop 或 style.userSelect(auto/text/all → true)。
     const selectable =
       this.__RN_currentProps.selectable === true ||
