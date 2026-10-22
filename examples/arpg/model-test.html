@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>model-test — single-model rendering isolation</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #101216;
+        color: #d8d8cf;
+        font: 13px/1.5 monospace;
+      }
+      #bar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 8px 12px;
+        flex-wrap: wrap;
+      }
+      #stage {
+        position: relative;
+        width: 960px;
+        height: 640px;
+        background: #1a1d22;
+        outline: 1px solid #333;
+      }
+      #status {
+        padding: 6px 12px;
+        color: #9c9;
+        min-height: 1.5em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <strong>model-test</strong>
+      <label>model <select id="model"></select></label>
+      <label>count <input id="count" type="range" min="1" max="8" value="1" /></label>
+      <label>yaw <input id="rot" type="range" min="0" max="350" step="5" value="0" /></label>
+      <label><input id="spin" type="checkbox" /> auto-orbit</label>
+      <label
+        >mode
+        <select id="mode">
+          <option value="textured">textured (game path)</option>
+          <option value="uv">UV as color (u=red v=green)</option>
+          <option value="normals">normals as color</option>
+          <option value="pbr">pbr (normal + orm maps)</option>
+          <option value="clamped">textured, uv clamped to [0,1]</option>
+          <option value="grid">calibration quad (known texture + UV)</option>
+          <option value="atlas">color textures on flat quads (decode on trial)</option>
+          <option value="vflip">textured, V flipped</option>
+        </select>
+      </label>
+      <span id="readout"></span>
+    </div>
+    <div id="stage"></div>
+    <div id="status">loading…</div>
+    <script>
+      // Native probe: runs BEFORE and INDEPENDENTLY of the TypeScript module,
+      // so a browser that cannot parse/run the module still reports itself.
+      window.addEventListener('error', (e) => {
+        const s = document.getElementById('status')
+        if (s) {
+          s.dataset.filled = '1'
+          s.textContent = 'JS ERROR: ' + e.message + ' @ ' + (e.filename || '?') + ':' + (e.lineno || '?')
+        }
+      })
+      window.addEventListener('unhandledrejection', (e) => {
+        const s = document.getElementById('status')
+        if (s) {
+          s.dataset.filled = '1'
+          s.textContent = 'JS REJECTION: ' + String((e.reason && e.reason.stack) || e.reason).slice(0, 300)
+        }
+      })
+      const c = document.createElement('canvas')
+      const gl = c.getContext('webgl2') || c.getContext('webgl')
+      const ext = gl && gl.getExtension('WEBGL_debug_renderer_info')
+      window.__glInfo = gl
+        ? ((gl instanceof WebGL2RenderingContext ? 'webgl2' : 'webgl1') +
+           ' · ' + (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'renderer hidden'))
+        : 'no webgl context'
+      setTimeout(() => {
+        const s = document.getElementById('status')
+        if (s && !s.dataset.filled) {
+          s.textContent =
+            'native probe: ' + window.__glInfo +
+            ' — (this line never changing means the TS module never ran: check the console)'
+        }
+      }, 3000)
+    </script>
+    <script type="module" src="/src/model-test.tsx?v=3"></script>
+  </body>
+</html>

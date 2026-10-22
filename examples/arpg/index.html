@@ -1,0 +1,1045 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#05070c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Sanctum · Rasen</title>
+    <style>
+      /* The game's own UI font, extracted from the user's RomFS into the
+         git-ignored public/original/ directory. If it is missing the browser
+         falls back to the system serif, so nothing breaks without it. */
+      @font-face {
+        font-family: 'D2';
+        src: url('/original/BlizzardGlobal.ttf') format('truetype');
+        font-display: swap;
+      }
+
+      :root {
+        --trim: #7d6733;
+        --trim-light: #d9c07a;
+        --trim-dark: #43371a;
+        --ink: #e6dcc4;
+        --ink-dim: #a89b7e;
+        --arcane-light: #4f9fe8;
+        --font-title: 'D2', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+        --font-ui: 'D2', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #05070c;
+        color: var(--ink);
+        font-family: var(--font-ui);
+        overflow: hidden;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        cursor: default;
+      }
+
+      #app {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+
+      /* The HUD is one layer with pointer events off, so the play surface
+         still receives every touch that does not land on a control. */
+      .hud-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }.overlay,
+
+
+      .cta {
+        pointer-events: auto;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Atmosphere — a vignette and a torch wash above the world and below *
+       * the HUD. Pure CSS, so it costs one composited layer rather than a  *
+       * per-frame canvas pass.                                             *
+       * ---------------------------------------------------------------- */
+      .vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(
+            ellipse 78% 64% at 50% 46%,
+            rgba(255, 190, 110, 0.07) 0%,
+            rgba(0, 0, 0, 0) 55%
+          ),
+          radial-gradient(
+            ellipse 120% 105% at 50% 50%,
+            rgba(0, 0, 0, 0) 42%,
+            rgba(0, 0, 0, 0.52) 78%,
+            rgba(0, 0, 0, 0.85) 100%
+          );
+      }
+
+      .grain {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        mix-blend-mode: overlay;
+        background-image:
+          repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 3px);
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Bottom bar                                                         *
+       * ---------------------------------------------------------------- */
+      .bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 118px;
+        background:
+          linear-gradient(180deg, rgba(255, 226, 168, 0.07) 0 2px, rgba(0, 0, 0, 0) 2px),
+          linear-gradient(180deg, #3b332a 0%, #241e18 34%, #14100d 100%);
+        border-top: 2px solid var(--trim);
+        box-shadow:
+          0 -10px 30px rgba(0, 0, 0, 0.72),
+          inset 0 1px 0 rgba(255, 226, 168, 0.14),
+          inset 0 -18px 26px rgba(0, 0, 0, 0.55);
+      }
+
+      /* Cooldown as a conic sweep — the usual radial timer read, with no
+         second canvas and no per-frame animation to drive. */
+      .slot-sweep {
+        position: absolute;
+        inset: 0;
+        border-radius: 2px;
+        pointer-events: none;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Orbs                                                               *
+       * ---------------------------------------------------------------- */
+      .globe {
+        position: absolute;
+        bottom: 22px;
+        width: 104px;
+        height: 104px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 32% 24%, #6f5d33 0%, #332a1c 42%, #14110c 100%);
+        box-shadow:
+          0 0 0 3px #4d3f1f,
+          0 0 0 5px #6b5828,
+          0 0 0 6px #2a2210,
+          0 10px 26px rgba(0, 0, 0, 0.85),
+          inset 0 0 14px rgba(0, 0, 0, 0.95);
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Experience bar                                                     *
+       * ---------------------------------------------------------------- */
+      .xp {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 8px;
+        background: linear-gradient(180deg, #100d0a, #050403);
+        border-top: 1px solid #3d3319;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9);
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Minimap                                                            *
+       * ---------------------------------------------------------------- */
+      .minimap {
+        position: absolute;
+        top: calc(12px + env(safe-area-inset-top, 0px));
+        right: 12px;
+        width: 178px;
+        border-radius: 4px;
+        background: linear-gradient(180deg, #2a241c, #12100c);
+        border: 2px solid var(--trim-dark);
+        box-shadow:
+          0 0 0 1px #6b5828,
+          0 10px 24px rgba(0, 0, 0, 0.75),
+          inset 0 1px 0 rgba(255, 226, 168, 0.14);
+        overflow: hidden;
+      }
+
+      .minimap-title {
+        padding: 4px 8px;
+        font-family: var(--font-title);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--trim-light);
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.1));
+        border-bottom: 1px solid rgba(0, 0, 0, 0.6);
+        text-shadow: 0 1px 2px #000;
+      }
+
+      .minimap-body {
+        position: relative;
+        height: 122px;
+        background: #090807;
+      }
+
+      .minimap-terrain {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+        opacity: 0.72;
+      }
+
+      .minimap-blip {
+        position: absolute;
+        width: 5px;
+        height: 5px;
+        margin: -2.5px 0 0 -2.5px;
+        border-radius: 50%;
+        pointer-events: none;
+      }
+
+      .minimap-blip.hero {
+        width: 8px;
+        height: 8px;
+        margin: -4px 0 0 -4px;
+        background: #ffe9a8;
+        box-shadow: 0 0 8px #ffd75e, 0 0 2px #000;
+      }
+
+      .minimap-blip.monster {
+        background: #d8493a;
+        box-shadow: 0 0 4px rgba(216, 73, 58, 0.9);
+      }
+
+      .minimap-blip.boss {
+        width: 9px;
+        height: 9px;
+        margin: -4.5px 0 0 -4.5px;
+        background: #ff8a2e;
+        box-shadow: 0 0 10px #ff6a10, 0 0 2px #000;
+      }
+
+      .minimap-foot {
+        display: flex;
+        justify-content: space-between;
+        padding: 3px 7px 4px;
+        font-size: 10px;
+        color: var(--ink-dim);
+        background: rgba(0, 0, 0, 0.35);
+        border-top: 1px solid rgba(255, 226, 168, 0.08);
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Boss bar                                                           *
+       * ---------------------------------------------------------------- */
+      .boss {
+        position: absolute;
+        top: calc(14px + env(safe-area-inset-top, 0px));
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(460px, 58vw);
+        text-align: center;
+        pointer-events: none;
+      }
+
+      .boss-name {
+        font-family: var(--font-title);
+        font-size: 15px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: #f0c9a0;
+        text-shadow: 0 2px 6px #000, 0 0 16px rgba(255, 90, 30, 0.5);
+        margin-bottom: 5px;
+      }
+
+      .boss-track {
+        position: relative;
+        /* Sized to the original art (36px tall) so the caps are not scaled. */
+        height: 36px;
+        padding: 0 4px;
+        border-radius: 3px;
+        background: linear-gradient(180deg, #1a0a08, #0a0504);
+        border: 2px solid var(--trim-dark);
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.9), 0 6px 16px rgba(0, 0, 0, 0.6);
+        overflow: hidden;
+      }
+
+      /* The original bar is a left cap, a tileable fill that tracks health, and a
+         right cap — the same composition the game uses. */
+      .boss-fill {
+        height: 100%;
+        background-image: url('/original/monster_healthbar_normal.png');
+        background-repeat: repeat-x;
+        background-position: left center;
+        transition: width 160ms linear;
+      }
+
+      .boss-track::before,
+      .boss-track::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        /* Exactly the art's own size — the caps are 4x36. Scaling them would
+           blur the bevel that makes the bar read as the original. */
+        width: 4px;
+        background-size: 4px 36px;
+        background-repeat: no-repeat;
+      }
+
+      .boss-track::before {
+        left: 0;
+        background-image: url('/original/monster_healthbar_normal_left_cap.png');
+      }
+
+      .boss-track::after {
+        right: 0;
+        background-image: url('/original/monster_healthbar_normal_right_cap.png');
+      }
+
+      .boss-track::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.18) 0 40%,
+          rgba(0, 0, 0, 0.28) 100%
+        );
+        pointer-events: none;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Side panels                                                        *
+       * ---------------------------------------------------------------- */
+      .log {
+        position: absolute;
+        left: 12px;
+        bottom: 134px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-width: 46vw;
+        font-size: 12px;
+        text-shadow: 0 1px 3px #000, 0 0 8px rgba(0, 0, 0, 0.9);
+        pointer-events: none;
+      }
+
+      .stats {
+        position: absolute;
+        top: calc(12px + env(safe-area-inset-top, 0px));
+        left: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-size: 11px;
+        color: var(--ink-dim);
+        text-shadow: 0 1px 3px #000;
+        pointer-events: none;
+      }
+
+      .stats b {
+        color: var(--ink);
+      }
+
+      .aim-hint {
+        position: absolute;
+        left: 50%;
+        bottom: 152px;
+        transform: translateX(-50%);
+        font-family: var(--font-title);
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--trim-light);
+        text-shadow: 0 2px 6px #000;
+        pointer-events: none;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Overlays                                                           *
+       * ---------------------------------------------------------------- */
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 24px;
+        text-align: center;
+        background: radial-gradient(ellipse at 50% 45%, rgba(10, 8, 6, 0.84), rgba(2, 2, 3, 0.97));
+      }
+
+      .overlay.dead {
+        background: radial-gradient(ellipse at 50% 45%, rgba(70, 6, 4, 0.55), rgba(6, 2, 2, 0.96));
+      }
+
+      .title {
+        font-family: var(--font-title);
+        font-size: clamp(34px, 7vw, 64px);
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        margin: 0;
+        color: #f2dfae;
+        text-shadow:
+          0 0 24px rgba(255, 170, 60, 0.35),
+          0 4px 0 #241a0c,
+          0 8px 26px rgba(0, 0, 0, 0.9);
+      }
+
+      .subtitle {
+        font-family: var(--font-title);
+        font-size: clamp(11px, 2vw, 15px);
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        color: var(--trim-light);
+        margin: 0;
+      }
+
+      .rule {
+        width: min(420px, 70vw);
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--trim), transparent);
+        opacity: 0.75;
+      }
+
+      .keys {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 5px 26px;
+        font-size: 13px;
+        color: var(--ink-dim);
+        max-width: 580px;
+        line-height: 1.7;
+        text-align: left;
+      }
+
+      .keys b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .cta {
+        margin-top: 4px;
+        padding: 12px 34px;
+        font-family: var(--font-title);
+        font-size: 15px;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: #f6e6bd;
+        background: linear-gradient(180deg, #4a3c1c, #241c0c);
+        border: 2px solid var(--trim);
+        border-radius: 3px;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 226, 168, 0.3),
+          0 8px 22px rgba(0, 0, 0, 0.7);
+        cursor: pointer;
+      }
+
+      .cta:active {
+        transform: translateY(1px);
+        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.7);
+      }
+
+      .dead-title {
+        font-family: var(--font-title);
+        font-size: clamp(30px, 6vw, 52px);
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: #e2503a;
+        margin: 0;
+        text-shadow: 0 0 30px rgba(226, 80, 58, 0.55), 0 4px 0 #2a0705;
+      }
+
+      .icon-btn img {
+        width: 70%;
+        height: 70%;
+        pointer-events: none;
+      }
+
+      /* The panels the mini-menu has no button for get a word instead of an icon:
+         the drawn set has nine pictures and no stash, waypoint, shop or mercenary
+         among them. */
+      .icon-btn.wide {
+        width: 44px;
+        font-size: 9px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgb(199, 179, 119);
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Skill panel — the real class skill tree, from the game's tables   *
+       * ---------------------------------------------------------------- */
+      .skill-panel {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(760px, 92vw);
+        max-height: 78vh;
+        overflow-y: auto;
+        padding: 16px;
+        border-radius: 4px;
+        background: linear-gradient(180deg, #2b241c, #14100d);
+        border: 2px solid var(--trim);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 226, 168, 0.16);
+      }
+
+      .skill-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+        gap: 8px;
+      }
+
+      .skill-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px;
+        border-radius: 3px;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.65));
+        border: 1px solid rgba(217, 192, 122, 0.25);
+      }
+
+      .skill-cell.locked {
+        opacity: 0.42;
+      }
+
+      .skill-cell img {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        pointer-events: none;
+      }
+
+      .skill-cell-name {
+        font-size: 12px;
+        color: var(--ink);
+        line-height: 1.25;
+      }
+
+      .skill-cell-meta {
+        font-size: 10px;
+        color: var(--ink-dim);
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Inventory — real items with the game's own tooltips               *
+       * ---------------------------------------------------------------- */
+      .bag-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+        gap: 4px;
+      }
+
+      .bag-cell {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 3px;
+        background: linear-gradient(180deg, #2b241c, #171310);
+        border: 2px solid var(--trim-dark);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .bag-cell img {
+        width: 76%;
+        height: 76%;
+        pointer-events: none;
+      }
+
+      .bag-cell.common { border-color: #7d7461; }
+      .bag-cell.magic { border-color: #3f6fa8; }
+      .bag-cell.rare { border-color: #b39a3f; }
+      .bag-cell.unique { border-color: #8a5bb8; }
+
+      .bag-tooltip {
+        margin-top: 12px;
+        padding: 8px 10px;
+        min-height: 64px;
+        border-radius: 3px;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(217, 192, 122, 0.25);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .bag-tooltip-title {
+        font-family: var(--font-title);
+        font-size: 13px;
+        margin-bottom: 4px;
+      }
+
+      .sheet { display: flex; flex-direction: column; gap: 2px; }
+      .sheet-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 8px;
+        font-size: 13px;
+        border-radius: 2px;
+        background: rgba(0, 0, 0, 0.35);
+      }
+      .sheet-label { color: var(--ink-dim); }
+      .sheet-value { color: var(--ink); font-family: var(--font-title); }
+      .quest-body { position: relative; padding: 26px 22px; }
+      .quest-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 6px;
+        font-size: 13px;
+        color: var(--ink-dim);
+      }
+      .quest-row.done { color: var(--ink); }
+      .quest-row img { width: 26px; height: 26px; pointer-events: none; }
+
+      /* ---------------------------------------------------------------- *
+       * Dialogue — the retail lines `vo.json` attributes to the speaker   *
+       * ---------------------------------------------------------------- */
+      .talk-prompt {
+        position: absolute;
+        left: 50%;
+        bottom: 190px;
+        transform: translateX(-50%);
+        padding: 8px 18px;
+        border-radius: 3px;
+        background: linear-gradient(180deg, rgba(43, 36, 28, 0.96), rgba(20, 16, 13, 0.96));
+        border: 1px solid var(--trim);
+        color: var(--parchment);
+        font-family: var(--font-title);
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        pointer-events: auto;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .dialogue-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: 178px;
+        pointer-events: auto;
+      }
+
+      .dialogue-box {
+        width: min(720px, 92vw);
+        max-height: 46vh;
+        overflow-y: auto;
+        padding: 18px 20px 12px;
+        border-radius: 4px;
+        background: linear-gradient(180deg, #2b241c, #100d0a);
+        border: 2px solid var(--trim);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 226, 168, 0.16);
+      }
+
+      .dialogue-speaker {
+        font-family: var(--font-title);
+        font-size: 15px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 10px;
+      }
+
+      .dialogue-text {
+        color: var(--parchment);
+        font-size: 15px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+
+      .dialogue-foot {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: 14px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 226, 168, 0.14);
+        color: rgba(240, 226, 200, 0.6);
+        font-size: 12px;
+        letter-spacing: 0.12em;
+      }
+
+      .dialogue-next,
+      .dialogue-close {
+        padding: 6px 16px;
+        border-radius: 3px;
+        border: 1px solid var(--trim);
+        color: var(--parchment);
+        font-family: var(--font-title);
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .dialogue-next {
+        margin-left: auto;
+      }
+
+      .dialogue-close {
+        color: rgba(240, 226, 200, 0.7);
+      }
+
+      /* The game's own face, from the package (`global/ui/font`). */
+      @font-face {
+        font-family: 'BlizzardGlobal';
+        src: url('/original/BlizzardGlobal.ttf') format('truetype');
+        font-display: swap;
+      }
+
+      :root {
+        --font-game: 'BlizzardGlobal', var(--font-title);
+      }
+
+      /* The game's own front end. Not a mock-up: every panel, frame and caption
+         inside it comes from the layout files and the sprite atlases. */
+      /*
+       * The game's own button widgets take the press.
+       *
+       * This is a **workaround**, and the evidence below is what stands, so that the next
+       * reader does not start from zero:
+       *
+       * - `QuickPlayButton` reaches the DOM with an inline `pointer-events: none` and a
+       *   working `pointerdown` handler. Dispatching the event on the element starts the
+       *   game; dispatching the same event on `body` or on the canvas does not. So the
+       *   handler is bound to this element and the inline style disagrees with it.
+       * - Instrumenting `renderWidget` recorded **91 render passes for that widget, every
+       *   one of them `hasOnActivate: true, frameNull: false, interactive: true`**, and
+       *   the compiled output hands the element
+       *   `{ ...base, 'pointer-events': isCatcher || interactive ? 'auto' : 'none' }`.
+       *   So the object says `auto` at every pass that runs while the page is up.
+       * - Making `interactive` independent of the sprite (`type === 'ButtonWidget'`)
+       *   changed nothing, which rules out "the atlas had not loaded yet" as the whole
+       *   story.
+       *
+       * What is *not* established is which write produced the `none`. A style binding is
+       * applied once per element and not re-read, so a first write with the condition
+       * false would persist — but no such write was observed. The next step is to record
+       * every value `bindStyle` writes for that element rather than to reason from the
+       * ones that run later.
+       *
+       * Keying on `data-ui-type` rather than a class is deliberate: it is the attribute
+       * `renderWidget` already writes, so this reads as "a ButtonWidget is a button,
+       * wherever it is drawn", which is what the retail menu is.
+       */
+      .frontend [data-ui-type='ButtonWidget'],
+      .frontend [data-ui-type='ClickCatcherWidget'],
+      .frontend [data-ui-type='HoverWidget'] {
+        pointer-events: auto !important;
+      }
+
+      .frontend {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 40;
+      }
+
+
+      .character-list {
+        position: absolute;
+        pointer-events: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 6px 2px;
+        overflow: hidden;
+      }
+
+      .character-row {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2px;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-family: var(--font-game);
+        color: rgb(240, 240, 240);
+        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+      }
+
+      .character-row[data-selected='true'] {
+        color: rgb(199, 179, 119);
+      }
+
+      .character-name {
+        font-size: 18px;
+        letter-spacing: 0.06em;
+      }
+
+      .character-meta {
+        font-size: 13px;
+        color: rgba(199, 179, 119, 0.85);
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Panels — the game's own layouts, with this app's content over them *
+       * ---------------------------------------------------------------- */
+      .panel-frame {
+        position: absolute;
+        inset: 0;
+        pointer-events: auto;
+        z-index: 50;
+      }
+
+      /* Why `fixed` and not the `absolute` the renderer writes inline.
+         `renderWidget` emits each widget's box as a `left`/`top` in *viewport*
+         pixels, and a widget's box is absolute — but a positioned parent makes
+         `left` relative to that parent, so nesting them adds every ancestor's own
+         offset a second time. The skills panel is anchored to the right edge, so
+         its background was landing at 2 x 1019px and the whole panel fell off the
+         screen. `fixed` takes each widget out of the ancestor chain, which puts
+         every one of them back at the coordinate the layout states. Scoped to the
+         panels, which are the only tree drawn from a game layout at the viewport's
+         own scale. */
+      .panel-frame [data-ui] {
+        position: fixed !important;
+      }
+
+      /* Content the overlays draw over a panel's frame. The box comes from the
+         layout — the widget the panel uses for that content — so it is set inline;
+         this only styles what goes inside it. */
+      .panel-grid {
+        display: grid;
+        flex: 1;
+        gap: 2px;
+      }
+
+      .bag-cell.empty {
+        background: rgba(10, 8, 6, 0.42);
+        border-color: rgba(97, 85, 60, 0.55);
+      }
+
+      .panel-note {
+        margin: 4px 0 0;
+        font-size: 11px;
+        line-height: 1.4;
+        color: rgba(199, 179, 119, 0.9);
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+      }
+
+      .waypoint-panel {
+        gap: 4px;
+      }
+
+      .waypoint-tabs {
+        display: flex;
+        gap: 4px;
+      }
+
+      .waypoint-tab {
+        pointer-events: auto;
+        cursor: pointer;
+        padding: 2px 8px;
+        font-size: 12px;
+        border: 1px solid var(--trim-dark);
+        border-radius: 2px;
+        background: linear-gradient(180deg, #332b21, #17130f);
+        color: rgba(204, 195, 176, 0.8);
+      }
+
+      .waypoint-tab.active {
+        color: rgb(255, 236, 196);
+        border-color: rgb(199, 179, 119);
+      }
+
+      .waypoint-title {
+        font-size: 12px;
+        color: rgb(199, 179, 119);
+      }
+
+      .waypoint-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+
+      .waypoint-row {
+        font-size: 14px;
+        padding: 1px 4px;
+        color: rgb(230, 224, 208);
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+      }
+
+      /* The mercenary's equipment slots are placed at their own measured boxes,
+         which are offsets inside the box that contains all four. */
+      .merc-slot {
+        position: absolute;
+      }
+
+      .panel-content {
+        position: absolute;
+        /* Above `.panel-frame` (50), because the layout's own click catcher is a
+           full-viewport widget with pointer events on: at the same depth it would
+           swallow every tap on the content drawn over it. */
+        z-index: 51;
+        pointer-events: auto;
+        overflow: auto;
+        font-family: var(--font-game);
+        color: rgb(240, 240, 240);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sheet-rows,
+      .quest-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .sheet-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 14px;
+        padding: 1px 4px;
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+      }
+
+      .sheet-row b {
+        color: rgb(199, 179, 119);
+      }
+
+      .quest-row {
+        font-size: 14px;
+        padding: 2px 4px;
+        color: rgb(204, 195, 176);
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+      }
+
+      .quest-row.done {
+        color: rgb(199, 179, 119);
+      }
+
+      .skill-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+        gap: 6px;
+      }
+
+      .skill-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        font-size: 11px;
+        text-align: center;
+      }
+
+      .skill-cell img {
+        width: 48px;
+        height: 48px;
+        image-rendering: pixelated;
+      }
+
+      .bag-cell[data-selected='true'] {
+        outline: 2px solid rgb(199, 179, 119);
+      }
+
+      /* A stock row: the vendor's own page, one item per line with its price. */
+      .bag-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 3px;
+        margin-top: 6px;
+        overflow: auto;
+      }
+
+      .bag-entry {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        padding: 2px 5px;
+        background: rgba(8, 9, 12, 0.55);
+        border: 1px solid rgba(199, 179, 119, 0.28);
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+      }
+
+      .bag-entry img {
+        width: 26px;
+        height: 26px;
+        image-rendering: pixelated;
+      }
+
+      .bag-entry b {
+        margin-left: auto;
+        color: rgb(199, 179, 119);
+      }
+
+      .bag-count {
+        position: absolute;
+        right: 2px;
+        bottom: 0;
+        font-size: 11px;
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
+      }
+
+      .bag-fallback {
+        font-size: 12px;
+        color: rgba(240, 240, 240, 0.7);
+      }
+
+      @media (max-width: 760px) {
+        .minimap {
+          width: 132px;
+        }
+        .minimap-body {
+          height: 92px;
+        }
+        .talk-prompt {
+          bottom: 152px;
+        }
+        .dialogue-overlay {
+          padding-bottom: 142px;
+        }
+        .dialogue-text {
+          font-size: 13px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

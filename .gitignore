@@ -72,6 +72,11 @@ Thumbs.db
 # (nothing references it) — keep the stray capture out of the re-included tree.
 examples/fps/public/orig-screenshot.png
 
+# Original-asset extraction output for the arpg example: read out of the user's
+# own RomFS and never distributed. Must come after the `public/` re-include above,
+# which would otherwise re-add these. See examples/arpg/src/original/.
+examples/arpg/public/original/
+
 # Generated comparison artifacts (vector-recreation pixel-alignment studio)
 recreate.html
 tools/recreate/recreate.html
@@ -135,3 +140,14 @@ examples/react-native/*.jsbundle
 # Synced from real react-native — run yarn sync-bench-rn to update
 packages/vue-rn/src/__bench__/__mocks__/rn-local-pkg/react-native/Libraries/Renderer/implementations/
 .env*
+
+# Scratch space for one-off probes and the game-extraction workspace (hactool,
+# RomFS, NCAs): large, machine-local, never committed.
+.scratch/
+
+# Local reference material, never distributed:
+# - .d2r-ref: a read-only checkout of the d2r-mobile graphics layer, used as an
+#   oracle while reconstructing the game in examples/arpg.
+# - scratch: one-off probe output (extracted containers, decoded dumps).
+.d2r-ref/
+scratch/

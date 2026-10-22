@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WebGPU capability probe · Rasen</title>
+  </head>
+  <body>
+    <p>Probing WebGPU for the features the reference pipeline needs.</p>
+    <script type="module">
+      /**
+       * Capability probe, not a demo.
+       *
+       * The question this answers: can WebGPU host the pipeline the reference
+       * project's graphics layer implies? That needs compute (15 of the game's
+       * shaders are compute, and WebGL2 has none), several render targets at
+       * once (fragment output counts of 1..5), float render targets, 3D and cube
+       * textures, and enough binding slots for the reflection tables.
+       *
+       * Nothing here needs game files: it establishes what the platform can do.
+       */
+      const report = {}
+
+      async function run() {
+        if (!navigator.gpu) {
+          window.__gpu = { ok: false, error: 'navigator.gpu missing' }
+          return
+        }
+        report.hasWebGPU = true
+
+        const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
+        if (!adapter) {
+          window.__gpu = { ok: false, error: 'no adapter' }
+          return
+        }
+        report.adapter = adapter.info ? { ...adapter.info } : {}
+        report.features = [...adapter.features]
+
+        const limits = adapter.limits
+        report.limits = {
+          maxColorAttachments: limits.maxColorAttachments,
+          maxColorAttachmentBytesPerSample: limits.maxColorAttachmentBytesPerSample,
+          maxComputeWorkgroupSizeX: limits.maxComputeWorkgroupSizeX,
+          maxComputeInvocationsPerWorkgroup: limits.maxComputeInvocationsPerWorkgroup,
+          maxComputeWorkgroupStorageSize: limits.maxComputeWorkgroupStorageSize,
+          maxStorageBuffersPerShaderStage: limits.maxStorageBuffersPerShaderStage,
+          maxStorageTexturesPerShaderStage: limits.maxStorageTexturesPerShaderStage,
+          maxTextureDimension3D: limits.maxTextureDimension3D,
+          maxSampledTexturesPerShaderStage: limits.maxSampledTexturesPerShaderStage,
+          maxBindGroups: limits.maxBindGroups,
+        }
+
+        const device = await adapter.requestDevice()
+        report.hasDevice = true
+
+        // 1. Compute: the capability WebGL2 lacks entirely. A trivial kernel
+        //    doubles 8 values; if the readback is 2,4,...,16 then compute works.
+        try {
+          const module = device.createShaderModule({
+            code: `
+              @group(0) @binding(0) var<storage, read_write> data: array<f32>;
+              @compute @workgroup_size(8)
+              fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+                data[id.x] = data[id.x] * 2.0;
+              }`,
+          })
+          const pipeline = device.createComputePipeline({
+            layout: 'auto',
+            compute: { module, entryPoint: 'main' },
+          })
+          const values = new Float32Array([1, 2, 3, 4, 5, 6, 7, 8])
+          const buffer = device.createBuffer({
+            size: values.byteLength,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+          })
+          device.queue.writeBuffer(buffer, 0, values)
+          const readback = device.createBuffer({
+            size: values.byteLength,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+          })
+          const bindGroup = device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [{ binding: 0, resource: { buffer } }],
+          })
+          const encoder = device.createCommandEncoder()
+          const pass = encoder.beginComputePass()
+          pass.setPipeline(pipeline)
+          pass.setBindGroup(0, bindGroup)
+          pass.dispatchWorkgroups(1)
+          pass.end()
+          encoder.copyBufferToBuffer(buffer, 0, readback, 0, values.byteLength)
+          device.queue.submit([encoder.finish()])
+          await readback.mapAsync(GPUMapMode.READ)
+          report.computeResult = [...new Float32Array(readback.getMappedRange().slice(0))]
+          readback.unmap()
+          report.computeWorks = true
+        } catch (error) {
+          report.computeWorks = false
+          report.computeError = String(error)
+        }
+
+        // 2. Multiple render targets: 3 fragment outputs, which is the shape
+        //    2693 of the game's shaders write.
+        try {
+          const module = device.createShaderModule({
+            code: `
+              @fragment
+              fn main() -> @location(0) vec4<f32>, @location(1) vec4<f32>, @location(2) vec4<f32> {
+                return vec4(1.0, 0.0, 0.0, 1.0), vec4(0.0, 1.0, 0.0, 1.0), vec4(0.0, 0.0, 1.0, 1.0);
+              }`,
+          })
+          const targets = [0, 1, 2].map(() => ({
+            format: 'rgba8unorm',
+            blend: {
+              // `alpha` is a required member — omitting it is a probe bug, not a
+              // platform limitation.
+              color: { operation: 'add', srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+              alpha: { operation: 'add', srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+            },
+          }))
+          const pipeline = device.createRenderPipeline({
+            layout: 'auto',
+            vertex: { module, entryPoint: 'main' },
+            fragment: { module, entryPoint: 'main', targets },
+          })
+          report.mrtWorks = !!pipeline
+          report.mrtTargets = pipeline.getBindGroupLayout ? targets.length : 0
+        } catch (error) {
+          report.mrtWorks = false
+          report.mrtError = String(error)
+        }
+
+        // 3. Float and 3D/cube texture support, which the shader facts table
+        //    shows the game relies on (11,976 3D bindings, 3,202 cube).
+        try {
+          const floatTarget = device.createRenderPipeline({
+            layout: 'auto',
+            vertex: { module: device.createShaderModule({ code: '@vertex fn main() -> @builtin(position) vec4<f32> { return vec4(0.0); }' }), entryPoint: 'main' },
+            fragment: {
+              module: device.createShaderModule({ code: '@fragment fn main() -> @location(0) vec4<f32> { return vec4(1.0); }' }),
+              entryPoint: 'main',
+              targets: [{ format: 'rgba16float' }],
+            },
+          })
+          report.floatRenderTarget = !!floatTarget
+        } catch (error) {
+          report.floatRenderTarget = false
+          report.floatError = String(error)
+        }
+
+        try {
+          device.createTexture({
+            size: [16, 16, 16],
+            dimension: '3d',
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          })
+          report.texture3d = true
+        } catch (error) {
+          report.texture3d = false
+          report.texture3dError = String(error)
+        }
+
+        try {
+          device.createTexture({
+            size: [16, 16, 6],
+            dimension: '2d',
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          })
+          report.cubeTexture = true
+        } catch (error) {
+          report.cubeTexture = false
+        }
+
+        report.ok = true
+        window.__gpu = report
+      }
+
+      run().catch((error) => {
+        window.__gpu = { ok: false, error: String(error) }
+      })
+    </script>
+  </body>
+</html>
