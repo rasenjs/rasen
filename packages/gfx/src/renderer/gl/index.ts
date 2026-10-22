@@ -12,13 +12,34 @@
 
 import type { Gl2Context, GlContext } from '../../node'
 import { ShaderProgram, DEFAULT_VERTEX_SHADER, DEFAULT_FRAGMENT_SHADER, DEFAULT_VERTEX_SHADER_ES3, DEFAULT_FRAGMENT_SHADER_ES3 } from './shader'
-import { Mat4x4f, mat4x4f } from '@rasenjs/math'
+import { Mat4x4f, mat4x4f, multiplyMat4x4 } from '@rasenjs/math'
 import { createTexture as createGLTexture, type TextureOptions } from '../../utils'
-import { Renderer, type BatchItem, type TextureHandle } from '../base'
+import {
+  Renderer,
+  type BatchItem,
+  type BlendMode,
+  type MaterialDraw,
+  type MaterialHandle,
+  type MaterialOptions,
+  type TextureHandle,
+} from '../base'
 export { Renderer }
 import { computeCameraMatrix, isLookAtCamera, type CameraConfig } from '../../camera'
 import { ShadowRenderer } from './shadow'
 import { InstancedRenderer } from './instanced'
+
+/** A compiled material and everything needed to draw with it. */
+interface GlMaterialRecord {
+  program: ShaderProgram
+  attributes: { location: number; components: number }[]
+  uniforms: Map<string, WebGLUniformLocation | null>
+  samplers: (WebGLUniformLocation | null)[]
+  stride: number
+  blend: BlendMode
+  depthTest: boolean
+  depthWrite: boolean
+  cull: 'none' | 'back'
+}
 
 export class WebGLRenderer extends Renderer {
   get ctx(): unknown {
@@ -136,6 +157,26 @@ export class WebGLRenderer extends Renderer {
   private instancedRenderer: InstancedRenderer | null = null
 
   /** Shadow mapping state (light view-projection + renderer). */
+  /**
+   * Compiled materials, keyed by handle id. Empty for every scene that does not
+   * use one — which is the case this feature must not cost anything.
+   */
+  private glMaterials = new Map<number, GlMaterialRecord>()
+  private nextMaterialId = 1
+  /** Interleaved vertex upload target for the material pass. Created on first use. */
+  private materialVbo: WebGLBuffer | null = null
+  /** Index upload target for the material pass. Created on first use. */
+  private materialIbo: WebGLBuffer | null = null
+  /**
+   * How many registered materials write depth.
+   *
+   * `clearBuffers` only clears the depth buffer when something in the frame uses
+   * it. A depth-writing material is such a thing, so it has to be counted — else
+   * the pass runs against an uninitialised buffer, `GL_LESS` rejects every
+   * fragment, and the pass draws nothing at all.
+   */
+  private materialDepthCount = 0
+
   private shadowMatrix: Mat4x4f | null = null
   private shadowRenderer: ShadowRenderer | null = null
   /** Overlay pass (e.g. first-person weapon rendered with its own camera). */
@@ -298,6 +339,10 @@ export class WebGLRenderer extends Renderer {
     return this.isWebGL2
   }
 
+  protected get maxTexturesPerDraw(): number {
+    return 4
+  }
+
   createTexture(source: Parameters<typeof createGLTexture>[1], options?: TextureOptions): WebGLTexture {
     return createGLTexture(this.gl, source, options)
   }
@@ -318,6 +363,12 @@ export class WebGLRenderer extends Renderer {
     // record is stale until its range is uploaded again.
     this.vertexBufferEpoch++
     this.sealedVertexStreams.clear()
+    // Orphaned storage has UNDEFINED content: the texIndex stream is no longer
+    // known-zero, so the next single-texture group must upload its zeros
+    // (those skip the upload while the buffer is believed zero). Skipping
+    // after a growth made textured groups sample stale slots — the "stripes
+    // of the wrong textures' rows" the merged path was blamed for.
+    this.texIndexStale = true
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
     gl.bufferData(gl.ARRAY_BUFFER, next * 3 * 4, gl.DYNAMIC_DRAW)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer)
@@ -533,6 +584,209 @@ export class WebGLRenderer extends Renderer {
     }
   }
 
+  // --- materials -----------------------------------------------------------
+
+  protected createMaterialProgram(options: MaterialOptions): MaterialHandle | null {
+    const gl = this.gl
+    const program = new ShaderProgram(gl)
+    if (!program.compile(options.vertex, options.fragment)) {
+      // A material that does not compile is reported by returning null rather
+      // than thrown: a broken effect must not take the whole scene down.
+      return null
+    }
+
+    let stride = 0
+    for (const attribute of options.attributes) stride += attribute.components * 4
+
+    const attributes = options.attributes.map((attribute) => ({
+      location: program.getAttribLocation(attribute.name),
+      components: attribute.components,
+    }))
+
+    const uniforms = new Map<string, WebGLUniformLocation | null>()
+    for (const uniform of options.uniforms ?? []) {
+      uniforms.set(uniform.name, program.getUniformLocation(uniform.name))
+    }
+    // Resolved even when the host did not declare them, so a material can rely
+    // on the renderer supplying the camera without extra wiring.
+    for (const builtin of ['u_viewProj', 'u_model']) {
+      if (!uniforms.has(builtin)) uniforms.set(builtin, program.getUniformLocation(builtin))
+    }
+
+    const samplers = (options.samplers ?? []).map((name) =>
+      program.getUniformLocation(name),
+    )
+
+    if (options.depthWrite ?? true) this.materialDepthCount++
+
+    const id = this.nextMaterialId++
+    this.glMaterials.set(id, {
+      program,
+      attributes,
+      uniforms,
+      samplers,
+      stride,
+      blend: options.blend ?? 'normal',
+      depthTest: options.depthTest ?? true,
+      depthWrite: options.depthWrite ?? true,
+      cull: options.cull ?? 'none',
+    })
+    return { id }
+  }
+
+  protected releaseMaterial(handle: MaterialHandle): void {
+    const record = this.glMaterials.get(handle.id)
+    if (!record) return
+    if (record.depthWrite) this.materialDepthCount = Math.max(0, this.materialDepthCount - 1)
+    record.program.destroy()
+    this.glMaterials.delete(handle.id)
+  }
+
+  protected drawMaterialPass(draws: readonly MaterialDraw[]): void {
+    const gl = this.gl
+    if (this.glMaterials.size === 0) return
+    if (!this.materialVbo) this.materialVbo = gl.createBuffer()
+    if (!this.materialVbo) return
+
+    // Depth func LEQUAL, the batch's own rule: two draws at the same depth
+    // (a model's alternate-material variant) let the later one cover the
+    // earlier, while real 3D depth still sorts. The material pass inherits GL
+    // state, so state the contract needs is set here, not assumed.
+    gl.depthFunc(gl.LEQUAL)
+
+    const ordered = draws.some((draw) => draw.order !== undefined)
+      ? [...draws].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      : draws
+
+    const viewProj = multiplyMat4x4(this.projectionMatrix, this.viewMatrix)
+    const identity = mat4x4f()
+    // The batch renderer's own state is restored at the end, so a material
+    // cannot leak blend/cull state into the rest of the frame.
+    let blendEnabled = false
+    let cullEnabled = false
+
+    for (const draw of ordered) {
+      const record = this.glMaterials.get(draw.material.id)
+      if (!record) continue
+
+      if (record.blend !== 'normal' && !blendEnabled) {
+        gl.enable(gl.BLEND)
+        blendEnabled = true
+      }
+      if (record.cull === 'back' && !cullEnabled) {
+        gl.enable(gl.CULL_FACE)
+        cullEnabled = true
+      }
+      this.applyMaterialBlend(record.blend, blendEnabled)
+
+      if (record.depthTest) gl.enable(gl.DEPTH_TEST)
+      else gl.disable(gl.DEPTH_TEST)
+      gl.depthMask(record.depthWrite)
+
+      gl.useProgram(record.program.getProgram())
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.materialVbo)
+      gl.bufferData(gl.ARRAY_BUFFER, draw.vertices, gl.DYNAMIC_DRAW)
+
+      let offset = 0
+      for (const attribute of record.attributes) {
+        gl.enableVertexAttribArray(attribute.location)
+        gl.vertexAttribPointer(
+          attribute.location,
+          attribute.components,
+          gl.FLOAT,
+          false,
+          record.stride,
+          offset,
+        )
+        offset += attribute.components * 4
+      }
+
+      if (record.uniforms.has('u_viewProj')) {
+        gl.uniformMatrix4fv(record.uniforms.get('u_viewProj')!, false, viewProj.source)
+      }
+      if (record.uniforms.has('u_model')) {
+        const model = draw.transform
+        gl.uniformMatrix4fv(
+          record.uniforms.get('u_model')!,
+          false,
+          model instanceof Mat4x4f ? model.source : model ? new Float32Array(model) : identity.source,
+        )
+      }
+
+      if (draw.uniforms) {
+        for (const [name, value] of Object.entries(draw.uniforms)) {
+          const location = record.uniforms.get(name)
+          if (!location) continue
+          if (value instanceof Mat4x4f) gl.uniformMatrix4fv(location, false, value.source)
+          else if (typeof value === 'number') gl.uniform1f(location, value)
+          else if (Array.isArray(value)) {
+            if (value.length === 2) gl.uniform2fv(location, value)
+            else if (value.length === 3) gl.uniform3fv(location, value)
+            else if (value.length === 4) gl.uniform4fv(location, value)
+          }
+        }
+      }
+
+      // Textures first, so the sampler units are set before the draw.
+      const textures = draw.textures ?? []
+      for (let unit = 0; unit < record.samplers.length; unit++) {
+        const location = record.samplers[unit]
+        if (!location) continue
+        const texture = textures[unit] ?? null
+        gl.activeTexture(gl.TEXTURE0 + unit)
+        gl.bindTexture(gl.TEXTURE_2D, texture as WebGLTexture | null)
+        gl.uniform1i(location, unit)
+      }
+
+      const indices = draw.indices
+      if (indices && indices.length > 0) {
+        const indexArray =
+          indices instanceof Uint16Array || indices instanceof Uint32Array
+            ? indices
+            : new Uint16Array(indices)
+        // The element buffer has to be bound, or drawElements is an INVALID_OPERATION
+        // and nothing is drawn at all — silently, which is how this was found.
+        if (!this.materialIbo) this.materialIbo = gl.createBuffer()
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.materialIbo)
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexArray, gl.DYNAMIC_DRAW)
+        gl.drawElements(
+          gl.TRIANGLES,
+          indexArray.length,
+          indexArray instanceof Uint16Array ? gl.UNSIGNED_SHORT : gl.UNSIGNED_INT,
+          0,
+        )
+      } else {
+        gl.drawArrays(gl.TRIANGLES, 0, draw.vertices.length / (record.stride / 4))
+      }
+
+      for (const attribute of record.attributes) gl.disableVertexAttribArray(attribute.location)
+    }
+
+    // Restore what the rest of the renderer assumes.
+    if (blendEnabled) gl.disable(gl.BLEND)
+    if (cullEnabled) gl.disable(gl.CULL_FACE)
+    gl.enable(gl.DEPTH_TEST)
+    gl.depthMask(true)
+  }
+
+  private applyMaterialBlend(blend: BlendMode, enabled: boolean): void {
+    if (!enabled) return
+    const gl = this.gl
+    switch (blend) {
+      case 'additive':
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE)
+        break
+      case 'multiply':
+        gl.blendFunc(gl.DST_COLOR, gl.ONE_MINUS_SRC_ALPHA)
+        break
+      case 'screen':
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_COLOR)
+        break
+      default:
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    }
+  }
+
   protected endFrame(): void {
     // WebGL presents implicitly; nothing to do.
   }
@@ -552,7 +806,7 @@ export class WebGLRenderer extends Renderer {
   /** Clear the active color buffer (and depth buffer when depth is on). */
   private clearBuffers() {
     const gl = this.gl
-    if (this.depthCount > 0) {
+    if (this.depthCount > 0 || this.materialDepthCount > 0) {
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     } else {
       gl.clear(gl.COLOR_BUFFER_BIT)

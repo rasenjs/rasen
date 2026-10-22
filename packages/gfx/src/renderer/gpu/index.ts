@@ -31,10 +31,29 @@
  * docs/GPU-BACKEND-DESIGN.md).
  */
 
-import { Mat4x4f } from '@rasenjs/math'
+import { Mat4x4f, mat4x4f, multiplyMat4x4 } from '@rasenjs/math'
 import { computeCameraMatrix, type CameraConfig } from '../../camera'
 import { isCompressedTextureSource, type CompressedTextureSource } from '../../utils'
-import { Renderer, MAX_TEXTURES_PER_DRAW, type BatchItem, type BlendMode, type GroupStreams, type TextureHandle } from '../base'
+import {
+  Renderer,
+  MAX_TEXTURES_PER_DRAW,
+  type BatchItem,
+  type BlendMode,
+  type GroupStreams,
+  type MaterialDraw,
+  type MaterialHandle,
+  type MaterialOptions,
+  type ShaderBindGroupHandle,
+  type ShaderBindGroupOptions,
+  type ShaderBindingDeclaration,
+  type ShaderBindingResource,
+  type ShaderDispatch,
+  type ShaderPassDraw,
+  type ShaderPipelineHandle,
+  type ShaderPipelineOptions,
+  type ShaderStageName,
+  type TextureHandle,
+} from '../base'
 import type { TransformState, TransformInput } from '../../transform-stack'
 import type { GpuCanvasContext } from '../../node'
 import {
@@ -142,6 +161,142 @@ export function getWebGPURenderer(context: GpuCanvasContext): WebGPURenderer | n
   return rendererByContext.get(context) ?? null
 }
 
+/** A compiled material: pipeline, uniform binding and its vertex buffer. */
+interface GpuMaterialRecord {
+  pipeline: GPURenderPipeline
+  bindGroup: GPUBindGroup
+  uniformBuffer: GPUBuffer
+  uniformData: Float32Array
+  /** Declared uniform names, in buffer order. */
+  declared: string[]
+  vertexBuffer: GPUBuffer | null
+  vertexBufferBytes: number
+  /** Floats per interleaved vertex, so a draw knows its vertex count. */
+  strideFloats: number
+}
+
+/** A shader pipeline the caller described: pipeline, its group layouts, and the
+ *  declarations a bind group needs to map resources back to WGSL bindings. */
+interface GpuShaderPipelineRecord {
+  pipeline: GPURenderPipeline | GPUComputePipeline
+  kind: 'render' | 'compute'
+  /** Bind group layout per group index, as declared by the caller. */
+  layouts: Map<number, GPUBindGroupLayout>
+  /** Each declared entry, keyed `group:binding`. */
+  declarations: Map<string, ShaderBindingDeclaration>
+  /** Float stride of vertex buffer slot 0, from the caller's declaration. */
+  vertexStride: number
+  /** Renderer-owned staging buffer for `ShaderPassDraw.vertices`. */
+  vertexBuffer: GPUBuffer | null
+  vertexBufferBytes: number
+}
+
+/**
+ * A bind group, plus the buffers this renderer created for uploaded bytes.
+ */
+interface GpuShaderBindGroupRecord {
+  bindGroup: GPUBindGroup
+  ownedBuffers: GPUBuffer[]
+}
+
+/** Shader stage names as a WebGPU visibility mask, for `ShaderBindingDeclaration.visibility`. */
+function stageFlags(stages: readonly ShaderStageName[]): GPUShaderStageFlags {
+  let flags = 0
+  for (const stage of stages) {
+    if (stage === 'vertex') flags |= GPUShaderStage.VERTEX
+    else if (stage === 'fragment') flags |= GPUShaderStage.FRAGMENT
+    else flags |= GPUShaderStage.COMPUTE
+  }
+  return flags
+}
+
+/** A typed-array / DataView check that also accepts the shared-memory variants
+ *  `writeBuffer` takes, without `any`. */
+function isArrayBufferView(value: GPUBuffer | ArrayBufferView): value is ArrayBufferView {
+  return typeof (value as ArrayBufferView).byteLength === 'number' && !('destroy' in value)
+}
+
+/**
+ * The visibility a declaration gets when the caller states none: every stage of
+ * the pipeline — except that WebGPU forbids a read-write storage buffer visible
+ * to the vertex stage, so for that kind the vertex bit is dropped rather than
+ * producing a layout the API rejects outright. A shader that really does use one
+ * in its vertex stage then fails on the shader's own usage, which is the honest
+ * place for that error.
+ */
+function defaultVisibility(entry: ShaderBindingDeclaration, union: GPUShaderStageFlags): GPUShaderStageFlags {
+  return entry.kind === 'storage' ? union & ~GPUShaderStage.VERTEX : union
+}
+
+/** One caller declaration as a bind group layout entry. Every field is either
+ *  the caller's value or WebGPU's default for that binding kind — nothing is
+ *  inferred from the WGSL. */
+function shaderLayoutEntry(
+  declaration: ShaderBindingDeclaration,
+  visibility: GPUShaderStageFlags,
+): GPUBindGroupLayoutEntry {
+  const base = { binding: declaration.binding, visibility }
+  switch (declaration.kind) {
+    case 'uniform':
+    case 'storage':
+    case 'read-only-storage':
+      return {
+        ...base,
+        buffer: {
+          type: declaration.kind,
+          hasDynamicOffset: declaration.hasDynamicOffset,
+          minBindingSize: declaration.minBindingSize,
+        },
+      }
+    case 'texture':
+    case 'depth-texture':
+      return {
+        ...base,
+        texture: {
+          sampleType: declaration.kind === 'depth-texture' ? 'depth' : (declaration.sampleType ?? 'float'),
+          viewDimension: declaration.viewDimension ?? '2d',
+          multisampled: declaration.multisampled ?? false,
+        },
+      }
+    case 'storage-texture':
+      return {
+        ...base,
+        storageTexture: {
+          access: declaration.access ?? 'write-only',
+          format: declaration.format ?? 'rgba8unorm',
+          viewDimension: declaration.viewDimension ?? '2d',
+        },
+      }
+    case 'comparison-sampler':
+      return { ...base, sampler: { type: 'comparison' } }
+    case 'sampler':
+      return { ...base, sampler: { type: declaration.samplerType ?? 'filtering' } }
+  }
+}
+
+/**
+ * Blend state for a material.
+ *
+ * WebGPU takes source and destination factors separately for colour and alpha;
+ * the four modes here mirror the GL backend's, so the same material looks the
+ * same on either backend.
+ */
+function blendState(mode: BlendMode): GPUBlendState {
+  const factors: Record<BlendMode, [GPUBlendFactor, GPUBlendFactor]> = {
+    normal: ['src-alpha', 'one-minus-src-alpha'],
+    additive: ['src-alpha', 'one'],
+    multiply: ['dst', 'one-minus-src-alpha'],
+    // WebGPU has no `one-minus-src-color` (that is GL's spelling); a screen
+    // blend is expressed as one / one-minus-src.
+    screen: ['one', 'one-minus-src'],
+  }
+  const [src, dst] = factors[mode]
+  return {
+    color: { operation: 'add', srcFactor: src, dstFactor: dst },
+    alpha: { operation: 'add', srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+  }
+}
+
 export class WebGPURenderer extends Renderer {
   get ctx(): unknown {
     // The backend context handle a child component may need — same value the
@@ -167,6 +322,28 @@ export class WebGPURenderer extends Renderer {
    * colours and visible seams between parts. */
   private uniformsSkipTonemap: GPUBuffer
   private uniformDataSkip: Float32Array
+
+  /**
+   * Compiled materials. Empty unless one is created, so the material pass costs
+   * nothing for every existing scene.
+   */
+  private gpuMaterials = new Map<number, GpuMaterialRecord>()
+  private nextMaterialId = 1
+
+  /**
+   * Shader passes. Empty until a caller creates one, like `gpuMaterials` — and
+   * `destroy()` reports the leak if a caller forgets, because a `GPUBuffer` this
+   * renderer created for a bind group is not garbage collected with it.
+   */
+  private gpuShaderPipelines = new Map<number, GpuShaderPipelineRecord>()
+  private gpuShaderBindGroups = new Map<number, GpuShaderBindGroupRecord>()
+  private nextShaderPipelineId = 1
+  private nextShaderBindGroupId = 1
+  /** WGSL modules by source, so two pipelines over one module compile once. */
+  private shaderModules = new Map<string, GPUShaderModule>()
+  /** Bind group layouts by structure, so pipelines that declare the same group
+   *  share one layout — which is what makes their bind groups interchangeable. */
+  private shaderGroupLayouts = new Map<string, GPUBindGroupLayout>()
 
   private pipelines = new Map<string, GPURenderPipeline>()
   private bindGroups = new Map<string, GPUBindGroup>()
@@ -595,6 +772,524 @@ export class WebGPURenderer extends Renderer {
     // Overlay layers would flush here with their own camera; none yet.
   }
 
+  // --- materials -----------------------------------------------------------
+
+  /**
+   * Compile a material into a pipeline plus its uniform binding.
+   *
+   * Uniform layout: one 16-byte slot per declared uniform in order (`mat4` takes
+   * four), then `u_viewProj` and `u_model` appended as two mat4s. The WGSL struct
+   * must declare exactly that shape — the shader author's side of the contract
+   * documented on `MaterialOptions.uniforms`.
+   */
+  protected createMaterialProgram(options: MaterialOptions): MaterialHandle | null {
+    // No WGSL source means this is a GLSL material, which this backend cannot
+    // compile. Refusing is better than producing a pipeline that draws nothing.
+    if (!options.wgsl) return null
+
+    const device = this.device
+    const module = device.createShaderModule({ code: options.wgsl.module })
+
+    const declared = options.uniforms ?? []
+    let uniformFloats = 0
+    for (const uniform of declared) uniformFloats += uniform.type === 'mat4' ? 16 : 4
+    // The two built-ins the renderer always supplies.
+    uniformFloats += 32
+
+    const stride = options.attributes.reduce((sum, a) => sum + a.components * 4, 0)
+    const attributes: GPUVertexAttribute[] = []
+    let offset = 0
+    options.attributes.forEach((attribute, index) => {
+      const format =
+        attribute.components === 1
+          ? 'float32'
+          : attribute.components === 2
+            ? 'float32x2'
+            : attribute.components === 3
+              ? 'float32x3'
+              : 'float32x4'
+      attributes.push({ shaderLocation: index, offset, format })
+      offset += attribute.components * 4
+    })
+
+    const pipeline = device.createRenderPipeline({
+      layout: 'auto',
+      vertex: {
+        module,
+        entryPoint: options.wgsl.vertexEntry ?? 'vertexMain',
+        buffers: [{ arrayStride: stride, attributes }],
+      },
+      fragment: {
+        module,
+        entryPoint: options.wgsl.fragmentEntry ?? 'fragmentMain',
+        targets: [{ format: this.format, blend: blendState(options.blend ?? 'normal') }],
+      },
+      primitive: { topology: 'triangle-list', cullMode: options.cull === 'back' ? 'back' : 'none' },
+      // The frame's render pass has no depth attachment, so a depth-stencil state
+      // here would make the pipeline incompatible with the pass it is drawn in.
+    })
+
+    const uniformBuffer = device.createBuffer({
+      size: Math.max(16, uniformFloats * 4),
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    })
+    const bindGroup = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
+    })
+
+    const id = this.nextMaterialId++
+    this.gpuMaterials.set(id, {
+      pipeline,
+      bindGroup,
+      uniformBuffer,
+      uniformData: new Float32Array(uniformFloats),
+      declared: declared.map((u) => u.name),
+      vertexBuffer: null,
+      vertexBufferBytes: 0,
+      strideFloats: stride / 4,
+    })
+    return { id }
+  }
+
+  protected releaseMaterial(handle: MaterialHandle): void {
+    const record = this.gpuMaterials.get(handle.id)
+    if (!record) return
+    record.uniformBuffer.destroy()
+    // Pipeline and bind group are GC'd with the record; GPU buffers are not.
+    this.gpuMaterials.delete(handle.id)
+  }
+
+  protected drawMaterialPass(draws: readonly MaterialDraw[]): void {
+    const pass = this.framePass
+    if (!pass || this.gpuMaterials.size === 0) return
+
+    const viewProj = multiplyMat4x4(this.projectionMatrix, this.viewMatrix)
+    const frame = mat4x4f()
+    const ordered = draws.some((draw) => draw.order !== undefined)
+      ? [...draws].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      : draws
+
+    for (const draw of ordered) {
+      const record = this.gpuMaterials.get(draw.material.id)
+      if (!record) continue
+
+      // Vertices: one buffer per material, resized only when it must grow. A
+      // per-draw allocation would churn the allocator every frame.
+      const bytes = draw.vertices.byteLength
+      if (!record.vertexBuffer || record.vertexBufferBytes < bytes) {
+        record.vertexBuffer?.destroy()
+        record.vertexBuffer = this.device.createBuffer({
+          size: bytes,
+          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        })
+        record.vertexBufferBytes = bytes
+      }
+      this.device.queue.writeBuffer(
+        record.vertexBuffer,
+        0,
+        draw.vertices as unknown as GPUAllowSharedBufferSource,
+      )
+
+      // Uniforms, in the documented order.
+      const data = record.uniformData
+      data.fill(0)
+      let at = 0
+      const write = (value: number | ArrayLike<number> | undefined, slots: number): void => {
+        if (value === undefined) {
+          at += slots
+          return
+        }
+        if (typeof value === 'number') data[at] = value
+        else for (let i = 0; i < value.length && i < slots; i++) data[at + i] = value[i]
+        at += slots
+      }
+      for (const name of record.declared) {
+        const value = draw.uniforms?.[name]
+        if (value instanceof Mat4x4f) write(value.source, 16)
+        else write(value as number | ArrayLike<number> | undefined, 4)
+      }
+      const model = draw.transform
+      write(viewProj.source, 16)
+      write(model instanceof Mat4x4f ? model.source : model ? new Float32Array(model) : frame.source, 16)
+      this.device.queue.writeBuffer(
+        record.uniformBuffer,
+        0,
+        data as unknown as GPUAllowSharedBufferSource,
+      )
+
+      pass.setPipeline(record.pipeline)
+      pass.setBindGroup(0, record.bindGroup)
+      if (record.vertexBuffer) {
+        pass.setVertexBuffer(0, record.vertexBuffer)
+        pass.draw(draw.vertices.length / record.strideFloats)
+      }
+    }
+  }
+
+  // --- shader passes --------------------------------------------------------
+
+  /** The WGSL module for `source`, compiled once per distinct source. */
+  private shaderModule(source: string): GPUShaderModule {
+    let module = this.shaderModules.get(source)
+    if (!module) {
+      module = this.device.createShaderModule({ code: source })
+      this.shaderModules.set(source, module)
+    }
+    return module
+  }
+
+  /**
+   * The bind group layout for one declared group, shared by every pipeline that
+   * declares the same entries. Sharing matters: a caller can then reuse one
+   * bind group across pipelines, which is the whole point of describing a group
+   * structurally rather than per pipeline.
+   */
+  private shaderGroupLayout(
+    group: number,
+    entries: readonly ShaderBindingDeclaration[],
+    visibility: GPUShaderStageFlags,
+  ): GPUBindGroupLayout {
+    const key = `${visibility}|${group}|${JSON.stringify(entries)}`
+    let layout = this.shaderGroupLayouts.get(key)
+    if (!layout) {
+      layout = this.device.createBindGroupLayout({
+        entries: entries.map((entry) =>
+          shaderLayoutEntry(entry, entry.visibility ? stageFlags(entry.visibility) : defaultVisibility(entry, visibility)),
+        ),
+      })
+      this.shaderGroupLayouts.set(key, layout)
+    }
+    return layout
+  }
+
+  /**
+   * Create a pipeline from the caller's declarations.
+   *
+   * Everything WebGPU needs is taken from `options` verbatim: the bind group
+   * layouts (so the WGSL is never scanned for bindings), the vertex buffers (so
+   * no attribute is assumed), and the targets (so no format is assumed — a
+   * target count and format are pipeline state and a fragment stage cannot
+   * imply them). A state mistake throws out of `createRenderPipeline`; it is
+   * reported through `onError` and turned into `null` here, because a shader
+   * this backend cannot host must leave the frame drawable.
+   */
+  protected createShaderPipelineProgram(options: ShaderPipelineOptions): ShaderPipelineHandle | null {
+    const device = this.device
+    const vertex = options.vertex
+    const fragment = options.fragment
+    const compute = options.compute
+    try {
+      if (compute && (vertex || fragment)) {
+        options.onError?.('a pipeline takes either compute or vertex/fragment stages, not both')
+        return null
+      }
+      if (!compute && !vertex) {
+        options.onError?.('a render pipeline needs a vertex stage')
+        return null
+      }
+      const defaultVisibility = compute
+        ? GPUShaderStage.COMPUTE
+        : (vertex ? GPUShaderStage.VERTEX : 0) | (fragment ? GPUShaderStage.FRAGMENT : 0)
+
+      const declared = new Map<number, readonly ShaderBindingDeclaration[]>()
+      for (const group of options.bindGroups ?? []) declared.set(group.group, group.entries)
+      // A pipeline layout is positional: index i is group i, with no holes, so a
+      // group the caller never declared is filled with an empty layout rather
+      // than shifting the ones after it.
+      const highest = declared.size === 0 ? -1 : Math.max(...declared.keys())
+      const layouts: GPUBindGroupLayout[] = []
+      const byIndex = new Map<number, GPUBindGroupLayout>()
+      for (let index = 0; index <= highest; index++) {
+        const entries = declared.get(index) ?? []
+        const layout = this.shaderGroupLayout(index, entries, defaultVisibility)
+        layouts.push(layout)
+        byIndex.set(index, layout)
+      }
+      const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: layouts })
+
+      const declarations = new Map<string, ShaderBindingDeclaration>()
+      for (const [group, entries] of declared) {
+        for (const entry of entries) declarations.set(`${group}:${entry.binding}`, entry)
+      }
+
+      let pipeline: GPURenderPipeline | GPUComputePipeline
+      let vertexStride = 0
+      if (compute) {
+        pipeline = device.createComputePipeline({
+          label: options.label,
+          layout: pipelineLayout,
+          compute: {
+            module: this.shaderModule(compute.module),
+            entryPoint: compute.entryPoint,
+          },
+        })
+      } else if (vertex) {
+        const buffers = (vertex.buffers ?? []).map((buffer) => ({
+          arrayStride: buffer.arrayStride,
+          stepMode: buffer.stepMode,
+          attributes: buffer.attributes.map((attribute) => ({ ...attribute })),
+        }))
+        vertexStride = buffers.length > 0 && buffers[0].arrayStride > 0 ? buffers[0].arrayStride / 4 : 0
+        pipeline = device.createRenderPipeline({
+          label: options.label,
+          layout: pipelineLayout,
+          vertex: {
+            module: this.shaderModule(vertex.module),
+            entryPoint: vertex.entryPoint,
+            buffers,
+          },
+          // A fragment stage is optional (a depth-only pass), and a target list
+          // without a fragment stage would be rejected by WebGPU.
+          fragment: fragment
+            ? {
+                module: this.shaderModule(fragment.module),
+                entryPoint: fragment.entryPoint,
+                targets: fragment.targets.map((target) => ({
+                  format: target.format,
+                  blend: typeof target.blend === 'string' ? blendState(target.blend) : target.blend,
+                })),
+              }
+            : undefined,
+          primitive: {
+            topology: options.topology ?? 'triangle-list',
+            cullMode: options.cullMode ?? 'none',
+          },
+          depthStencil: options.depthStencil,
+        })
+      } else {
+        return null
+      }
+
+      const id = this.nextShaderPipelineId++
+      this.gpuShaderPipelines.set(id, {
+        pipeline,
+        kind: compute ? 'compute' : 'render',
+        layouts: byIndex,
+        declarations,
+        vertexStride,
+        vertexBuffer: null,
+        vertexBufferBytes: 0,
+      })
+      return { id }
+    } catch (error) {
+      options.onError?.(error instanceof Error ? error.message : String(error))
+      return null
+    }
+  }
+
+  /**
+   * Wait for the modules to compile. WebGPU reports a WGSL error asynchronously,
+   * so this is the only place a caller can learn that a pipeline it holds is
+   * not actually usable; without it, a typo in a shader is a silent no-op.
+   */
+  protected async validateShaderPipeline(options: ShaderPipelineOptions): Promise<string | null> {
+    const sources = new Set<string>()
+    for (const stage of [options.vertex, options.fragment, options.compute]) {
+      if (stage) sources.add(stage.module)
+    }
+    const problems: string[] = []
+    for (const source of sources) {
+      const module = this.shaderModules.get(source)
+      if (!module || typeof module.getCompilationInfo !== 'function') continue
+      const info = await module.getCompilationInfo()
+      for (const message of info.messages) {
+        if (message.type === 'error') {
+          problems.push(`line ${message.lineNum}:${message.linePos} ${message.message}`)
+        }
+      }
+    }
+    return problems.length > 0 ? problems.join('; ') : null
+  }
+
+  /**
+   * Build a bind group from the caller's resources.
+   *
+   * The kind of each binding comes from the pipeline's own declarations, so the
+   * caller states a resource once and never repeats the WGSL type. Bytes handed
+   * over for a uniform/storage binding are uploaded once, into a buffer this
+   * renderer owns and destroys with the group — that is the lifetime rule a
+   * caller would otherwise have to get right by hand.
+   */
+  protected createShaderBindGroupResources(
+    pipeline: ShaderPipelineHandle,
+    options: ShaderBindGroupOptions,
+  ): ShaderBindGroupHandle | null {
+    const record = this.gpuShaderPipelines.get(pipeline.id)
+    if (!record) return null
+    const layout = record.layouts.get(options.group)
+    if (!layout) return null
+
+    const ownedBuffers: GPUBuffer[] = []
+    const entries: GPUBindGroupEntry[] = []
+    try {
+      for (const resource of options.entries) {
+        const declaration = record.declarations.get(`${options.group}:${resource.binding}`)
+        if (!declaration) continue
+        entries.push({
+          binding: resource.binding,
+          resource: this.shaderBindingResource(declaration, resource, ownedBuffers),
+        })
+      }      const bindGroup = this.device.createBindGroup({ layout, entries })
+      const id = this.nextShaderBindGroupId++
+      this.gpuShaderBindGroups.set(id, { bindGroup, ownedBuffers })
+      return { id, group: options.group, pipeline }
+    } catch (error) {
+      for (const buffer of ownedBuffers) buffer.destroy()
+      options.onError?.(error instanceof Error ? error.message : String(error))
+      return null
+    }
+  }
+
+  /** One binding's resource, uploading caller bytes into a buffer gfx owns. */
+  private shaderBindingResource(
+    declaration: ShaderBindingDeclaration,
+    resource: ShaderBindingResource,
+    ownedBuffers: GPUBuffer[],
+  ): GPUBindingResource {
+    switch (declaration.kind) {
+      case 'uniform':
+      case 'storage':
+      case 'read-only-storage': {
+        const buffer = resource.buffer
+        if (!buffer) throw new Error(`binding ${declaration.binding} needs a buffer`)
+        if (isArrayBufferView(buffer)) {
+          const usage =
+            declaration.kind === 'uniform' ? GPUBufferUsage.UNIFORM : GPUBufferUsage.STORAGE
+          const upload = this.device.createBuffer({
+            // An empty upload is a legal buffer description but not a legal
+            // binding, so the size floor keeps a zero-length array bindable.
+            size: Math.max(16, buffer.byteLength),
+            usage: usage | GPUBufferUsage.COPY_DST,
+          })
+          this.device.queue.writeBuffer(upload, 0, buffer as unknown as GPUAllowSharedBufferSource)
+          ownedBuffers.push(upload)
+          return { buffer: upload }
+        }
+        return {
+          buffer,
+          offset: resource.offset ?? 0,
+          size: resource.size,
+        } as GPUBufferBinding
+      }
+      case 'texture':
+      case 'depth-texture':
+      case 'storage-texture': {
+        if (!resource.texture) throw new Error(`binding ${declaration.binding} needs a texture view`)
+        return resource.texture
+      }
+      case 'sampler':
+      case 'comparison-sampler': {
+        if (!resource.sampler) throw new Error(`binding ${declaration.binding} needs a sampler`)
+        return resource.sampler
+      }
+    }
+    if (!resource.externalTexture) throw new Error(`binding ${declaration.binding} needs an external texture`)
+    return resource.externalTexture
+  }
+
+  protected releaseShaderPipeline(handle: ShaderPipelineHandle): void {
+    const record = this.gpuShaderPipelines.get(handle.id)
+    if (!record) return
+    record.vertexBuffer?.destroy()
+    this.gpuShaderPipelines.delete(handle.id)
+    // The pipeline object is garbage collected; any bind group built from its
+    // layout keeps working, because the layout is shared and cached.
+  }
+
+  protected releaseShaderBindGroup(handle: ShaderBindGroupHandle): void {
+    const record = this.gpuShaderBindGroups.get(handle.id)
+    if (!record) return
+    for (const buffer of record.ownedBuffers) buffer.destroy()
+    this.gpuShaderBindGroups.delete(handle.id)
+  }
+
+  protected drawShaderPassQueue(draws: readonly ShaderPassDraw[]): void {
+    const pass = this.framePass
+    if (!pass || this.gpuShaderPipelines.size === 0) return
+    const ordered = draws.some((draw) => draw.order !== undefined)
+      ? [...draws].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      : draws
+
+    for (const draw of ordered) {
+      const record = this.gpuShaderPipelines.get(draw.pass.id)
+      if (!record || record.kind !== 'render') continue
+      pass.setPipeline(record.pipeline as GPURenderPipeline)
+      draw.bindGroups.forEach((group, index) => {
+        if (!group) return
+        const bindGroup = this.gpuShaderBindGroups.get(group.id)
+        if (bindGroup) pass.setBindGroup(index, bindGroup.bindGroup)
+      })
+
+      if (draw.vertexBuffers) {
+        draw.vertexBuffers.forEach((buffer, slot) => pass.setVertexBuffer(slot, buffer))
+      }
+      if (draw.vertices) {
+        const bytes = draw.vertices.byteLength
+        if (!record.vertexBuffer || record.vertexBufferBytes < bytes) {
+          // Destroyed, not leaked: the staging buffer is only ever read by a
+          // command recorded from here on, and growth is rare.
+          record.vertexBuffer?.destroy()
+          record.vertexBuffer = this.device.createBuffer({
+            size: bytes,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+          })
+          record.vertexBufferBytes = bytes
+        }
+        this.device.queue.writeBuffer(
+          record.vertexBuffer,
+          0,
+          draw.vertices as unknown as GPUAllowSharedBufferSource,
+        )
+        pass.setVertexBuffer(0, record.vertexBuffer)
+      }
+
+      if (draw.indices && draw.indexCount) {
+        pass.setIndexBuffer(draw.indices, draw.indexFormat ?? 'uint32')
+        pass.drawIndexed(
+          draw.indexCount,
+          draw.instanceCount ?? 1,
+          draw.firstIndex ?? 0,
+          draw.baseVertex ?? 0,
+        )
+        continue
+      }
+      const count =
+        draw.vertexCount ??
+        (draw.vertices && record.vertexStride > 0 ? draw.vertices.length / record.vertexStride : 0)
+      if (count > 0) pass.draw(count, draw.instanceCount ?? 1)
+    }
+  }
+
+  /**
+   * Run the queued dispatches.
+   *
+   * These own their encoder and are submitted immediately, which is what makes
+   * them ordered before this frame's render pass: WebGPU executes queue
+   * submissions in order, so a dispatch that produces a texture or buffer the
+   * frame samples is guaranteed to have run.
+   */
+  protected dispatchShaderPassQueue(dispatches: readonly ShaderDispatch[]): void {
+    if (this.gpuShaderPipelines.size === 0) return
+    const encoder = this.device.createCommandEncoder({})
+    const pass = encoder.beginComputePass({})
+    let recorded = false
+    for (const dispatch of dispatches) {
+      const record = this.gpuShaderPipelines.get(dispatch.pass.id)
+      if (!record || record.kind !== 'compute') continue
+      pass.setPipeline(record.pipeline as GPUComputePipeline)
+      dispatch.bindGroups.forEach((group, index) => {
+        if (!group) return
+        const bindGroup = this.gpuShaderBindGroups.get(group.id)
+        if (bindGroup) pass.setBindGroup(index, bindGroup.bindGroup)
+      })
+      pass.dispatchWorkgroups(...dispatch.workgroups)
+      recorded = true
+    }
+    pass.end()
+    if (recorded) this.device.queue.submit([encoder.finish()])
+  }
+
   protected endFrame(): void {
     if (this.framePass) {
       this.framePass.end()
@@ -749,6 +1444,17 @@ export class WebGPURenderer extends Renderer {
     this.pipelines.clear()
     this.bindGroups.clear()
     this.white?.destroy()
+    // Shader-pass state the caller did not release. The pipelines and bind
+    // groups are garbage collected; the buffers this renderer created for
+    // uploaded bytes are not, which is exactly why it owns them.
+    for (const record of this.gpuShaderPipelines.values()) record.vertexBuffer?.destroy()
+    for (const record of this.gpuShaderBindGroups.values()) {
+      for (const buffer of record.ownedBuffers) buffer.destroy()
+    }
+    this.gpuShaderPipelines.clear()
+    this.gpuShaderBindGroups.clear()
+    this.shaderModules.clear()
+    this.shaderGroupLayouts.clear()
   }
 
   // -- internals -------------------------------------------------------------

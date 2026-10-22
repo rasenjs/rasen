@@ -73,6 +73,16 @@ export class MockGPUDevice {
   destroyedTextures: MockGPUTexture[] = []
   buffers: MockGPUBuffer[] = []
   textures: MockGPUTexture[] = []
+  /** Everything the shader-pass path creates, in creation order, so a test can
+   *  assert what actually reached the device rather than what was intended. */
+  shaderModules: MockGPUShaderModule[] = []
+  bindGroupLayouts: MockGPUBindGroupLayout[] = []
+  pipelineLayouts: { bindGroupLayouts: unknown[]; label?: string }[] = []
+  renderPipelines: MockGPURenderPipeline[] = []
+  computePipelines: MockGPUComputePipeline[] = []
+  bindGroups: MockBindGroup[] = []
+  /** Messages `getCompilationInfo` reports — the WGSL error channel. */
+  compilationMessages: { type: string; message: string; lineNum: number; linePos: number }[] = []
   readonly queue: MockQueue = new MockQueue(this)
 
   createBuffer(desc: { size: number; usage: number; label?: string }): MockGPUBuffer {
@@ -89,28 +99,53 @@ export class MockGPUDevice {
    *  recorded (render-pass descriptors, copy sizes) without threading a handle
    *  through the renderer. */
   lastCommandEncoder: MockCommandEncoder | null = null
+  /** Every encoder, in creation order — the only way to tell a compute pass
+   *  apart from the frame's own pass, since both belong to one device. */
+  encoders: MockCommandEncoder[] = []
   createCommandEncoder(): MockCommandEncoder {
     const encoder = new MockCommandEncoder()
+    this.encoders.push(encoder)
     this.lastCommandEncoder = encoder
     return encoder
   }
-  createShaderModule(): object {
-    return {}
+  createShaderModule(desc?: { code?: string; label?: string }): object {
+    const module = new MockGPUShaderModule(desc?.code ?? '', this)
+    this.shaderModules.push(module)
+    return module
   }
   createSampler(): object {
     return {}
   }
-  createBindGroupLayout(): object {
-    return {}
+  createBindGroupLayout(desc: { entries: unknown[]; label?: string }): MockGPUBindGroupLayout {
+    const layout = new MockGPUBindGroupLayout(desc.entries, desc.label)
+    this.bindGroupLayouts.push(layout)
+    return layout
   }
-  createPipelineLayout(): object {
-    return {}
+  createPipelineLayout(desc: { bindGroupLayouts: unknown[]; label?: string }): object {
+    this.pipelineLayouts.push(desc)
+    return { __bindGroupLayouts: desc.bindGroupLayouts }
   }
-  createRenderPipeline(): object {
-    return {}
+  createRenderPipeline(desc: unknown): MockGPURenderPipeline {
+    const pipeline = new MockGPURenderPipeline(desc, this.pipelineLayoutFrom(desc))
+    this.renderPipelines.push(pipeline)
+    return pipeline
   }
-  createBindGroup(desc: { entries: { binding: number; resource: unknown }[] }): MockBindGroup {
-    return { entries: desc.entries }
+  createComputePipeline(desc: unknown): MockGPUComputePipeline {
+    const pipeline = new MockGPUComputePipeline(desc, this.pipelineLayoutFrom(desc))
+    this.computePipelines.push(pipeline)
+    return pipeline
+  }
+  /** The layouts of the pipeline layout a descriptor names, so a pipeline's
+   *  `getBindGroupLayout(i)` answers with the SAME object the descriptor handed
+   *  to `createPipelineLayout` — the property the backend relies on. */
+  private pipelineLayoutFrom(desc: unknown): unknown[] {
+    const layout = (desc as { layout?: { __bindGroupLayouts?: unknown[] } }).layout
+    return layout?.__bindGroupLayouts ?? []
+  }
+  createBindGroup(desc: { entries: { binding: number; resource: unknown }[]; layout?: unknown }): MockBindGroup {
+    const group: MockBindGroup = { entries: desc.entries, layout: desc.layout }
+    this.bindGroups.push(group)
+    return group
   }
   pushErrorScope(): void {}
   popErrorScope(): Promise<null> {
@@ -118,8 +153,51 @@ export class MockGPUDevice {
   }
 }
 
+/** A shader module: the renderer asks for compilation info only to report WGSL
+ *  errors, so what a test needs is control over the messages. */
+export class MockGPUShaderModule {
+  constructor(
+    public code: string,
+    public device: MockGPUDevice
+  ) {}
+  getCompilationInfo(): Promise<{ messages: { type: string; message: string; lineNum: number; linePos: number }[] }> {
+    return Promise.resolve({ messages: this.device.compilationMessages })
+  }
+}
+
+export class MockGPUBindGroupLayout {
+  constructor(
+    public entries: unknown[],
+    public label?: string
+  ) {}
+}
+
+export class MockGPURenderPipeline {
+  constructor(
+    public desc: unknown,
+    public layouts: unknown[]
+  ) {}
+  getBindGroupLayout(index: number): unknown {
+    return this.layouts[index]
+  }
+}
+
+export class MockGPUComputePipeline {
+  constructor(
+    public desc: unknown,
+    public layouts: unknown[]
+  ) {}
+  getBindGroupLayout(index: number): unknown {
+    return this.layouts[index]
+  }
+}
+
+/** A bind group as the renderer hands it over: the entries it bound, and the
+ *  layout it was created against (which is what makes a layout/pipeline-layout
+ *  mismatch visible in a test). */
 export interface MockBindGroup {
   entries: { binding: number; resource: unknown }[]
+  layout?: unknown
 }
 
 export class MockQueue {
@@ -159,6 +237,12 @@ export class MockCommandEncoder {
   renderPassDescriptors: Array<{
     colorAttachments?: Array<{ clearValue?: { r: number; g: number; b: number; a: number } }>
   }> = []
+  /** Every render pass opened, so a test can reach the one a frame drew into
+   *  without depending on call order. */
+  passes: MockRenderPassEncoder[] = []
+  lastPass: MockRenderPassEncoder | null = null
+  computePasses: MockComputePassEncoder[] = []
+  lastComputePass: MockComputePassEncoder | null = null
   beginRenderPass(descriptor?: unknown): MockRenderPassEncoder {
     this.calls.push('beginRenderPass')
     if (descriptor) {
@@ -166,7 +250,17 @@ export class MockCommandEncoder {
         colorAttachments?: Array<{ clearValue?: { r: number; g: number; b: number; a: number } }>
       })
     }
-    return new MockRenderPassEncoder(this)
+    const pass = new MockRenderPassEncoder(this)
+    this.lastPass = pass
+    this.passes.push(pass)
+    return pass
+  }
+  beginComputePass(): MockComputePassEncoder {
+    this.calls.push('beginComputePass')
+    const pass = new MockComputePassEncoder(this)
+    this.lastComputePass = pass
+    this.computePasses.push(pass)
+    return pass
   }
   copyTextureToBuffer(_source?: unknown, _destination?: unknown, size?: unknown): void {
     this.calls.push('copyTextureToBuffer')
@@ -181,19 +275,54 @@ export class MockCommandEncoder {
 }
 
 export class MockRenderPassEncoder {
+  /** Pipelines, bind groups and draws recorded by this pass. Kept apart from
+   *  `encoder.calls` so existing assertions on that sequence are unaffected. */
+  pipelines: unknown[] = []
+  bindGroups: { index: number; group: MockBindGroup }[] = []
+  vertexBuffers: { slot: number; buffer: unknown }[] = []
+  draws: { count: number; instances: number }[] = []
+  indexedDraws: { count: number; instances: number; firstIndex: number; baseVertex: number }[] = []
   constructor(public encoder: MockCommandEncoder) {}
-  setPipeline(): void {}
+  setPipeline(pipeline: unknown): void {
+    this.pipelines.push(pipeline)
+  }
   setBindGroup(_index: number, group: MockBindGroup): void {
+    this.bindGroups.push({ index: _index, group })
     this.encoder.calls.push(`bindGroup:${(group as { __tag?: string }).__tag ?? 'untagged'}`)
   }
-  setVertexBuffer(): void {}
+  setVertexBuffer(slot: number, buffer: unknown): void {
+    this.vertexBuffers.push({ slot, buffer })
+  }
   setIndexBuffer(): void {}
   drawIndexed(count: number, instances: number, firstIndex: number, baseVertex: number): void {
+    this.indexedDraws.push({ count, instances, firstIndex, baseVertex })
     this.encoder.calls.push(`drawIndexed(${count},${instances},${firstIndex},${baseVertex})`)
   }
-  draw(): void {}
+  draw(count = 0, instances = 1): void {
+    this.draws.push({ count, instances })
+  }
   end(): void {
     this.encoder.calls.push('end')
+  }
+}
+
+export class MockComputePassEncoder {
+  pipelines: unknown[] = []
+  bindGroups: { index: number; group: MockBindGroup }[] = []
+  workgroups: [number, number, number][] = []
+  ended = false
+  constructor(public encoder: MockCommandEncoder) {}
+  setPipeline(pipeline: unknown): void {
+    this.pipelines.push(pipeline)
+  }
+  setBindGroup(index: number, group: MockBindGroup): void {
+    this.bindGroups.push({ index, group })
+  }
+  dispatchWorkgroups(x: number, y: number, z: number): void {
+    this.workgroups.push([x, y, z])
+  }
+  end(): void {
+    this.ended = true
   }
 }
 

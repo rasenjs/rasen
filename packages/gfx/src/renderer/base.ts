@@ -32,6 +32,312 @@ import type { GfxNode } from '../node'
  *  and 2D-style meshes that emulate an additive/multiply/screen draw. */
 export type BlendMode = 'normal' | 'additive' | 'multiply' | 'screen'
 
+// ---------------------------------------------------------------------------
+// Materials — an opt-in second pipeline
+// ---------------------------------------------------------------------------
+
+/**
+ * A material is a caller-supplied shader pair drawn through its own program,
+ * alongside the batches the built-in program handles.
+ *
+ * Why it exists: the built-in program has one fixed vertex layout and one fixed
+ * lighting model. Anything with its own BRDF (physically based shading, a custom
+ * effect) needs its own program, and forking the batch renderer to get one would
+ * put the spine and instanced paths at risk.
+ *
+ * ## Cost when unused: none
+ *
+ * Nothing here runs unless a material is created. Submissions for shapes and
+ * meshes do not gain a branch, and the frame pays a single `null` check (see
+ * `draw`). That property is the whole reason the pass is a separate list rather
+ * than a flag on every batch item, and it is asserted by a test.
+ */
+
+export type MaterialUniformType = 'float' | 'vec2' | 'vec3' | 'vec4' | 'mat4'
+
+export interface MaterialUniformDeclaration {
+  readonly name: string
+  readonly type: MaterialUniformType
+}
+
+/** One interleaved vertex attribute, in the order it appears in the buffer. */
+export interface MaterialAttribute {
+  readonly name: string
+  readonly components: 1 | 2 | 3 | 4
+}
+
+/**
+ * A WGSL module for backends that take WGSL (WebGPU) instead of GLSL.
+ *
+ * The two backends do not share a shading language, so a material that wants to
+ * run on both supplies both. Handing a WebGPU backend GLSL is not an error the
+ * compiler can catch, so the backend simply refuses a material it has no source
+ * for and `createMaterial` returns null.
+ */
+export interface MaterialWgslSource {
+  module: string
+  vertexEntry?: string
+  fragmentEntry?: string
+}
+
+export interface MaterialOptions {
+  vertex: string
+  fragment: string
+  /** Required by the WebGPU backend; ignored by the GL backend. */
+  wgsl?: MaterialWgslSource
+  /** The interleaved layout of the buffers passed to `drawMaterial`. */
+  attributes: readonly MaterialAttribute[]
+  /**
+   * Uniforms the host may bind, in the order they appear in the uniform buffer.
+   * `u_viewProj` and `u_model` are appendend by the renderer after these, so a
+   * material does not have to be handed the camera.
+   *
+   * The layout is deliberately trivial: every declared uniform occupies one
+   * 16-byte slot and a `mat4` occupies four. A WebGPU shader declares the matching
+   * struct with one `vec4<f32>` per declared uniform (and `mat4x4<f32>` for the
+   * two built-ins), which keeps the two sides easy to keep in step — the
+   * alternative, std140 packing rules, is a class of bug for no benefit here.
+   */
+  uniforms?: readonly MaterialUniformDeclaration[]
+  /** Sampler uniform names, bound from `MaterialDraw.textures` in order. */
+  samplers?: readonly string[]
+  blend?: BlendMode
+  depthTest?: boolean
+  depthWrite?: boolean
+  cull?: 'none' | 'back'
+}
+
+export interface MaterialHandle {
+  readonly id: number
+}
+
+export interface MaterialDraw {
+  material: MaterialHandle
+  /** Interleaved vertices matching the material's declared attributes. */
+  vertices: Float32Array
+  indices?: Uint32Array | Uint16Array | number[]
+  transform?: Mat4x4f | number[]
+  uniforms?: Record<string, number | readonly number[] | Mat4x4f>
+  textures?: readonly (TextureHandle | null)[]
+  /** Draw order inside the pass; lower first. Defaults to submission order. */
+  order?: number
+}
+
+// ---------------------------------------------------------------------------
+// Shader passes — an opt-in third pipeline, for WGSL the caller owns entirely
+// ---------------------------------------------------------------------------
+
+/**
+ * A *shader pass* is a caller-supplied WGSL module with the caller's own bind
+ * group layouts, vertex layout and render targets, drawn through a pipeline
+ * this renderer only creates and caches.
+ *
+ * Why it exists, and how it differs from a material: a material is a *contract*
+ * — the renderer supplies the camera (`u_viewProj`, `u_model`) and dictates the
+ * uniform packing, so a material only has to describe its own parameters. That
+ * works when the renderer knows something about the shading model. It cannot
+ * work for a shader that arrives already compiled, with its own reflection
+ * tables, its own vertex layout and its own bindings — which is what a shader
+ * extracted from a shipped game is. There is nothing to infer there and
+ * inferring it would be a guess, so this layer refuses to:
+ *
+ *   - the **bindings** are declared by the caller, entry by entry, and become a
+ *     `GPUBindGroupLayout` verbatim. This renderer never parses the WGSL to
+ *     discover them: a shader may legally declare two resource variables at the
+ *     same `@group/@binding` (the extracted set does, in 65 of 119 modules), and
+ *     only the caller knows whether that is an alias to collapse or a mistake.
+ *   - the **vertex layout** is declared, not derived from `@location` attributes:
+ *     which attribute supplies which location depends on the mesh format, and a
+ *     module may take no attributes at all.
+ *   - the **targets** are declared. Target count and format are pipeline state in
+ *     WebGPU, and a fragment stage does not carry them.
+ *   - the **camera** is not supplied. There is no `u_viewProj` convention to
+ *     append: a game shader reads whatever its own constant buffer holds.
+ *
+ * What this renderer does own is the part that is pure bookkeeping: shader
+ * module creation, layout/pipeline caching, the bind groups' buffer uploads for
+ * caller-supplied bytes, queueing, and the guarantee that all of it is free when
+ * unused (one `null` check per frame — see `draw`).
+ */
+export type ShaderStageName = 'vertex' | 'fragment' | 'compute'
+
+/** What the WGSL declares at a binding, in WebGPU's own vocabulary. */
+export type ShaderBindingKind =
+  | 'uniform'
+  | 'storage'
+  | 'read-only-storage'
+  | 'texture'
+  | 'storage-texture'
+  | 'depth-texture'
+  | 'sampler'
+  | 'comparison-sampler'
+
+export type ShaderSampleType = 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth'
+
+export type ShaderViewDimension = '1d' | '2d' | '2d-array' | 'cube' | 'cube-array' | '3d'
+
+export type ShaderStorageAccess = 'write-only' | 'read-only' | 'read-write'
+
+export type ShaderSamplerType = 'filtering' | 'non-filtering' | 'comparison'
+
+/**
+ * One binding, as the shader declares it. The only fields that matter are the
+ * ones its `kind` uses; anything left out takes WebGPU's default for that kind.
+ */
+export interface ShaderBindingDeclaration {
+  readonly binding: number
+  readonly kind: ShaderBindingKind
+  /** Stages that read this binding. Defaults to every stage of the pipeline. */
+  readonly visibility?: readonly ShaderStageName[]
+  /** `texture` only. A `float` sample type is the permissive choice. */
+  readonly sampleType?: ShaderSampleType
+  /** `texture`, `storage-texture`, `depth-texture`. */
+  readonly viewDimension?: ShaderViewDimension
+  /** `texture` only. */
+  readonly multisampled?: boolean
+  /** `storage-texture` only. */
+  readonly access?: ShaderStorageAccess
+  /** `storage-texture` only, and it must match the WGSL exactly. */
+  readonly format?: GPUTextureFormat
+  /** `sampler`, `comparison-sampler` only. */
+  readonly samplerType?: ShaderSamplerType
+  /** `uniform`, `storage`, `read-only-storage` only. */
+  readonly hasDynamicOffset?: boolean
+  /** `uniform`, `storage`, `read-only-storage` only. */
+  readonly minBindingSize?: number
+}
+
+/** One bind group, at its explicit group index. */
+export interface ShaderBindGroupDeclaration {
+  readonly group: number
+  readonly entries: readonly ShaderBindingDeclaration[]
+}
+
+export interface ShaderStageSource {
+  /** The WGSL source. Two stages of one pipeline may come from two modules. */
+  readonly module: string
+  readonly entryPoint: string
+}
+
+export interface ShaderVertexAttribute {
+  readonly shaderLocation: number
+  readonly offset: number
+  readonly format: GPUVertexFormat
+}
+
+/** One vertex buffer slot, exactly as `GPUVertexBufferLayout` states it. */
+export interface ShaderVertexBuffer {
+  readonly arrayStride: number
+  readonly stepMode?: GPUVertexStepMode
+  readonly attributes: readonly ShaderVertexAttribute[]
+}
+
+export interface ShaderColorTarget {
+  readonly format: GPUTextureFormat
+  /** A named blend mode, or a raw WebGPU blend state. Defaults to no blending. */
+  readonly blend?: BlendMode | GPUBlendState
+}
+
+export interface ShaderPipelineOptions {
+  /** Also part of the cache key: two pipelines that differ only in label are cached separately. */
+  readonly label?: string
+  readonly vertex?: ShaderStageSource & { readonly buffers?: readonly ShaderVertexBuffer[] }
+  /**
+   * Note the pass this renderer draws into has ONE colour attachment and no depth
+   * attachment, so a pipeline declaring more targets, or a `depthStencil` state,
+   * is created but cannot be drawn through it. A caller that needs such a
+   * pipeline owns the pass it records (see the class doc on shader passes).
+   */
+  readonly fragment?: ShaderStageSource & { readonly targets: readonly ShaderColorTarget[] }
+  readonly compute?: ShaderStageSource
+  /** Every group the shader uses. Omitted groups get no layout entry. */
+  readonly bindGroups?: readonly ShaderBindGroupDeclaration[]
+  readonly topology?: GPUPrimitiveTopology
+  readonly cullMode?: GPUCullMode
+  readonly depthStencil?: GPUDepthStencilState
+  /**
+   * Called with the backend's reason when creation fails — a backend without
+   * WGSL, a module that does not compile, an invalid layout. Creation still
+   * returns `null` rather than throwing: a shader this renderer cannot host must
+   * not take the frame down.
+   */
+  readonly onError?: (message: string) => void
+}
+
+export interface ShaderPipelineHandle {
+  readonly id: number
+}
+
+export interface ShaderBindGroupHandle {
+  readonly id: number
+  readonly group: number
+  readonly pipeline: ShaderPipelineHandle
+}
+
+/**
+ * A binding's resource at creation time.
+ *
+ * Uniform/storage data may be handed over as bytes; this renderer then owns the
+ * buffer, sizes it once and re-uploads per draw, so a caller does not have to
+ * build a `GPUBuffer` and track the WebGPU lifetime rule that a buffer referenced
+ * by a submitted command must not be destroyed until the queue is done with it.
+ */
+export interface ShaderBindingResource {
+  readonly binding: number
+  /** `uniform`, `storage`, `read-only-storage`: a buffer, or the bytes to upload. */
+  readonly buffer?: GPUBuffer | ArrayBufferView
+  /** Byte offset into a caller-owned `GPUBuffer`. */
+  readonly offset?: number
+  /** Byte size into a caller-owned `GPUBuffer`; defaults to the rest of it. */
+  readonly size?: number
+  /** `texture`, `depth-texture`, `storage-texture`. */
+  readonly texture?: GPUTextureView
+  /** `sampler`, `comparison-sampler`. */
+  readonly sampler?: GPUSampler
+  /** `external-texture`. */
+  readonly externalTexture?: GPUExternalTexture
+}
+
+export interface ShaderBindGroupOptions {
+  readonly group: number
+  readonly entries: readonly ShaderBindingResource[]
+  /** Called with the backend's reason when the group cannot be created. */
+  readonly onError?: (message: string) => void
+}
+
+/** The result of the asynchronous half of pipeline creation (see `compileShaderPipeline`). */
+export interface ShaderPipelineResult {
+  readonly pipeline: ShaderPipelineHandle | null
+  /** The backend's error text, or `null` when the pipeline is usable. */
+  readonly error: string | null
+}
+
+export interface ShaderPassDraw {
+  readonly pass: ShaderPipelineHandle
+  /** Bound at `setBindGroup(i)` where `i` is the array index. `null` skips the slot. */
+  readonly bindGroups: readonly (ShaderBindGroupHandle | null)[]
+  /** Interleaved vertices for a single-buffer layout, uploaded by this renderer. */
+  readonly vertices?: Float32Array
+  /** Caller-owned buffers, for layouts with more than one slot. */
+  readonly vertexBuffers?: readonly GPUBuffer[]
+  /** Vertices to draw; defaults to `vertices` divided by the declared stride. */
+  readonly vertexCount?: number
+  readonly indices?: GPUBuffer
+  readonly indexFormat?: GPUIndexFormat
+  readonly indexCount?: number
+  readonly firstIndex?: number
+  readonly baseVertex?: number
+  readonly instanceCount?: number
+  /** Draw order inside the pass; lower first. Defaults to submission order. */
+  readonly order?: number
+}
+
+export interface ShaderDispatch {
+  readonly pass: ShaderPipelineHandle
+  readonly bindGroups: readonly (ShaderBindGroupHandle | null)[]
+  readonly workgroups: readonly [number, number, number]
+}
+
 export type GlPointerEventType = 'click' | 'pointerdown'
 
 /**
@@ -249,6 +555,21 @@ export abstract class Renderer {
   private activeShadow: { map: TextureHandle; matrix: Mat4x4f } | null = null
 
   /** Recycled BatchItem objects (see addShape / flush). */
+  /**
+   * Draws queued for the material pass, or `null` when nothing has ever
+   * submitted one. Allocating lazily is what keeps this free for every existing
+   * scene.
+   */
+  private materialDraws: MaterialDraw[] | null = null
+
+  /**
+   * Shader-pass queues, `null` until something submits one. Same lazy shape as
+   * `materialDraws`: a scene that never creates a shader pipeline pays one
+   * `null` check per frame and nothing else.
+   */
+  private shaderDraws: ShaderPassDraw[] | null = null
+  private shaderDispatches: ShaderDispatch[] | null = null
+
   private itemPool: BatchItem[] = []
 
   /** O(1) pending-vertex counter (a per-addShape O(n) reduce used to make the
@@ -372,6 +693,14 @@ export abstract class Renderer {
   draw() {
     if (!this.needsFullRedraw) return
     this.needsFullRedraw = false
+    // Compute first: a dispatch may produce what this frame's draws sample, and
+    // WebGPU executes queue submissions in order. Like the passes below, the
+    // whole thing is one null check when nothing ever dispatched.
+    const dispatches = this.shaderDispatches
+    if (dispatches !== null && dispatches.length > 0) {
+      this.dispatchShaderPassQueue(dispatches)
+      dispatches.length = 0
+    }
     this.beginFrame()
     // Pre-order traversal of the scene-tree roots. Group nodes push their
     // transform before recursing children and pop afterwards, so subtree
@@ -379,6 +708,19 @@ export abstract class Renderer {
     for (const root of this.children) root.draw()
     this.drawWorld()
     this.drawOverlay()
+    // The material pass, if anything queued one this frame. One null check per
+    // frame is the entire cost for scenes that never use materials.
+    const materialDraws = this.materialDraws
+    if (materialDraws !== null && materialDraws.length > 0) {
+      this.drawMaterialPass(materialDraws)
+      materialDraws.length = 0
+    }
+    // ...and the shader pass, for the same reason and at the same cost.
+    const shaderDraws = this.shaderDraws
+    if (shaderDraws !== null && shaderDraws.length > 0) {
+      this.drawShaderPassQueue(shaderDraws)
+      shaderDraws.length = 0
+    }
     this.endFrame()
   }
 
@@ -454,6 +796,159 @@ export abstract class Renderer {
 
   abstract createTexture(source: BitmapSource, options?: TextureOptions): TextureHandle
   abstract deleteTexture(texture: TextureHandle): void
+
+  // --- materials -----------------------------------------------------------
+
+  /** Whether a material pass has ever been used. */
+  get materialsActive(): boolean {
+    return this.materialDraws !== null
+  }
+
+  /**
+   * Compile a material, or `null` when the backend cannot (a backend without
+   * support returns null rather than throwing, so a scene stays renderable).
+   */
+  createMaterial(options: MaterialOptions): MaterialHandle | null {
+    return this.createMaterialProgram(options)
+  }
+
+  /** Compile a material and queue one draw with it. */
+  drawMaterial(draw: MaterialDraw): void {
+    ;(this.materialDraws ??= []).push(draw)
+  }
+
+  /** Drop a material and any queued draws that referenced it. */
+  destroyMaterial(handle: MaterialHandle): void {
+    const queue = this.materialDraws
+    if (queue) {
+      for (let i = queue.length - 1; i >= 0; i--) {
+        if (queue[i].material === handle) queue.splice(i, 1)
+      }
+    }
+    this.releaseMaterial(handle)
+  }
+
+  /** Backend hook: compile the program. Default: unsupported. */
+  protected createMaterialProgram(_options: MaterialOptions): MaterialHandle | null {
+    return null
+  }
+
+  /** Backend hook: release the program. Default: nothing to release. */
+  protected releaseMaterial(_handle: MaterialHandle): void {}
+
+  /** Backend hook: draw the queued material pass. Default: nothing to draw. */
+  protected drawMaterialPass(_draws: readonly MaterialDraw[]): void {}
+
+  // --- shader passes --------------------------------------------------------
+
+  /** Whether a shader pass has ever been created. */
+  get shaderPassesActive(): boolean {
+    return this.shaderDraws !== null || this.shaderDispatches !== null
+  }
+
+  /**
+   * Ask the backend for a shader pipeline. `null` when this backend cannot host
+   * it (only the WebGPU backend takes WGSL at all), which is why a caller must
+   * treat `null` as "this effect is unavailable here" rather than as an error.
+   *
+   * WebGPU reports two different classes of failure at two different times: a
+   * layout or state mistake throws here (and is reported to `options.onError`),
+   * while a WGSL compile error is only knowable asynchronously. So a non-null
+   * handle means the state was accepted, not that the module compiles — use
+   * `compileShaderPipeline` when that distinction matters.
+   */
+  createShaderPipeline(options: ShaderPipelineOptions): ShaderPipelineHandle | null {
+    return this.createShaderPipelineProgram(options)
+  }
+
+  /**
+   * Create a shader pipeline and wait for the backend to confirm it — module
+   * compilation included — reporting the error text instead of failing silently.
+   * On failure the pipeline is released, so the returned handle is `null`.
+   */
+  async compileShaderPipeline(options: ShaderPipelineOptions): Promise<ShaderPipelineResult> {
+    const pipeline = this.createShaderPipeline(options)
+    if (!pipeline) {
+      return { pipeline: null, error: 'the backend refused the pipeline' }
+    }
+    const error = await this.validateShaderPipeline(options)
+    if (error !== null) {
+      this.destroyShaderPipeline(pipeline)
+      return { pipeline: null, error }
+    }
+    return { pipeline, error: null }
+  }
+
+  /** Build a bind group for `pipeline`'s group at `options.group`. */
+  createShaderBindGroup(
+    pipeline: ShaderPipelineHandle,
+    options: ShaderBindGroupOptions,
+  ): ShaderBindGroupHandle | null {
+    return this.createShaderBindGroupResources(pipeline, options)
+  }
+
+  /** Drop a pipeline. Queued draws and dispatches using it are dropped too. */
+  destroyShaderPipeline(handle: ShaderPipelineHandle): void {
+    const drop = <T extends { pass: ShaderPipelineHandle }>(queue: T[] | null): void => {
+      if (!queue) return
+      for (let i = queue.length - 1; i >= 0; i--) {
+        if (queue[i].pass === handle) queue.splice(i, 1)
+      }
+    }
+    drop(this.shaderDraws)
+    drop(this.shaderDispatches)
+    this.releaseShaderPipeline(handle)
+  }
+
+  /**
+   * Drop a bind group. Safe to call while draws that reference it are queued:
+   * WebGPU semaphores GPU resources at submit, and this renderer drops the
+   * reference rather than destroying anything the queue may still read.
+   */
+  destroyShaderBindGroup(handle: ShaderBindGroupHandle): void {
+    this.releaseShaderBindGroup(handle)
+  }
+
+  /** Queue one draw with a shader pipeline. */
+  drawShaderPass(draw: ShaderPassDraw): void {
+    ;(this.shaderDraws ??= []).push(draw)
+  }
+
+  /** Queue one compute dispatch. Runs before the frame's render pass. */
+  dispatchShaderPass(dispatch: ShaderDispatch): void {
+    ;(this.shaderDispatches ??= []).push(dispatch)
+  }
+
+  /** Backend hook: create the pipeline. Default: unsupported. */
+  protected createShaderPipelineProgram(_options: ShaderPipelineOptions): ShaderPipelineHandle | null {
+    return null
+  }
+
+  /** Backend hook: confirm the pipeline compiles (or explain why not). */
+  protected async validateShaderPipeline(_options: ShaderPipelineOptions): Promise<string | null> {
+    return 'this backend does not host WGSL pipelines'
+  }
+
+  /** Backend hook: create the bind group. Default: unsupported. */
+  protected createShaderBindGroupResources(
+    _pipeline: ShaderPipelineHandle,
+    _options: ShaderBindGroupOptions,
+  ): ShaderBindGroupHandle | null {
+    return null
+  }
+
+  /** Backend hook: release the pipeline. */
+  protected releaseShaderPipeline(_handle: ShaderPipelineHandle): void {}
+
+  /** Backend hook: release the bind group. */
+  protected releaseShaderBindGroup(_handle: ShaderBindGroupHandle): void {}
+
+  /** Backend hook: draw the queued shader pass. Default: nothing to draw. */
+  protected drawShaderPassQueue(_draws: readonly ShaderPassDraw[]): void {}
+
+  /** Backend hook: run the queued compute dispatches. Default: nothing to run. */
+  protected dispatchShaderPassQueue(_dispatches: readonly ShaderDispatch[]): void {}
+
   abstract destroy(): void
 
   // --- camera ---------------------------------------------------------------
@@ -489,6 +984,19 @@ export abstract class Renderer {
   /** Shadow state accessor for backends (drawGroup/drawSealedRun apply it). */
   protected getShadow(): { map: TextureHandle; matrix: Mat4x4f } | null {
     return this.activeShadow
+  }
+
+  /**
+   * How many distinct textures one merged draw group may carry on this
+   * backend. The fragment shader's sampler array is only one half of the
+   * contract: WebGL1 has no per-vertex texture index (the `texIndices`
+   * stream is WebGL2-only), so a group with more than one texture would draw
+   * every item against `textures[0]` — wrong texels on everything but the
+   * first texture. Backends without multi-texture support return 1 here and
+   * `flushMerged` chunks accordingly, keeping each group single-texture.
+   */
+  protected get maxTexturesPerDraw(): number {
+    return MAX_TEXTURES_PER_DRAW
   }
 
   // --- submission -----------------------------------------------------------
@@ -1012,7 +1520,7 @@ export abstract class Renderer {
   }
 
   /** Merged flush: CONTIGUOUS runs of (blendMode, hasTexture, per-item
-   * flags), then chunks of ≤ MAX_TEXTURES_PER_DRAW distinct textures per
+   * flags), then chunks of ≤ `maxTexturesPerDraw` distinct textures per
    * draw. Every key component is an item-level boolean, so each group is
    * flag-homogeneous and the some()/every() derivations in a backend's
    * drawGroup reduce to the shared item value — per-item output is identical
@@ -1075,7 +1583,7 @@ export abstract class Renderer {
         if (sawSealed) { flushSealed(); sealedDrawn = true }
         const tex = it.texture ?? null
         if (tex && !slots.has(tex)) {
-          if (textures.length >= MAX_TEXTURES_PER_DRAW) break
+          if (textures.length >= this.maxTexturesPerDraw) break
           slots.set(tex, textures.length)
           textures.push(tex)
         }

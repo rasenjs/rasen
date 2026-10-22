@@ -226,6 +226,29 @@ export interface CompressedTextureSource {
   readonly levels: ReadonlyArray<{ readonly data: Uint8Array }>
 }
 
+/**
+ * Straight (non-premultiplied) RGBA8 pixels — `ImageData`'s layout. Uploaded
+ * DIRECTLY, with no canvas round-trip: a canvas stores premultiplied colour,
+ * and the un-premultiply on read destroys data channels (a normal map's RGB
+ * quantizes to per-texel noise wherever alpha is small; the alpha survives,
+ * which is exactly the observed failure).
+ */
+export interface RawPixelSource {
+  readonly width: number
+  readonly height: number
+  readonly bytes: Uint8Array
+}
+
+/** Structural test for {@link RawPixelSource}. */
+export function isRawPixelSource(source: unknown): source is RawPixelSource {
+  if (!source || typeof source !== 'object') return false
+  const s = source as Partial<RawPixelSource>
+  if (typeof s.width !== 'number' || typeof s.height !== 'number') return false
+  const bytes = s.bytes as Uint8Array | undefined
+  return !!bytes && typeof bytes === 'object' &&
+    typeof (bytes as Uint8Array).byteLength === 'number'
+}
+
 /** Structural test for {@link CompressedTextureSource}. */
 export function isCompressedTextureSource(source: unknown): source is CompressedTextureSource {
   if (!source || typeof source !== 'object') return false
@@ -287,7 +310,10 @@ export function createTexture(
 
   gl.bindTexture(gl.TEXTURE_2D, texture)
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
-  if (isCompressedTextureSource(source)) {
+  if (isRawPixelSource(source)) {
+    // Straight RGBA8 pixels, no premultiply round-trip (see RawPixelSource).
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, source.width, source.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, source.bytes)
+  } else if (isCompressedTextureSource(source)) {
     // Compressed blocks go straight to the GPU — no CPU decode, VRAM is the
     // compressed size. Each mip level uploads at its own (halved) extent.
     const gl2 = gl as { compressedTexImage2D?: (...a: unknown[]) => void }

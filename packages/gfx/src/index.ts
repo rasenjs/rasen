@@ -18,6 +18,21 @@ export { gfxHostHooks } from './host-hooks'
 export { TransformStack } from './transform-stack'
 export type { InstanceData } from './renderer/gl/instanced'
 export * from './components'
+
+// Physically based shading: the BRDF, its uniforms and its attributes. The
+// renderer's default program only has a directional Lambert term, so a material
+// pass compiles this program instead.
+export {
+  PBR_ATTRIBUTES,
+  PBR_FRAGMENT_SHADER,
+  PBR_UNIFORMS,
+  PBR_VERTEX_SHADER,
+  PBR_WGSL,
+  DEFAULT_PBR_LIGHTING,
+  DEFAULT_PBR_MATERIAL,
+  type PbrLighting,
+  type PbrMaterial,
+} from './materials/pbr'
 export * from './types'
 export * from './utils'
 export { loadGLB, loadGLBAssets } from './utils/gltf'
@@ -26,6 +41,31 @@ export type { LoadedGLTF } from './utils/gltf'
 // Re-export renderer utilities for advanced usage
 export { ShaderProgram, DEFAULT_VERTEX_SHADER, DEFAULT_FRAGMENT_SHADER } from './renderer/gl/shader'
 export type { BatchItem, SealedMesh, GroupStreams, TextureHandle, BlendMode } from './renderer/base'
+// Shader passes: WGSL pipelines the caller describes completely — bindings,
+// vertex layout and targets. Exported as types because the interface *is* the
+// feature: what a caller states is exactly what reaches WebGPU.
+export type {
+  ShaderStageName,
+  ShaderBindingKind,
+  ShaderSampleType,
+  ShaderViewDimension,
+  ShaderStorageAccess,
+  ShaderSamplerType,
+  ShaderBindingDeclaration,
+  ShaderBindGroupDeclaration,
+  ShaderStageSource,
+  ShaderVertexAttribute,
+  ShaderVertexBuffer,
+  ShaderColorTarget,
+  ShaderPipelineOptions,
+  ShaderPipelineHandle,
+  ShaderBindGroupHandle,
+  ShaderBindingResource,
+  ShaderBindGroupOptions,
+  ShaderPipelineResult,
+  ShaderPassDraw,
+  ShaderDispatch,
+} from './renderer/base'
 export { ShadowRenderer } from './renderer/gl/shadow'
 
 // The WebGPU renderer and its WGSL. Same layer as BatchRenderer above: one

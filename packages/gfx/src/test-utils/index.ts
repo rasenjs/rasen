@@ -10,8 +10,14 @@ export {
   createMockGPUContext,
   installMockNavigatorGPU,
   MockCommandEncoder,
+  MockComputePassEncoder,
+  MockGPUBindGroupLayout,
+  MockGPUComputePipeline,
   MockGPUDevice,
+  MockGPURenderPipeline,
+  MockGPUShaderModule,
   MockQueue,
+  MockRenderPassEncoder,
   type MockBindGroup,
   type MockGPUBuffer,
   type RecordedWrite
@@ -91,6 +97,8 @@ export function createMockWebGLContext(): GlContext {
     enable: vi.fn(),
     blendFunc: vi.fn(),
     drawArrays: vi.fn(),
+    drawElements: vi.fn(),
+    depthMask: vi.fn(),
     flush: vi.fn(),
     getParameter: vi.fn((param) => {
       if (param === 0x8869) return 8 // MAX_VERTEX_ATTRIBS
@@ -114,6 +122,9 @@ export function createMockWebGLContext(): GlContext {
     ARRAY_BUFFER: 0x8892,
     STATIC_DRAW: 0x88e4,
     DYNAMIC_DRAW: 0x88e8,
+    UNSIGNED_SHORT: 0x1403,
+    UNSIGNED_INT: 0x1405,
+    ELEMENT_ARRAY_BUFFER: 0x8893,
     FLOAT: 0x1406,
     TRIANGLES: 0x0004,
     DEPTH_TEST: 0x0b71,

@@ -4,6 +4,18 @@ import { createMockWebGLContext } from '../../../test-utils'
 import type { BlendMode } from '../../base'
 
 /**
+ * The shipped GL renderer caps draw groups at ONE texture (the merged
+ * multi-texture path mis-samples when many differently-textured shapes churn
+ * through groups — named in `renderer/gl/index.ts`). The merged path's
+ * contracts are still real, so tests for it opt back in explicitly.
+ */
+class MergedTextureRenderer extends BatchRenderer {
+  protected override get maxTexturesPerDraw(): number {
+    return 4
+  }
+}
+
+/**
  * Fast-lane (beginMesh/endMesh) sealed-run CONTRACT tests.
  *
  * These lock the three invariants the multi-page-atlas regression (NIKKE
@@ -166,7 +178,7 @@ describe('BatchRenderer sealed runs (fast lane)', () => {
 
   it('re-zeroes the texIndex attribute with ZEROS after a multi-texture legacy group', () => {
     const gl = makeMockGl2()
-    const r = new BatchRenderer(gl, IDENTITY)
+    const r = new MergedTextureRenderer(gl, IDENTITY)
     const texA = {} as WebGLTexture
     const texB = {} as WebGLTexture
     // Two adjacent legacy items with different textures merge into one
@@ -215,9 +227,13 @@ describe('BatchRenderer sealed clean-stream upload skip', () => {
     sealMesh(r, tex)
     r.flush()
     const frame1 = arrayUploads(gl).length
-    // positions(1) + color(1) + uv(1) = 3 vertex-stream uploads, none skipped
-    // (the index stream is an ELEMENT upload, counted separately below).
-    expect(frame1).toBe(3)
+    // positions(1) + color(1) + uv(1) + the one-time texIndex zero-fill = 4
+    // vertex-stream uploads, none skipped (the index stream is an ELEMENT
+    // upload, counted separately below). The zero-fill is the "stripes of the
+    // wrong textures' rows" fix: buffer storage starts as undefined content,
+    // and a_texIndex is always enabled, so the stream must be written before
+    // anything samples it.
+    expect(frame1).toBe(4)
     expect(elementUploads(gl).length).toBe(1)
 
     // Frame 2: same producer, same range, streams untouched (the span's
@@ -312,12 +328,15 @@ describe('BatchRenderer sealed clean-stream upload skip', () => {
     r.endMesh(m, 10, 18, tex, 'normal', false, false)
     r.flush()
     // Even with unchanged* declared, the growth wiped the buffers — every
-    // stream must upload. positions + color + uv + index = 4 (the 10-vert
+    // stream must upload. positions + color + uv + texIndex = 4 (the 10-vert
     // mesh), PLUS the earlier 4-vert run at its old range if it re-stages…
     // it doesn't: only one sealed mesh this frame. The key assertion: the
-    // clean declarations did NOT produce skips (no "1 upload" frame).
+    // clean declarations did NOT produce skips (no "1 upload" frame). The
+    // texIndex upload is part of "everything": orphaned storage is undefined
+    // content, and a group that skips its zero-fill would sample stale
+    // texture slots (the multi-texture "stripes" bug).
     const uploads = arrayUploads(gl)
-    expect(uploads.length).toBe(3) // pos + color + uv (index is ELEMENT)
+    expect(uploads.length).toBe(4) // pos + color + uv + texIndex (index is ELEMENT)
     expect(elementUploads(gl).length).toBe(1)
   })
 })
