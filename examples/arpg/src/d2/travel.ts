@@ -188,7 +188,7 @@
  * `verify-drlg.ts` audit.
  */
 
-import { decodeDs1Cell } from '../original/ds1'
+import { decodeDs1Cell } from '@rasenjs/assets'
 import type { Dt1File } from './dt1'
 import { parseDt1 } from './dt1'
 import {
@@ -864,9 +864,33 @@ export function createAreaArt(
   // it, not just the first: keeping only the primary block is what left a house
   // with a floor and no walls. The roof is a separate pass because the game
   // draws it above the actors.
-  const cellCache = new Map<string, TileArt | null>()
+  //
+  // There is deliberately NO per-cell cache: `bakeGround` asks for each cell
+  // exactly once per layer, so a cache never hits, while each entry pins a
+  // canvas of its own — 6,400 of them for an 80x80 area. Those canvases are what
+  // pushed the page past the browser's canvas budget, after which it hands back
+  // EMPTY canvases without an error (measured: 7,000 cell-sized canvases, every
+  // sample blank), which is how an area came out with no floor at all.
 
+  // Block pictures are cached by (tileset, block, layer), NOT per cell: a block
+  // repeats across hundreds of cells, and a canvas per cell is what blew the
+  // canvas budget on a large area — 6,400 cells at two blocks each meant ~12,800
+  // live canvases, after which the browser hands back EMPTY canvases with no
+  // error and the area bakes with no floor at all.
+  const blockCache = new Map<string, { art: TileArt; roofY: number } | null>()
   const blockArt = (tileset: string, blockIndex: number, layer: 'ground' | 'walls' | 'roof'): { art: TileArt; roofY: number } | null => {
+    const key = `${tileset}#${blockIndex}#${layer}`
+    const cached = blockCache.get(key)
+    if (cached !== undefined) {
+      if (cached !== null) stats.reused += 1
+      return cached
+    }
+    const built = buildBlockArt(tileset, blockIndex, layer)
+    blockCache.set(key, built)
+    return built
+  }
+
+  const buildBlockArt = (tileset: string, blockIndex: number, layer: 'ground' | 'walls' | 'roof'): { art: TileArt; roofY: number } | null => {
     if (!palette) return null
     const set = tilesets.get(tileset)
     if (!set) return null
@@ -887,12 +911,6 @@ export function createAreaArt(
 
   const composeCell = (x: number, y: number, layer: 'ground' | 'walls' | 'roof'): TileArt | null => {
     if (!canDraw) return null
-    const key = `${x},${y},${layer}`
-    const cached = cellCache.get(key)
-    if (cached !== undefined) {
-      stats.reused += 1
-      return cached
-    }
     const tile = level.tileAt(x, y)
     let built: TileArt | null = null
     const parts: TileArt[] = []
@@ -927,7 +945,6 @@ export function createAreaArt(
         built = { canvas, frameX: minX, frameY: minY }
       }
     }
-    cellCache.set(key, built)
     return built
   }
 

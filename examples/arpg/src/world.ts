@@ -514,12 +514,27 @@ function bakeGround(map: WorldMap, terrain: TerrainArt = {}, realLevel: RealLeve
   ctx.fillStyle = '#0b0d12'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-  // The roof pass: the game draws roofs ABOVE the actors, so they bake to
-  // their own bitmap at the same placement instead of into the ground one.
-  const roofCanvas = document.createElement('canvas')
-  roofCanvas.width = canvas.width
-  roofCanvas.height = canvas.height
-  const roofCtx = roofCanvas.getContext('2d')!
+  // The roof pass: the game draws roofs ABOVE the actors, so they bake to their
+  // own bitmap at the same placement instead of into the ground one.
+  //
+  // Allocated on the FIRST roof cell, because a map bitmap is
+  // `(width + height)` wide by half that tall — 84 megapixels for an 80x80
+  // dungeon — and a dungeon has no roofs at all. Keeping an all-transparent
+  // bitmap that size costs as much as the ground and pushes the page into
+  // backing-store eviction, which the browser does SILENTLY: a canvas past the
+  // budget simply reads back blank (measured: 7,000 cell-sized canvases, every
+  // sample empty, no exception).
+  let roofCanvas: HTMLCanvasElement | null = null
+  let roofCtx: CanvasRenderingContext2D | null = null
+  const roofTarget = (): CanvasRenderingContext2D => {
+    if (roofCtx === null) {
+      roofCanvas = document.createElement('canvas')
+      roofCanvas.width = canvas.width
+      roofCanvas.height = canvas.height
+      roofCtx = roofCanvas.getContext('2d')!
+    }
+    return roofCtx
+  }
   // Walls are collected per cell rather than baked: see `WorldMap.wallCells`.
   const wallCells: WallCell[] = []
 
@@ -539,7 +554,7 @@ function bakeGround(map: WorldMap, terrain: TerrainArt = {}, realLevel: RealLeve
       // The level's own picture, when there is one. It carries the wall shapes,
       // the corners and the floor transitions that a per-kind texture cannot.
       const roofArt = realLevel?.roofArtAt?.(x, y) ?? null
-      if (roofArt) drawTileArt(roofCtx, cx, cy, roofArt)
+      if (roofArt) drawTileArt(roofTarget(), cx, cy, roofArt)
       const wallArt = realLevel?.wallArtAt?.(x, y) ?? null
       if (wallArt) wallCells.push({ x, y, art: wallArt })
       const tileArt = realLevel?.artAt?.(x, y) ?? null
@@ -590,7 +605,7 @@ function bakeGround(map: WorldMap, terrain: TerrainArt = {}, realLevel: RealLeve
   }
 
   map.ground = canvas
-  map.roof = roofCanvas
+  map.roof = roofCanvas ?? document.createElement('canvas')
   map.wallCells = wallCells
   map.groundX = -offsetX
   map.groundY = -offsetY
