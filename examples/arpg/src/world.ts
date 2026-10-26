@@ -229,6 +229,13 @@ export interface TileArt {
   crop?: { x: number; y: number; width: number; height: number }
   frameX: number
   frameY: number
+  /**
+   * A wall picture's DT1 orientation: which of the tile's four faces it covers.
+   *
+   * Set on the wall pass only. See `three-d/wall-depth.ts` — it is what decides
+   * whether the wall stands in front of the cell's centre or behind it.
+   */
+  orientation?: number
 }
 
 export function generateWorld(
@@ -534,6 +541,9 @@ function packWallArt(cells: WallCell[]): void {
       crop: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
       frameX: cell.art.frameX,
       frameY: cell.art.frameY,
+      // The face the wall covers must survive packing: it is what places the
+      // wall on the right side of its tile in the 3D layer.
+      ...(cell.art.orientation !== undefined ? { orientation: cell.art.orientation } : {}),
     }
   })
 }

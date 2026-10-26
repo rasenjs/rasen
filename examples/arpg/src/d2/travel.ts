@@ -906,7 +906,15 @@ export function createAreaArt(
     const bitmap = assembleTile(block, palette, set.bytes, layer === 'roof' ? 'roof' : 'ground')
     if (!bitmap) return null
     stats.built += 1
-    return { art: { canvas: bitmapToCanvas(bitmap), frameX: bitmap.frameX, frameY: bitmap.frameY }, roofY: block.roofY }
+    return {
+      art: {
+        canvas: bitmapToCanvas(bitmap),
+        frameX: bitmap.frameX,
+        frameY: bitmap.frameY,
+        ...(layer === 'walls' ? { orientation: block.orientation } : {}),
+      },
+      roofY: block.roofY,
+    }
   }
 
   const composeCell = (x: number, y: number, layer: 'ground' | 'walls' | 'roof'): TileArt | null => {
@@ -914,9 +922,13 @@ export function createAreaArt(
     const tile = level.tileAt(x, y)
     let built: TileArt | null = null
     const parts: TileArt[] = []
+    let orientation: number | undefined
     for (const ref of tile?.refs ?? []) {
       const part = blockArt(ref.tileset, ref.blockIndex, layer)
       if (part === null) continue
+      if (layer === 'walls' && orientation === undefined && part.art.orientation !== undefined) {
+        orientation = part.art.orientation
+      }
       // The roof pass: the game subtracts roof_y from the tile's screen Y,
       // which is the same as moving the picture up inside its frame.
       parts.push(
@@ -942,7 +954,12 @@ export function createAreaArt(
       const ctx = canvas.getContext('2d')
       if (ctx) {
         for (const art of parts) ctx.drawImage(art.canvas, art.frameX - minX, art.frameY - minY)
-        built = { canvas, frameX: minX, frameY: minY }
+        built = {
+          canvas,
+          frameX: minX,
+          frameY: minY,
+          ...(orientation !== undefined ? { orientation } : {}),
+        }
       }
     }
     return built

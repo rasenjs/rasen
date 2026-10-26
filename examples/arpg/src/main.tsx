@@ -343,6 +343,10 @@ async function main(): Promise<void> {
                     canvas: bitmapToCanvas(bitmap),
                     frameX: bitmap.frameX,
                     frameY: bitmap.frameY,
+                    // The wall pass records which face the block covered: the 3D
+                    // layer places the wall on that side of the tile, which is
+                    // what decides whether it hides a character in the same cell.
+                    ...(layer === 'walls' ? { orientation: block.orientation } : {}),
                   },
                   roofY: block.roofY,
                 }
@@ -368,9 +372,15 @@ async function main(): Promise<void> {
             const tile = loaded.tileAt(x, y)
             let built: TileArt | null = null
             const parts: { art: TileArt; roofY: number }[] = []
+            let orientation: number | undefined
             for (const ref of tile?.refs ?? []) {
               const part = blockArt(ref.tileset, ref.blockIndex, layer)
-              if (part) parts.push(part)
+              if (!part) continue
+              // The cell's own wall face: the first wall block that named one.
+              if (layer === 'walls' && orientation === undefined && part.art.orientation !== undefined) {
+                orientation = part.art.orientation
+              }
+              parts.push(part)
             }
             if (parts.length > 0) {
               // The roof pass: the game subtracts roof_y from the tile's
@@ -400,7 +410,12 @@ async function main(): Promise<void> {
                 for (const { art } of placed) {
                   ctx.drawImage(art.canvas, art.frameX - minX, art.frameY - minY)
                 }
-                built = { canvas, frameX: minX, frameY: minY }
+                built = {
+                  canvas,
+                  frameX: minX,
+                  frameY: minY,
+                  ...(orientation !== undefined ? { orientation } : {}),
+                }
               }
             }
             cellArtCache.set(key, built)

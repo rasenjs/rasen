@@ -33,20 +33,20 @@ import { unref } from '@rasenjs/gfx'
 import { Gr2Model, loadModelParts, type LoadedModel, type PartSpec } from './model'
 import { TILE_HEIGHT, TILE_WIDTH } from '../iso'
 import { ActorShadow } from './actor-shadow'
-import { mergeOutlines, type GroundOutline, type MergedOutline } from './ground-outline'
+import { mergeOutlines } from './ground-outline'
+import type { GroundOutline, MergedOutline } from './ground-outline'
 import {
   bindingScratchFor,
   computeBonePose,
   computeBonePoseBlended,
   loadAnimationRig,
   skinPartWithRigInto,
-  skinScratchFor,
   type AnimationRig,
   type BindingScratch,
-  type SkinScratch,
-  type SkinnedPart,
 } from './skinning'
 import type { AnimFade } from './anim-state'
+import { WallQuads } from './wall-quads'
+import type { WallCell } from '../world'
 import {
   ACTOR_CAMERA_DIST,
   MODEL_UNITS_PER_TILE,
@@ -100,6 +100,14 @@ export interface Actor3DLayerProps {
   actors: PropValue<Actor3D[]>
   /** World pan: the tile point (tiles) that lands at the canvas center. */
   camera: PropValue<{ x: number; y: number }>
+  /**
+   * The world's wall cells, drawn as depth-tested quads in THIS canvas.
+   *
+   * They must share the canvas with the models: two canvases have one ordering
+   * between them, so a wall could never be interleaved with a character per
+   * pixel. That interleaving is the whole reason they moved here.
+   */
+  walls?: PropValue<readonly WallCell[]>
   /** Logical canvas width in px. */
   width: PropValue<number>
   /** Logical canvas height in px. */
@@ -203,7 +211,9 @@ export function Actor3DLayer(props: Actor3DLayerProps) {
   // buffer shared per part would have one actor's pose overwrite another's.
   // Each actor gets its own set, sized once and rewritten every frame.
   interface PartBuffers {
-    skin: SkinScratch
+    /** This actor's own copy of the skinned vertices — two actors can share one
+     * mesh, so the outputs cannot live on the mesh. */
+    out: { skin: Float32Array; vertices: Float32Array; normals: Float32Array; tangents?: Float32Array }
     bindings: BindingScratch
   }
   const partBuffers = new Map<number, PartBuffers[]>()
@@ -218,7 +228,12 @@ export function Actor3DLayer(props: Actor3DLayerProps) {
     if (existing !== undefined) return existing
     const bindings = part.boneBindings ?? []
     const buffers: PartBuffers = {
-      skin: skinScratchFor(part as SkinnedPart, bindings),
+      out: {
+        skin: new Float32Array(bindings.length * 16),
+        vertices: new Float32Array(part.vertices.length),
+        normals: new Float32Array(part.normals.length),
+        ...(part.tangents ? { tangents: new Float32Array(part.tangents.length) } : {}),
+      },
       bindings: bindingScratchFor(bindings),
     }
     if (partIndex >= 0) perActor[partIndex] = buffers
@@ -282,7 +297,7 @@ export function Actor3DLayer(props: Actor3DLayerProps) {
     }
     const parts = loaded.parts.map((part) => {
       const buffers = buffersFor(index, part)
-      return skinPartWithRigInto(part, rig, boneWorlds, buffers.skin, buffers.bindings)
+      return skinPartWithRigInto(part, rig, boneWorlds, buffers.out, buffers.bindings)
     })
     skinCache.set(index, { key, parts })
     return parts
@@ -478,7 +493,12 @@ export function Actor3DLayer(props: Actor3DLayerProps) {
         renderOptions={renderOptions}
         style={style}
       >
-        {children}
+        {/* The wall quads come first: same canvas, same depth buffer as the
+            models, which is the only way a wall can hide a character per
+            pixel. */}
+        {props.walls === undefined
+          ? children
+          : [WallQuads({ cells: props.walls, camera, width, height }), ...children]}
       </canvas>
     </div>
   )

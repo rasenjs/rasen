@@ -18,7 +18,7 @@
  */
 
 import { com, each } from '@rasenjs/core'
-import { group, image as imageNode } from '@rasenjs/canvas-2d'
+import { group } from '@rasenjs/canvas-2d'
 import type {
   ActorSlot,
   EffectSlot,
@@ -29,7 +29,6 @@ import type {
 } from './game'
 import { Hud, type HudProps } from './hud'
 import { toScreen, toWorld } from './iso'
-import type { WallCell } from './world'
 import { Actor3DLayer } from './three-d/actor-layer'
 import { actor3DActors, actor3DTick, hiddenActorSlots } from './three-d/game-actors'
 import { viewportKey } from './viewport'
@@ -242,50 +241,6 @@ function propStandsInFront(
   return false
 }
 
-/**
- * Is this wall cell in FRONT of a nearby 3D actor (nearer the camera)?
- *
- * A wall's art is tall, so a wall one or two cells nearer than a character
- * overlaps them on screen even though their tiles do not. Whether it should
- * cover them is a per-cell question -- which is exactly why baking every wall
- * into one bitmap could not be right: it forced one answer for all of them and
- * left the character hidden behind walls it was standing in front of.
- */
-function wallCoversActor(
-  cell: WallCell,
-  actors: ReadonlyArray<{ id: string; tileX: number; tileY: number; visible?: boolean }>,
-): boolean {
-  const depth = cell.x + cell.y
-  // The wall's own picture on screen. A wall is TALL: its art reaches far above
-  // the cell it stands on, so overlap is measured on the picture, not the tile.
-  const point = toScreen(cell.x, cell.y)
-  const left = point.x - 80 + cell.art.frameX
-  const top = point.y - 40 + cell.art.frameY
-  const right = left + cell.art.canvas.width
-  const bottom = top + cell.art.canvas.height
-  let hidesSomeone = false
-  for (const actor of actors) {
-    if (actor.visible === false) continue
-    const head = actor.id.split(':')[0]
-    if (head !== 'hero' && head !== 'monster' && head !== 'npc') continue
-    const centre = toScreen(actor.tileX, actor.tileY)
-    const actorLeft = centre.x - 44
-    const actorRight = centre.x + 44
-    const actorBottom = centre.y
-    const actorTop = centre.y - 132
-    if (right < actorLeft || left > actorRight) continue
-    if (bottom < actorTop || top > actorBottom) continue
-    // An actor nearer the camera than this wall occludes it outright: the
-    // character in front always wins, because a wall drawn above the 3D layer
-    // covers EVERY actor in it.
-    if (actor.tileX + actor.tileY > depth) return false
-    // Behind or in the SAME cell: the wall covers the actor. Equal depth used to
-    // keep the wall underneath, which is what put a character's upper body
-    // through the wall standing in its own tile.
-    hidesSomeone = true
-  }
-  return hidesSomeone
-}
 
 function renderSlot(slot: Slot, game: Game) {
   switch (slot.kind) {
@@ -385,33 +340,6 @@ const OVERLAY_LAYER_STYLE = { position: 'absolute', inset: '0px' } as const
    * and mounted in the other — which is what made walls flicker out of existence
    * while the player walked past.
    */
-  const wallNodes = (over: boolean) =>
-    each(map.wallCells, (cell: WallCell) => {
-      const point = toScreen(cell.x, cell.y)
-      return group({
-        x: point.x - 80 + cell.art.frameX,
-        y: point.y - 40 + cell.art.frameY,
-        // `opacity` rather than a `visible` prop: the 2D group has none, and
-        // hiding by opacity keeps the node mounted, which is the point.
-        opacity: () => {
-          actor3DTick.value
-          return wallCoversActor(cell, actor3DActors()) === over ? 1 : 0
-        },
-        children: [
-          imageNode({
-            // Wall pictures live in a shared atlas page; `crop` is where this
-            // one sits on it.
-            image: cell.art.canvas,
-            x: 0,
-            y: 0,
-            crop: cell.art.crop,
-            width: cell.art.crop?.width ?? cell.art.canvas.width,
-            height: cell.art.crop?.height ?? cell.art.canvas.height,
-          }),
-        ],
-      })
-    })
-
 const map = game.map
   return (
     <div class="stage" style={{ position: 'absolute', inset: '0' }}>
@@ -433,7 +361,6 @@ const map = game.map
               width={map.groundWidth}
               height={map.groundHeight}
             />
-            {wallNodes(false)}
             {each(game.renderList, (slot: Slot) =>
               propStandsInFront(slot, actor3DActors()) ? group({ children: [] }) : renderSlot(slot, game),
             )}
@@ -467,6 +394,9 @@ const map = game.map
             const center = toWorld(size.width / 2 - game.cameraX.value, size.height / 2 - game.cameraY.value)
             return { x: center.x, y: center.y }
           },
+          // The walls moved into this canvas: they need the same depth buffer as
+          // the models to be occluded correctly, per pixel.
+          walls: () => map.wallCells,
           width: size.width,
           height: size.height,
         }),
@@ -481,7 +411,6 @@ const map = game.map
           <canvas width={size.width} height={size.height}>
             <group x={game.cameraX} y={game.cameraY}>
               {/* Walls nearer the camera than a character, then the roofs. */}
-              {wallNodes(true)}
               {/*
                 The props that stand in front of a 3D actor. The scene pass skips
                 them (they belong above the models), so this pass has to draw
