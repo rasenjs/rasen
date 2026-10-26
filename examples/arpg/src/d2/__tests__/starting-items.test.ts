@@ -13,7 +13,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { rollStartingItems, type KitSlot } from '../creation'
+import { placeStartingItems, rollStartingItems, type KitSlot } from '../creation'
 import type { ItemBaseRecord } from '../item-base'
 import { step, type Seed } from '../rng'
 
@@ -84,6 +84,23 @@ function staffModsOf(chain: readonly string[]): number {
   return 7
 }
 
+/** The `bodylocs` row id a name such as `rarm` refers to. */
+const BODY_LOCS = read('table_bodylocs.json')
+function bodyLocOf(name: string): number | null {
+  const index = BODY_LOCS.findIndex((row) => String(row.Code ?? '').trim().toLowerCase() === name.toLowerCase())
+  return index < 0 ? null : index
+}
+
+/** `ItemTypes.Beltable`, inherited down the chain. */
+function beltableOf(chain: readonly string[]): boolean {
+  for (const code of chain) {
+    const row = typeByCode.get(code)
+    if (row === undefined) continue
+    if (Number(row.Beltable ?? 0) === 1) return true
+  }
+  return false
+}
+
 function baseOf(code: string): ItemBaseRecord | null {
   const row = [...WEAPONS, ...ARMOR, ...MISC].find((candidate) => String(candidate.code ?? '').trim() === code)
   if (row === undefined) return null
@@ -106,16 +123,23 @@ function baseOf(code: string): ItemBaseRecord | null {
 }
 
 /** The sliver of the class rows this needs: which items the class starts with. */
-function kitOf(className: string): KitSlot[] {
+function kitOf(className: string): Array<KitSlot & { bodyLoc: number; beltable: boolean }> {
   const rows = JSON.parse(readFileSync(join(findTableDirectory(), 'table_charstats.json'), 'utf8')) as Rows
   const row = rows.find((candidate) => String(candidate.class ?? '').toLowerCase() === className)
   if (row === undefined) throw new Error(`no ${className} row`)
-  const kit: KitSlot[] = []
+  const kit: Array<KitSlot & { bodyLoc: number; beltable: boolean }> = []
   for (let index = 1; index <= 10; index += 1) {
     const code = String(row[`item${index}`] ?? '').trim()
     const count = Number(row[`item${index}count`] ?? 0) || 0
     if (code === '' || code === '0' || count <= 0) continue
-    kit.push({ code, count })
+    const loc = String(row[`item${index}loc`] ?? '').trim()
+    const base = baseOf(code)
+    kit.push({
+      code,
+      count,
+      bodyLoc: loc === '' ? 0 : (bodyLocOf(loc) ?? 0),
+      beltable: base !== null && beltableOf(base.types),
+    })
   }
   return kit
 }
@@ -218,5 +242,35 @@ describe('a new Barbarian', () => {
 
   it('leaves the game seed where the run left it: 17 steps', () => {
     expect([gameSeed.low, gameSeed.high]).toEqual([0x2f6ab60b, 0x58c69aea])
+  })
+})
+
+describe('where the kit lands', () => {
+  // The spec logs the result: the class weapon in `rarm`, the potions in belt boxes
+  // 0..3, and the two scrolls at (9, 3) then (9, 2) — the bottom-right corner first,
+  // because a one-cell item is searched from there.
+  it('equips the Sorceress weapon, belts the potions and stacks the scrolls bottom-right', () => {
+    expect(placeStartingItems(kitOf('sorceress'))).toEqual([
+      { kind: 'equipped', bodyLoc: 4 },
+      { kind: 'belt', box: 0 },
+      { kind: 'belt', box: 1 },
+      { kind: 'belt', box: 2 },
+      { kind: 'belt', box: 3 },
+      { kind: 'inventory', x: 9, y: 3 },
+      { kind: 'inventory', x: 9, y: 2 },
+    ])
+  })
+
+  it('gives the Barbarian a second equipped slot for the buckler', () => {
+    const placements = placeStartingItems(kitOf('barbarian'))
+    expect(placements.slice(0, 2)).toEqual([
+      { kind: 'equipped', bodyLoc: 4 },
+      { kind: 'equipped', bodyLoc: 5 },
+    ])
+    // Eight items: weapon, buckler, four potions, then the two scrolls.
+    expect(placements.slice(6)).toEqual([
+      { kind: 'inventory', x: 9, y: 3 },
+      { kind: 'inventory', x: 9, y: 2 },
+    ])
   })
 })

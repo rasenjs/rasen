@@ -229,3 +229,70 @@ export function rollStartingItems(
   }
   return items
 }
+
+/** Where a starting item ends up, as the game's own inventory address. */
+export type ItemPlacement =
+  | { kind: 'equipped'; bodyLoc: number }
+  | { kind: 'belt'; box: number }
+  | { kind: 'inventory'; x: number; y: number }
+
+/** The default belt: four boxes, which sit in the bottom row of the grid. */
+const BELT_BOXES = 4
+
+/** The inventory page a starting item lands on, in cells. */
+const INVENTORY = { width: 10, height: 4 } as const
+
+/**
+ * Where each starting item goes.
+ *
+ * The order the game tries is: the belt if the base can go in one, then the slot
+ * `itemNloc` names, then the inventory. An item that is neither equipped nor
+ * belted gets a 1×1 spot searched **from the bottom-right corner** — columns from
+ * the right, rows from the bottom — which is why a new character's scrolls land on
+ * (9, 3) and then (9, 2) rather than the top-left.
+ *
+ * Two limits, stated rather than worked around: multi-cell items use a different,
+ * scored search that is not implemented here, and a belt box is placed as a box
+ * index — the save's own coordinate for one is not in the source spec.
+ */
+export function placeStartingItems(
+  kit: ReadonlyArray<KitSlot & { bodyLoc?: number; beltable?: boolean }>,
+): ItemPlacement[] {
+  const grid: boolean[][] = Array.from({ length: INVENTORY.height }, () =>
+    Array.from({ length: INVENTORY.width }, () => false),
+  )
+  // The belt itself occupies the bottom row's first four cells.
+  for (let box = 0; box < BELT_BOXES; box += 1) grid[INVENTORY.height - 1][box] = true
+
+  const taken: boolean[] = Array.from({ length: BELT_BOXES }, () => false)
+  const placements: ItemPlacement[] = []
+  for (const slot of kit) {
+    for (let copy = 0; copy < slot.count; copy += 1) {
+      if (slot.beltable === true) {
+        const box = taken.indexOf(false)
+        if (box >= 0) {
+          taken[box] = true
+          placements.push({ kind: 'belt', box })
+          continue
+        }
+      }
+      if ((slot.bodyLoc ?? 0) !== 0) {
+        placements.push({ kind: 'equipped', bodyLoc: slot.bodyLoc! })
+        continue
+      }
+      let free: { x: number; y: number } | null = null
+      for (let x = INVENTORY.width - 1; x >= 0 && free === null; x -= 1) {
+        for (let y = INVENTORY.height - 1; y >= 0; y -= 1) {
+          if (!grid[y][x]) {
+            free = { x, y }
+            break
+          }
+        }
+      }
+      if (free === null) throw new Error(`${slot.code}: no room left in the starting inventory`)
+      grid[free.y][free.x] = true
+      placements.push({ kind: 'inventory', x: free.x, y: free.y })
+    }
+  }
+  return placements
+}
