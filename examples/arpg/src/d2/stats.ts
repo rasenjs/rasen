@@ -118,6 +118,22 @@ export interface StatDef {
   readonly saveBits: number | null
   readonly saveAdd: number | null
   readonly saveParamBits: number | null
+  /**
+   * `ValShift`: the item property list stores `value >> valShift`, and the reader
+   * shifts it back. Only `maxhp` and `maxmana` are non-zero (8) in the shipped
+   * table — the in-memory value keeps the eight fraction bits, the file does not.
+   */
+  readonly valShift: number
+  /**
+   * `CSvBits`: the width of this stat in a save's `gf` list, and the reason a
+   * save holds fewer stats than the character has. Zero means the stat is never
+   * saved — experience and the level-derived stats are rebuilt on load instead.
+   */
+  readonly csvBits: number
+  /** `CSvParam`: width of the `gf` list's param field for this stat, 0 for most. */
+  readonly csvParam: number
+  /** `CSvSigned`: how the `gf` list clamps a `csvBits`-wide value. */
+  readonly csvSigned: boolean
   readonly encode: number | null
   readonly sendBits: number | null
   readonly signed: boolean
@@ -200,6 +216,10 @@ export function parseStatRow(row: StatRow): StatDef | null {
     saveBits: integer(row, 'Save Bits'),
     saveAdd: integer(row, 'Save Add'),
     saveParamBits: integer(row, 'Save Param Bits'),
+    valShift: integer(row, 'ValShift') ?? 0,
+    csvBits: integer(row, 'CSvBits') ?? 0,
+    csvParam: integer(row, 'CSvParam') ?? 0,
+    csvSigned: flag(row, 'CSvSigned'),
     encode: integer(row, 'Encode'),
     sendBits: integer(row, 'Send Bits'),
     signed: flag(row, 'Signed'),
