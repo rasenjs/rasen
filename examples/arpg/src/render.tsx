@@ -399,11 +399,14 @@ const OVERLAY_LAYER_STYLE = { position: 'absolute', inset: '0px' } as const
         },
         children: [
           imageNode({
+            // Wall pictures live in a shared atlas page; `crop` is where this
+            // one sits on it.
             image: cell.art.canvas,
             x: 0,
             y: 0,
-            width: cell.art.canvas.width,
-            height: cell.art.canvas.height,
+            crop: cell.art.crop,
+            width: cell.art.crop?.width ?? cell.art.canvas.width,
+            height: cell.art.crop?.height ?? cell.art.canvas.height,
           }),
         ],
       })

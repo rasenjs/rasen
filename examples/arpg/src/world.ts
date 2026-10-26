@@ -22,6 +22,7 @@ import { drawIsoTile, groundColors, type GroundTile, type PropKind } from './spr
 export type TerrainArt = Partial<Record<GroundTile, CanvasImageSource[]>>
 import { TILE_HEIGHT, TILE_WIDTH } from './iso'
 import { dt1FlagIndex } from './d2/dt1'
+import { blitIntoPages, packAtlas } from './three-d/tile-atlas'
 
 export interface Tile {
   kind: GroundTile
@@ -217,7 +218,15 @@ export interface WallCell {
 }
 
 export interface TileArt {
+  /**
+   * The surface the picture is on: its own canvas, or a shared atlas page.
+   *
+   * Wall pictures are packed into a few pages before the area is handed over —
+   * see `three-d/tile-atlas.ts` for why a canvas per cell is not affordable.
+   */
   canvas: HTMLCanvasElement
+  /** Where on {@link canvas} this picture sits, when it is a page. */
+  crop?: { x: number; y: number; width: number; height: number }
   frameX: number
   frameY: number
 }
@@ -500,6 +509,35 @@ function drawTileArt(
   ctx.drawImage(art.canvas, cx - TILE_WIDTH / 2 + art.frameX, cy - TILE_HEIGHT / 2 + art.frameY)
 }
 
+/**
+ * Replace the wall cells' per-cell canvases with rectangles into a few atlas
+ * pages.
+ *
+ * A town bakes 380 wall pictures and a dungeon 1,721, each with a canvas of its
+ * own, and those canvases are held for as long as the area is loaded. That is the
+ * same budget the ground bitmap competes for, and once the page is over it the
+ * browser starts returning EMPTY canvases with no error at all. Packing turns
+ * hundreds of objects into a handful of pages; the per-cell canvases are dropped
+ * as soon as the blit is done.
+ */
+function packWallArt(cells: WallCell[]): void {
+  if (cells.length === 0) return
+  const pictures = cells.map((cell) => cell.art.canvas)
+  const packed = packAtlas(
+    pictures.map((picture) => ({ width: picture.width, height: picture.height })),
+  )
+  const pages = blitIntoPages(pictures, packed)
+  cells.forEach((cell, index) => {
+    const rect = packed.rects[index]
+    cell.art = {
+      canvas: pages[rect.page],
+      crop: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      frameX: cell.art.frameX,
+      frameY: cell.art.frameY,
+    }
+  })
+}
+
 function bakeGround(map: WorldMap, terrain: TerrainArt = {}, realLevel: RealLevelGrid | null = null): void {
   const offsetX = (map.height - 1) * HALF_W + PADDING
   const offsetY = PADDING
@@ -603,6 +641,8 @@ function bakeGround(map: WorldMap, terrain: TerrainArt = {}, realLevel: RealLeve
       }
     }
   }
+
+  packWallArt(wallCells)
 
   map.ground = canvas
   map.roof = roofCanvas ?? document.createElement('canvas')
