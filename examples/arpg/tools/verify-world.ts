@@ -224,7 +224,6 @@ function verifyTileGeometry(): { problems: string[]; counts: string[] } {
       const minX = Math.min(...placed.map((p) => p.subTile.xPos))
       const minY = Math.min(...placed.map((p) => p.subTile.yPos))
       const artWidth = Math.max(...placed.map((p) => p.subTile.xPos + p.width)) - minX
-      const artHeight = Math.max(...placed.map((p) => p.subTile.yPos + p.height)) - minY
       if (artWidth <= 0 || artWidth % SUB_TILE_WIDTH !== 0) {
         artWidthOff += 1
         if (examples.length < 8) {
