@@ -177,12 +177,36 @@ function propKindFor(def: { name: string; token: string | null; isDoor: boolean 
 // Balance
 // ---------------------------------------------------------------------------
 
+/**
+ * The melee baseline, in tiles: how far a body can reach beyond itself.
+ *
+ * This is the `1` in the original's reach — the attacker's own body — with the
+ * target's body added on top by {@link meleeReachTiles}. The two were a single
+ * invented constant before (`1.55`), which is why a monster three tiles wide could
+ * only be hit from a distance that left its body next to the hero untouched.
+ */
+const MELEE_BASE_REACH = 1
+
+/** D2 measures reach in sub-tiles, five to a tile, the same 5x5 lattice the collision uses. */
+const SUBTILES_PER_TILE = 5
+
+/**
+ * How far apart two centres may be and still connect, in tiles.
+ *
+ * The game tests the bodies, not the centres: a reach of one tile plus the
+ * target's own size, so a 1x1 monster is hit from 1.5 tiles and a 3x3 from 2.5.
+ * The weapon's `rangeadder` (a spear reaches further than a club) is the third
+ * term; it is 0 until the hero has an equipped weapon to read it from.
+ */
+export function meleeReachTiles(targetSizeTiles: number, weaponRangeAdder = 0): number {
+  return MELEE_BASE_REACH + targetSizeTiles / 2 + weaponRangeAdder / SUBTILES_PER_TILE
+}
+
 const HERO = {
   maxHealth: 190,
   maxMana: 60,
   damage: 19,
   speed: 4.1,
-  range: 1.55,
   cooldown: 0.55,
   healthRegen: 1.1,
   manaRegen: 3.4,
@@ -2933,7 +2957,7 @@ export class Game {
       const distance = Math.hypot(dx, dy)
       if (target.hp <= 0 || distance > 22) {
         this.commands.attackTarget = null
-      } else if (distance > HERO.range - 0.2) {
+      } else if (distance > this.meleeReachTo(target) - 0.2) {
         dirX = dx / distance
         dirY = dy / distance
       }
@@ -2979,13 +3003,27 @@ export class Game {
     }
   }
 
+  /**
+   * The distance at which the hero can hit this monster, in tiles.
+   *
+   * The monster's own `monstats2` size decides how much of it is body: a 3x3
+   * brute is hit from further out than a 1x1 skeleton, because the hero's arm only
+   * has to cross the gap between the two bodies rather than their centres.
+   */
+  private meleeReachTo(monster: Monster): number {
+    const size = monster.brain?.def.size
+    const bodyTiles = size === undefined ? 1 : Math.max(size.sizeX, size.sizeY)
+    return meleeReachTiles(bodyTiles)
+  }
+
   private pickMeleeTarget(): Monster | null {
     let best: Monster | null = null
-    let bestDistance = HERO.range
+    let bestDistance = Infinity
     for (const monster of this.monsters) {
       if (monster.hp <= 0) continue
       const distance = Math.hypot(monster.x - this.hero.x, monster.y - this.hero.y)
-      if (distance > bestDistance) continue
+      if (distance > this.meleeReachTo(monster)) continue
+      if (distance >= bestDistance) continue
       bestDistance = distance
       best = monster
     }
