@@ -55,7 +55,7 @@
  *   game's program. This module assembles what the shipped data describes.
  */
 
-import { parseDs1, decodeDs1Cell, ds1SubtileToTile, type Ds1File } from '../original/ds1'
+import { parseDs1, decodeDs1Cell, ds1SubtileToTile, type Ds1File } from '@rasenjs/assets'
 import { dt1BlockKey, dt1FlagIndex, dt1KeyOf, parseDt1, type Dt1Block, type Dt1File } from './dt1'
 
 /** One row of `LvlPrest.txt`, with the columns level assembly needs. */
@@ -932,6 +932,14 @@ export function assembleLevelFromDs1(
         }
         continue
       }
+
+      // The cell's own walk bit is not a fallback: the original stamps it over the
+      // WHOLE 5x5 block, whatever the tiles' own sub-tile flags say. It marks the
+      // cells whose entry blocks walking — stairs, doorways, arches — where every
+      // sub-cell is denied even though the art leaves the centre clear. Ignoring it
+      // let a walker step into those cells, which is what puts a character visually
+      // inside the tile it is standing in.
+      if (anyUnwalkableBit) for (let k = 0; k < 25; k++) grid[k] |= 0x01
 
       flags[i] = grid
       // When the primary reference was the unresolvable one but another layer
