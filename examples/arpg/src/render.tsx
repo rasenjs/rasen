@@ -1,6 +1,6 @@
 /**
- * The scene tree — one JSX tree holding the WebGL-free canvas world *and* the
- * DOM interface.
+ * The scene tree — one JSX tree holding the canvas world, the depth-tested 3D
+ * layer, and the DOM interface.
  *
  * Layers, back to front:
  *
@@ -10,7 +10,17 @@
  *      to what is on screen;
  *   3. screen-space overlays drawn in the canvas (the thumbstick and the aim
  *      dot) which must not move with the camera;
- *   4. the DOM HUD, the vignette, and the overlays.
+ *   4. the 3D layer: the models AND the world's flat art (walls, props), in one
+ *      canvas with one depth buffer, which is the only way art and geometry can
+ *      interleave per pixel (`three-d/world-quads.ts`);
+ *   5. the baked roof bitmap, above the actors because a character walks under a
+ *      roof — the game's own rule, not an approximation;
+ *   6. the DOM HUD, the vignette, and the overlays.
+ *
+ * The ground and the roofs are still baked bitmaps: the first is one flat plane
+ * whose art comes from thousands of small tiles, and giving it real depth would
+ * mean drawing those tiles rather than a bitmap of them (a streaming problem, not
+ * a depth one). Everything that has to interleave with a character is in layer 4.
  *
  * The depth sort is done by the simulation: it hands over an ordered array and
  * `each` reorders the mounted nodes to match. Nothing here sorts anything —
@@ -317,13 +327,10 @@ const map = game.map
         </canvas>
       ))}
       {/*
-        The 3D actor layer: models whose feet land on the same diamonds the 2D
+        The 3D layer: models whose feet land on the same diamonds the 2D
         projection draws, via an orthographic camera aligned to `toScreen` (see
-        three-d/projection.ts). Mounted over the canvas and under the HUD. It
-        deliberately draws every model over the whole scene — cross-layer depth
-        (a model behind a wall tile) is wrong until the world itself is 3D.
-        Roofs are the exception the game itself makes: they draw in their own
-        pass ABOVE the actors, which is the canvas mounted below this one.
+        three-d/projection.ts), plus the world's flat art in the same buffer.
+        Mounted over the ground canvas and under the roof canvas.
 
         The `actors` getter reads the frame tick first: every placement and
         visibility getter in the layer unrefs this prop, so the tick is what
