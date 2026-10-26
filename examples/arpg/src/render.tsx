@@ -17,7 +17,7 @@
  * ordering is a simulation concern, and the scene tree only reproduces it.
  */
 
-import { com, each } from '@rasenjs/core'
+import { com, each, unref } from '@rasenjs/core'
 import { group } from '@rasenjs/canvas-2d'
 import type {
   ActorSlot,
@@ -31,6 +31,7 @@ import { Hud, type HudProps } from './hud'
 import { toScreen, toWorld } from './iso'
 import { Actor3DLayer } from './three-d/actor-layer'
 import { actor3DActors, actor3DTick, hiddenActorSlots } from './three-d/game-actors'
+import { propArt, wallArt } from './three-d/world-quads'
 import { viewportKey } from './viewport'
 
 type Slot = ActorSlot | PropSlot | LootSlot | FloatSlot | EffectSlot
@@ -111,34 +112,6 @@ function ActorSprite(props: { slot: ActorSlot }) {
   )
 }
 
-/** A static prop. Nothing about it is reactive except its position in the list. */
-function PropSprite(props: { slot: PropSlot; geometry: Geometry }) {
-  const { slot, geometry } = props
-  // `slot.x`/`slot.y` are the object's TILE coordinates — the same pair the
-  // depth sort and the 3D layer use — so they have to be projected before they
-  // mean anything on screen. Drawing them directly put every object at the
-  // world origin in PIXELS (a prop on tile (32, 16) was painted at (32, 16) px
-  // instead of (1280, 1920)), which is the offset that looked like the map
-  // being misaligned.
-  const point = toScreen(slot.x, slot.y)
-  const width = geometry.frameWidth * slot.scale
-  const height = geometry.frameHeight * slot.scale
-  return (
-    <sprite
-      image={slot.image}
-      frameWidth={geometry.frameWidth}
-      frameHeight={geometry.frameHeight}
-      columns={geometry.columns}
-      frame={slot.frame}
-      // Bottom-centre on the cell, the same anchor `Game.spriteAnchor` culls by.
-      x={point.x - width / 2}
-      y={point.y - height}
-      width={width}
-      height={height}
-    />
-  )
-}
-
 /** A ground drop, with its name floating above it in the rarity colour. */
 function LootSprite(props: { slot: LootSlot; geometry: Geometry }) {
   const { slot, geometry } = props
@@ -213,35 +186,6 @@ function EffectRing(props: { slot: EffectSlot }) {
   )
 }
 
-/**
- * Is this 2D prop standing in front of a 3D actor?
- *
- * The 3D layer draws every model over the whole 2D canvas, so a prop that is
- * NEARER the camera than a character (greater `x + y`) would still be painted
- * under it — the "the character walks over the tree instead of behind it" look.
- * Such a prop moves to the overlay pass, which sits above the 3D layer.
- *
- * The test is per prop against the nearest characters: props and characters
- * rarely share a tile, so a one-and-a-half tile radius covers the overlap.
- */
-function propStandsInFront(
-  slot: Slot,
-  actors: ReadonlyArray<{ id: string; tileX: number; tileY: number; visible?: boolean }>,
-): boolean {
-  if (slot.kind !== 'prop' || !slot.active) return false
-  const depth = slot.x + slot.y
-  for (const actor of actors) {
-    if (actor.visible === false) continue
-    const head = actor.id.split(':')[0]
-    if (head !== 'hero' && head !== 'monster' && head !== 'npc') continue
-    if (actor.tileX + actor.tileY >= depth) continue
-    if (Math.max(Math.abs(actor.tileX - slot.x), Math.abs(actor.tileY - slot.y)) > 1.5) continue
-    return true
-  }
-  return false
-}
-
-
 function renderSlot(slot: Slot, game: Game) {
   switch (slot.kind) {
     case 'actor':
@@ -249,7 +193,10 @@ function renderSlot(slot: Slot, game: Game) {
       // slot's node mounted so the pool's reassignment never re-creates it.
       return hiddenActorSlots.has(slot) ? group({ children: [] }) : ActorSprite({ slot })
     case 'prop':
-      return PropSprite({ slot, geometry: game.propGeometry })
+      // Props are drawn by the 3D layer (`propArt`), which needs the depth
+      // buffer to put them in front of or behind a character correctly. An
+      // empty group keeps the slot mounted for when it becomes active again.
+      return group({ children: [] })
     case 'loot':
       return LootSprite({ slot, geometry: game.lootGeometry })
     case 'float':
@@ -361,9 +308,7 @@ const map = game.map
               width={map.groundWidth}
               height={map.groundHeight}
             />
-            {each(game.renderList, (slot: Slot) =>
-              propStandsInFront(slot, actor3DActors()) ? group({ children: [] }) : renderSlot(slot, game),
-            )}
+            {each(game.renderList, (slot: Slot) => renderSlot(slot, game))}
           </group>
 
           {/* Screen space — these must not move with the camera. */}
@@ -394,9 +339,15 @@ const map = game.map
             const center = toWorld(size.width / 2 - game.cameraX.value, size.height / 2 - game.cameraY.value)
             return { x: center.x, y: center.y }
           },
-          // The walls moved into this canvas: they need the same depth buffer as
-          // the models to be occluded correctly, per pixel.
-          walls: () => map.wallCells,
+          // The world's flat art shares this canvas' depth buffer with the
+          // models, so walls and props occlude per pixel instead of by guess.
+          art: () => [
+            ...wallArt(map.wallCells),
+            ...propArt(
+              unref(game.renderList).filter((slot): slot is PropSlot => slot.kind === 'prop'),
+              game.propGeometry,
+            ),
+          ],
           width: size.width,
           height: size.height,
         }),
@@ -410,24 +361,17 @@ const map = game.map
         {each(viewportKey, (size: { width: number; height: number }) => (
           <canvas width={size.width} height={size.height}>
             <group x={game.cameraX} y={game.cameraY}>
-              {/* Walls nearer the camera than a character, then the roofs. */}
-              {/*
-                The props that stand in front of a 3D actor. The scene pass skips
-                them (they belong above the models), so this pass has to draw
-                them — leaving them out here removed them from the world.
-              */}
-              {each(game.renderList, (slot: Slot) =>
-                propStandsInFront(slot, actor3DActors())
-                  ? renderSlot(slot, game)
-                  : group({ children: [] }),
-              )}
-              <image
-                image={map.roof}
-                x={map.groundX}
-                y={map.groundY}
-                width={map.groundWidth}
-                height={map.groundHeight}
-              />
+              {/* An array, because the JSX types want `Mountable[]` and this
+                  pass has exactly one child left. */}
+              {[
+                <image
+                  image={map.roof}
+                  x={map.groundX}
+                  y={map.groundY}
+                  width={map.groundWidth}
+                  height={map.groundHeight}
+                />,
+              ]}
             </group>
           </canvas>
         ))}

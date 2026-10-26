@@ -45,8 +45,7 @@ import {
   type BindingScratch,
 } from './skinning'
 import type { AnimFade } from './anim-state'
-import { WallQuads } from './wall-quads'
-import type { WallCell } from '../world'
+import { WorldQuads, type SpriteArt } from './world-quads'
 import {
   ACTOR_CAMERA_DIST,
   MODEL_UNITS_PER_TILE,
@@ -101,13 +100,14 @@ export interface Actor3DLayerProps {
   /** World pan: the tile point (tiles) that lands at the canvas center. */
   camera: PropValue<{ x: number; y: number }>
   /**
-   * The world's wall cells, drawn as depth-tested quads in THIS canvas.
+   * The world's flat art (walls, props), drawn as depth-tested quads in THIS
+   * canvas.
    *
-   * They must share the canvas with the models: two canvases have one ordering
-   * between them, so a wall could never be interleaved with a character per
-   * pixel. That interleaving is the whole reason they moved here.
+   * It must share the canvas with the models: two canvases have one ordering
+   * between them, so flat art could never be interleaved with a character per
+   * pixel. That interleaving is the whole reason it moved here.
    */
-  walls?: PropValue<readonly WallCell[]>
+  art?: PropValue<readonly SpriteArt[]>
   /** Logical canvas width in px. */
   width: PropValue<number>
   /** Logical canvas height in px. */
@@ -493,12 +493,13 @@ export function Actor3DLayer(props: Actor3DLayerProps) {
         renderOptions={renderOptions}
         style={style}
       >
-        {/* The wall quads come first: same canvas, same depth buffer as the
+        {/* The world's art comes first: same canvas, same depth buffer as the
             models, which is the only way a wall can hide a character per
-            pixel. */}
-        {props.walls === undefined
+            pixel. Models drawn after win an exact depth tie — units over
+            objects, the order the 2D painter used. */}
+        {props.art === undefined
           ? children
-          : [WallQuads({ cells: props.walls, camera, width, height }), ...children]}
+          : [WorldQuads({ art: props.art, camera, width, height }), ...children]}
       </canvas>
     </div>
   )
