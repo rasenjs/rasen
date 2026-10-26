@@ -1,4 +1,16 @@
 /**
+ * Evidence: the base stats and the skill list are `[C]` — the source spec produced
+ * its per-class table by creating every class three times in the running game and
+ * reading the numbers back, and the test here repeats that comparison against
+ * `charstats.txt`.
+ *
+ * The item rolls are `[C]` for the draws (seeds, durability, defense, sockets) and
+ * `[I]` for what is deliberately absent: the staff-mod picks beyond the count roll,
+ * the ethereal roll (a starting item skips it before drawing), and the placement
+ * rules — an equipped item and an inventory item are both specified, a belt box is
+ * specified as a box but NOT as a save coordinate, so nothing here invents one.
+ */
+/**
  * A new character, in the order the original creates one.
  *
  * `NewCharFromStub` does five things: build the skill list, seed the unit, write

@@ -1,4 +1,9 @@
 /**
+ * Evidence: every primitive here is `[C]` in the source spec — confirmed by an
+ * emulation that matches the binary's own functions bit for bit — and this file is
+ * pinned by that trace, call for call, including the seeds left behind.
+ */
+/**
  * The game's random number generator.
  *
  * One seed is two 32-bit words stepped by a 64-bit multiply-and-add — the scheme

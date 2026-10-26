@@ -1,4 +1,15 @@
 /**
+ * Evidence, step by step, as the source spec tags them:
+ *
+ *   `[C]` run-verified — the durability roll, the defense roll, the quantity rule,
+ *         the socket-roll draw and its 33 threshold, the staff-mod count roll.
+ *   `[I]` read from the code only — the `spawnstack` top of a misc quantity, the
+ *         `start mod cap + 1` count (confirmed separately as a count, not a draw).
+ *
+ * The starting-kit test pins every one of these against two logged creations, so a
+ * regression shows up as a wrong seed rather than a wrong-looking item.
+ */
+/**
  * What an item's own numbers are, before any affix touches it.
  *
  * Every item the game makes rolls its *base* stats first — durability, defense,

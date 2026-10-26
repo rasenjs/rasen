@@ -1,4 +1,14 @@
 /**
+ * Evidence: the header, the section order, the section markers, the stat list's
+ * skip rule and the checksum are all `[C]` in the source spec — measured against
+ * saves the game wrote — and the checksum and the first 48 header bytes are
+ * reproduced byte for byte in the test next to this file.
+ *
+ * `[I]` branches, which no run fed: the mercenary header's dead flag, and the first
+ * word of a corpse block (the original writes an uninitialised stack word there, so
+ * no two of its own saves agree; this writes zero).
+ */
+/**
  * The `.d2s` save file.
  *
  * A save is a 335-byte header and then, in this order: the quest record, the

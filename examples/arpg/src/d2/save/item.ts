@@ -1,4 +1,12 @@
 /**
+ * Evidence: the field order and every width come from the source spec, which tagged
+ * the common part and the property framing `[C]` — it decoded 25 game-written saves
+ * with them — while the quality payloads and the ear/personalized/realm branches are
+ * `[I]`, read from the code. The one `[C]` item dump the spec publishes (a staff's
+ * 29 bytes) is reproduced exactly by the test next to this file, which is the check
+ * that the whole chain of widths is right: one wrong field shifts every bit after it.
+ */
+/**
  * One item, as the save file stores it.
  *
  * An item is written as: a `JM` tag, the common part (where it is, what it is, its
