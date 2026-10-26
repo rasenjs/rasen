@@ -52,6 +52,8 @@ export const FRAME_LAYOUT = {
   useLighting: 160,
   useShadow: 164,
   skipTonemap: 168,
+  /** Fills the 4 bytes that alignment already reserves before the mat4x4. */
+  alphaCutoff: 172,
   shadowMatrix: 176, // mat4x4 -> 176..239; 240 is 16-aligned
 } as const
 
@@ -93,6 +95,7 @@ export const FRAME_FIELDS = [
   { name: 'u_useLighting', offset: FRAME_LAYOUT.useLighting, type: 'float' as const },
   { name: 'u_useShadow', offset: FRAME_LAYOUT.useShadow, type: 'float' as const },
   { name: 'u_skipTonemap', offset: FRAME_LAYOUT.skipTonemap, type: 'float' as const },
+  { name: 'u_alphaCutoff', offset: FRAME_LAYOUT.alphaCutoff, type: 'float' as const },
   { name: 'u_shadowMatrix', offset: FRAME_LAYOUT.shadowMatrix, type: 'mat4' as const },
 ]
 
@@ -109,6 +112,11 @@ struct Uniforms {
   useLighting: f32,
   useShadow: f32,
   skipTonemap: f32,
+  // Alpha below this is discarded instead of blended; 0 disables the test.
+  // NOTE: the WebGL backend sets this per draw. The WebGPU backend's uniforms
+  // are frame-level, so it writes 0 and does not support a per-draw cutoff yet
+  // — a caller asking for one there gets blending, not cutout.
+  alphaCutoff: f32,
   shadowMatrix: mat4x4<f32>,
 };
 
@@ -191,6 +199,11 @@ fn fs_main(input: FsIn) -> @location(0) vec4<f32> {
 
   var color = base.rgb * input.color.rgb;
   let alpha = base.a * input.color.a;
+  // Same cutout as the GLSL path, in the same place: before anything consumes
+  // the alpha, so a discarded pixel costs no shading.
+  if (u.alphaCutoff > 0.0 && alpha < u.alphaCutoff) {
+    discard;
+  }
 
   if (u.useLighting > 0.5) {
     let n = normalize(input.normal);

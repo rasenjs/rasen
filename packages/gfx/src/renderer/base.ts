@@ -406,6 +406,15 @@ export interface BatchItem {
   premultiplied?: boolean
   /** 2D blend equation (normal/additive/multiply/screen). Default normal. */
   blendMode?: BlendMode
+  /**
+   * Alpha below this is discarded instead of blended; 0 disables the test.
+   *
+   * Pixel art must be cut out rather than blended, because a sprite drawn as a
+   * depth-tested quad needs its transparent region to write NO depth (or the
+   * hole would occlude what stands behind it) while its opaque region writes
+   * depth (or nothing could occlude the sprite). Blending cannot do both.
+   */
+  alphaCutoff?: number
   /** Optional triangle index list into `vertices` (3 entries per triangle).
    * When EVERY item in a group carries indices, the group draws indexed:
    * unique vertices are transformed and uploaded once instead of once per
@@ -464,6 +473,16 @@ export function mergedGroupKey(it: BatchItem): number {
     | (it.depthWrite === false ? 32 : 0)
     | (it.normals && it.normals.length > 0 ? 64 : 0)
     | (it.sealed ? 128 : 0)
+    // The cutoff is a shader UNIFORM, so items that disagree cannot share a
+    // draw. Eight bits above the flags: two different cutoffs must not merge.
+    | (cutoffByteOf(it) << 8)
+}
+
+/** The item's cutoff as a byte, so it can live inside the merge key. */
+export function cutoffByteOf(it: BatchItem): number {
+  const cutoff = it.alphaCutoff
+  if (cutoff === undefined || !(cutoff > 0)) return 0
+  return Math.min(255, Math.round(cutoff * 255))
 }
 
 
@@ -1081,6 +1100,7 @@ export abstract class Renderer {
     translationOnly?: boolean,
     packedColor?: Uint8Array | Color,
     staticContent?: boolean,
+    alphaCutoff?: number,
   ) {
     const transformMatrix = transform instanceof Mat4x4f
       ? transform
@@ -1112,6 +1132,7 @@ export abstract class Renderer {
     item.indices = indices
     item.translationOnly = effectiveTranslationOnly
     item.packedColor = packedColor
+    item.alphaCutoff = alphaCutoff
     // Culling bounds: computed per submission from the source arrays + the
     // item's transform (the same data drawGroup will read). Only when the
     // option is on — otherwise the O(V) min/max pass is skipped entirely.
@@ -1221,6 +1242,58 @@ export abstract class Renderer {
     span.unchangedColor = false
     span.unchangedIndices = false
     return span
+  }
+
+  /**
+   * One shape, with its options named.
+   *
+   * This is the form new code should use: {@link addShape}'s positional tail has
+   * sixteen parameters and every capability added to it made an existing call
+   * site harder to read. Anything that is not the four positional facts —
+   * geometry, colour, transform and texture coordinates — goes in `options`.
+   */
+  addShapeWith(
+    vertices: Float32Array,
+    color: Color,
+    transform: Mat4x4f | Float32Array | number[] | TransformInput,
+    options: {
+      uv?: Float32Array
+      texture?: TextureHandle | null
+      vertexColors?: Float32Array
+      depthWrite?: boolean
+      normals?: Float32Array
+      layer?: number
+      skipTonemap?: boolean
+      premultiplied?: boolean
+      blendMode?: BlendMode
+      indices?: Uint16Array | number[]
+      translationOnly?: boolean
+      packedColor?: Uint8Array | Color
+      /** Alpha below this is discarded instead of blended; 0 disables it. */
+      alphaCutoff?: number
+    } = {},
+  ): void {
+    this.addShapeInternal(
+      vertices,
+      color,
+      transform instanceof Mat4x4f || Array.isArray(transform) || transform instanceof Float32Array
+        ? transform
+        : toMatrixInput(transform),
+      options.uv,
+      options.texture,
+      options.vertexColors,
+      options.depthWrite,
+      options.normals,
+      options.layer,
+      options.skipTonemap,
+      options.premultiplied,
+      options.blendMode,
+      options.indices,
+      options.translationOnly,
+      options.packedColor,
+      false,
+      options.alphaCutoff,
+    )
   }
 
   /**

@@ -143,6 +143,7 @@ export class WebGLRenderer extends Renderer {
   private shadowMatrixLoc: WebGLUniformLocation | null = null
   private useShadowLoc: WebGLUniformLocation | null = null
   private skipTonemapLoc: WebGLUniformLocation | null = null
+  private alphaCutoffLoc: WebGLUniformLocation | null = null
 
   private glOptions: {
     batching: boolean
@@ -260,6 +261,7 @@ export class WebGLRenderer extends Renderer {
     this.shadowMatrixLoc = this.shader.getUniformLocation('u_shadowMatrix')
     this.useShadowLoc = this.shader.getUniformLocation('u_useShadow')
     this.skipTonemapLoc = this.shader.getUniformLocation('u_skipTonemap')
+    this.alphaCutoffLoc = this.shader.getUniformLocation('u_alphaCutoff')
 
     this.shader.use()
     // Sampler array u_tex[4] → texture units 0..3 (fixed mapping, set once).
@@ -1068,6 +1070,10 @@ export class WebGLRenderer extends Renderer {
     // Skybox / background items keep their original colours (skip ACES).
     const skipTonemap = items.every((it) => it.skipTonemap === true)
     if (this.skipTonemapLoc) gl.uniform1i(this.skipTonemapLoc, skipTonemap ? 1 : 0)
+
+    // The cutoff is part of the group key, so every item here carries the same
+    // one: the first item speaks for the group.
+    if (this.alphaCutoffLoc) gl.uniform1f(this.alphaCutoffLoc, items[0]?.alphaCutoff ?? 0)
 
     if (this.isWebGL2) {
       // WebGL2 fast path: attrib pointers live in a per-combination VAO

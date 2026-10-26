@@ -87,6 +87,31 @@ export type GpuCanvasContext = Omit<GPUCanvasContext, 'canvas'> & {
 export type MeshSpan = ReturnType<Renderer['beginMesh']>
 
 /**
+ * The optional half of a shape submission.
+ *
+ * Everything that is not geometry, colour, transform or texture coordinates.
+ * `alphaCutoff` in particular cannot be expressed through blending: pixel art
+ * needs its transparent region to write NO depth and its opaque region to write
+ * depth, which is a `discard`, not a blend.
+ */
+export interface ShapeOptions {
+uv?: Float32Array
+texture?: TextureHandle | null
+vertexColors?: Float32Array
+depthWrite?: boolean
+normals?: Float32Array
+layer?: number
+skipTonemap?: boolean
+premultiplied?: boolean
+blendMode?: BlendMode
+indices?: Uint16Array | number[]
+translationOnly?: boolean
+packedColor?: Uint8Array | { r: number; g: number; b: number; a: number }
+/** Alpha below this is discarded instead of blended; 0 disables the test. */
+alphaCutoff?: number
+}
+
+/**
  * 场景树节点 —— 组件的唯一可见面。
  *
  * Mountable<GfxNode> 的 node 入参；同时也是场景树的成员。
@@ -105,7 +130,7 @@ export interface GfxNode {
   /** Optional bounds provider (world coordinates); null for 3D components. */
   bounds?: () => Bounds | null
 
-  // -- 几何提交（转发到 batch） ---------------------------------------------
+// -- 几何提交（转发到 batch） ---------------------------------------------
 
   /** batchKey 仅为兼容保留（调试标记），batch 层忽略它。 */
   addShape(
@@ -125,6 +150,18 @@ export interface GfxNode {
     indices?: Uint16Array | number[],
     translationOnly?: boolean,
     packedColor?: Uint8Array | { r: number; g: number; b: number; a: number },
+  ): void
+  /**
+   * One shape with its options named — the form new code should use.
+   *
+   * `addShape`'s positional tail has sixteen parameters; every capability added
+   * to it made the existing call sites harder to read.
+   */
+  addShapeWith?(
+    vertices: Float32Array,
+    color: { r: number; g: number; b: number; a: number },
+    transform: Mat4x4f | Float32Array | number[] | TransformInput,
+    options?: ShapeOptions,
   ): void
   beginMesh(vertexCount: number, indexCount: number): MeshSpan | null
   endMesh(
@@ -214,6 +251,9 @@ function attachNode(
     addShape: (batchKey, vertices, color, transform, uv, texture, vertexColors, depthWrite, normals, layer, skipTonemap, premultiplied, blendMode, indices, translationOnly, packedColor) => {
       void batchKey
       renderer.addShape(vertices, color, toMatrix(transform), uv, texture, vertexColors, depthWrite, normals, layer, skipTonemap, premultiplied, blendMode, indices, translationOnly, packedColor)
+    },
+    addShapeWith: (vertices, color, transform, options) => {
+      renderer.addShapeWith(vertices, color, toMatrix(transform), options)
     },
     beginMesh: (vertexCount, indexCount) => renderer.beginMesh(vertexCount, indexCount),
     endMesh: (span, vertexCount, indexCount, texture, blendMode, premultiplied, skipTonemap) =>

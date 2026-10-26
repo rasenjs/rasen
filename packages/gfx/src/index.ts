@@ -12,8 +12,11 @@ export {
   type RenderContextOptions,
 } from './renderer/gl/index'
 export type { CameraConfig } from './camera'
+
+export { orthoCameraFromTile, transformForTile } from './iso'
+export type { IsoTileSize, IsoModelPlacement } from './iso'
 export { isLookAtCamera, computeCameraMatrix } from './camera'
-export { createRoot, createNode, createRootNode, type GfxNode, type GlNode, type GlContext, type CanvasSurface, type GpuCanvasContext, type MeshSpan } from './node'
+export { createRoot, createNode, createRootNode, type GfxNode, type ShapeOptions, type GlNode, type GlContext, type CanvasSurface, type GpuCanvasContext, type MeshSpan } from './node'
 export { gfxHostHooks } from './host-hooks'
 export { TransformStack } from './transform-stack'
 export type { InstanceData } from './renderer/gl/instanced'

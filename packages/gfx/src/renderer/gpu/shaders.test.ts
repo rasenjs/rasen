@@ -59,6 +59,7 @@ describe('uniform block layout (engine pipeline)', () => {
       'useLighting',
       'useShadow',
       'skipTonemap',
+      'alphaCutoff',
       'shadowMatrix',
     ])
   })
@@ -93,6 +94,7 @@ describe('WGSL / GLSL parity', () => {
       'u_shadowMatrix': 'shadowMatrix',
       'u_useShadow': 'useShadow',
       'u_skipTonemap': 'skipTonemap',
+      'u_alphaCutoff': 'alphaCutoff',
     }
     for (const u of glslUniforms) {
       const counterpart = expected[u]

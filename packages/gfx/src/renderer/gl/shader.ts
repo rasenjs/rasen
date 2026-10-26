@@ -196,11 +196,21 @@ uniform sampler2D u_shadowMap;
 uniform mat4 u_shadowMatrix;
 uniform bool u_useShadow;
 uniform bool u_skipTonemap;
+/**
+ * Alpha below this is thrown away instead of blended. 0 disables the test.
+ *
+ * Pixel art has to be CUT OUT, not blended: a tile's transparent region must not
+ * write depth (or the hole would occlude what stands behind it), and its opaque
+ * region must write depth (or nothing could occlude the tile). Blending cannot
+ * do both, so a sprite-based world drawn as depth-tested quads needs this.
+ */
+uniform float u_alphaCutoff;
 
 void main() {
   vec4 base = u_useTexture ? texture2D(u_texture, v_texCoord) : vec4(1.0, 1.0, 1.0, 1.0);
   vec3 color = base.rgb * v_color.rgb;
   float alpha = base.a * v_color.a;
+  if (u_alphaCutoff > 0.0 && alpha < u_alphaCutoff) discard;
 
   if (u_useLighting) {
     vec3 n = normalize(v_normal);
@@ -313,6 +323,15 @@ uniform sampler2D u_shadowMap;
 uniform mat4 u_shadowMatrix;
 uniform bool u_useShadow;
 uniform bool u_skipTonemap;
+/**
+ * Alpha below this is thrown away instead of blended. 0 disables the test.
+ *
+ * Pixel art has to be CUT OUT, not blended: a tile's transparent region must not
+ * write depth (or the hole would occlude what stands behind it), and its opaque
+ * region must write depth (or nothing could occlude the tile). Blending cannot
+ * do both, so a sprite-based world drawn as depth-tested quads needs this.
+ */
+uniform float u_alphaCutoff;
 
 out vec4 fragColor;
 
@@ -330,6 +349,7 @@ void main() {
   }
   vec3 color = base.rgb * v_color.rgb;
   float alpha = base.a * v_color.a;
+  if (u_alphaCutoff > 0.0 && alpha < u_alphaCutoff) discard;
 
   if (u_useLighting) {
     vec3 n = normalize(v_normal);
