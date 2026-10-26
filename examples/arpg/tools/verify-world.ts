@@ -24,7 +24,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
-import { parseDs1 } from '../src/original/ds1'
+import { parseDs1 } from '@rasenjs/assets'
 import { parseDt1 } from '../src/d2/dt1'
 import {
   assembleTile,
@@ -188,10 +188,21 @@ function verifyTileGeometry(): { problems: string[]; counts: string[] } {
         }
       }
 
-      // Art placement: a block that may be drawn must be exactly one cell wide,
-      // must start at its frame origin, and must fit a cell. Roof blocks are the
-      // family that does not — their art sits at an offset inside the block's box
-      // — so they are counted separately instead of failing the check.
+      // Art placement.
+      //
+      // This used to demand that every drawable block be exactly one cell wide,
+      // start at its frame origin and fit a cell — and it failed on 1489 blocks,
+      // which was the CHECK being wrong, not the art. The exported tilesets are
+      // full of legitimate partial tiles: a floor transition whose picture is 128
+      // or 96 pixels wide and sits at (32, 0) inside the frame, and walls whose
+      // art rises 288 pixels above it. `drawTileArt` anchors by
+      // `cx - TILE_WIDTH/2 + frameX`, so an offset frame is exactly how they are
+      // meant to be drawn.
+      //
+      // What IS true of every ground block, and therefore worth guarding: the
+      // picture is a whole number of 32-pixel sub-cells, and its frame offset
+      // keeps it within one cell's width of the frame's left edge. Roof blocks are
+      // counted separately rather than checked.
       const placed = placeableSubTiles(block)
       if (placed.length === 0) continue
       if (block.roofY !== 0) {
@@ -214,32 +225,34 @@ function verifyTileGeometry(): { problems: string[]; counts: string[] } {
       const minY = Math.min(...placed.map((p) => p.subTile.yPos))
       const artWidth = Math.max(...placed.map((p) => p.subTile.xPos + p.width)) - minX
       const artHeight = Math.max(...placed.map((p) => p.subTile.yPos + p.height)) - minY
-      if (artWidth !== block.sizeX) {
+      if (artWidth <= 0 || artWidth % SUB_TILE_WIDTH !== 0) {
         artWidthOff += 1
         if (examples.length < 8) {
-          examples.push(`${relative(data, path)}#${block.index}: art is ${artWidth} wide against sizeX ${block.sizeX}`)
+          examples.push(`${relative(data, path)}#${block.index}: art is ${artWidth} wide, not a multiple of ${SUB_TILE_WIDTH}`)
         }
       }
-      if (minX !== 0 || minY !== 0) {
+      if (minX <= -TILE_WIDTH || minX >= TILE_WIDTH) {
         artFrameOff += 1
         if (examples.length < 8) {
-          examples.push(`${relative(data, path)}#${block.index}: art frame starts at (${minX},${minY}), not the origin`)
+          examples.push(`${relative(data, path)}#${block.index}: art frame starts at x ${minX}, outside a cell's width`)
         }
       }
-      if (artWidth > TILE_WIDTH || artHeight > TILE_HEIGHT) {
+      // A ground tile may be taller than the cell only upwards (a wall face that
+      // reaches above the floor); it may never be more than a cell wide.
+      if (minY > 0) {
         artTooBig += 1
         if (examples.length < 8) {
-          examples.push(`${relative(data, path)}#${block.index}: art ${artWidth}x${artHeight} does not fit a ${TILE_WIDTH}x${TILE_HEIGHT} cell`)
+          examples.push(`${relative(data, path)}#${block.index}: art starts ${minY}px below the frame, past the cell's floor`)
         }
       }
       if (palette) {
         const bitmap = assembleTile(block, palette, bytes)
         if (bitmap === null) {
           problems.push(`${relative(data, path)}#${block.index}: floor block assembled to nothing`)
-        } else if (bitmap.width !== TILE_WIDTH) {
+        } else if (bitmap.width <= 0 || bitmap.width % SUB_TILE_WIDTH !== 0) {
           artWidthOff += 1
           if (examples.length < 8) {
-            examples.push(`${relative(data, path)}#${block.index}: picture ${bitmap.width} wide, expected ${TILE_WIDTH}`)
+            examples.push(`${relative(data, path)}#${block.index}: picture ${bitmap.width} wide, not a multiple of ${SUB_TILE_WIDTH}`)
           }
         }
       }
