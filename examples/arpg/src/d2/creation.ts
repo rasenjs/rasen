@@ -17,6 +17,15 @@
 
 import type { CharStatsRow } from './stats'
 import type { SaveStat } from './save/d2s'
+import { step, type Seed } from './rng'
+import {
+  rollBaseStats,
+  rollSockets,
+  rollStaffModCount,
+  type BaseStats,
+  type ItemBaseRecord,
+  type SocketRoll,
+} from './item-base'
 
 /** Stat ids the creation writes, by the names `itemstatcost.txt` uses. */
 const STAT = {
@@ -123,4 +132,88 @@ export function initialRightSkill(
  */
 export function initialSkillBytes(skillCount = 30): Uint8Array {
   return new Uint8Array(skillCount)
+}
+
+/** One slot of a class's starting kit: what the item is and how many copies of it. */
+export interface KitSlot {
+  code: string
+  count: number
+}
+
+/** An item the creation made, before any affix has looked at it. */
+export interface CreatedItem {
+  code: string
+  /**
+   * `Unit+0x28`: the low word the unit seed was created from.
+   *
+   * This is the "item seed" a save stores and a reload restores, so it has to
+   * survive the draws that follow it — which is why it is kept beside the seed
+   * rather than read back out of it.
+   */
+  unitId: number
+  /**
+   * The item's unit seed, after its base stats were drawn. The base stats are what
+   * this seed decided; nothing later moves it.
+   */
+  unitSeed: Seed
+  /** The item seed, after the socket roll — the seed the affixes build on. */
+  itemSeed: Seed
+  /** The low word the item seed was created from, which the socket count uses. */
+  start: number
+  base: BaseStats
+  /** The socket roll: it happens for a socketable base even when the result is thrown away. */
+  sockets: SocketRoll
+}
+
+/**
+ * The starting kit, rolled the way the game rolls it.
+ *
+ * Each copy takes exactly two draws from the game seed — one for its unit seed, one
+ * for its item seed — and everything else it decides comes from those two. That is
+ * why the kit's size alone fixes the game seed's position when creation finishes:
+ * seven copies for the Sorceress and Necromancer, eight for the rest.
+ *
+ * The ethereal roll is not here because a starting item skips it before drawing.
+ * The socket roll IS here because it draws first and refuses afterwards, so
+ * leaving it out would put every later item one draw ahead.
+ */
+export function rollStartingItems(
+  kit: readonly KitSlot[],
+  bases: (code: string) => ItemBaseRecord | null,
+  gameSeed: Seed,
+  options: { ilvl?: number; difficultyCap?: number } = {},
+): CreatedItem[] {
+  const ilvl = options.ilvl ?? 1
+  const difficultyCap = options.difficultyCap ?? 3
+  const items: CreatedItem[] = []
+  for (const slot of kit) {
+    const base = bases(slot.code)
+    if (base === null) continue
+    for (let copy = 0; copy < slot.count; copy += 1) {
+      step(gameSeed)
+      const unitId = gameSeed.low
+      const unitSeed: Seed = { low: unitId, high: 666 }
+      step(gameSeed)
+      const start = gameSeed.low
+      const itemSeed: Seed = { low: start, high: 666 }
+      const baseStats = rollBaseStats(base, unitSeed)
+      // The normal builder runs between the base stats and the sockets, and a base
+      // that can carry class skills takes its count roll here even when it ends up
+      // with none. The rest of that phase is not implemented, so an item that does
+      // roll a mod stops instead of producing seeds that are quietly wrong.
+      if (base.staffMods < 7) {
+        const mods = rollStaffModCount(itemSeed)
+        if (mods > 0) {
+          throw new Error(
+            `${slot.code}: the staff-mod phase rolled ${mods} mod(s); its skill picks are not implemented yet`,
+          )
+        }
+      }
+      // A starting item never gets sockets — but the roll is taken first, so the
+      // seed still moves and every later item's seeds depend on it.
+      const sockets = rollSockets(itemSeed, base, ilvl, start, difficultyCap, true)
+      items.push({ code: slot.code, unitId, unitSeed, itemSeed, start, base: baseStats, sockets })
+    }
+  }
+  return items
 }
