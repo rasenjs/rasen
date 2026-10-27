@@ -1,7 +1,8 @@
 # @rasenjs/assets
 
-Asset parsing and loading for [Rasen](https://github.com/rasenjs/rasen):
-**Spine** skeletons and **glTF/GLB** models.
+Asset parsing for [Rasen](https://github.com/rasenjs/rasen): **Spine**
+skeletons, **glTF/GLB** models, **Granny/GR2** containers, **NVN** texture
+layouts, and **Diablo II `.ds1`** level layouts.
 
 The package is a pure data layer — parsers plus the Spine runtime (skeleton
 pose solving, `AnimationState`, path constraints, hit testing) — and performs no

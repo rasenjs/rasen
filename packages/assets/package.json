@@ -1,7 +1,7 @@
 {
   "name": "@rasenjs/assets",
   "version": "0.1.0-alpha",
-  "description": "Asset loading utilities for Spine and GLTF/GLB — I/O, image loading, format combination",
+  "description": "Asset format parsers (Spine, GLTF/GLB, Granny GR2, NVN textures, Diablo II .ds1) and the Spine runtime — pure data layer, no I/O",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
