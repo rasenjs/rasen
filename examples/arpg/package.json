@@ -14,9 +14,12 @@
     "assets:extract": "../../node_modules/.bin/tsx tools/extract-original.ts extract"
   },
   "dependencies": {
+    "@rasenjs/animation": "workspace:*",
+    "@rasenjs/assets": "workspace:*",
     "@rasenjs/canvas-2d": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
+    "@rasenjs/math": "workspace:*",
     "@rasenjs/reactive-signals": "workspace:*",
     "@rasenjs/vite-plugin-rasen": "workspace:*"
   },

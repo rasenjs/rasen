@@ -4115,7 +4115,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/animation@workspace:packages/animation":
+"@rasenjs/animation@workspace:*, @rasenjs/animation@workspace:packages/animation":
   version: 0.0.0-use.local
   resolution: "@rasenjs/animation@workspace:packages/animation"
   dependencies:
@@ -4126,8 +4126,8 @@ __metadata:
 
 "@rasenjs/assets@file:../../packages/assets::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=78a19f&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
-  checksum: 10c0/c17d1665e7e0fc02f81a6b7cc553bb3db4df68e70600187aa8f0d4b85cc7b9d9acafe9d4b0ba5c026e27058e0e673ad85294b9653bccaf80998b2aa29ee69010
+  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=087144&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  checksum: 10c0/cbea8774df7bdca1e6fd3f040b8b8da0873312f51979ee4429a1ecc3e70e0b62caec54317645be158265b4543b445363d58c6dcc683d5898d5bcb6f0578a00ed
   languageName: node
   linkType: hard
 
@@ -4143,11 +4143,11 @@ __metadata:
 
 "@rasenjs/canvas-2d@file:../../packages/canvas-2d::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.1
-  resolution: "@rasenjs/canvas-2d@file:../../packages/canvas-2d#../../packages/canvas-2d::hash=57b418&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/canvas-2d@file:../../packages/canvas-2d#../../packages/canvas-2d::hash=654c8d&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
-  checksum: 10c0/89bdfec882734fcd65b131e67f131f07f93facc07381c47576b33e2071dd8bd93a8f087ee66022946aaad2fc86deb743f6e92f241a9dfe910cfbd8c8b7216364
+  checksum: 10c0/0d7799939e8f6b54bbddddb4bd6b158948867e48b1576cd8100d1657bb7f2f6e3e1ad52b6855a2678e8a5ccbfa8a4b8107ffb4f01b14350a7adc928fcc88db34
   languageName: node
   linkType: hard
 
@@ -4181,25 +4181,25 @@ __metadata:
 
 "@rasenjs/core@file:../../packages/core::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
   version: 0.1.8
-  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=adcce1&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=25f6fd&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   peerDependencies:
     zod: ^3.0.0
   peerDependenciesMeta:
     zod:
       optional: true
-  checksum: 10c0/c39985e5f37d861f9e66c6c3c72c5e7b4117b6c2313051428641d8e0330b8dd81c51f528ab3b1a470a07b4e81a4d8af34b196061df2e96e3dc6094d96d925f66
+  checksum: 10c0/0a852ca0da2739090973b1ccaa56c5c6eea676b8a2b37ed003c5769069296a5e4a1ff056fdd5c763b504e34b10d90e43f2331c07aba25141388b6060871b7bb2
   languageName: node
   linkType: hard
 
 "@rasenjs/core@file:../../packages/core::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=adcce1&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=25f6fd&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   peerDependencies:
     zod: ^3.0.0
   peerDependenciesMeta:
     zod:
       optional: true
-  checksum: 10c0/c39985e5f37d861f9e66c6c3c72c5e7b4117b6c2313051428641d8e0330b8dd81c51f528ab3b1a470a07b4e81a4d8af34b196061df2e96e3dc6094d96d925f66
+  checksum: 10c0/0a852ca0da2739090973b1ccaa56c5c6eea676b8a2b37ed003c5769069296a5e4a1ff056fdd5c763b504e34b10d90e43f2331c07aba25141388b6060871b7bb2
   languageName: node
   linkType: hard
 
@@ -4216,13 +4216,13 @@ __metadata:
 
 "@rasenjs/dom@file:../../packages/dom::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=1b94a1&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=09f6ab&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/gfx": "workspace:*"
-  checksum: 10c0/5d9e15e5a138f6c09dd593488bc0673db755177de367b4b725ab20dd8be9a186a65fae51fa79531829b0fa311df008104b87c4d19daa654a5ff1f38a33dabbf7
+  checksum: 10c0/138deea64ebd33a9b4b48d82d4952d9c385a04d567d7414ac9ed26463ae3b63b060d5c51ec8dbea669efb1fafa240b8cca0812083e886788766d5a5d083b2107
   languageName: node
   linkType: hard
 
@@ -4269,10 +4269,13 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/examples-arpg@workspace:examples/arpg"
   dependencies:
+    "@rasenjs/animation": "workspace:*"
+    "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
+    "@rasenjs/math": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
     "@rasenjs/vite-plugin-rasen": "workspace:*"
     typescript: "npm:^5.3.3"
@@ -4471,23 +4474,23 @@ __metadata:
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=93377b&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=e941bb&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/67b5f1ece64d918156654ff5722515fe86772a6648f58b967ba13aaba4799c6436ed1800ed9a23e6edae29246afc32fd0855ddb8c83ef01ecb8dbb1ebe518199
+  checksum: 10c0/8c6a9268a2d85a96151fb1610ff402f74d2c7e78552136203aeca9125aebff62d91c66971a4c85da25b96e9900f709f0448a40f2f0f33b278c7ab9845ec29aa6
   languageName: node
   linkType: hard
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=93377b&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=e941bb&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/67b5f1ece64d918156654ff5722515fe86772a6648f58b967ba13aaba4799c6436ed1800ed9a23e6edae29246afc32fd0855ddb8c83ef01ecb8dbb1ebe518199
+  checksum: 10c0/8c6a9268a2d85a96151fb1610ff402f74d2c7e78552136203aeca9125aebff62d91c66971a4c85da25b96e9900f709f0448a40f2f0f33b278c7ab9845ec29aa6
   languageName: node
   linkType: hard
 
