@@ -15,7 +15,7 @@ import {
   type LevelTables,
 } from '../levels'
 import { parseDt1 } from '../dt1'
-import { parseDs1 } from '../../original/ds1'
+import { parseDs1 } from '@rasenjs/assets'
 
 /**
  * Level assembly, run against the real tables and files.
@@ -35,7 +35,27 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PACKAGE_ROOT = join(HERE, '..', '..', '..')
 const TABLES_DIR = join(PACKAGE_ROOT, 'public', 'original')
 const ROMFS = process.env.D2R_ROMFS ?? '/tmp/d2r-all'
-const TILES_ROOT = join(ROMFS, 'global', 'tiles')
+/**
+ * The tile tree to read.
+ *
+ * The extracted RomFS when it is there, otherwise the export this package ships
+ * (`public/original/tiles`) — the same tree under the same names, so the suite
+ * runs on the shipped corpus instead of skipping. That matters: eight of these
+ * nine tests were skipping on a machine without a RomFS, which is most of them.
+ */
+const TILES_ROOT = [
+  join(ROMFS, 'global', 'tiles'),
+  join(PACKAGE_ROOT, 'public', 'original', 'tiles'),
+].find((candidate) => existsSync(candidate)) ?? join(ROMFS, 'global', 'tiles')
+/**
+ * Whether the tree holds every act.
+ *
+ * The shipped export carries act 1 only, which is enough for the assembly tests
+ * — they load act-1 areas — but two of them census every preset and every level
+ * type in the tables, and those need the whole tree. Gating on this keeps those
+ * two honest instead of failing on a file the export never promised.
+ */
+const HAS_ALL_ACTS = existsSync(join(TILES_ROOT, 'act2'))
 const tablesFile = (name: string) => join(TABLES_DIR, `table_${name}.json`)
 const hasCorpus =
   existsSync(TILES_ROOT) &&
@@ -267,7 +287,7 @@ describe.skipIf(!hasCorpus)('level assembly from the retail tables', () => {
     expect(() => loadLevel(town.id, 0, source, { variantIndex: 9 })).toThrow(/out of range/)
   })
 
-  it('rests on two facts about the tables, both re-measured here', () => {
+  it.skipIf(!HAS_ALL_ACTS)('rests on two facts about the tables, both re-measured here', () => {
     // Fact one: a preset's files are variants of one room, all the same size.
     const multi = tables.presets.filter((preset) => preset.files.length > 1)
     expect(multi.length).toBeGreaterThan(400)
@@ -336,7 +356,7 @@ describe.skipIf(!hasCorpus)('level assembly from the retail tables', () => {
     expect(cave.stats.blockedSubtiles).toBeGreaterThan(cave.stats.walkableSubtiles)
   })
 
-  it('never needs a legacy 4/1 tileset: no level type names one', () => {
+  it.skipIf(!HAS_ALL_ACTS)('never needs a legacy 4/1 tileset: no level type names one', () => {
     const referenced = new Set(
       tables.levelTypes.flatMap((type) => type.files.filter(Boolean).map((f) => f.toLowerCase()))
     )
@@ -366,6 +386,44 @@ describe.skipIf(!hasCorpus)('level assembly from the retail tables', () => {
     // eslint-disable-next-line no-console -- the census is the evidence
     console.log(`Level types name ${referenced.size} distinct tilesets; unreadable among them: ${missing.length}`)
     expect(missing).toEqual([])
+  })
+
+  it('denies a whole cell when the cell itself says it blocks walking', () => {
+    // A `.ds1` cell carries its own walk bit (bit 17). The original stamps it over
+    // the WHOLE 5x5 sub-cell block, whatever the tiles' own sub-tile flags say —
+    // it marks the cells whose entry is special (stairs, doorways, arches), where
+    // every sub-cell is denied even though the art leaves the middle clear.
+    //
+    // This code used to consult the bit only when no tile resolved, so such a cell
+    // kept its art's flags and a walker could stand in a doorway the art draws as
+    // solid. Checked here on a real level rather than a fixture: if the stamp ever
+    // stops being applied, this fails on the first doorway it meets.
+    const town = findPreset(tables, 'Act 1 - Town 1')!
+    const level = loadLevel(town.id, 20261013, source)
+    const layers = [...level.ds1.floors, ...level.ds1.walls]
+    let seen = 0
+    const offenders: string[] = []
+    for (let y = 0; y < level.ds1.height; y += 1) {
+      for (let x = 0; x < level.ds1.width; x += 1) {
+        const i = y * level.ds1.width + x
+        const marked = layers.some((layer) => {
+          const raw = layer.cells[i] ?? 0
+          // An empty cell (low byte zero) is not a cell at all.
+          if ((raw & 0xff) === 0) return false
+          return (raw & 0x20000) !== 0
+        })
+        if (!marked) continue
+        seen += 1
+        const flags = level.flagsAt(x, y)
+        if (flags === null) continue
+        const free = [...flags].filter((byte) => (byte & 0x01) === 0).length
+        if (free > 0 && offenders.length < 5) offenders.push(`(${x},${y}) has ${free}/25 free`)
+      }
+    }
+    // eslint-disable-next-line no-console -- the census is the evidence
+    console.log(`Cells with the walk bit: ${seen}`)
+    expect(seen).toBeGreaterThan(0)
+    expect(offenders).toEqual([])
   })
 
   it('finds levels through their presets, and fails loudly on nonsense', () => {
