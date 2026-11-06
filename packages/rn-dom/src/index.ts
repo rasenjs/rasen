@@ -6,7 +6,7 @@
 
 // Re-export shared utilities so framework adapters (Vue, etc.)
 // can consume them from a single package.
-import { parseCSS, normalizeEventName, isEvent, applyStylePatch } from './utils'
+export { parseCSS, normalizeEventName, isEvent, applyStylePatch } from './utils'
 
 // Generic tag-alias mechanism (see elements/shared.ts). Third-party tag packages
 // use it to point their tags at an existing tag — e.g. HTML `<span>` → `Text`,

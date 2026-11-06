@@ -21,8 +21,8 @@ export * from './d2/index'
 // --- GLTF ---
 export { loadGLTF, parseGLB, type GLTFMesh, type GLTFLoadResult } from './gltf/parser'
 
-// --- Common image utilities (host-injected adapter; no DOM at runtime) ---
-export { loadImage, loadImageBitmap, loadImages, setImageAdapter, type ImageAdapter, type ImageLike } from './common/image'
+// --- Common image utilities (adapter slot lives in @rasenjs/core; no DOM at runtime) ---
+export { loadImage, loadImageBitmap, loadImages, type ImageAdapter, type ImageLike } from './common/image'
 export type { ImageSource } from './common/image'
 
 // --- Checksums (asset manifests) ---

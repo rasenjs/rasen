@@ -3,51 +3,29 @@
  *
  * This package is platform-neutral: it must not call DOM APIs at runtime
  * (no `window` / `document` / `Image` / `fetch`). All platform access goes
- * through adapters injected by the host via `setImageAdapter` (or per-call
- * options). Browsers inject the DOM implementation (`createDomImageAdapter`);
- * native / test hosts inject their own or leave the adapter unset — loader
- * functions then throw honestly instead of touching platform globals.
+ * through the adapter slot `@rasenjs/core` owns (`setImageAdapter` /
+ * `getImageAdapter`): browsers get one from `@rasenjs/dom` (its `<canvas>`
+ * component registers `domImageAdapter`); native / test hosts inject their
+ * own or leave the adapter unset — loader functions then throw honestly
+ * instead of touching platform globals.
  *
  * The adapter shapes use minimal structural typing (host objects need no
  * adaptation); no DOM lib types leak into this package's API surface.
  */
 
-/** Minimal image surface the renderers consume (DOM Image satisfies it). */
-export interface ImageLike {
-  /** Decoded pixel width. */
-  readonly width: number
-  /** Decoded pixel height. */
-  readonly height: number
-}
+import { getImageAdapter, type ImageAdapter, type ImageLike } from '@rasenjs/core'
 
-/**
- * Host-injected image adapter. Implementations load a URL into an image-like
- * object usable as a texture source by the renderer packages.
- */
-export interface ImageAdapter {
-  loadImage: (url: string, crossOrigin?: string) => Promise<ImageLike>
-  loadImageBitmap: (url: string, crossOrigin?: string) => Promise<ImageLike>
-}
+export type { ImageAdapter, ImageLike }
 
 /** An image-like source usable as a texture by renderers. */
 export type ImageSource = ImageLike
 
-let adapter: ImageAdapter | null = null
-
-/**
- * Set the platform image adapter. Hosts must call this before using the
- * loaders (the dom package does it at import time; native hosts inject their
- * own implementation).
- */
-export function setImageAdapter(a: ImageAdapter | null): void {
-  adapter = a
-}
-
 /** Ensure an adapter is present, or throw with an actionable message. */
 function requireAdapter(): ImageAdapter {
+  const adapter = getImageAdapter()
   if (!adapter) {
     throw new Error(
-      '[rasen/assets] No image adapter set. Call setImageAdapter({ ... }) in the host before loading images.'
+      '[rasen/assets] No image adapter set. Call setImageAdapter (from @rasenjs/core) in the host before loading images.'
     )
   }
   return adapter

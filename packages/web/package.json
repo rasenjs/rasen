@@ -62,7 +62,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && cp src/jsx-runtime.d.ts dist/jsx-runtime.d.ts && cp src/jsx-runtime-ssr.d.ts dist/jsx-runtime-ssr.d.ts",
     "test": "../../node_modules/.bin/vitest --run",
     "typecheck": "../../node_modules/.bin/tsc --noEmit"
   },

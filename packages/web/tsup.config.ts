@@ -16,16 +16,6 @@ export default defineConfig([
     external: ['@rasenjs/html', '@rasenjs/router-html', '@rasenjs/core']
   },
   {
-    entry: {
-      'jsx-runtime': 'src/jsx-runtime.ts',
-      'jsx-runtime-ssr': 'src/jsx-runtime-ssr.ts',
-    },
-    format: ['esm'],
-    dts: true,
-    clean: false,
-    external: ['@rasenjs/core', '@rasenjs/dom', '@rasenjs/html']
-  },
-  {
     // Element factories without the router: `@rasenjs/web/elements`.
     entry: { elements: 'src/elements.ts' },
     format: ['esm'],
@@ -39,5 +29,18 @@ export default defineConfig([
     dts: true,
     clean: false,
     external: ['@rasenjs/html', '@rasenjs/core']
+  },
+  {
+    // Runtime arms of the types-only jsx-runtime entries. Both conditions get
+    // one so the subpath always resolves; the hand-written `.d.ts` files are
+    // copied over the generated ones by the build script.
+    entry: {
+      'jsx-runtime': 'src/jsx-runtime.ts',
+      'jsx-runtime-ssr': 'src/jsx-runtime-ssr.ts',
+    },
+    format: ['esm'],
+    dts: true,
+    clean: false,
+    external: ['@rasenjs/core']
   }
 ])

@@ -1,7 +1,15 @@
 /**
- * JSX runtime entry for @rasenjs/web (SSR/SSG).
+ * Runtime arm of `@rasenjs/web`'s `jsx-runtime` subpath for the `node`
+ * condition (the SSR/HTML host).
  *
- * Thin re-export of @rasenjs/html's JSX runtime (HTML string intrinsic
- * elements). Selected by the package's `node` conditional export.
+ * Types only in a working build — `@rasenjs/compiler` eliminates every JSX
+ * node. This module gives the subpath a runtime target so a build that skipped
+ * the compiler fails with the actionable message instead of an unresolvable
+ * export.
  */
-export * from '@rasenjs/html/jsx-runtime'
+export {
+  jsx,
+  jsxs,
+  jsxDEV,
+  NO_JSX_RUNTIME_MESSAGE,
+} from '@rasenjs/core/jsx-runtime-stub'

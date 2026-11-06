@@ -19,7 +19,8 @@ npm install @rasenjs/assets
 ## Usage
 
 ```typescript
-import { loadGLTF, parseGLB, loadImage, setImageAdapter } from '@rasenjs/assets'
+import { loadGLTF, parseGLB, loadImage } from '@rasenjs/assets'
+import { setImageAdapter } from '@rasenjs/core' // the adapter slot lives in core
 
 // glTF / GLB — fetches and parses, returning the meshes ready to draw
 const model = await loadGLTF('/models/robot.glb')
@@ -28,8 +29,9 @@ const model = await loadGLTF('/models/robot.glb')
 // Raw bytes, when the host does its own fetching
 const parsed = parseGLB(new Uint8Array(arrayBuffer))
 
-// Images: inject the host's loader once. @rasenjs/dom installs one at import
-// time; other hosts provide their own (native, embedded, tests).
+// Images: inject the host's loader once. @rasenjs/dom installs one with its
+// `<canvas>` component (the only DOM entry that pulls assets in); other hosts
+// provide their own (native, embedded, tests).
 setImageAdapter({
   loadImage: (url) => new Promise((res, rej) => {
     const img = new Image()

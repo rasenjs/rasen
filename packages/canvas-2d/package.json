@@ -53,5 +53,6 @@
     "cross-env": "^7.0.3",
     "pixelmatch": "^5.3.0",
     "pngjs": "^7.0.0"
-  }
+  },
+  "sideEffects": false
 }
