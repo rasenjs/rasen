@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>Terrene — a Rasen tile-world slice</title>
+    <meta
+      name="description"
+      content="A tile-world sandbox slice showing one reactive core driving a baked canvas world and a DOM interface."
+    />
+    <!--
+      An inline SVG favicon: a 2×2 block glyph in the palette's dirt and grass
+      colours. Inline rather than a file so the project still ships exactly zero
+      binary assets, which is also why it is a `data:` URI rather than a request.
+    -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23684a31'/%3E%3Crect width='16' height='4' fill='%2356943e'/%3E%3Crect width='16' height='1' fill='%2384c45c'/%3E%3Crect y='7' width='16' height='1' fill='%23000000' opacity='.18'/%3E%3Crect x='7' width='1' height='16' fill='%23000000' opacity='.18'/%3E%3C/svg%3E"
+    />
+    <style>
+      /*
+       * All static CSS lives here, as in the other examples. The dynamic styling
+       * is written by the widget layer through the DOM host (`src/ui/kit-dom.ts`),
+       * so nothing here describes a widget — only the page shell.
+       */
+      :root {
+        --shell: #0b0d13;
+        --ink: #e8ecf5;
+        --ink-dim: #9ea8bc;
+        --accent: #e8c46e;
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: var(--shell);
+        color: var(--ink);
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        overflow: hidden;
+        /* The world is dragged with the pointer; let nothing scroll or select. */
+        overscroll-behavior: none;
+        user-select: none;
+      }
+
+      #app {
+        position: absolute;
+        inset: 0;
+      }
+
+      .stage {
+        position: absolute;
+        inset: 0;
+      }
+
+      .viewport {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+
+      /*
+       * The canvas is the world *and* the draggable surface, so the cursor says so.
+       * `touch-action: none` is what keeps a pointer drag from being stolen by the
+       * browser's scroll gesture.
+       */
+      .viewport canvas {
+        display: block;
+        cursor: crosshair;
+        touch-action: none;
+      }
+
+      /*
+       * The DOM overlay sits above the canvas and is click-through by default: the
+       * widget host marks only the elements that should receive a click with
+       * `pointer-events: auto` (see `BoxSpec.interactive`). Without this, the
+       * inventory panel would swallow every world click that landed on it and
+       * mining would feel broken in that corner of the screen.
+       */
+      .stage > div:not(.viewport) {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      #boot {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: var(--shell);
+        color: var(--ink-dim);
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        z-index: 100;
+        transition: opacity 240ms ease;
+      }
+
+      #boot.gone {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="boot">Generating world…</div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // The boot veil is removed by the app once the first frame has been
+      // presented. Doing it from a timeout here means a crash in the app leaves
+      // the veil up, which is the honest signal that something went wrong.
+      window.addEventListener('terraria:ready', function () {
+        var boot = document.getElementById('boot')
+        if (boot) boot.classList.add('gone')
+      })
+    </script>
+  </body>
+</html>
