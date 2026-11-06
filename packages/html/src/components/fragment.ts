@@ -1,7 +1,14 @@
 /**
  * HTML fragment implementation for SSR
  */
-import { getReactiveRuntime, type Mountable, type FragmentChild } from '@rasenjs/core'
+import {
+  fragment as coreFragment,
+  getReactiveRuntime,
+  type Mountable,
+  type FragmentChild,
+  type HostHooks,
+  type TextHandle,
+} from '@rasenjs/core'
 import type { StringHost } from '../types'
 import type { SSRNode } from '../host-hooks'
 import { escapeHtml } from '../utils'
@@ -11,16 +18,22 @@ import { MARKERS, createMarker } from '../marker-constants'
  * HTML fragment uses comment markers to preserve boundaries for hydration
  * Following the same pattern as text nodes: <!-- f --> and <!-- /f -->
  */
-const hostHooks = {
-  createMarker: (_host: StringHost, kind: string): string => {
+/**
+ * Fragment-scoped SSR hooks — the same shape `htmlHostHooks` uses for
+ * control flow, plus TEXT markers so fragment text hydrates like a text node.
+ * (`HostHooks<SSRNode>` is the honest type: containers are StringHost,
+ * markers and text are strings.)
+ */
+const hostHooks: HostHooks<SSRNode> = {
+  createMarker: (_parent: SSRNode, kind: string): string => {
     return createMarker(kind)
   },
-  insert: (host: StringHost, node: string, _ref: string | null): void => {
-    host.append(node)
+  insert: (parent: SSRNode, node: SSRNode, _ref: SSRNode | null): void => {
+    ;(parent as StringHost).append(node as string)
   },
-  detach: (): void => {},
-  nextSibling: (): string | null => null,
-  createText: (_host: StringHost, content: string) => {
+  detach: (_node: SSRNode): void => {},
+  nextSibling: (): SSRNode | null => null,
+  createText: (_parent: SSRNode, content: string): TextHandle<string> => {
     // Wrap each text piece with comment markers for hydration matching
     const node = `${createMarker(MARKERS.TEXT_START)}${escapeHtml(content)}${createMarker(MARKERS.TEXT_END)}`
     return {
@@ -36,7 +49,7 @@ const hostHooks = {
  * Fragment function interface for HTML/SSR
  */
 interface FragmentFunction {
-  (config: { children: Array<Mountable<StringHost>> }): Mountable<SSRNode>
+  (config: { children?: unknown }): Mountable<SSRNode>
   (strings: TemplateStringsArray, ...values: FragmentChild<StringHost>[]): Mountable<SSRNode>
 }
 
@@ -57,7 +70,7 @@ interface FragmentFunction {
  * f`Count: ${count} items`
  */
 export const fragment: FragmentFunction = (
-  configOrStrings: { children: Array<Mountable<StringHost>> } | TemplateStringsArray,
+  configOrStrings: { children?: unknown } | TemplateStringsArray,
   ...values: FragmentChild<StringHost>[]
 ): Mountable<SSRNode> => {
   const runtime = getReactiveRuntime()
@@ -90,11 +103,24 @@ export const fragment: FragmentFunction = (
     }
   }
   
-  // For object config, import core fragment
-  const { fragment: coreFragment } = require('@rasenjs/core')
-  const config = configOrStrings as { children: Array<Mountable<StringHost>> }
+  // For object config, delegate to core's structural fragment with THIS
+  // host's hooks — its text/ref/mountable handling plus the hydration
+  // markers above. (A `require()` here threw in this package's ESM builds.)
+  const config = configOrStrings as { children?: unknown }
   return coreFragment({ children: config.children, hooks: hostHooks })
 }
+
+/**
+ * The JSX name the compiler's emitted `Fragment({...})` binds to (HTML_TAGS
+ * lists it under this host's root): the children form of `fragment`.
+ *
+ * With normalization owned by core, an alias is all this host needs — unlike
+ * DOM, whose `Fragment` renders text live without hooks and therefore stays
+ * its own implementation. Text here comes through core's structural fragment
+ * plus `hostHooks` above (hydration-markered pieces), which is exactly why
+ * `<>{'a'}</>` used to render as `""` through the JSX-runtime fallback.
+ */
+export { fragment as Fragment }
 
 /**
  * f - fragment 的简写别名

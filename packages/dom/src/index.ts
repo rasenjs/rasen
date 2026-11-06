@@ -3,18 +3,18 @@
  */
 
 export * from './components'
-// NOT part of ./components: that barrel is namespace-imported by the JSX
-// runtime, and a member that imports @rasenjs/gfx pins the whole GPU stack
-// into every app. This re-export stays droppable (the module is pure), and
-// `<canvas>` reaches it through the compiler's component-tag rewrite
-// (packages/compiler/src/component-tags.ts) rather than the tag registry.
+// `canvas` stays OUT of the barrel: a direct, named re-export is what lets a
+// bundler drop the whole GL chain when an app never imports it, while
+// `export *` would reach canvas.ts and its @rasenjs/gfx imports. Emitted
+// `<canvas>` code references this binding by name — the app's auto-import
+// config supplies `canvas` from this root (docs/COMPILE-DESIGN.md).
 export { canvas, type CanvasProps } from './components/canvas'
+// The host's tag names as pure data — the binding half of JSX (the compiler
+// emits bare calls; an app's auto-import `imports` map binds them, see
+// www/guide/advanced/jsx).
+export { DOM_TAGS } from './tags'
 export { watchProp } from './utils'
 export { hostHooks, type HostHooks } from './host-hooks'
-// Side-effect import: registers the browser image adapter with
-// @rasenjs/assets (the assets package itself is DOM-free).
-import './image-adapter'
-export { domImageAdapter } from './image-adapter'
 export { MARKERS, isMarkerMatch, MARKER_DEBUG_MAP } from './marker-constants'
 export {
   bindLookControls,

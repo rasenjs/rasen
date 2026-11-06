@@ -28,7 +28,7 @@
   ],
   "scripts": {
     "dev": "../../node_modules/.bin/tsup --watch",
-    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "build": "yarn clean && ../../node_modules/.bin/tsup && cp src/jsx-runtime.d.ts dist/jsx-runtime.d.ts",
     "test": "../../node_modules/.bin/vitest --run",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
     "clean": "rm -rf dist"
@@ -57,8 +57,5 @@
   "license": "MIT",
   "dependencies": {
     "@rasenjs/core": "workspace:^"
-  },
-  "devDependencies": {
-    "@rasenjs/dom": "workspace:*"
   }
 }

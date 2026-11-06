@@ -7,7 +7,7 @@
  * contract.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { jsx } from './jsx-runtime'
+import { span } from './components'
 import { when } from '@rasenjs/core'
 import { ref, useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { mount } from './index'
@@ -30,8 +30,8 @@ describe('when() with a signals ref', () => {
     const unmount = mount(
       when({
         condition: () => condition.value,
-        then: () => jsx('span', { children: 'Then' }),
-        else: () => jsx('span', { children: 'Else' }),
+        then: () => span({ children: 'Then' }),
+        else: () => span({ children: 'Else' }),
       }),
       container,
     )

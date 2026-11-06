@@ -117,17 +117,19 @@ p({}, text({ content: () => `Count: ${count()}` }))
 
 Accepted child kinds: `string`, `number`, a ref, a getter returning
 `string | number`, and a `Mountable`. Pass a **flat** array — the factory does
-not flatten nested arrays (the JSX runtime does).
+not flatten nested arrays (the compiled output does: JSX elimination wraps any
+dynamic children run in `flat(Infinity).filter(…)`, the same rule core's
+`normalizeChildren` states for the fragment implementations).
 
-## Registration and delegation
+## Bindings and delegation
 
-`registerTag('custom-button', CustomButton)` teaches the runtime what a
-lowercase tag means; PascalCase tags need no registration. The compiler resolves
-lowercase tags it knows first — `<canvas />` compiles to a `canvas({ … })` call
-with the import injected, so no registration and no string reach the output. The
-mapping is data: `@rasenjs/dom/tags` exports `TAG_MANIFEST` (`elements` +
-`components`) for a build tool to extend. See
-[JSX & the Compiler](https://github.com/rasenjs/rasen/tree/main/www/guide/advanced/jsx).
+There is nothing to register: the compiler emits every lowercase tag as a bare
+call (`canvas({ … })`, `div({ … })`) and the app's `unplugin-auto-import`
+binds the names to this package's root — the mapping lives in the vite config,
+not at runtime (see
+[JSX & the Compiler](https://github.com/rasenjs/rasen/tree/main/www/guide/advanced/jsx)).
+`canvas` stays a direct named export so a bundler can drop the GL chain when an
+app never imports it.
 
 ## Components
 

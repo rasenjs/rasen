@@ -12,11 +12,6 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./tags": {
-      "types": "./dist/tags.d.ts",
-      "import": "./dist/tags.js",
-      "require": "./dist/tags.cjs"
-    },
     "./jsx-runtime": {
       "types": "./dist/jsx-runtime.d.ts",
       "import": "./dist/jsx-runtime.js",
@@ -43,7 +38,7 @@
   ],
   "scripts": {
     "dev": "../../node_modules/.bin/tsup --watch",
-    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "build": "yarn clean && ../../node_modules/.bin/tsup && cp src/jsx-runtime.d.ts dist/jsx-runtime.d.ts",
     "test": "../../node_modules/.bin/vitest --run",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
     "clean": "rm -rf dist"
@@ -68,7 +63,6 @@
   "author": "Rasen Contributors",
   "license": "MIT",
   "dependencies": {
-    "@rasenjs/assets": "workspace:*",
     "@rasenjs/canvas-2d": "workspace:*",
     "@rasenjs/core": "workspace:^",
     "@rasenjs/gfx": "workspace:*"
@@ -80,8 +74,6 @@
   },
   "sideEffects": [
     "./dist/index.js",
-    "./dist/index.cjs",
-    "./dist/jsx-runtime.js",
-    "./dist/jsx-runtime.cjs"
+    "./dist/index.cjs"
   ]
 }

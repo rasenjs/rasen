@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setReactiveRuntime } from '@rasenjs/core'
-import { createReactiveRuntime } from '@rasenjs/reactive-vue'
 import {
   renderToString,
   div,
@@ -12,7 +10,8 @@ import {
   ul,
   li,
   escapeHtml,
-  stringifyStyle
+  stringifyStyle,
+  HTML_TAGS
 } from './index'
 import { useReactiveRuntime } from '@rasenjs/reactive-vue'
 
@@ -168,5 +167,27 @@ describe('@rasenjs/html', () => {
           '<td class="col-md-4"><a class="lbl">plain</a></td></tr>'
       )
     })
+  })
+})
+
+/**
+ * `HTML_TAGS` is the list an app's `unplugin-auto-import` config spreads, and
+ * every name in it becomes an `import { … } from '@rasenjs/html'`. A name the
+ * package does not export is therefore a build failure in every SSR app that
+ * writes that tag — which is exactly how 23 element factories went missing
+ * (the list came from core's canonical tags, the factories did not).
+ */
+describe('HTML_TAGS ↔ package exports', () => {
+  it('every listed tag is a real export of this package', async () => {
+    const root = await import('./index')
+    const missing = HTML_TAGS.filter(
+      (tag) => !(tag in (root as unknown as Record<string, unknown>))
+    )
+    expect(missing).toEqual([])
+  })
+
+  it('lists canvas and Fragment', () => {
+    expect(HTML_TAGS).toContain('canvas')
+    expect(HTML_TAGS).toContain('Fragment')
   })
 })

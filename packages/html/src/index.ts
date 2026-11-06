@@ -4,6 +4,14 @@
 
 export * from './components'
 export * from './types'
+// The fragment compiled from `<>…</>`: THIS host's text-capable
+// implementation (core's structural fragment + html's hydration-markered
+// hooks) — emitted code binds `Fragment` through the app's auto-import from
+// this root, and HTML_TAGS lists it.
+export { Fragment } from './components/fragment'
+// The host's tag names as pure data — the binding half of JSX (see
+// www/guide/advanced/jsx).
+export { HTML_TAGS } from './tags'
 export {
   escapeHtml,
   escapeAttr,

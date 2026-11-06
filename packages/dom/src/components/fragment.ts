@@ -23,7 +23,7 @@
  * panel inside a gate used to stay shut.
  */
 
-import { getReactiveRuntime, type Mountable, type PropValue } from '@rasenjs/core'
+import { getReactiveRuntime, normalizeChildren, type Mountable, type PropValue } from '@rasenjs/core'
 import { bindText } from '../bindings'
 import type { HostHooks as DomHostHooks } from '../host-hooks'
 
@@ -31,23 +31,15 @@ import type { HostHooks as DomHostHooks } from '../host-hooks'
 export { fragment, f } from '@rasenjs/core'
 
 export function Fragment(props: { children?: unknown }): Mountable<HTMLElement> {
-  const raw = props.children
-  const kids = Array.isArray(raw) ? raw : raw === undefined || raw === null ? [] : [raw]
+  // One rule, shared with core/compilers (coerce, flatten, drop
+  // nullish/boolean) — this host only owns the per-child rendering below.
+  const kids = normalizeChildren(props.children)
 
   return ((host: HTMLElement, hooks?: DomHostHooks) => {
     const runtime = getReactiveRuntime()
     const cleanups: Array<(() => void) | undefined> = []
 
-    // Nested arrays (`<>{a}{b.map(…)}</>`) are the same shape one level down.
-    const flat: unknown[] = []
-    const flatten = (list: unknown[]) => {
-      for (const c of list) Array.isArray(c) ? flatten(c) : flat.push(c)
-    }
-    flatten(kids)
-
-    for (const child of flat) {
-      if (child === null || child === undefined || typeof child === 'boolean') continue
-
+    for (const child of kids) {
       if (typeof child === 'function') {
         // The hooks go down with the child: a structural child places its
         // content with them (see the note above).

@@ -1,11 +1,14 @@
 /**
- * DOM image adapter for @rasenjs/assets — the browser-side implementation of
- * the host injection point. Importing this module auto-registers it, so DOM
- * apps get image loading for free; native hosts register their own adapter
- * instead (the assets package itself never touches DOM globals).
+ * DOM image adapter for core's image adapter slot — the browser-side
+ * implementation hosts register. Registered by the canvas component
+ * (`components/canvas.ts`) when an app renders a `<canvas>`: that module is
+ * the only DOM entry that pulls the canvas/gfx renderers (and with them
+ * assets) in, so apps that never touch canvas bundle neither assets nor this
+ * adapter. Native hosts register their own adapter instead (the assets
+ * package itself never touches DOM globals).
  */
 
-import { setImageAdapter, type ImageAdapter, type ImageLike } from '@rasenjs/assets'
+import type { ImageAdapter, ImageLike } from '@rasenjs/core'
 
 const domImageAdapter: ImageAdapter = {
   loadImage(url: string, crossOrigin?: string): Promise<ImageLike> {
@@ -25,7 +28,5 @@ const domImageAdapter: ImageAdapter = {
     return createImageBitmap(await resp.blob())
   },
 }
-
-setImageAdapter(domImageAdapter)
 
 export { domImageAdapter }

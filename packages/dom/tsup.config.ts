@@ -3,11 +3,12 @@ import { defineConfig } from 'tsup'
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
-    // Data-only: the tag manifest a build tool reads (no runtime imports).
-    tags: 'src/tags.ts',
-    'jsx-runtime': 'src/jsx-runtime.ts',
     template: 'src/template.ts',
     bindings: 'src/bindings.ts',
+    // Runtime arm of the types-only jsx-runtime entry (see src/jsx-runtime.ts):
+    // it must exist so the subpath resolves at runtime; the hand-written
+    // `.d.ts` is copied over the generated one by the build script.
+    'jsx-runtime': 'src/jsx-runtime.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

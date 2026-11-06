@@ -13,6 +13,10 @@ export { each, repeat } from './each'
 export { match } from './match'
 export { transition, fade, slide, scale } from './transition'
 export type { TransitionConfig } from './transition'
+// The prop shape every element factory accepts — re-exported so the host's
+// `jsx-runtime.d.ts` can type `IntrinsicElements` without reaching into
+// `@rasenjs/dom` (a dev-only dependency of this package).
+export type { BaseProps, StyleRecord, Child } from './elements'
 export {
   // 基础元素
   div,
@@ -33,12 +37,20 @@ export {
   ul,
   ol,
   li,
+  dl,
+  dt,
+  dd,
   // 表单
   form,
   label,
   textarea,
   select,
   option,
+  optgroup,
+  fieldset,
+  legend,
+  datalist,
+  output,
   // 表格
   table,
   thead,
@@ -47,6 +59,9 @@ export {
   tr,
   th,
   td,
+  caption,
+  colgroup,
+  col,
   // 语义化布局
   section,
   article,
@@ -55,6 +70,17 @@ export {
   nav,
   main,
   aside,
+  details,
+  summary,
+  dialog,
+  figure,
+  figcaption,
+  address,
+  time,
+  // 文本格式
+  b,
+  i,
+  u,
   // 其他
   br,
   hr,
@@ -73,6 +99,8 @@ export {
   video,
   audio,
   source,
+  track,
+  picture,
   iframe,
   svg,
   canvas

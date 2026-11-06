@@ -1,5 +1,5 @@
 import type { PropValue, Mountable } from '@rasenjs/core'
-import { getReactiveRuntime, rafSchedule, toValue } from '@rasenjs/core'
+import { getReactiveRuntime, rafSchedule, setImageAdapter, toValue } from '@rasenjs/core'
 import type {
   CanvasNode,
   RenderContextOptions as Canvas2DRenderOptions
@@ -7,6 +7,7 @@ import type {
 import type { GfxNode, GlContext, GpuCanvasContext, CameraConfig } from '@rasenjs/gfx'
 import { createRoot as createCanvas2DRoot, canvasHostHooks } from '@rasenjs/canvas-2d'
 import { createRoot as createGlRoot, createRootNode, getRenderContext, gfxHostHooks, WebGPURenderer, type WebGPURendererOptions, type WebGLRenderer as RenderContextType } from '@rasenjs/gfx'
+import { domImageAdapter } from '../image-adapter'
 
 /**
  * contextType → 渲染器节点与配置的类型映射。
@@ -86,6 +87,11 @@ export interface CanvasProps<T extends keyof HostTypes = '2d'> {
 export function canvas<T extends keyof HostTypes = '2d'>(
   props: CanvasProps<T>
 ): Mountable<HTMLElement> {
+  // Assets-based components (Spine, textures) load images through the
+  // @rasenjs/assets adapter slot. Registering inside the component's code
+  // path — not at module load — keeps the adapter, and with it
+  // @rasenjs/assets, tree-shaken out of apps that never render a `<canvas>`.
+  setImageAdapter(domImageAdapter)
   return (domHost: HTMLElement) => {
     // 创建 canvas 元素
     const canvasEl = document.createElement('canvas')

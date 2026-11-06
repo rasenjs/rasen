@@ -19,7 +19,15 @@ export type StyleRecord = Record<
   PropValue<string | number | null | undefined>
 >
 
-interface BaseProps {
+/**
+ * Props every string-host element factory accepts.
+ *
+ * Exported so the host's own `jsx-runtime.d.ts` can type `IntrinsicElements`
+ * from it: JSX types must not reach into another host package (`@rasenjs/dom`
+ * is only a dev dependency here, and a published `@rasenjs/html` must not
+ * require the DOM renderer to typecheck its own tags).
+ */
+export interface BaseProps {
   id?: PropValue<string>
   class?: PropValue<string>
   className?: PropValue<string>
@@ -124,11 +132,19 @@ export const h6 = createElement('h6')
 export const ul = createElement('ul')
 export const ol = createElement('ol')
 export const li = createElement('li')
+export const dl = createElement('dl')
+export const dt = createElement('dt')
+export const dd = createElement('dd')
 
 // Forms
 export const form = createElement('form')
 export const label = createElement('label')
 export const select = createElement('select')
+export const optgroup = createElement('optgroup')
+export const fieldset = createElement('fieldset')
+export const legend = createElement('legend')
+export const datalist = createElement('datalist')
+export const output = createElement('output')
 
 // Tables
 export const table = createElement('table')
@@ -138,6 +154,9 @@ export const tfoot = createElement('tfoot')
 export const tr = createElement('tr')
 export const th = createElement('th')
 export const td = createElement('td')
+export const caption = createElement('caption')
+export const colgroup = createElement('colgroup')
+export const col = createElement('col')
 
 // Semantic layout
 export const section = createElement('section')
@@ -147,6 +166,18 @@ export const footer = createElement('footer')
 export const nav = createElement('nav')
 export const main = createElement('main')
 export const aside = createElement('aside')
+export const details = createElement('details')
+export const summary = createElement('summary')
+export const dialog = createElement('dialog')
+export const figure = createElement('figure')
+export const figcaption = createElement('figcaption')
+export const address = createElement('address')
+export const time = createElement('time')
+
+// Inline text formatting
+export const b = createElement('b')
+export const i = createElement('i')
+export const u = createElement('u')
 
 // Other common elements
 export const pre = createElement('pre')
@@ -350,6 +381,42 @@ export const source = (
 
   return element({
     tag: 'source',
+    ...restProps,
+    attrs: newAttrs as any
+  })
+}
+
+/**
+ * picture component — a container for `<source>` fallbacks.
+ */
+export const picture = (props: BaseProps): Mountable<SSRNode> => {
+  return element({ tag: 'picture', ...props })
+}
+
+/**
+ * track component — a timed text track for `<video>` / `<audio>`.
+ */
+export const track = (
+  props: BaseProps & {
+    src?: PropValue<string>
+    kind?: PropValue<string>
+    srclang?: PropValue<string>
+    label?: PropValue<string>
+    default?: PropValue<boolean>
+  }
+): Mountable<SSRNode> => {
+  const { src, kind, srclang, label, attrs, ...restProps } = props as any
+
+  const newAttrs = {
+    ...(attrs || {}),
+    ...(src !== undefined ? { src } : {}),
+    ...(kind !== undefined ? { kind } : {}),
+    ...(srclang !== undefined ? { srclang } : {}),
+    ...(label !== undefined ? { label } : {})
+  }
+
+  return element({
+    tag: 'track',
     ...restProps,
     attrs: newAttrs as any
   })
