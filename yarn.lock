@@ -3129,6 +3129,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@jridgewell/sourcemap-codec@npm:^1.6.0":
+  version: 1.6.0
+  resolution: "@jridgewell/sourcemap-codec@npm:1.6.0"
+  checksum: 10c0/b5be700e45a775f218589c3466c4ffea630582b4988657652da464e5ab8a7d18bf928ee4fd2363fb346ede4bea9c6ff0bae05a538358c4565ece6199531b5f72
+  languageName: node
+  linkType: hard
+
 "@jridgewell/trace-mapping@npm:^0.3.24, @jridgewell/trace-mapping@npm:^0.3.25, @jridgewell/trace-mapping@npm:^0.3.28":
   version: 0.3.31
   resolution: "@jridgewell/trace-mapping@npm:0.3.31"
@@ -4126,8 +4133,11 @@ __metadata:
 
 "@rasenjs/assets@file:../../packages/assets::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=087144&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
-  checksum: 10c0/cbea8774df7bdca1e6fd3f040b8b8da0873312f51979ee4429a1ecc3e70e0b62caec54317645be158265b4543b445363d58c6dcc683d5898d5bcb6f0578a00ed
+  resolution: "@rasenjs/assets@file:../../packages/assets#../../packages/assets::hash=8a7d67&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  dependencies:
+    "@rasenjs/core": "workspace:^"
+    "@rasenjs/math": "workspace:^"
+  checksum: 10c0/666392fa844b26f5ffd730adcc4bb777a085b146f16381968833e24c0cbe3d14f1a571079aa8582f83c887c28228eb9bd314d5ebe96231c364e3d1e1d542904c
   languageName: node
   linkType: hard
 
@@ -4135,6 +4145,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/assets@workspace:packages/assets"
   dependencies:
+    "@rasenjs/core": "workspace:^"
+    "@rasenjs/math": "workspace:^"
     tsup: "npm:^8.0.0"
     typescript: "npm:^5.3.0"
     vitest: "npm:^1.6.0"
@@ -4143,11 +4155,11 @@ __metadata:
 
 "@rasenjs/canvas-2d@file:../../packages/canvas-2d::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.1
-  resolution: "@rasenjs/canvas-2d@file:../../packages/canvas-2d#../../packages/canvas-2d::hash=654c8d&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/canvas-2d@file:../../packages/canvas-2d#../../packages/canvas-2d::hash=f56b7d&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
-  checksum: 10c0/0d7799939e8f6b54bbddddb4bd6b158948867e48b1576cd8100d1657bb7f2f6e3e1ad52b6855a2678e8a5ccbfa8a4b8107ffb4f01b14350a7adc928fcc88db34
+  checksum: 10c0/13d4102a8d5ede27d18a1a70a02fb4db005f84a1619384d329045e10f4fc9bd5fda52037e46f9b8ef15f55d4d8fcf284d0943cbb20187fa6ad60368579ff9a94
   languageName: node
   linkType: hard
 
@@ -4181,25 +4193,25 @@ __metadata:
 
 "@rasenjs/core@file:../../packages/core::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
   version: 0.1.8
-  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=25f6fd&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=f3e93e&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   peerDependencies:
     zod: ^3.0.0
   peerDependenciesMeta:
     zod:
       optional: true
-  checksum: 10c0/0a852ca0da2739090973b1ccaa56c5c6eea676b8a2b37ed003c5769069296a5e4a1ff056fdd5c763b504e34b10d90e43f2331c07aba25141388b6060871b7bb2
+  checksum: 10c0/7fc0998ce427cd16d035eb96856da2141bfede3cd077603296e3ef0fdecdb9a2fb6b4cbe3d5c95060738d4674c3726b1ed0adf866cdcf368230b1975aa1b2e87
   languageName: node
   linkType: hard
 
 "@rasenjs/core@file:../../packages/core::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=25f6fd&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/core@file:../../packages/core#../../packages/core::hash=f3e93e&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   peerDependencies:
     zod: ^3.0.0
   peerDependenciesMeta:
     zod:
       optional: true
-  checksum: 10c0/0a852ca0da2739090973b1ccaa56c5c6eea676b8a2b37ed003c5769069296a5e4a1ff056fdd5c763b504e34b10d90e43f2331c07aba25141388b6060871b7bb2
+  checksum: 10c0/7fc0998ce427cd16d035eb96856da2141bfede3cd077603296e3ef0fdecdb9a2fb6b4cbe3d5c95060738d4674c3726b1ed0adf866cdcf368230b1975aa1b2e87
   languageName: node
   linkType: hard
 
@@ -4216,13 +4228,12 @@ __metadata:
 
 "@rasenjs/dom@file:../../packages/dom::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.8
-  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=09f6ab&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/dom@file:../../packages/dom#../../packages/dom::hash=fe7121&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
-    "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/gfx": "workspace:*"
-  checksum: 10c0/138deea64ebd33a9b4b48d82d4952d9c385a04d567d7414ac9ed26463ae3b63b060d5c51ec8dbea669efb1fafa240b8cca0812083e886788766d5a5d083b2107
+  checksum: 10c0/717b81a02f2bb4adc01eb4c2711dd7636e720e5dfa1322520c6a92e57ef7f2b541e7db6ef8f2c86cc153ae9aea964567eb7c9a27a9e1ee5528f9386ad5615593
   languageName: node
   linkType: hard
 
@@ -4230,7 +4241,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/dom@workspace:packages/dom"
   dependencies:
-    "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/gfx": "workspace:*"
@@ -4277,7 +4287,6 @@ __metadata:
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/math": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
   languageName: unknown
@@ -4302,12 +4311,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/examples-craft@workspace:examples/craft"
   dependencies:
+    "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/gfx": "workspace:*"
     "@rasenjs/math": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
   languageName: unknown
@@ -4317,12 +4326,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/examples-fps@workspace:examples/fps"
   dependencies:
+    "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/gfx": "workspace:*"
     "@rasenjs/math": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
   languageName: unknown
@@ -4345,10 +4354,10 @@ __metadata:
   resolution: "@rasenjs/examples-mario@workspace:examples/mario"
   dependencies:
     "@rasenjs/canvas-2d": "workspace:*"
+    "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
   languageName: unknown
@@ -4360,6 +4369,7 @@ __metadata:
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/canvas-2d": "workspace:*"
+    "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/gfx": "workspace:*"
@@ -4406,12 +4416,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rasenjs/examples-racing@workspace:examples/racing"
   dependencies:
+    "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/gfx": "workspace:*"
     "@rasenjs/math": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
   languageName: unknown
@@ -4448,10 +4458,10 @@ __metadata:
   resolution: "@rasenjs/examples-terraria@workspace:examples/terraria"
   dependencies:
     "@rasenjs/canvas-2d": "workspace:*"
+    "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
   languageName: unknown
@@ -4462,11 +4472,11 @@ __metadata:
   resolution: "@rasenjs/examples-web@workspace:examples/web"
   dependencies:
     "@rasenjs/canvas-2d": "workspace:*"
+    "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:*"
     "@rasenjs/dom": "workspace:*"
     "@rasenjs/reactive-signals": "workspace:*"
     "@rasenjs/reactive-vue": "workspace:*"
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
     typescript: "npm:^5.3.3"
     vite: "npm:^5.0.7"
   languageName: unknown
@@ -4474,23 +4484,23 @@ __metadata:
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=e941bb&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=edcc89&locator=benchmark-gfx%40workspace%3Abenchmark%2Fgfx"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/8c6a9268a2d85a96151fb1610ff402f74d2c7e78552136203aeca9125aebff62d91c66971a4c85da25b96e9900f709f0448a40f2f0f33b278c7ab9845ec29aa6
+  checksum: 10c0/54f3d11349fb41f5c64e641c05a599214e5bfbd8c3accc5c93315ed68754f1e35268b53000b7fb2944ae3b61a9962873ced20566774ccc7ad377e2fbea73d449
   languageName: node
   linkType: hard
 
 "@rasenjs/gfx@file:../../packages/gfx::locator=benchmark-spine%40workspace%3Abenchmark%2Fspine":
   version: 0.1.0-alpha
-  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=e941bb&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
+  resolution: "@rasenjs/gfx@file:../../packages/gfx#../../packages/gfx::hash=edcc89&locator=benchmark-spine%40workspace%3Abenchmark%2Fspine"
   dependencies:
     "@rasenjs/assets": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/math": "workspace:^"
-  checksum: 10c0/8c6a9268a2d85a96151fb1610ff402f74d2c7e78552136203aeca9125aebff62d91c66971a4c85da25b96e9900f709f0448a40f2f0f33b278c7ab9845ec29aa6
+  checksum: 10c0/54f3d11349fb41f5c64e641c05a599214e5bfbd8c3accc5c93315ed68754f1e35268b53000b7fb2944ae3b61a9962873ced20566774ccc7ad377e2fbea73d449
   languageName: node
   linkType: hard
 
@@ -4534,7 +4544,6 @@ __metadata:
   resolution: "@rasenjs/html@workspace:packages/html"
   dependencies:
     "@rasenjs/core": "workspace:^"
-    "@rasenjs/dom": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -4606,6 +4615,7 @@ __metadata:
   dependencies:
     "@babel/core": "npm:^7.28.5"
     "@babel/types": "npm:^7.28.5"
+    "@rasenjs/compiler": "workspace:*"
     "@rasenjs/core": "workspace:^"
     "@rasenjs/reactive-vue": "workspace:^"
     "@rasenjs/rn-dom": "workspace:^"
@@ -4823,7 +4833,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@rasenjs/vite-plugin-rasen@workspace:*, @rasenjs/vite-plugin-rasen@workspace:packages/vite-plugin-rasen":
+"@rasenjs/vite-plugin-rasen@workspace:packages/vite-plugin-rasen":
   version: 0.0.0-use.local
   resolution: "@rasenjs/vite-plugin-rasen@workspace:packages/vite-plugin-rasen"
   dependencies:
@@ -7392,6 +7402,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"acorn@npm:^8.18.0":
+  version: 8.19.0
+  resolution: "acorn@npm:8.19.0"
+  bin:
+    acorn: bin/acorn
+  checksum: 10c0/21007e0ca638dd13d44a0ad26856b7a885cc6c4319cd2bc71694bc8ec3f0606c23ecd12b157e167f909d9d2b2d68d5b50fe3f54211b1aab7c3451a7c801fe62e
+  languageName: node
+  linkType: hard
+
 "agent-base@npm:6":
   version: 6.0.2
   resolution: "agent-base@npm:6.0.2"
@@ -8560,6 +8579,13 @@ __metadata:
   version: 0.2.4
   resolution: "confbox@npm:0.2.4"
   checksum: 10c0/4c36af33d9df7034300c452f7b289179264493bd0671fa81b995a0d70dc897b1d37f1af10d3ffb187f178d17ba1ed2ba167ed0f599ba3a139c271205dd553f73
+  languageName: node
+  linkType: hard
+
+"confbox@npm:^0.3.1":
+  version: 0.3.1
+  resolution: "confbox@npm:0.3.1"
+  checksum: 10c0/f81496a1b40cb3bf25d74c31b2ea7bf7e622b0aff1e10b7d0aebb36e8fb1d550c13c6f872ae37c9235d5a28988f71970496172a282a5123f7fd0b0812c6967cf
   languageName: node
   linkType: hard
 
@@ -9735,6 +9761,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"escape-string-regexp@npm:^5.0.0":
+  version: 5.0.0
+  resolution: "escape-string-regexp@npm:5.0.0"
+  checksum: 10c0/6366f474c6f37a802800a435232395e04e9885919873e382b157ab7e8f0feb8fed71497f84a6f6a81a49aab41815522f5839112bd38026d203aea0c91622df95
+  languageName: node
+  linkType: hard
+
 "escodegen@npm:^2.0.0, escodegen@npm:^2.1.0":
   version: 2.1.0
   resolution: "escodegen@npm:2.1.0"
@@ -10042,6 +10075,13 @@ __metadata:
   version: 1.1.0
   resolution: "exsolve@npm:1.1.0"
   checksum: 10c0/38ecec58d6e4ddfe31b5e6773a0193057fcb8462e1c0959aee3c9441729b4db901f3b23af68963cb871fb3f83b46c49ed2f69e0ef6d5254951f483c68cc934e9
+  languageName: node
+  linkType: hard
+
+"exsolve@npm:^1.1.3":
+  version: 1.1.3
+  resolution: "exsolve@npm:1.1.3"
+  checksum: 10c0/6359d8b6cc1ed9c48efadfe67cc434dcbc01bc727f14a0c899696c5bbd95202089cf6105a738c7fb0fd2ee62d5181842c8c098e63f185647832a631a50badf81
   languageName: node
   linkType: hard
 
@@ -11186,6 +11226,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"js-tokens@npm:^10.0.0":
+  version: 10.0.0
+  resolution: "js-tokens@npm:10.0.0"
+  checksum: 10c0/a93498747812ba3e0c8626f95f75ab29319f2a13613a0de9e610700405760931624433a0de59eb7c27ff8836e526768fb20783861b86ef89be96676f2c996b64
+  languageName: node
+  linkType: hard
+
 "js-tokens@npm:^3.0.0 || ^4.0.0, js-tokens@npm:^4.0.0":
   version: 4.0.0
   resolution: "js-tokens@npm:4.0.0"
@@ -11762,6 +11809,15 @@ __metadata:
   dependencies:
     "@jridgewell/sourcemap-codec": "npm:^1.5.5"
   checksum: 10c0/299378e38f9a270069fc62358522ddfb44e94244baa0d6a8980ab2a9b2490a1d03b236b447eee309e17eb3bddfa482c61259d47960eb018a904f0ded52780c4a
+  languageName: node
+  linkType: hard
+
+"magic-string@npm:^1.1.0, magic-string@npm:^1.2.3":
+  version: 1.4.5
+  resolution: "magic-string@npm:1.4.5"
+  dependencies:
+    "@jridgewell/sourcemap-codec": "npm:^1.6.0"
+  checksum: 10c0/79295b85e19f2e18bb01b81671d27ae192546e88534dfcef2e36f2c04f45b39db497ce85a62efda0336356308cdc037a1c73fc0f1bd0945d12ae1e794163b247
   languageName: node
   linkType: hard
 
@@ -13178,6 +13234,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"picomatch@npm:^4.0.7":
+  version: 4.0.7
+  resolution: "picomatch@npm:4.0.7"
+  checksum: 10c0/beb6ae02c43ae44e84883b90830196d9046b1726ead292adcf7f57945e0bb0d992d68563d87e03b484b6f3c9a5c6defda7523477f047d7f0e663f126cc01787f
+  languageName: node
+  linkType: hard
+
 "pirates@npm:^4.0.1":
   version: 4.0.7
   resolution: "pirates@npm:4.0.7"
@@ -13287,6 +13350,17 @@ __metadata:
     exsolve: "npm:^1.0.8"
     pathe: "npm:^2.0.3"
   checksum: 10c0/dd9b20682426abaddcac9dc786aa22542e12df15a03dea2afa7bf54da0933358c6c7f545c0c3c1c7b24a2904ab4a451bf4e34a50c6837e458359eea30c257ed4
+  languageName: node
+  linkType: hard
+
+"pkg-types@npm:^2.3.3":
+  version: 2.4.0
+  resolution: "pkg-types@npm:2.4.0"
+  dependencies:
+    confbox: "npm:^0.3.1"
+    exsolve: "npm:^1.1.3"
+    pathe: "npm:^2.0.3"
+  checksum: 10c0/80782725a4bf5eae540375a811911875a54ecd3f42d4a8fdc404de1d1693404187a00801c8719ee69b8c33f8a28339eeebd973dbb87a27a24c8d6089452538a6
   languageName: node
   linkType: hard
 
@@ -13686,6 +13760,7 @@ __metadata:
     tsup: "npm:^8.5.1"
     tsx: "npm:^4.21.0"
     typescript: "npm:^5.3.2"
+    unplugin-auto-import: "npm:^21.1.0"
     vitest: "npm:^1.0.4"
     vue-router: "npm:^5.2.0"
   dependenciesMeta:
@@ -14877,6 +14952,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"strip-literal@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "strip-literal@npm:4.0.0"
+  dependencies:
+    js-tokens: "npm:^10.0.0"
+  checksum: 10c0/166dcaf997c185d6d6a19ed9877d182bc6bf8286e71113e1c03e6d9c916b28f11380c202bb6f6e08f9e3b48d3aa05c5e333eb733d7bbb54ea857bca39f05d6df
+  languageName: node
+  linkType: hard
+
 "strnum@npm:^1.1.1":
   version: 1.1.2
   resolution: "strnum@npm:1.1.2"
@@ -15537,6 +15621,36 @@ __metadata:
   languageName: node
   linkType: hard
 
+"unimport@npm:^6.4.0":
+  version: 6.5.0
+  resolution: "unimport@npm:6.5.0"
+  dependencies:
+    acorn: "npm:^8.18.0"
+    escape-string-regexp: "npm:^5.0.0"
+    estree-walker: "npm:^3.0.3"
+    local-pkg: "npm:^1.2.1"
+    magic-string: "npm:^1.2.3"
+    mlly: "npm:^1.8.2"
+    pathe: "npm:^2.0.3"
+    picomatch: "npm:^4.0.7"
+    pkg-types: "npm:^2.3.3"
+    scule: "npm:^1.3.0"
+    strip-literal: "npm:^4.0.0"
+    tinyglobby: "npm:^0.2.17"
+    unplugin: "npm:^3.3.0"
+    unplugin-utils: "npm:^0.3.2"
+  peerDependencies:
+    oxc-parser: "*"
+    rolldown: ^1.0.0
+  peerDependenciesMeta:
+    oxc-parser:
+      optional: true
+    rolldown:
+      optional: true
+  checksum: 10c0/12d601ecc83d654cc08803c1af0a4dff2c5a34fd71c5d2f0714e1b841a0676e5d5968dec3623a74d855bbce987ceb6f78c28bd4efc504c77762553fb1d5bf44a
+  languageName: node
+  linkType: hard
+
 "unique-filename@npm:^5.0.0":
   version: 5.0.0
   resolution: "unique-filename@npm:5.0.0"
@@ -15657,6 +15771,28 @@ __metadata:
   version: 1.0.0
   resolution: "unpipe@npm:1.0.0"
   checksum: 10c0/193400255bd48968e5c5383730344fbb4fa114cdedfab26e329e50dd2d81b134244bb8a72c6ac1b10ab0281a58b363d06405632c9d49ca9dfd5e90cbd7d0f32c
+  languageName: node
+  linkType: hard
+
+"unplugin-auto-import@npm:^21.1.0":
+  version: 21.1.0
+  resolution: "unplugin-auto-import@npm:21.1.0"
+  dependencies:
+    local-pkg: "npm:^1.2.1"
+    magic-string: "npm:^1.1.0"
+    picomatch: "npm:^4.0.5"
+    unimport: "npm:^6.4.0"
+    unplugin: "npm:^3.3.0"
+    unplugin-utils: "npm:^0.3.2"
+  peerDependencies:
+    "@nuxt/kit": ^4.0.0
+    "@vueuse/core": "*"
+  peerDependenciesMeta:
+    "@nuxt/kit":
+      optional: true
+    "@vueuse/core":
+      optional: true
+  checksum: 10c0/fb1bfad6cad4c9d835e0bcd01eeffb55a646ba336bf83e93d473eb95920c8c2d469c0bac7f0e15cd9c279f6083ffcdcf7982f445c416ce5a526e56f4ea4fd338
   languageName: node
   linkType: hard
 

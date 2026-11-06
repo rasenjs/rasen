@@ -151,3 +151,7 @@ packages/vue-rn/src/__bench__/__mocks__/rn-local-pkg/react-native/Libraries/Rend
 # - scratch: one-off probe output (extracted containers, decoded dumps).
 .d2r-ref/
 scratch/
+
+# unplugin-auto-import's generated declarations — the example tsconfigs only
+# include src/, so these are build artifacts, not sources:
+auto-imports.d.ts
