@@ -2,36 +2,51 @@
  * Bundler-agnostic plugin (vite / webpack / rspack / esbuild via unplugin).
  *
  * Pipeline per module (in order):
- *   1. Static hoisting — compile intrinsic-tag subtrees into template calls.
+ *   1. Structural rewrite (opt-in) — `&&` / `?:` / `.map()` into `when`/`each`,
+ *      while children are still raw JSX.
+ *   2. Static hoisting — compile intrinsic-tag subtrees into template calls.
  *      Consumes RAW JSX: its shape detection (`cond ? 'cls' : ''` →
  *      bindClassToggle, static StringLiteral attrs, …) only holds for the
  *      expressions the author wrote.
- *   2. Standard JSX handling — wrap the attribute expressions that are LEFT
- *      (fallback / component subtrees) in getters so the runtime props layer
- *      sees a reactive source.
- *   3. HMR — inject enterHmrModule/exitHmrModule around modules using com()
+ *   3. Attribute getters — wrap the attribute expressions that are LEFT
+ *      (fallback / component subtrees) in getters so the props layer sees a
+ *      reactive source. This edits JSX syntax, so it must run while JSX still
+ *      exists — before step 4 removes it.
+ *   4. JSX elimination — every remaining JSX node becomes a bare factory call
+ *      (eliminate-jsx.ts). After this the module contains no JSX at all: the
+ *      bundler's JSX transform never runs. Tag bindings are the app's own
+ *      `unplugin-auto-import` config — the compiler injects imports only for
+ *      hoisting helpers, which never appear in the author's source.
+ *   5. HMR — inject enterHmrModule/exitHmrModule around modules using com()
  *      (dev only; hot-accept is left to the bundler's own HMR).
  *
- * ⚠️ Order matters: running step 2 first would rewrite every complex prop
- * expression to `() => expr` before step 1 sees it. The hoisting pass then
+ * ⚠️ Order matters: running step 3 first would rewrite every complex prop
+ * expression to `() => expr` before step 2 sees it. The hoisting pass then
  * fails its shape checks and wraps the getter *again* (`() => () => expr`), so
  * `bindClass`/`bindProp` would receive a getter that returns a function and
  * stringify it into the attribute. Locked by the pipeline tests in
  * `__tests__/pipeline.test.ts`.
  *
- * Static hoisting is ON by default (no `@rasen-compile` directive needed);
- * disable via `compile: false` for testing.
+ * Static hoisting is ON by default; disable via `compile: false` for testing.
  *
- * Usage (vite):
+ * Usage (vite) — pair with `unplugin-auto-import` so emitted calls resolve
+ * (the full recipe is in www/guide/advanced/jsx):
  *   import { rasenCompile } from '@rasenjs/compiler'
- *   export default defineConfig({ plugins: [rasenCompile.vite()] })
+ *   import { DOM_TAGS } from '@rasenjs/dom'
+ *   import AutoImport from 'unplugin-auto-import/vite'
+ *   export default defineConfig({
+ *     plugins: [rasenCompile.vite(), AutoImport({
+ *       include: [/\.tsx$/],
+ *       imports: [{ '@rasenjs/dom': [...DOM_TAGS] }],
+ *     })],
+ *   })
  */
 
 import { createUnplugin } from 'unplugin'
 import { compileModule, type CompilerOptions } from './core'
 import { transformJsxExpressions } from './jsx-transform'
 import { transformStructural } from './structural'
-import { rewriteComponentTags, resolveComponentTags } from './component-tags'
+import { eliminateJsx } from './eliminate-jsx'
 import { injectHmr, usesCom, hasHmrWrapping } from './hmr'
 
 export interface RasenCompilerPluginOptions extends CompilerOptions {
@@ -93,24 +108,31 @@ export function transformModule(
     if (result) out = result.code
   }
 
-  // 2b. Component tags — lowercase tags that are module imports, not
-  //     host-element strings. Runs AFTER compilation so only what the
-  //     compiler left as JSX needs renaming: a compiled `<canvas/>` is
-  //     already a `canvas({...})` call, while leftover JSX would reach the
-  //     bundler as `jsx('canvas', …)` — a string only the global tag registry
-  //     can resolve (and the reason a heavy component behind that registry
-  //     ships in apps that never render it).
-  const tagged = rewriteComponentTags(out, filename, resolveComponentTags(options))
-  if (tagged) out = tagged
-
   // 3. JSX attribute handling for whatever hoisting left behind (fallbacks,
-  //    component subtrees).
+  //    component subtrees). Edits JSX syntax in the source, so it must run
+  //    while JSX still exists — i.e. before elimination.
   if (jsxTransform) {
     out = transformJsxExpressions(out)
   }
 
-  // 4. HMR wrapping — modules using com().
-  if (hmr && usesCom(out) && !hasHmrWrapping(out)) {
+  // 4. JSX elimination — the last pass that may see JSX: every remaining node
+  //    becomes a bare factory call (eliminate-jsx.ts). Bindings for those
+  //    names are the app's auto-import config, not the compiler's — so after
+  //    this the module contains no JSX and no tag imports from us.
+  const eliminated = eliminateJsx(out, filename)
+  if (eliminated !== null) out = eliminated
+
+  // 5. HMR wrapping — modules using com(). @rasenjs/core's own sources are
+  // excluded: the prelude imports `@rasenjs/core`, so wrapping core with it
+  // creates a self-referential cycle (`hmrState` is still in its TDZ when the
+  // wrapped module's body runs). Core's components are not app modules and
+  // have no HMR lifecycle of their own.
+  if (
+    hmr &&
+    !/[/\\](packages[/\\]core[/\\]src|@rasenjs[/\\]core[/\\])([/\\]|$)/.test(filename) &&
+    usesCom(out) &&
+    !hasHmrWrapping(out)
+  ) {
     out = injectHmr(out, filename)
   }
 

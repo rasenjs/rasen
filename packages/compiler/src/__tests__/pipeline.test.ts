@@ -41,6 +41,15 @@ describe('transformModule pipeline', () => {
     expect(out).toContain('bindStyle(_r0, () => mk(b))')
   })
 
+  it('对象字面量（含 as 断言）加括号，不被读成箭头的块体', () => {
+    const code = `function V(dev) {
+  return <canvas renderOptions={{ clearColor: 'rgba(0,0,0,0)', continuousRender: true } as never} contextType="2d" />
+}`
+    const out = run(code)
+    expect(out).toContain('() => ({')
+    expect(out).not.toMatch(/=>\s*\{\s*clearColor/)
+  })
+
   it('组件子树经静态提升后仍挂载到 slot（无重复包装）', () => {
     const code = `function App(cls) {
   return <div class="box"><Header id={cls} title="hi" /></div>
@@ -59,14 +68,18 @@ describe('transformModule pipeline', () => {
     expect(out).not.toContain('() => () => pick')
   })
 
-  it('无法提升的元素回退为 JSX，但其属性仍被包成 getter', () => {
+  it('无法提升的元素回退成裸调用，属性仍被包成 getter', () => {
     const code = `function F(rest, mk) {
   return <div {...rest} class={mk()}>x</div>
 }`
     const out = run(code)
     expect(out).not.toContain('() => () =>')
-    // 回退路径：原始 JSX 保留，复杂表达式被包装供运行时 props 读取
-    expect(out).toMatch(/class=\{\(\) => mk\(\)\}/)
+    // 回退路径：JSX 被消除成调用；getter 留在 props 里供运行时读取。
+    // import 不在这里断言——标签绑定是 auto-import 的契约（见 compile.test）。
+    expect(out).toContain('div({')
+    expect(out).toContain('...rest')
+    expect(out).toContain('class: () => mk()')
+    expect(out).not.toContain('<div')
   })
 })
 

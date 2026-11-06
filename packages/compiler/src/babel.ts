@@ -5,7 +5,7 @@
  *   plugins: [require('@rasenjs/compiler/babel').default]
  */
 
-import { COMPILE_DIRECTIVE, transformProgram, type CompilerOptions } from './core'
+import { transformProgram, type CompilerOptions } from './core'
 
 export interface BabelPluginAPI {
   types: typeof import('@babel/types')
@@ -21,10 +21,12 @@ export default function rasenCompileBabel(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       Program(programPath: any, state: any) {
         const filename: string = state.file?.opts?.filename ?? 'file.tsx'
+        // Same contract as the bundler plugin: the passes are on for every
+        // module (`enabled: false` turns them off). No per-file directive —
+        // a file without JSX is a no-op anyway.
+        if (options.enabled === false) return
         const code = state.file?.code
-        if (typeof code !== 'string' || !code.includes(COMPILE_DIRECTIVE)) {
-          return
-        }
+        if (typeof code !== 'string') return
 
         const stats = transformProgram(programPath.node, code, {
           ...options,

@@ -1,7 +1,7 @@
 /**
  * Static-hoisting compiler tests (compileModule, AST-native)
  *
- * Static hoisting is ON by default — no `@rasen-compile` directive needed.
+ * Static hoisting is ON by default.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -441,6 +441,17 @@ const el = <p>{inline(list)}</p>`
     expect(r.code).not.toContain('renderText(')
   })
 
+  it('com() 包装的组件在子节点位回退（不被烘成文本）', () => {
+    // The wrapper call's JSX callback is what makes the binding a mountable:
+    // `const T = com(() => <div/>)` — hoisting it as text would hand
+    // renderText a function and stringify its source.
+    const code = `const TechInfoModal = com(() => <div class="m">info</div>)
+const el = <div class="shell">{TechInfoModal()}</div>`
+    const r = compileModule(code)!
+    expect(r.code).not.toContain('renderText(')
+    expect(r.code).toContain('{TechInfoModal()}')
+  })
+
   it('三元 / 逻辑表达式里夹着工厂调用也回退', () => {
     const code = `import { text } from '@rasenjs/dom'
 const el = <p class="t">{cond ? text({ content: () => x }) : fallback}</p>`
@@ -474,128 +485,84 @@ const el = <td class="c">{textOf(item.label)}</td>`
 })
 
 /**
- * Component tags — lowercase tags that are module imports, not host-element
- * strings. A string can only be resolved through the global tag registry, which
- * is also what pins everything the registering module imports (the DOM canvas
- * bridge pulls the whole GL stack that way).
+ * JSX elimination — lowercase tags become BARE calls.
  *
- * The author's spelling is kept: a compilable `<canvas/>` becomes a plain
- * `canvas({...})` CALL, and the import is injected. Only JSX the compiler has to
- * leave behind is renamed, because the bundler's JSX transform reads a lowercase
- * tag as a string.
+ * The compiler emits no tag imports: binding those names is the app's
+ * `unplugin-auto-import` config (recipe: docs/COMPILE-DESIGN.md). These
+ * tests pin what the transform owes and nothing more — calls in the author's
+ * spelling, no JSX left, no compiler-side tag imports, and the two errors
+ * only the pass that sees JSX can raise.
  */
-describe('组件标签：小写标签自动引入', () => {
-  /** Full pipeline (compile + rewrite): the tag becomes a call. */
-  const compile = (code: string, options: any = {}) =>
+describe('JSX 消除：小写标签发裸调用', () => {
+  const run = (code: string, options: any = {}) =>
     transformModule(code, 'C.tsx', { structural: true, ...options })
-  /** Rewrite only: nothing to rename or import means null. */
-  const isolated = (code: string, options: any = {}) =>
-    transformModule(code, 'C.tsx', { compile: false, jsxTransform: false, ...options })
 
-  it('根 <canvas> 编译成调用并注入 import（不改名）', () => {
-    const out = compile(`export const C = () => <canvas width={400} />`)!
-    expect(out).toContain("import { canvas } from '@rasenjs/dom'")
-    expect(out).toContain('canvas(')
-    expect(out).not.toContain('_rasenCanvas')
+  it('根 <canvas> 成为调用：不改名、编译器不发标签 import', () => {
+    const out = run(`export const C = () => <canvas width={400} />`)!
+    expect(out).toContain('canvas({')
+    expect(out).not.toContain('_rasen')
     expect(out).not.toContain('<canvas')
+    expect(out).not.toContain(`from '@rasenjs/dom'`)
   })
 
-  it('子 <canvas> 同样编译成调用', () => {
-    const out = compile(`export const C = () => <div class="w"><canvas width={400} /></div>`)!
-    expect(out).toContain("import { canvas } from '@rasenjs/dom'")
+  it('子 <canvas> 同样成调用并挂进 slot', () => {
+    const out = run(`export const C = () => <div class="w"><canvas width={400} /></div>`)!
     expect(out).toContain('mountSlot(')
+    expect(out).toContain('canvas({')
     expect(out).not.toContain('<canvas')
   })
 
-  it('编译器处理不了的 JSX 才改名（小写标签在 bundler 眼里是字符串）', () => {
-    const out = compile(`export const C = () => <canvas {...rest} />`)!
-    expect(out).toContain("import { canvas as _rasenCanvas } from '@rasenjs/dom'")
-    expect(out).toContain('<_rasenCanvas')
-    expect(out).not.toMatch(/<canvas[\s/>]/)
-  })
-
-  it('同一文件里多个 <canvas> 都拿到 import（别名不互相覆盖）', () => {
-    // Two leftover <canvas> mounts in one file: each needs its own local
-    // name, and BOTH must be imported. Importing only the last one left the
-    // first as an undefined binding at runtime ("_rasenCanvas is not
-    // defined").
-    const out = compile(
-      `export const C = () => <div><canvas {...a} /><canvas {...b} /></div>`,
+  it('条件子集成调用，动态 children 内联 flat+filter', () => {
+    const out = run(
+      `export const C = ({ cond }: any) => <div class="w">{cond && <b>x</b>}</div>`,
+      { structural: false }
     )!
-    expect(out).toContain("import { canvas as _rasenCanvas } from '@rasenjs/dom'")
-    expect(out).toContain("import { canvas as _rasenCanvas2 } from '@rasenjs/dom'")
-    expect(out).toContain('<_rasenCanvas')
-    expect(out).toContain('<_rasenCanvas2')
+    expect(out).toContain('b({')
+    expect(out).toContain('cond && b({')
+    expect(out).toContain('.flat(Infinity).filter(')
+    expect(out).not.toContain('<b')
   })
 
-  it('作者已 import 时不重复注入', () => {
-    const out = compile(`import { canvas } from '@rasenjs/dom'\nexport const C = () => <canvas width={400} />`)!
+  it('Fragment 成裸调用', () => {
+    const out = run(`export const C = (xs: any[]) => <>{xs.map((x) => <li>{x}</li>)}</>`, {
+      structural: false,
+    })!
+    expect(out).toContain('Fragment({')
+    expect(out).toContain('.flat(Infinity).filter(')
+    expect(out).not.toContain('<>')
+  })
+
+  it('作者已显式 import 的标签原样使用（auto-import 跳过已导入名）', () => {
+    const out = run(
+      `import { canvas } from '@rasenjs/dom'\nexport const C = () => <canvas width={400} />`
+    )!
     expect(out.match(/import \{ canvas \} from '@rasenjs\/dom'/g)).toHaveLength(1)
-  })
-
-  it('无关文件零改动', () => {
-    expect(isolated(`export const C = () => <div class="w">hi</div>`)).toBeNull()
-  })
-
-  it('内置元素不受影响', () => {
-    expect(isolated(`export const C = () => <div class="w"><span>hi</span></div>`)).toBeNull()
-  })
-
-  it('非 DOM 宿主不被注入 DOM 的 canvas（html 里 canvas 是元素）', () => {
-    expect(
-      transformModule(`export const C = () => <canvas width={400} />`, 'C.tsx', {
-        compile: false,
-        jsxTransform: false,
-        templateSource: '@rasenjs/html/template',
-      })
-    ).toBeNull()
-  })
-
-  it('componentTags 可覆盖与关闭', () => {
-    const on = compile(`export const C = () => <widget x={1} />`, {
-      componentTags: { widget: { module: '@rasenjs/widgets' } },
-    })!
-    expect(on).toContain("import { widget } from '@rasenjs/widgets'")
-    expect(on).toContain('widget({')
-
-    expect(isolated(`export const C = () => <widget x={1} />`, { componentTags: {} })).toBeNull()
-  })
-
-  it('export 名可与标签名不同', () => {
-    const out = compile(`export const C = () => <stage />`, {
-      componentTags: { stage: { module: '@rasenjs/dom', export: 'canvas' } },
-    })!
-    expect(out).toContain("import { canvas } from '@rasenjs/dom'")
     expect(out).toContain('canvas({')
   })
-})
 
-describe('组件标签：tagManifest（宿主导出的数据）', () => {
-  const manifest = {
-    elements: ['div', 'span', 'widget'],
-    components: { canvas: { module: '@rasenjs/dom' }, stage: { module: '@rasenjs/dom' } },
-  }
-
-  it('components 决定哪些标签走导入', () => {
-    const out = transformModule(`export const C = () => <div class="w"><stage a={1} /></div>`, 'C.tsx', {
-      structural: true, tagManifest: manifest,
-    })!
-    expect(out).toContain("import { stage } from '@rasenjs/dom'")
-    expect(out).toContain('stage({')
+  it('局部绑定遮蔽标签时报错', () => {
+    expect(() =>
+      run(`function f(rest: any) { const div = 1; return <div {...rest} /> }`, {
+        structural: false,
+      })
+    ).toThrow(/local binding/)
   })
 
-  it('elements 决定哪些标签编译成 template（可覆盖默认集）', () => {
-    // `widget` 不在默认元素表里，manifest 把它声明成元素后即走 template 路径。
-    const out = transformModule(`export const C = () => <widget class="w">hi</widget>`, 'C.tsx', {
-      structural: true, tagManifest: manifest,
-    })!
-    expect(out).toContain("template('<widget class=\"w\">hi</widget>')")
+  it('非法调用名（连字符标签）报错，指向 PascalCase 包装', () => {
+    expect(() => run(`export const C = () => <my-widget />`)).toThrow(/PascalCase/)
   })
 
-  it('manifest 未列出的标签既不编译也不导入', () => {
-    const out = transformModule(`export const C = () => <marquee>hi</marquee>`, 'C.tsx', {
-      compile: false, jsxTransform: false, tagManifest: manifest,
-    })
-    expect(out).toBeNull()
+  it('无 JSX 文件零改动', () => {
+    expect(run(`export const C = () => 1`)).toBeNull()
+  })
+
+  it('compile 关闭时也只发裸调用（零标签 import 是契约）', () => {
+    const out = transformModule(`export const C = () => <div class="w">hi</div>`, 'C.tsx', {
+      compile: false,
+      jsxTransform: false,
+    })!
+    expect(out).toContain('div({')
+    expect(out).toContain('children: ["hi"]')
+    expect(out).not.toContain('import')
   })
 })

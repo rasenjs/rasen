@@ -26,17 +26,10 @@ import generatorModule from '@babel/generator'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const generate: any = (generatorModule as any).default || generatorModule
 import * as BabelTypes from '@babel/types'
-import {
-  type ComponentTagSpec,
-  type TagManifest,
-  resolveComponentTags,
-} from './component-tags'
 
 // @babel/traverse ESM/CJS interop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const traverse: any = (traverseModule as any).default || traverseModule
-
-export const COMPILE_DIRECTIVE = '@rasen-compile'
 
 /**
  * 默认可静态提升的宿主内置标签清单（DOM）。
@@ -66,21 +59,14 @@ export interface CompilerOptions {
   templateSource?: string
   /** 静态提升开关（默认开启）。设为 false 时跳过编译，走标准 JSX。 */
   enabled?: boolean
-  /** 可静态提升的宿主内置标签集合（默认 DOM 标签清单）。 */
-  intrinsicTags?: Set<string>
   /**
-   * 小写标签 → 模块导入（见 component-tags.ts）。
+   * 可静态提升的宿主内置标签集合（默认 DOM 标签清单）。
    *
-   * 默认把 `canvas` 解析为 `@rasenjs/dom` 的导入，于是 `<canvas>` 不再变成
-   * 字符串、不需要全局 tag registry。宿主可覆盖/扩展；传 `{}` 可关闭。
+   * 只决定哪些标签能烘进 `template()` HTML——这是编译期形状判断。标签的
+   * 绑定（哪个名字从哪个模块 import）不在编译器里：它由应用自己的
+   * unplugin-auto-import 配置提供，配方见 docs/COMPILE-DESIGN.md。
    */
-  componentTags?: Record<string, ComponentTagSpec>
-  /**
-   * 宿主导出的标签清单（`@rasenjs/dom/tags` 导出 `TAG_MANIFEST`）。
-   * `elements` 覆盖默认元素集，`components` 覆盖默认组件映射 —— 传它就等于
-   * 一次性拿到宿主的默认值再自行扩展。
-   */
-  tagManifest?: TagManifest
+  intrinsicTags?: Set<string>
 }
 
 interface GenContext {
@@ -209,8 +195,11 @@ function toSingleQuoted(s: string): string {
  *  embedded in a string literal, so a raw newline would split that literal.
  *
  *  Returns the RAW text (not HTML-escaped): the caller decides whether it ends
- *  up in markup (escape it) or in a text-node write (keep it raw). */
-function normalizeJsxText(node: BabelTypes.JSXText): string | null {
+ *  up in markup (escape it) or in a text-node write (keep it raw).
+ *
+ *  Shared with JSX elimination (eliminate-jsx.ts): the `children` array it
+ *  emits must read the author's text exactly as the baked HTML does. */
+export function normalizeJsxText(node: BabelTypes.JSXText): string | null {
   const raw = node.value
   if (!/\S/.test(raw)) return null // whitespace-only between tags → dropped
   return raw
@@ -572,14 +561,29 @@ function collectMountableBindings(scope: any): Set<string> {
       if (seen.has(name)) continue
       seen.add(name)
       const node = current.bindings[name]?.path?.node
-      const fn =
-        node?.type === 'FunctionDeclaration'
-          ? node
-          : node?.type === 'VariableDeclarator' &&
-              (node.init?.type === 'ArrowFunctionExpression' ||
-                node.init?.type === 'FunctionExpression')
-            ? node.init
-            : null
+      let fn: any = null
+      if (node?.type === 'FunctionDeclaration') {
+        fn = node
+      } else if (node?.type === 'VariableDeclarator') {
+        const init = node.init
+        if (
+          init?.type === 'ArrowFunctionExpression' ||
+          init?.type === 'FunctionExpression'
+        ) {
+          fn = init
+        } else if (init?.type === 'CallExpression') {
+          // A wrapper call — `const T = com(() => <div/>)`, the component idiom:
+          // the factory it returns builds JSX, so a call in a child position is
+          // a mountable, never text. (Without this, `{T()}` was hoisted into
+          // `renderText(T())` and the runtime refused to stringify its source.)
+          const wrapped = (init.arguments ?? []).find(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (a: any) =>
+              a?.type === 'ArrowFunctionExpression' || a?.type === 'FunctionExpression'
+          )
+          if (wrapped && returnsJsxOrArray(wrapped)) names.add(name)
+        }
+      }
       if (fn && returnsJsxOrArray(fn)) names.add(name)
     }
   }
@@ -651,56 +655,6 @@ function isMountableChildCall(
     return typeof property.value === 'string' && isFactoryName(property.value)
   }
   return property.type === 'Identifier' && isFactoryName(property.name)
-}
-
-/**
- * Serialize a ROOT component tag into a call expression, or null.
- *
- * `<canvas width={400} />` → `canvas({ width: 400 })`
- * `<canvas>{kids}</canvas>` → `canvas({ children: <>{kids}</> })`
- *
- * Only the shapes the compiler can prove are handled (simple attributes, no
- * spread); anything else returns null so the JSX is left for the bundler, where
- * the component-tag rewrite turns the tag into an identifier first.
- */
-function rootComponentCall(
-  node: BabelTypes.JSXElement,
-  options: CompilerOptions,
-  ctx: GenContext
-): string | null {
-  const nameNode = node.openingElement.name
-  if (nameNode.type !== 'JSXIdentifier') return null
-  const tag = nameNode.name
-  const spec = resolveComponentTags(options)[tag]
-  if (!spec) return null
-
-  let props = ''
-  for (const attr of node.openingElement.attributes) {
-    if (attr.type !== 'JSXAttribute' || attr.name.type !== 'JSXIdentifier') return null
-    const v = attr.value
-    if (v === null || v === undefined) props += `${attr.name.name}: true, `
-    else if (v.type === 'StringLiteral') props += `${attr.name.name}: ${JSON.stringify(v.value)}, `
-    else if (v.type === 'JSXExpressionContainer' && v.expression.type !== 'JSXEmptyExpression') {
-      props += `${attr.name.name}: ${ctx.source.slice(v.expression.start!, v.expression.end!)}, `
-    } else return null
-  }
-
-  const hasChildren = node.children.some(
-    (c) => c.type !== 'JSXText' || /\S/.test((c as BabelTypes.JSXText).value ?? '')
-  )
-  if (hasChildren) {
-    // The children stay JSX (a fragment) so the bundler compiles whatever is
-    // inside them — attributes, spreads, nested components, all of it.
-    if (!node.closingElement) return null
-    const inner = ctx.source.slice(
-      node.openingElement.end!,
-      node.closingElement.start!
-    )
-    props += `children: <>{${inner}}</>, `
-  }
-
-  const callee = spec.export ?? tag
-  return `${callee}({ ${props.trim()} })`
 }
 
 /**
@@ -1037,7 +991,8 @@ function compileElement(
         ctx.helpers.add('child')
         ctx.helpers.add('mountSlot')
         // The instance is created where the template is built, so both paths
-        // below use the same object.
+        // below use the same object. The callee is the tag itself — binding
+        // it is the app's auto-import, exactly as for any leftover JSX.
         ctx.navStatements.push(
           `const ${inst} = ${nameNode.name}({ ${propsSrc.trim()} })`
         )
@@ -1114,10 +1069,7 @@ export function transformProgram(
     navCache: new Map<string, string>(),
     source,
     intrinsicTags:
-      options.intrinsicTags ??
-      (options.tagManifest?.elements
-        ? new Set<string>(options.tagManifest.elements)
-        : DEFAULT_INTRINSIC_TAGS),
+      options.intrinsicTags ?? DEFAULT_INTRINSIC_TAGS,
     arrayBindings: new Set<string>(),
     mountableFactories: new Set<string>(),
     mountableNamespaces: new Set<string>(),
@@ -1154,19 +1106,6 @@ export function transformProgram(
       // Same per-root rule as the array names: an inner scope's binding shadows
       // the outer one, so a helper name is classified where it is used.
       ctx.mountableBindings = collectMountableBindings(path.scope)
-      // A ROOT component tag is an expression, not a subtree: `<canvas/>` at the
-      // top is `canvas({...})`. Letting the bundler's JSX transform do it would
-      // turn the lowercase tag into a host-element STRING (`jsx('canvas', …)`),
-      // whose only resolution is the global tag registry — which is also what
-      // pins everything the registering module imports. Emitting the call here
-      // keeps the author's spelling and never produces a string.
-      const rootCall = rootComponentCall(path.node, options, ctx)
-      if (rootCall !== null) {
-        path.replaceWith(parseExpression(rootCall))
-        path.skip()
-        compiled++
-        return
-      }
       const html = compileElement(path.node, ctx, rootVar, [])
       if (html === null) {
         fellBack++
@@ -1231,12 +1170,51 @@ export function transformProgram(
   // 全部回退时也返回统计（compiled=0），由调用方决定是否生成输出
 
   // ── prepend imports + template declarations (AST nodes, unshifted) ──
+  // A helper name the module already binds must not be imported again: a
+  // second `template` from another module (a route DSL, say) leaves the
+  // emitted `template('…')` calls resolving to the WRONG function — the
+  // bundler then wires a path parser where a clone function belongs.
+  // Same source → the module's own import already serves the calls (skip);
+  // different source or a local → rename theirs, with the error saying so.
+  const bound = new Map<string, string>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const node of ast.program.body as any[]) {
+    if (node.type === 'ImportDeclaration') {
+      for (const spec of node.specifiers ?? []) {
+        if (spec.local?.name) bound.set(spec.local.name, node.source.value)
+      }
+      continue
+    }
+    if (node.type === 'VariableDeclaration') {
+      for (const d of node.declarations ?? []) if (d.id?.name) bound.set(d.id.name, '<local>')
+    } else if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') {
+      if (node.id?.name) bound.set(node.id.name, '<local>')
+    }
+  }
+  const filename = options.filename ?? 'file.tsx'
+  /** null = already imported from exactly this source; the calls can use it. */
+  const needFrom = (name: string, source: string): string | null => {
+    const owner = bound.get(name)
+    if (owner === undefined) return name
+    if (owner === source) return null
+    throw new Error(
+      `[rasen-compiler] ${filename} already binds '${name}' ` +
+        `(${owner === '<local>' ? 'as a local declaration' : `from '${owner}'`}), ` +
+        `but hoisted output needs it from '${source}' — rename that binding.`
+    )
+  }
+
   const helperNames = Array.from(ctx.helpers)
-  const templateImport = parseStatements(
-    `import { ${helperNames.join(', ')} } from '${ctx.templateSource}'`
-  )
+    .map((n) => needFrom(n, ctx.templateSource))
+    .filter((n): n is string => n !== null)
+  const templateImport =
+    helperNames.length > 0
+      ? parseStatements(`import { ${helperNames.join(', ')} } from '${ctx.templateSource}'`)
+      : []
   const coreImport = ctx.needsCoreSetValue
-    ? parseStatements(`import { setValue } from '@rasenjs/core'`)
+    ? needFrom('setValue', '@rasenjs/core') === null
+      ? []
+      : parseStatements(`import { setValue } from '@rasenjs/core'`)
     : []
   const templateDecls = ctx.templates.flatMap((t) =>
     parseStatements(`const ${t.name} = template('${toSingleQuoted(t.html)}')`)

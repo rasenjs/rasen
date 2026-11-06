@@ -8,6 +8,11 @@
  *  - existing function / JSX element              -> skip (never double-wrap)
  *  - everything else (binary/call/member/cond/...) -> wrap in `() => expr` (reactive)
  *
+ * An object-LIKE value (`{…} as never` reaches here as a TS assertion, not an
+ * ObjectExpression) is wrapped as `() => (…)`: without the parens the braces
+ * read as the arrow's block body and `key: value` becomes a label statement —
+ * a plain syntax error downstream.
+ *
  * Children `{expr}` are NOT transformed (handled by processChildren at runtime).
  *
  * Uses @babel/parser + @babel/traverse with surgical string insertion (no codegen),
@@ -40,10 +45,11 @@ const SKIP_TYPES = new Set([
   'JSXFragment',
 ])
 
-// Special props handled by the JSX runtime / host components — never wrap:
-//  - children: processed by processChildren (expects array/ref/getter of Mountables)
+// Special props handled at emission / by the host — never wrap:
+//  - children: the elimination pass wraps dynamic runs itself
+//              (flat(Infinity) + drop nullish/boolean) — plain values pass through
 //  - ref:      element reference (must stay a Ref)
-//  - key:      handled by jsx()
+//  - key:      passes through as an ordinary prop
 const SPECIAL_ATTRS = new Set(['children', 'ref', 'key'])
 
 function shouldWrap(expr: { type: string; expressions?: unknown[] }): boolean {
@@ -54,6 +60,20 @@ function shouldWrap(expr: { type: string; expressions?: unknown[] }): boolean {
     return false
   }
   return true
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function startsObjectLike(node: any): boolean {
+  if (node.type === 'ObjectExpression') return true
+  if (
+    node.type === 'TSAsExpression' ||
+    node.type === 'TSNonNullExpression' ||
+    node.type === 'TSTypeAssertion' ||
+    node.type === 'ParenthesizedExpression'
+  ) {
+    return startsObjectLike(node.expression)
+  }
+  return false
 }
 
 /**
@@ -79,7 +99,14 @@ export function transformJsxExpressions(code: string): string {
       if (!value || value.type !== 'JSXExpressionContainer') return
       const expr = value.expression
       if (!shouldWrap(expr)) return
-      edits.push({ start: expr.start, text: '() => ' })
+      if (startsObjectLike(expr)) {
+        // Parens keep the object an expression — `{…}` right after `=>` is a
+        // block body, and its `key: value` pairs parse as labels.
+        edits.push({ start: expr.start, text: '() => (' })
+        edits.push({ start: expr.end, text: ')' })
+      } else {
+        edits.push({ start: expr.start, text: '() => ' })
+      }
     },
   })
 

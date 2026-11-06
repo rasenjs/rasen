@@ -39,9 +39,9 @@ module.exports = {
 }
 ```
 
-The Babel adapter is **opt-in per file**: it only compiles modules containing
-the `@rasen-compile` directive. The bundler plugin has no such requirement —
-its passes are on by default.
+The Babel adapter compiles **every module it is configured with**, exactly
+like the bundler plugin — its passes are on by default, and a file without
+JSX is a no-op (`enabled: false` turns it off).
 
 ### Set the JSX runtime
 
