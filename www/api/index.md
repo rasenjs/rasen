@@ -62,12 +62,15 @@ interface ReactiveRuntime {
 ### JSX runtime
 
 ```typescript
-import { Fragment, registerTag, configureTags } from '@rasenjs/core'
+import { Fragment } from '@rasenjs/core'
 ```
 
-`registerTag(name, component)` / `configureTags({ prefix: tags })` teach the
-runtime what a lowercase tag means (PascalCase tags need no registration). Host
-packages register their own tags in their `jsx-runtime` entry.
+`Fragment` is the `<>…</>` implementation hosts re-export. There are no
+`jsx`/`jsxs` factories on this module — Rasen compiles JSX away, so nothing
+resolves a tag at runtime; the host `jsx-runtime` entries are types-only, with
+a stub (`@rasenjs/core/jsx-runtime-stub`) whose functions throw with the fix
+if anything ever calls them. Tag names are bound by the app's
+`unplugin-auto-import` config.
 [JSX & the Compiler →](/guide/advanced/jsx)
 
 ## `@rasenjs/dom`
@@ -109,8 +112,8 @@ interface RasenCompilerPluginOptions {
 ```
 
 Metro / React Native and other Babel pipelines use
-`@rasenjs/compiler/babel` instead, and that adapter compiles only modules that
-carry the `@rasen-compile` directive.
+`@rasenjs/compiler/babel` instead — same passes, same defaults (no per-file
+opt-in).
 
 [@rasenjs/compiler →](/packages/compiler)
 

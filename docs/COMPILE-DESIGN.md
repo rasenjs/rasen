@@ -152,12 +152,20 @@ Static/dynamic judgment must be cheap and reliable:
   dynamic (emit wiring op). Component children = mount points. This is why
   Solid/Svelte/Vapor all compile explicit syntax; none interpret arbitrary JS
   (React Compiler is the counter-example proving the cost).
-- **Factory-call transformation**: possible best-effort later (Million.js
-  style — direct named import + object literal props only), silently passing
-  through anything unrecognized. Not the main route.
+- **Factory-call output (elimination)**: every JSX node hoisting cannot bake
+  becomes a BARE factory call — `div({ … })` — with **no import emitted**:
+  binding those names is `unplugin-auto-import`'s declarative `imports` map —
+  each host ships its tag names as data (`DOM_TAGS`), the app lists them plus
+  its own components (recipe:
+  [JSX & the Compiler](../www/guide/advanced/jsx)). The compiler injects
+  imports only for its hoisting helpers, which never appear in source.
 
-Decision: JSX is the primary compilation input (`packages/dom` already ships
-a jsx-runtime). Factory-call transformation may follow as best-effort.
+Decision: JSX is the primary compilation input. What hoisting cannot prove is
+no longer left to the bundler's JSX transform — it is compiled to calls, so
+output contains no JSX at all, the bundler's JSX handling never runs, and the
+runtime needs no tag registry (`jsx-runtime` entries are types-only `.d.ts`
+files; a runtime stub beside each keeps the subpath resolvable and reports the
+fix if it is ever called).
 
 ## 7. Mixed-mode fallback rules
 
@@ -177,7 +185,7 @@ component is fine — both paths produce plain DOM nodes.
 | Phase | Scope | Acceptance |
 |---|---|---|
 | P1 ✅ | Runtime primitives + tests (`template-bind.test.ts`) | done |
-| P2 ✅ | Compiler MVP: JSX transform for pure-element components; directive opt-in (`/** @rasen-compile */`); everything else passes through | benchmark rasen entry compiled end-to-end (geo ≈1.2× vs native) |
+| P2 ✅ | Compiler MVP: JSX transform for pure-element components; everything else passes through (gated at the time by a `/** @rasen-compile */` directive — since removed; hoisting is on by default) | benchmark rasen entry compiled end-to-end (geo ≈1.2× vs native) |
 | P3 ✅ | Hydration unification: `t0(host)` claim+adopt, path-addressed interior; IR emits SSR HTML from the same walk (`__RASEN_SSR__` define gates the branch per build target) | dom/compiler/html suites green; e2e node render verified |
 | P4 ✅ | Component mount points (`<!--r-->` anchor + `mountSlot`/`ssrSlot`, host passed down); global event delegation opt-in with bubbling-type whitelist | suites green; delegation tests cover fallback for non-bubbling events |
 
