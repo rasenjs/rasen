@@ -14,8 +14,11 @@
  *
  * Why these intercepts are needed:
  *  - `react/jsx-runtime` / `react/jsx-dev-runtime`: RN's babel preset compiles
- *    JSX to `import { jsx } from 'react/jsx-runtime'`. Rasen renders without
- *    React, so these are redirected to `@rasenjs/react-native/jsx-runtime`.
+ *    JSX to `import { jsx } from 'react/jsx-runtime'`. With the rasen Babel
+ *    plugin installed no JSX survives to that point (`Program.enter` eliminates
+ *    it), but third-party RN modules and a project mid-migration still emit the
+ *    import — so it is redirected to `@rasenjs/react-native/jsx-runtime`, whose
+ *    runtime stub reports the actionable error instead of pulling React in.
  *  - `@rasenjs/*`: each package's `exports` maps `import` → `dist/index.js`
  *    and `require` → `dist/index.cjs`. Metro can resolve both conditions,
  *    producing TWO module instances (module-level state splits — e.g. the
@@ -58,7 +61,7 @@ function esmEntry(resolve: (id: string) => string, pkgName: string): string {
   return path.join(packageRoot(resolve, pkgName), 'dist', 'index.js')
 }
 
-/** Resolve a package's jsx-runtime entry. */
+/** Resolve a package's jsx-runtime entry (the runtime stub). */
 function jsxRuntimeEntry(resolve: (id: string) => string, pkgName: string): string {
   return path.join(packageRoot(resolve, pkgName), 'dist', 'jsx-runtime.js')
 }

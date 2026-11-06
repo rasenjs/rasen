@@ -362,15 +362,26 @@ module.exports = withRasenRN(getDefaultConfig(__dirname))
 
 What it does:
 - Redirects `react/jsx-runtime` / `react/jsx-dev-runtime` to
-  `@rasenjs/react-native/jsx-runtime` (Rasen renders without React)
+  `@rasenjs/react-native/jsx-runtime` (Rasen renders without React). With the
+  Babel plugin below no JSX survives to that point; the redirect covers
+  third-party RN modules and projects mid-migration, and the target is a stub
+  that reports the fix instead of pulling React in.
 - Forces a single module instance for `@rasenjs/*` packages (avoids the
   `import`/`require` split that would duplicate module-level state)
 - Adds the rasen package roots to `watchFolders` and `mjs` to `sourceExts`
 
-## Babel Plugin (Metro HMR)
+## Babel Plugin (JSX + Metro HMR)
 
-`@rasenjs/react-native/babel` injects rasen's HMR runtime calls into component
-files for Metro (which uses `module.hot.accept()`, unlike Vite):
+`@rasenjs/react-native/babel` runs two passes:
+
+- **JSX elimination** (on `Program.enter`) — the same pass `@rasenjs/compiler`
+  runs for bundlers. Metro has no `unplugin-auto-import` phase, so leaving JSX
+  to the bundler would compile it to `import { jsx } from 'react/jsx-runtime'`
+  and land on a runtime Rasen no longer ships. After this the module contains
+  no JSX: every tag is the author's own binding (`<View>` → `View({ … })`) and
+  `Fragment` is `@rasenjs/core`'s structural fragment (`<>…</>`).
+- **HMR injection** — rasen's runtime calls for Metro (which uses
+  `module.hot.accept()`, unlike Vite):
 
 ```js
 // babel.config.js
@@ -382,8 +393,10 @@ module.exports = {
 }
 ```
 
-Only files that call `com()` (rasen's component wrapper) are injected, so
-plain utility modules are untouched.
+Only files that call `com()` (rasen's component wrapper) get the HMR
+wrapping, so plain utility modules are untouched; JSX elimination runs on
+every file (a module without JSX is a no-op). `{ hmr: false }` or
+`{ jsx: false }` turns either pass off.
 
 ## DevTools
 

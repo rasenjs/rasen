@@ -51,7 +51,7 @@
   ],
   "scripts": {
     "dev": "../../node_modules/.bin/tsup --watch",
-    "build": "yarn clean && ../../node_modules/.bin/tsup",
+    "build": "yarn clean && ../../node_modules/.bin/tsup && cp src/jsx-runtime.d.ts dist/jsx-runtime.d.ts",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "typecheck": "../../node_modules/.bin/tsc --noEmit",
@@ -75,6 +75,7 @@
   "author": "Rasen Contributors",
   "license": "MIT",
   "dependencies": {
+    "@rasenjs/compiler": "workspace:*",
     "@rasenjs/core": "workspace:^",
     "@rasenjs/rn-dom": "workspace:^"
   },

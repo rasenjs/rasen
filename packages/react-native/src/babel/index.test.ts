@@ -84,3 +84,65 @@ const App = com(() => {})
     expect(out).toContain('enterHmrModule("src/components/Counter.tsx")')
   })
 })
+
+/**
+ * JSX elimination — the reason the RN pipeline needs no `jsx-runtime`.
+ *
+ * Metro has no `unplugin-auto-import` phase, so leaving JSX to the bundler
+ * would compile it to `import { jsx } from 'react/jsx-runtime'`, which Metro
+ * redirects at a runtime Rasen no longer ships. The plugin eliminates JSX on
+ * `Program.enter`, before the RN preset's own JSX transform can fire.
+ */
+describe('rasenRNBabel (JSX elimination)', () => {
+  /** Only the elimination pass — no HMR noise in the assertions. */
+  function eliminate(code: string, filename = '/project/src/App.tsx') {
+    const result = transformSync(code, {
+      plugins: [[rasenRNBabel, { hmr: false, root: '/project' }]],
+      filename,
+      configFile: false,
+      babelrc: false,
+      // The real pipeline gets this from the RN preset; the test run has none.
+      parserOpts: { plugins: ['jsx', 'typescript'] },
+    })
+    return result?.code ?? ''
+  }
+
+  it('turns a PascalCase tag into a bare call', () => {
+    const out = eliminate(`
+import { View, Text } from '@rasenjs/react-native'
+export const App = () => <View style={{ flex: 1 }}><Text content="hi" /></View>
+`)
+    expect(out).toContain('View({')
+    expect(out).toContain('Text({')
+    expect(out).not.toContain('<View')
+    expect(out).not.toContain('react/jsx-runtime')
+  })
+
+  it('drops nullish children and flattens nested runs', () => {
+    const out = eliminate(`
+import { View, Text } from '@rasenjs/react-native'
+export const App = ({ rows, show }: any) => (
+  <View>{show && <Text content="x" />}{rows.map((r: any) => <Text content={r} />)}</View>
+)
+`)
+    expect(out).toContain('.flat(Infinity).filter(')
+    expect(out).not.toContain('<View')
+  })
+
+  it('compiles a fragment through the app Fragment binding', () => {
+    const out = eliminate(`
+import { Text } from '@rasenjs/react-native'
+export const App = () => <><Text content="a" /><Text content="b" /></>
+`)
+    expect(out).toContain('Fragment({')
+    expect(out).not.toContain('<>')
+  })
+
+  it('leaves a module without JSX untouched', () => {
+    const out = eliminate(`
+import { view } from '@rasenjs/react-native'
+export const helper = () => view({})
+`)
+    expect(out).not.toContain('.flat(Infinity)')
+  })
+})

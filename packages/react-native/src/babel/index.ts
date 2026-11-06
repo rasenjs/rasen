@@ -1,11 +1,23 @@
 /**
- * @rasenjs/react-native — Babel plugin (Metro HMR injection)
+ * @rasenjs/react-native — Babel plugin.
  *
- * Metro's HMR uses `module.hot.accept()` (webpack-style), unlike Vite's
- * `import.meta.hot.accept()`. This plugin injects rasen's HMR runtime calls
- * (`enterHmrModule` / `exitHmrModule` from `@rasenjs/core`) plus
- * `module.hot.accept()` into component files, mirroring what
- * `@rasenjs/vite-plugin-rasen` does for Vite.
+ * Two passes, both in `Program.exit` (bottom-up, so nested JSX is already
+ * converted by the time a parent is visited):
+ *
+ *  1. **JSX elimination** — the same pass `@rasenjs/compiler` runs for bundlers
+ *     (`eliminateJsxFromFile`). Metro has no `unplugin-auto-import` phase, so
+ *     leaving JSX for the bundler would compile it to
+ *     `import { jsx } from 'react/jsx-runtime'`, which Metro then redirects to
+ *     a runtime that no longer exists. Eliminating here means the module
+ *     contains no JSX and no `react/jsx-runtime` import at all: every tag is
+ *     the author's own PascalCase binding (`<View>` → `View({ … })`), which RN
+ *     components already are.
+ *
+ *  2. **HMR injection** — Metro's HMR uses `module.hot.accept()` (webpack
+ *     style), unlike Vite's `import.meta.hot.accept()`. This adds rasen's
+ *     runtime calls (`enterHmrModule` / `exitHmrModule` from `@rasenjs/core`)
+ *     plus `module.hot.accept()` to component files, mirroring what
+ *     `rasenCompile` does for Vite.
  *
  * Usage (babel.config.js):
  * ```js
@@ -17,17 +29,21 @@
  * }
  * ```
  *
- * Only files that call `com()` (rasen's component wrapper) are injected, so
- * plain utility modules are left untouched.
+ * Only files that call `com()` get the HMR wrapping, so plain utility modules
+ * are left untouched; JSX elimination runs on every file (a module without JSX
+ * is a no-op).
  */
 
 import type { PluginObj, PluginPass } from '@babel/core'
 import type * as BabelTypes from '@babel/types'
 import { relative } from 'path'
+import { eliminateJsxFromFile } from '@rasenjs/compiler'
 
 export interface RasenRNBabelOptions {
   /** Enable HMR injection (default true). */
   hmr?: boolean
+  /** Enable JSX elimination (default true). */
+  jsx?: boolean
   /** Project root used to derive the module id (default process.cwd()). */
   root?: string
 }
@@ -40,12 +56,31 @@ export default function rasenRNBabel(
 ): PluginObj<PluginPass> {
   const t = api.types
   const hmrEnabled = options.hmr !== false
+  const jsxEnabled = options.jsx !== false
   const root = options.root ?? process.cwd()
 
   return {
-    name: 'rasen-rn-hmr',
+    name: 'rasen-rn',
     visitor: {
       Program: {
+        // 1. JSX elimination runs on ENTER, before Babel descends into the
+        //    nodes: the React Native preset is a *preset*, so its JSX
+        //    transform would otherwise convert `jsx('View', …)` calls before
+        //    we ever see them (presets run after plugins, but their visitors
+        //    still fire during this same traversal). Converting the whole
+        //    program here means no JSX node survives to be lowered into
+        //    `react/jsx-runtime` — which Metro would redirect at nothing.
+        enter(_path, state) {
+          if (!jsxEnabled) return
+          // The two packages resolve their own `@babel/types` copy (Metro
+          // brings its own), so the AST types are structurally identical but
+          // nominally different — cast at the boundary, not inside the pass.
+          eliminateJsxFromFile(
+            state.file.ast as Parameters<typeof eliminateJsxFromFile>[0],
+            state.filename ?? '',
+          )
+        },
+        // 2. HMR wrapping happens on EXIT, when the body is final.
         exit(path, state) {
           if (!hmrEnabled) return
           const code = state.file.code ?? ''
@@ -56,7 +91,7 @@ export default function rasenRNBabel(
           const filename = state.filename ?? ''
           const moduleId = relative(root, filename).replace(/\\/g, '/')
 
-          // 1. Insert the import + enterHmrModule call after the last import.
+          // Insert the import + enterHmrModule call after the last import.
           const importDecl = t.importDeclaration(
             [
               t.importSpecifier(
@@ -87,7 +122,7 @@ export default function rasenRNBabel(
             path.node.body.unshift(importDecl, enterCall)
           }
 
-          // 2. Append exitHmrModule() + module.hot.accept() at the end.
+          // Append exitHmrModule() + module.hot.accept() at the end.
           path.node.body.push(
             t.expressionStatement(t.callExpression(t.identifier('exitHmrModule'), [])),
             t.expressionStatement(

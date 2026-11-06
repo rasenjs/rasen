@@ -45,6 +45,9 @@ import type { ElementProps, Child } from './element'
 
 export { element, element as component, element as h, tag }
 export type { ElementProps, Child }
+// The fragment compiled from `<>…</>`: emitted code binds `Fragment` through
+// the app's auto-import from this root (same object the jsx-runtime re-exports).
+export { Fragment } from '@rasenjs/core'
 
 // Re-export types from rn-dom for convenience
 export type { RNNode, RNTextNode, RNCommentNode, RNStyle, RNEvent }

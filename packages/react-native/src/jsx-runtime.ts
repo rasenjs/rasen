@@ -1,71 +1,16 @@
 /**
- * JSX runtime entry for @rasenjs/react-native
+ * Runtime arm of `@rasenjs/react-native`'s `jsx-runtime` subpath.
  *
- * Configured with RN Fabric intrinsic elements as lowercase JSX tags.
- * Use as `jsxImportSource` in tsconfig.json:
- *
- * ```json
- * { "jsxImportSource": "@rasenjs/react-native" }
- * ```
+ * The Rasen RN pipeline eliminates JSX in Babel (`src/babel/index.ts` runs
+ * `eliminateJsxFromFile`), so a compiled module contains no JSX and emits no
+ * `react/jsx-runtime` import at all. This module exists for the two cases that
+ * still resolve it: Metro's redirect of `react/jsx-runtime` (see `src/metro`),
+ * and a project that has not added the rasen Babel plugin yet. Importing is
+ * harmless; calling reports the fix.
  */
-import {
+export {
   jsx,
   jsxs,
-  Fragment,
-  configureTags,
-  type TagComponent,
-  type JSXElement,
-  type JSXElementChildrenAttribute,
-  type JSXIntrinsicAttributes,
-} from '@rasenjs/core'
-import type { RNElementPropMap } from '@rasenjs/rn-dom/elements'
-import * as tags from './components'
-
-configureTags({ '': tags as unknown as Record<string, TagComponent> })
-
-export { jsx, jsxs, jsx as jsxDEV, Fragment }
-
-/** JSX tag name → native component name mapping */
-interface RNComponentNameMap {
-  view: 'View'
-  text: 'Text'
-  image: 'Image'
-  textInput: 'TextInput'
-  scrollView: 'ScrollView'
-  activityIndicator: 'ActivityIndicator'
-  switch: 'Switch'
-  modal: 'Modal'
-  refreshControl: 'RefreshControl'
-  drawerLayoutAndroid: 'DrawerLayoutAndroid'
-  progressBarAndroid: 'ProgressBarAndroid'
-}
-
-// Composite JS components (typed via their own prop interfaces).
-interface RNComponentProps {
-  pressable: import('./components/Pressable').PressableProps
-  button: import('./components/Button').ButtonProps
-  touchableOpacity: import('./components/TouchableOpacity').TouchableOpacityProps
-  touchableHighlight: import('./components/TouchableHighlight').TouchableHighlightProps
-  touchableWithoutFeedback: import('./components/TouchableWithoutFeedback').TouchableWithoutFeedbackProps
-  safeAreaView: import('./components/SafeAreaView').SafeAreaViewProps
-  imageBackground: import('./components/ImageBackground').ImageBackgroundProps
-  keyboardAvoidingView: import('./components/KeyboardAvoidingView').KeyboardAvoidingViewProps
-  statusBar: import('./components/StatusBar').StatusBarProps
-  flatList: import('./components/FlatList').FlatListProps<object>
-}
-
-export namespace JSX {
-  type IntrinsicElementProps<K extends keyof RNComponentNameMap> =
-    RNElementPropMap[RNComponentNameMap[K]]
-
-  export type IntrinsicElements = {
-    [K in keyof RNComponentNameMap]: IntrinsicElementProps<K>
-  } & {
-    [K in keyof RNComponentProps]: RNComponentProps[K]
-  } & {
-    [tag: string]: Record<string, unknown>
-  }
-  export type Element = JSXElement
-  export interface ElementChildrenAttribute extends JSXElementChildrenAttribute {}
-  export interface IntrinsicAttributes extends JSXIntrinsicAttributes {}
-}
+  jsxDEV,
+  NO_JSX_RUNTIME_MESSAGE,
+} from '@rasenjs/core/jsx-runtime-stub'
