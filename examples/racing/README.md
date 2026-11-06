@@ -37,8 +37,8 @@ plus the reactive DOM layer for UI — all in **one JSX syntax**:
 - **Unified JSX** — DOM and WebGL share the same JSX. `<canvas>` is a JSX tag
   (mapped to the `@rasenjs/dom` canvas component) and WebGL 3D shapes are
   lowercase JSX tags too (`<mesh>`, `<group>`, `<billboard>`,
-  `<perspectiveCamera>`, registered via `configureTags` and typed through
-  `src/jsx.d.ts`).
+  `<perspectiveCamera>`, bound by the vite config's `unplugin-auto-import`
+  and typed through `src/jsx.d.ts`).
 - **3D scene from GLB assets** — track pieces, decorations and AI trucks are
   loaded from Kenney's `.glb` models via `@rasenjs/gfx`'s `loadGLB` and
   rendered as `<mesh>` with per-pixel directional lighting + shadow mapping.

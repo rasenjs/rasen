@@ -1,20 +1,12 @@
 /**
- * Entry — boots the reactive runtime, registers WebGL JSX tags, mounts the
- * Rasen app and runs the game loop.
+ * Entry — boots the reactive runtime, mounts the Rasen app and runs the
+ * game loop. JSX tags bind through the vite config's auto-import.
  */
 
-import { configureTags } from '@rasenjs/core'
 import { mount } from '@rasenjs/dom'
 import { ref } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import {
-  billboard,
-  box,
-  group,
-  mesh,
-  rect,
-  voxelRaycast,
-} from '@rasenjs/gfx'
+import { voxelRaycast } from '@rasenjs/gfx'
 import { forwardVector } from '@rasenjs/math'
 import { Blocks } from './blocks'
 import { bindLookControls, setupKeyboard, type MouseControls } from './input'
@@ -23,18 +15,6 @@ import { createApp } from './render'
 import { World } from './world'
 
 useReactiveRuntime()
-
-// Register WebGL components as lowercase JSX tags (types in jsx.d.ts), so DOM
-// and WebGL share one JSX syntax.
-configureTags({
-  '': {
-    mesh,
-    box,
-    billboard,
-    group,
-    rect,
-  },
-})
 
 // Hot-bar selection: 1-8 pick the block to place.
 const SELECTABLE: Record<string, number> = {

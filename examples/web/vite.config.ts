@@ -1,8 +1,19 @@
 import { defineConfig } from 'vite'
-import { rasenHMR } from '@rasenjs/vite-plugin-rasen'
+import { rasenCompile } from '@rasenjs/compiler'
+import { DOM_TAGS } from '@rasenjs/dom'
+import AutoImport from 'unplugin-auto-import/vite'
+
 
 export default defineConfig({
-  plugins: [rasenHMR()],
+  plugins: [
+    rasenCompile.vite(),
+    AutoImport({
+      include: [/\.tsx$/],
+      imports: [
+        { '@rasenjs/dom': [...DOM_TAGS] },
+      ],
+    }),
+  ],
   resolve: {
     dedupe: ['@rasenjs/core']
   },

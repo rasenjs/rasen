@@ -1,8 +1,23 @@
 import { defineConfig } from 'vite'
-import { rasenHMR } from '@rasenjs/vite-plugin-rasen'
+import { rasenCompile } from '@rasenjs/compiler'
+import { DOM_TAGS } from '@rasenjs/dom'
+import AutoImport from 'unplugin-auto-import/vite'
+
 
 export default defineConfig({
-  plugins: [rasenHMR()],
+  plugins: [
+    rasenCompile.vite(),
+    AutoImport({
+      // Tags only exist where JSX is: a plain .ts module that happens to use
+      // `dt` as a parameter (an HTML tag name!) must never see an injected
+      // tag import.
+      include: [/\.tsx$/],
+      imports: [
+        { '@rasenjs/dom': [...DOM_TAGS] },
+        { '@rasenjs/gfx': ['mesh', 'box', 'billboard', 'group', 'rect'] },
+      ],
+    }),
+  ],
   resolve: {
     dedupe: ['@rasenjs/core']
   },

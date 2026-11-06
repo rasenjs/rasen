@@ -3,7 +3,7 @@
  *
  * TS resolves `jsxImportSource`'s JSX namespace from `<module>/jsx-runtime`,
  * so the augmentation targets `@rasenjs/dom/jsx-runtime`. Runtime: the tags
- * are registered via `configureTags` in main.ts (matching the names below),
+ * are bound by the vite config's auto-import (same names, vite.config.ts),
  * so DOM and WebGL share one JSX syntax (Rasen's model).
  */
 import type {

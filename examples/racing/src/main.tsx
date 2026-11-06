@@ -5,11 +5,11 @@
  * drift through corners, and watch the camera pull back as you speed up.
  * Ported from the Godot starter kit (vehicle.gd / view.gd / main.tscn).
  */
-import { configureTags, com, getReactiveRuntime, type Mountable } from '@rasenjs/core'
+import { com, getReactiveRuntime, type Mountable } from '@rasenjs/core'
 import { mount, when } from '@rasenjs/dom'
 import { ref, computed, type SignalComputed } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { group, mesh, billboard, each, getRenderContext, type CameraConfig, type GfxNode } from '@rasenjs/gfx'
+import { each, getRenderContext, type CameraConfig, type GfxNode } from '@rasenjs/gfx'
 import { Mat4x4f, vec3f } from '@rasenjs/math'
 import type { Ref } from '@rasenjs/core'
 import { loadRacingAssets, type RacingAssets } from './assets'
@@ -20,7 +20,6 @@ import { SoundManager } from './sound'
 import { TrailManager, type SmokePuff } from './trail'
 
 useReactiveRuntime()
-configureTags({ '': { mesh, group, billboard, each } })
 
 // === Reactive state (drives the 3D scene + HUD every frame) ===
 const viewW = ref(window.innerWidth)
@@ -86,8 +85,8 @@ interface AppProps {
   assets: RacingAssets
 }
 
-const App = com((p: AppProps): Mountable<HTMLElement> => {
-  const { assets } = p
+const App = com((props: AppProps): Mountable<HTMLElement> => {
+  const { assets } = props
 
   // Track + decoration meshes (from the decoded GridMap)
   const trackMeshes: Mountable[] = []
@@ -123,7 +122,7 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
   const body = parts.get('body')
   const under = parts.get('underside')
   const bl = parts.get('wheel-back-left')
-  const br = parts.get('wheel-back-right')
+  const wheelBR = parts.get('wheel-back-right')
   const fl = parts.get('wheel-front-left')
   const fr = parts.get('wheel-front-right')
 
@@ -145,7 +144,7 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
   const bodyPos = worldPos(body ?? { center: { x: 0, y: 0, z: 0 } })
   const underPos = worldPos(under ?? { center: { x: 0, y: 0, z: 0 } })
   const blPos = worldPos(bl ?? { center: { x: 0, y: 0, z: 0 } })
-  const brPos = worldPos(br ?? { center: { x: 0, y: 0, z: 0 } })
+  const brPos = worldPos(wheelBR ?? { center: { x: 0, y: 0, z: 0 } })
   const flPos = worldPos(fl ?? { center: { x: 0, y: 0, z: 0 } })
   const frPos = worldPos(fr ?? { center: { x: 0, y: 0, z: 0 } })
 
@@ -193,7 +192,7 @@ const App = com((p: AppProps): Mountable<HTMLElement> => {
 
   const vehicleChildren: Mountable<GfxNode>[] = [
     bodyMesh, underMesh,
-    wheelMesh(bl, blPos, wheelRot(vyaw)), wheelMesh(br, brPos, wheelRot(vyaw)),
+    wheelMesh(bl, blPos, wheelRot(vyaw)), wheelMesh(wheelBR, brPos, wheelRot(vyaw)),
     steerWheelMesh(fl, flPos, wheelRot(frontRotY)), steerWheelMesh(fr, frPos, wheelRot(frontRotY)),
   ].filter((c): c is Mountable<GfxNode> => c != null)
 

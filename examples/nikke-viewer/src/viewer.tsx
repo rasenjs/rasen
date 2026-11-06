@@ -25,7 +25,7 @@ import { com, each, type Mountable } from '@rasenjs/core'
 import { text, when } from '@rasenjs/dom'
 import { ref, useReactiveRuntime } from '@rasenjs/reactive-vue'
 import { watch } from '@vue/reactivity'
-import { template, createRouter, createBrowserHistory } from '@rasenjs/router-dom'
+import { template as routeTemplate, createRouter, createBrowserHistory } from '@rasenjs/router-dom'
 import { z } from 'zod'
 import {
   parseSpineBinary,
@@ -231,11 +231,11 @@ if (renderMode.value === 'webgpu') {
 const router = createRouter(
   {
     home: { path: '/' },
-    char: template`/char/${{ id: z.string() }}`,
-    charPose: template`/char/${{ id: z.string() }}/pose/${{
+    char: routeTemplate`/char/${{ id: z.string() }}`,
+    charPose: routeTemplate`/char/${{ id: z.string() }}/pose/${{
       pose: z.enum(['fb', 'cover', 'aim'])
     }}`,
-    charPoseAnim: template`/char/${{ id: z.string() }}/pose/${{
+    charPoseAnim: routeTemplate`/char/${{ id: z.string() }}/pose/${{
       pose: z.enum(['fb', 'cover', 'aim'])
     }}/anim/${{ anim: z.string() }}`
   },

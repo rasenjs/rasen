@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "@rasenjs/canvas-2d": "workspace:*",
+    "@rasenjs/compiler": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/reactive-signals": "workspace:*",
-    "@rasenjs/reactive-vue": "workspace:*",
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
+    "@rasenjs/reactive-vue": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

@@ -12,12 +12,12 @@
     "deploy": "vite build && npx vercel deploy dist --prod --project craft --archive=tgz"
   },
   "dependencies": {
+    "@rasenjs/compiler": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/gfx": "workspace:*",
     "@rasenjs/math": "workspace:*",
-    "@rasenjs/reactive-signals": "workspace:*",
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
+    "@rasenjs/reactive-signals": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

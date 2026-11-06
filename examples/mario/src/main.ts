@@ -2,8 +2,6 @@
  * Entry — loads assets, boots the game loop, mounts the Rasen app.
  */
 
-import { configureTags } from '@rasenjs/core'
-import { group, image, rect, sprite, text } from '@rasenjs/canvas-2d'
 import { mount } from '@rasenjs/dom'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { loadAssets } from './assets'
@@ -12,18 +10,6 @@ import { Input, setupKeyboard } from './input'
 import { createApp } from './render'
 
 useReactiveRuntime()
-
-// Register canvas-2d components as lowercase JSX tags (types in jsx.d.ts),
-// so DOM and canvas share one JSX syntax.
-configureTags({
-  '': {
-    rect,
-    image,
-    text,
-    group,
-    sprite,
-  },
-})
 
 function startLoop(game: Game) {
   let last = performance.now()

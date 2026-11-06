@@ -56,7 +56,8 @@ game, plus the reactive DOM layer for UI — all in **one JSX syntax**:
 - **Unified JSX** — DOM and canvas share the same JSX. `<canvas>` is a JSX
   tag (mapped to the `@rasenjs/dom` canvas component) and canvas-2d shapes are
   lowercase JSX tags too (`<rect>`, `<image>`, `<text>`, `<group>`, `<sprite>`,
-  registered via `configureTags` and typed through `src/jsx.d.ts`).
+  bound by the vite config's `unplugin-auto-import` and typed through
+  `src/jsx.d.ts`).
 - **Entity = one self-contained module** — each game object is a class
   (`Mario`, `Goomba`, `Koopa`, `Coin`, `Block`, `Item`, `Particle`) that owns
   its behaviour, and its render component (`MarioSprite`, `GoombaSprite`, …)

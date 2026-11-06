@@ -5,20 +5,12 @@
  * 结构完全按 nikke-viewer 的做法:div > canvas(宿主组件)> canvas-2d 子组件
  * (PascalCase 直接调用,无需 tag 注册)。
  */
-import { com, configureTags } from '@rasenjs/core'
-import { rect, image } from '@rasenjs/canvas-2d'
+import { com } from '@rasenjs/core'
 import { mount } from '@rasenjs/dom'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { Signal } from 'signal-polyfill'
 
 useReactiveRuntime()
-
-configureTags({
-  '': {
-    rect,
-    image,
-  },
-})
 
 function makeCanvas(color: string): HTMLCanvasElement {
   const c = document.createElement('canvas')
