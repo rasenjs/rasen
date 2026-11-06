@@ -14,8 +14,7 @@
 
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { mount } from '@rasenjs/dom'
-import { Fragment, jsx } from '../../../../packages/dom/src/jsx-runtime'
+import { Fragment, div, mount } from '@rasenjs/dom'
 import { when } from '@rasenjs/core'
 import { ref, useReactiveRuntime } from '@rasenjs/reactive-signals'
 
@@ -29,22 +28,22 @@ describe('a panel inside a gate', () => {
     document.body.appendChild(container)
 
     mount(
-      jsx('div', {
+      div({
         children: [
           when({
             condition: () => started.value,
             then: () =>
-              jsx(Fragment, {
+              Fragment({
                 children: [
                   when({
                     condition: () => open.value,
-                    then: () => jsx('div', { 'data-panel': 'bag', children: 'PANEL' }),
+                    then: () => div({ 'data-panel': 'bag', children: 'PANEL' }),
                   }),
                 ],
               }),
           }),
         ],
-      }) as never,
+      }),
       container,
     )
 

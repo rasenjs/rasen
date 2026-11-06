@@ -47,10 +47,9 @@
 import { element, unref, type GfxNode } from '@rasenjs/gfx'
 import type { PropValue } from '@rasenjs/core'
 import { Mat4x4f } from '@rasenjs/math'
-import { ConvexHull } from './convex-hull'
 import type { MergedOutline } from './ground-outline'
-import { SHADOW_DIRECTION, shadowReach } from './lighting'
 import { buildShadowMesh } from './shadow-shape'
+import { SHADOW_DIRECTION, shadowReach } from './lighting'
 
 /** Height above the ground, so the shadow does not fight the ground's depth. */
 const LIFT = 0.02
@@ -126,7 +125,6 @@ export const ActorShadow = (props: ActorShadowProps) => {
   const footprint = new Float32Array(MAX_POINTS * 2)
   const swept = new Float32Array(MAX_POINTS * 4)
   const outline = new Float32Array(MAX_POINTS * 4)
-  const hull = new ConvexHull(MAX_POINTS * 2)
   // The mesh: the centre, the inset outline (the core's rim) and the
   // outline itself (the penumbra's outer edge).
   const vertices = new Float32Array((MAX_POINTS * 2 + 1) * 3)
@@ -199,8 +197,7 @@ export const ActorShadow = (props: ActorShadowProps) => {
         SHADOW_DIRECTION[1] * reach,
         transform.tx,
         transform.tz,
-        hull,
-        swept,
+          swept,
         outline,
         vertices,
         uvs,

@@ -42,7 +42,7 @@ import { com, type PropValue } from '@rasenjs/core'
 import { mount } from '@rasenjs/dom'
 import { ref, useReactiveRuntime } from '@rasenjs/reactive-signals'
 import { unref, type CameraConfig } from '@rasenjs/gfx'
-import { loadGr2, type Gr2TriangleGroup } from './original/gr2'
+import { loadGr2, type Gr2TriangleGroup } from '@rasenjs/assets'
 import {
   Gr2Model,
   MODEL_ROOT,

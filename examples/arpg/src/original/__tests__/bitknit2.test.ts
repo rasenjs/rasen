@@ -19,8 +19,8 @@
 // The suite is plain Node file I/O, so it asks for the node environment.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { md5Hex } from '../md5'
-import { BITKNIT2_MAGIC, decodeBitknit2, isBitknit2 } from '../bitknit2'
+import { md5Hex } from '@rasenjs/assets'
+import { BITKNIT2_MAGIC, decodeBitknit2, isBitknit2 } from '@rasenjs/assets'
 
 /** Load one binary fixture. */
 function fixture(name: string): Uint8Array {

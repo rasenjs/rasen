@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseSprite, spriteFrame } from '../sprite'
-import { nvnSwizzle } from '../nvn-deswizzle'
-import { nvnTexLayout, type NvnTextureDesc } from '../nvn-tex'
+import { nvnSwizzle } from '@rasenjs/assets'
+import { nvnTexLayout, type NvnTextureDesc } from '@rasenjs/assets'
 
 /**
  * The `SpA1` container, verified end to end against assets we build ourselves.

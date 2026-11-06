@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildAnimationGr2, type CurveSpec, type SyntheticAnimation } from './fixtures/build-gr2-anim-fixture'
-import { loadGr2Animations, type Gr2Curve, type Gr2TransformTrack } from '../gr2-anim'
+import { loadGr2Animations, type Gr2Curve, type Gr2TransformTrack } from '@rasenjs/assets'
 
 /**
  * The tests build synthetic `.animations` containers with hand-computed raw

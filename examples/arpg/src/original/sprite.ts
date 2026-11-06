@@ -18,8 +18,8 @@
  * TypeScript so the browser needs no image pipeline.
  */
 
-import { decodeDxt5, nvnDeswizzle } from './nvn-deswizzle'
-import type { NvnTextureDesc } from './nvn-tex'
+import { decodeDxt5, nvnDeswizzle } from '@rasenjs/assets'
+import type { NvnTextureDesc } from '@rasenjs/assets'
 
 /** NVNformat for BC3_UNORM (DXT5). */
 const NVN_FORMAT_DXT5 = 0x44

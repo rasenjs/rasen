@@ -1,36 +1,22 @@
 /**
  * Reading the original game's own assets.
  *
- * Everything in this folder is a port of the reference project's extractors
- * (`dm/ios/tools/romfs_art.py`, `touch_layout.py`, `dm/gfx/nvn/nvn_tex.c`,
- * `dm/gfx/tex/nvn_deswizzle.c`). It contains **no game data**: it reads files the
- * caller supplies and verifies each one against the manifest, which is how a
- * wrong game version is caught instead of decoding into wrong pixels.
+ * The FORMAT readers now live in `@rasenjs/assets` — the Granny containers and
+ * their BitKnit2 payload, the NVN texture layouts, the `.ds1` level layout and
+ * the manifest checksum. They are pure byte readers and nothing about them is
+ * specific to this game, so a host that stages retail assets can use them
+ * directly.
  *
- * The reason this exists is narrow and worth stating plainly: original art is the
- * only way to reproduce the original *look*, and the look is the only part of a
- * Diablo II: Resurrected port that art extraction can actually reach. The game's
- * behaviour lives in its compiled program, which no extractor can read.
+ * What stays here is what IS specific: the RomFS tree this game's files come
+ * from, the sprite and PNG helpers used by the extraction tools, the physics
+ * description read from the data, and the model assembly that turns a decoded
+ * mesh into the parts the renderer draws.
+ *
+ * It contains **no game data**: it reads files the caller supplies and verifies
+ * each one against the manifest, which is how a wrong game version is caught
+ * instead of decoding into wrong pixels.
  */
 
-export { md5, md5Hex } from './md5'
-export {
-  nvnFmtBpb,
-  nvnTexLayout,
-  nvnTexLevelOffset,
-  nvnTexLevelTiles,
-  type NvnTextureDesc,
-  type NvnTextureLayout,
-} from './nvn-tex'
-export {
-  decodeBc1,
-  decodeDxt5,
-  nvnBlOffset,
-  nvnDeswizzle,
-  nvnDeswizzleGeometry,
-  nvnSwizzle,
-  type DeswizzleGeometry,
-} from './nvn-deswizzle'
 export {
   findEntry,
   parseManifest,
@@ -40,12 +26,4 @@ export {
   type RomfsSource,
 } from './romfs'
 export { parseSprite, spriteFrame, spriteToCanvas, type Sprite } from './sprite'
-export {
-  decodeTexture,
-  mipOffset,
-  parseTextureHeader,
-  type Texture,
-  type TextureFormat,
-  type TextureHeader,
-} from './texture'
 export { encodePng } from './png'

@@ -28,9 +28,9 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { loadGr2, type Gr2Mesh, type Gr2Skeleton } from '../src/original/gr2'
-import { loadGr2Animations, type Gr2TransformTrack } from '../src/original/gr2-anim'
-import { boneIndexOf, computeBonePose, inverseBindOf, matricesForBindings, skinMesh, type SkinnedPart } from '../src/three-d/skinning'
+import { loadGr2, type Gr2Mesh, type Gr2Skeleton } from '@rasenjs/assets'
+import { loadGr2Animations, type Gr2TransformTrack } from '@rasenjs/assets'
+import { boneIndexByName, computeBonePose, inverseBindOf, matricesForBindings, skinMeshInto, type SkinnedPart } from '../src/three-d/skinning'
 
 const HERE = new URL('.', import.meta.url).pathname
 const DEFAULT_GR2 = join(HERE, '..', '..', '..', '.scratch', 'gr2')
@@ -224,7 +224,7 @@ function main(): void {
     process.stdout.write('  curve families NOT implemented but present in this file: 0 (DaKeyframes32f, keyframed DaK32fC32f and pre-v7 old_curve are absent from the D2R corpus)\n')
 
     // -- models ------------------------------------------------------------
-    const boneIndex = boneIndexOf(skeleton)
+    const boneIndex = boneIndexByName(skeleton)
     const inverseBind = inverseBindOf(skeleton)
     const meshParts: MeshParts[] = []
     for (const path of character.modelPaths) {
@@ -244,7 +244,7 @@ function main(): void {
 
         // Bind pose must skin back to the original vertices within 1e-3.
         const worlds = computeBonePose(skeleton, [], 0)
-        const skinned = skinMesh(
+        const skinned = skinMeshInto(
           part,
           matricesForBindings(worlds, boneIndex, mesh.boneBindings),
           mesh.boneBindings,
@@ -274,7 +274,7 @@ function main(): void {
         for (const entry of meshParts) {
           const mesh = entry.mesh
           for (const part of entry.parts) {
-            const skinned = skinMesh(
+            const skinned = skinMeshInto(
               part,
               matricesForBindings(worlds, boneIndex, mesh.boneBindings),
               mesh.boneBindings,

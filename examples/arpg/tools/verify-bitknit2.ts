@@ -38,7 +38,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { decodeBitknit2, isBitknit2 } from '../src/original/bitknit2'
+import { decodeBitknit2, isBitknit2 } from '@rasenjs/assets'
 
 const HERE = resolve(dirname(fileURLToPath(import.meta.url)))
 const root = resolve(

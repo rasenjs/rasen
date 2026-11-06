@@ -17,7 +17,7 @@
 import { describe, expect, it } from 'vitest'
 import { compileModule } from '@rasenjs/compiler'
 import { mount } from '@rasenjs/dom'
-import { template, child, mountSlot, collectHtml } from '../../../../packages/dom/src/template'
+import { template, child, mountSlot, collectHtml } from '@rasenjs/dom/template'
 // The core's SOURCE, so a probe in it is live: the package resolution
 // would hand the built bundle instead.
 import { when } from '../../../../packages/core/src/components/when'

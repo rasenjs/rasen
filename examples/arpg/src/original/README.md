@@ -5,13 +5,24 @@ draw the original game's own art instead of an imitation of it.
 
 | File | Ported from |
 | ---- | ----------- |
-| `nvn-tex.ts` | `dm/gfx/nvn/nvn_tex.c` (which ports deko3d's `dk_image.cpp`, zlib licence, © 2018-2020 fincs) |
-| `nvn-deswizzle.ts` | `dm/gfx/tex/nvn_deswizzle.c`, plus the DXT5 block decode the original delegates to Pillow |
 | `romfs.ts` | `dm/ios/tools/romfs_art.py` and `touch_layout.py`'s entry reader |
 | `sprite.ts` | `romfs_art.py`'s `sprite()` / `frame()` |
-| `md5.ts` | — (needed because the manifest is MD5-verified, and the browser has no `crypto` MD5) |
-| `bitknit2.ts` | `eiz/pybg3`'s `src/rans.h` (MIT, © 2024 Mackenzie Straight) — the BitKnit2 decoder that Granny3D `.model` sections are compressed with |
 | `png.ts` | — (the original hands linear data to Pillow; here we encode PNG ourselves) |
+
+The byte-level FORMAT readers moved to `@rasenjs/assets`, because none of them is
+specific to this game — they read a Granny container, an NVN texture layout, a
+`.ds1` level grid or a manifest checksum, and any host staging the same retail
+assets needs exactly that:
+
+| Moved to | Ported from |
+| -------- | ----------- |
+| `assets/src/nvn/tex.ts` | `dm/gfx/nvn/nvn_tex.c` (which ports deko3d's `dk_image.cpp`, zlib licence, © 2018-2020 fincs) |
+| `assets/src/nvn/deswizzle.ts` | `dm/gfx/tex/nvn_deswizzle.c`, plus the DXT5 block decode the original delegates to Pillow |
+| `assets/src/gr2/bitknit2.ts` | `eiz/pybg3`'s `src/rans.h` (MIT, © 2024 Mackenzie Straight) — the BitKnit2 decoder that Granny3D `.model` sections are compressed with |
+| `assets/src/gr2/gr2.ts` | the container's object tree |
+| `assets/src/gr2/anim.ts` | the animation tracks and their curve codecs |
+| `assets/src/d2/ds1.ts` | the level layout format |
+| `assets/src/common/md5.ts` | — (the manifest is MD5-verified, and there is no MD5 in the platform crypto API) |
 
 ## What this is, and what it is not
 

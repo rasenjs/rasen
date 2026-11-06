@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { GR2_MAGIC, loadGr2 } from '../gr2'
+import { GR2_MAGIC, loadGr2 } from '@rasenjs/assets'
 
 const fixture = (name: string): Uint8Array =>
   new Uint8Array(readFileSync(join(__dirname, 'fixtures', name)))

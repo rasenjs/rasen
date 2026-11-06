@@ -26,7 +26,7 @@ import {
   ds1WallGrid,
   parseDs1,
   type Ds1File,
-} from '../src/original/ds1'
+} from '@rasenjs/assets'
 
 /**
  * Act names as the game's own files label them; the field itself is 0-based.

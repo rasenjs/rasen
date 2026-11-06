@@ -25,7 +25,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { loadGr2Animations, type Gr2Curve, type Gr2TransformTrack } from '../src/original/gr2-anim'
+import { loadGr2Animations, type Gr2Curve, type Gr2TransformTrack } from '@rasenjs/assets'
 
 const HERE = new URL('.', import.meta.url).pathname
 const SAMPLES = [join(HERE, '..', '..', '..', '.scratch', 'gr2')]

@@ -28,12 +28,12 @@ import {
   type Gr2Material,
   type Gr2Mesh,
   type Gr2TriangleGroup,
-} from '../original/gr2'
-import { decodeTexture } from '../original/texture'
+} from '@rasenjs/assets'
+import { decodeTexture } from '@rasenjs/assets'
 import type { PropValue } from '@rasenjs/core'
 import { element, unref, type GfxNode, type RawPixelSource } from '@rasenjs/gfx'
 import { drawCharacter } from './character-material'
-import { ConvexHull } from './convex-hull'
+import { convexHull } from '@rasenjs/math'
 import type { GroundOutline } from './ground-outline'
 import { LIGHT_DIRECTION } from './lighting'
 
@@ -474,7 +474,7 @@ function groundOutlineOf(parts: PartSpec[], bounds: ModelBounds): GroundOutline 
   if (pointCount === 0) return { points: new Float32Array(0), top: height }
 
   const hullPoints = new Float32Array(at)
-  const hull = new ConvexHull(pointCount).build(points, pointCount, hullPoints)
+  const hull = convexHull(points, pointCount, hullPoints)
   if (hull < 3) return { points: new Float32Array(0), top: height }
   return { points: hullPoints.slice(0, hull * 2), top: height }
 }

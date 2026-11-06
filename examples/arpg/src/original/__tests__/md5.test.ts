@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
-import { md5Hex } from '../md5'
+import { md5Hex } from '@rasenjs/assets'
 
 /**
  * The reader verifies every RomFS entry against the manifest's MD5, so a broken

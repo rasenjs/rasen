@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ConvexHull } from './convex-hull'
+import { convexHull } from '@rasenjs/math'
 import { buildShadowMesh, PENUMBRA_INSET } from './shadow-shape'
 
 /** A square's four corners, as x/z pairs. */
@@ -7,9 +7,8 @@ const SQUARE = new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1])
 
 describe('the convex hull', () => {
   it('keeps the corners of a square', () => {
-    const hull = new ConvexHull(8)
     const out = new Float32Array(16)
-    expect(hull.build(SQUARE, 4, out)).toBe(4)
+    expect(convexHull(SQUARE, 4, out)).toBe(4)
     for (const [x, z] of [
       [-1, -1],
       [1, -1],
@@ -25,22 +24,19 @@ describe('the convex hull', () => {
 
   it('drops the points inside the hull', () => {
     const points = new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1, 0, 0, 0.5, 0.25])
-    const hull = new ConvexHull(16)
     const out = new Float32Array(32)
-    expect(hull.build(points, 6, out)).toBe(4)
+    expect(convexHull(points, 6, out)).toBe(4)
   })
 
   it('reports a single point as a one-point hull', () => {
-    const hull = new ConvexHull(4)
     const out = new Float32Array(8)
-    expect(hull.build(new Float32Array([3, 4]), 1, out)).toBe(1)
+    expect(convexHull(new Float32Array([3, 4]), 1, out)).toBe(1)
     expect(out[0]).toBe(3)
     expect(out[1]).toBe(4)
   })
 })
 
 describe('the shadow mesh', () => {
-  const hull = new ConvexHull(64)
   const swept = new Float32Array(256)
   const outline = new Float32Array(256)
   const vertices = new Float32Array(256 * 3)
@@ -55,7 +51,6 @@ describe('the shadow mesh', () => {
       0,
       0,
       0,
-      hull,
       swept,
       outline,
       vertices,
@@ -81,7 +76,6 @@ describe('the shadow mesh', () => {
       0,
       0,
       0,
-      hull,
       swept,
       outline,
       vertices,
@@ -106,7 +100,6 @@ describe('the shadow mesh', () => {
       0,
       0,
       0,
-      hull,
       swept,
       outline,
       vertices,
@@ -134,7 +127,6 @@ describe('the shadow mesh', () => {
       0,
       0,
       0,
-      hull,
       swept,
       outline,
       vertices,
@@ -157,7 +149,6 @@ describe('the shadow mesh', () => {
       0,
       0,
       0,
-      hull,
       swept,
       outline,
       vertices,

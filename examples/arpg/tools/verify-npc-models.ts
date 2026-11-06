@@ -33,7 +33,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadGr2, type Gr2File } from '../src/original/gr2'
+import { loadGr2, type Gr2File } from '@rasenjs/assets'
 import type { ModelSource } from '../src/three-d/model'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))

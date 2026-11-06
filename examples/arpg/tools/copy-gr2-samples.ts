@@ -29,7 +29,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadGr2 } from '../src/original/gr2'
+import { loadGr2 } from '@rasenjs/assets'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const ARPG_DIR = resolve(SCRIPT_DIR, '..')

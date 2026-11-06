@@ -15,7 +15,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { loadGr2, type Gr2File } from '../src/original/gr2'
+import { loadGr2, type Gr2File } from '@rasenjs/assets'
 
 const HERE = new URL('.', import.meta.url).pathname
 const SAMPLES = [

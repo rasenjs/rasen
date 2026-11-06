@@ -20,16 +20,16 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadGr2, type Gr2BoneBinding, type Gr2Mesh } from '../original/gr2'
-import { loadGr2Animations, type Gr2Animation, type Gr2TransformTrack } from '../original/gr2-anim'
+import { loadGr2, type Gr2BoneBinding, type Gr2Mesh } from '@rasenjs/assets'
+import { loadGr2Animations, type Gr2Animation, type Gr2TransformTrack } from '@rasenjs/assets'
 import { buildPart, type PartSpec } from './model'
 import {
-  boneIndexOf,
+  boneIndexByName,
   computeBonePose,
   computeBonePoseBlended,
   inverseBindOf,
   matricesForBindings,
-  skinMesh,
+  skinMeshInto,
   type SkinnedPart,
 } from './skinning'
 
@@ -38,7 +38,7 @@ const GR2 = join(__dirname, '..', '..', '..', '..', '.scratch', 'gr2')
 const diabloSkeleton = loadGr2(readFileSync(join(GR2, 'diablo', 'skeleton', 'diablo.skeleton'))).skeletons[0]
 const diabloModel = loadGr2(readFileSync(join(GR2, 'diablo', 'torso.model')))
 const diabloAnims = loadGr2Animations(readFileSync(join(GR2, 'diablo', 'animation', 'combined.animations')))
-const diabloBoneIndex = boneIndexOf(diabloSkeleton)
+const diabloBoneIndex = boneIndexByName(diabloSkeleton)
 const diabloInverseBind = inverseBindOf(diabloSkeleton)
 
 function clipNamed(name: string): Gr2Animation {
@@ -138,7 +138,7 @@ describe('bind-pose skinning reproduces the original vertices', () => {
     const worlds = bindPoseWorlds()
     for (const mesh of diabloModel.meshes) {
       const part = wholeMeshPart(mesh)
-      const skinned = skinMesh(part, bindingMatrices(mesh, worlds), mesh.boneBindings, bindingMatrices(mesh, diabloInverseBind))
+      const skinned = skinMeshInto(part, bindingMatrices(mesh, worlds), mesh.boneBindings, bindingMatrices(mesh, diabloInverseBind))
       let worst = 0
       for (let i = 0; i < part.vertices.length; i += 1) {
         worst = Math.max(worst, Math.abs(skinned.vertices[i] - part.vertices[i]))
@@ -152,7 +152,7 @@ describe('bind-pose skinning reproduces the original vertices', () => {
     const mesh = diabloModel.meshes[0]
     const group = mesh.groups[0]
     const part = asSkinned(buildPart(mesh, group, null))
-    const skinned = skinMesh(part, bindingMatrices(mesh, bindPoseWorlds()), mesh.boneBindings, bindingMatrices(mesh, diabloInverseBind))
+    const skinned = skinMeshInto(part, bindingMatrices(mesh, bindPoseWorlds()), mesh.boneBindings, bindingMatrices(mesh, diabloInverseBind))
     let worst = 0
     for (let i = 0; i < part.vertices.length; i += 1) {
       worst = Math.max(worst, Math.abs(skinned.vertices[i] - part.vertices[i]))
@@ -193,12 +193,12 @@ describe('weight handling', () => {
   it('renormalizes weights so a partial sum still blends fully', () => {
     // Raw [0.25, 0.25] sums to 0.5; renormalized the vertex lands at x = 5
     // (half of the +10 translation), not the unnormalized 2.5.
-    const skinned = skinMesh(partWith([0.25, 0.25, 0, 0], [0, 1, 0, 0]), boneMatrices, boneBindings, inverseBind)
+    const skinned = skinMeshInto(partWith([0.25, 0.25, 0, 0], [0, 1, 0, 0]), boneMatrices, boneBindings, inverseBind)
     expect(skinned.vertices[0]).toBeCloseTo(5, 6)
   })
 
   it('blends all four influences', () => {
-    const skinned = skinMesh(partWith([0.1, 0.2, 0.3, 0.4], [1, 1, 1, 0]), boneMatrices, boneBindings, inverseBind)
+    const skinned = skinMeshInto(partWith([0.1, 0.2, 0.3, 0.4], [1, 1, 1, 0]), boneMatrices, boneBindings, inverseBind)
     // 0.6 of the x = 10 bone (weights 0.1 + 0.2 + 0.3), 0.4 of the static one.
     expect(skinned.vertices[0]).toBeCloseTo(6, 6)
   })
@@ -206,13 +206,13 @@ describe('weight handling', () => {
   it('leaves a zero-weight vertex at its bind position', () => {
     const part = partWith([0, 0, 0, 0], [1, 1, 1, 1])
     part.vertices[0] = 3
-    const skinned = skinMesh(part, boneMatrices, boneBindings, inverseBind)
+    const skinned = skinMeshInto(part, boneMatrices, boneBindings, inverseBind)
     expect(skinned.vertices[0]).toBe(3)
     expect(Array.from(skinned.normals)).toEqual([0, 0, 1])
   })
 
   it('produces unit normals after deformation', () => {
-    const skinned = skinMesh(partWith([0.5, 0.5, 0, 0], [0, 1, 0, 0]), boneMatrices, boneBindings, inverseBind)
+    const skinned = skinMeshInto(partWith([0.5, 0.5, 0, 0], [0, 1, 0, 0]), boneMatrices, boneBindings, inverseBind)
     const length = Math.hypot(skinned.normals[0], skinned.normals[1], skinned.normals[2])
     expect(length).toBeCloseTo(1, 5)
   })
@@ -224,7 +224,7 @@ describe('deformed pose (diablo "walk" at t = 0.3s)', () => {
   it('differs from bind pose but stays finite and near the mesh bounds', () => {
     const mesh = diabloModel.meshes[0]
     const part = wholeMeshPart(mesh)
-    const skinned = skinMesh(part, bindingMatrices(mesh, worlds), mesh.boneBindings, bindingMatrices(mesh, diabloInverseBind))
+    const skinned = skinMeshInto(part, bindingMatrices(mesh, worlds), mesh.boneBindings, bindingMatrices(mesh, diabloInverseBind))
 
     let moved = 0
     for (let i = 0; i < part.vertices.length; i += 1) moved = Math.max(moved, Math.abs(skinned.vertices[i] - part.vertices[i]))
@@ -267,16 +267,16 @@ describe('bone-index semantics (measured verdict: indices are into boneBindings)
     const worlds = computeBonePose(diabloSkeleton, tracksOf(clipNamed('walk')), 0.3)
 
     // Correct: index -> boneBindings row (matrices re-ordered per binding).
-    const smooth = skinMesh(part, bindingMatrices(mesh, worlds), mesh.boneBindings, bindingMatrices(mesh, diabloInverseBind))
+    const smooth = skinMeshInto(part, bindingMatrices(mesh, worlds), mesh.boneBindings, bindingMatrices(mesh, diabloInverseBind))
 
     // Wrong: index -> skeleton bone row, matrices left in skeleton order.
     const wrongPart = part
-    const wrong = skinMesh(
+    const wrong = skinMeshInto(
       wrongPart,
       worlds,
       diabloSkeleton.bones.map((bone) => ({ boneName: bone.name, obbMin: [0, 0, 0] as [number, number, number], obbMax: [0, 0, 0] as [number, number, number] })),
-      diabloInverseBind,
-    )
+      diabloInverseBind
+)
 
     const good = edgeDistortion(mesh, part.vertices, smooth.vertices)
     const bad = edgeDistortion(mesh, part.vertices, wrong.vertices)
@@ -329,12 +329,11 @@ describe('tangent skinning (the normal map follows the surface)', () => {
     // lit against a fixed frame while the surface moves under it.
     expect(part.tangents).toBeDefined()
     const source = part.tangents!
-    const skinned = skinMesh(
-      part,
+    const skinned = skinMeshInto(part,
       bindingMatrices(mesh, bindPoseWorlds()),
       mesh.boneBindings,
-      bindingMatrices(mesh, diabloInverseBind),
-    )
+      bindingMatrices(mesh, diabloInverseBind)
+)
     const tangent = skinned.tangents
     expect(tangent).toBeDefined()
     expect(tangent!.length).toBe(source.length)
@@ -377,7 +376,7 @@ describe('tangent skinning (the normal map follows the surface)', () => {
     inverse[5] = 1
     inverse[10] = 1
     inverse[15] = 1
-    const skinned = skinMesh(part, rotate, bindings, inverse)
+    const skinned = skinMeshInto(part, rotate, bindings, inverse)
     const tangent = skinned.tangents!
     // (1, 0, 0) turned 90° about Y is (0, 0, -1).
     expect(Math.abs(tangent[0])).toBeLessThan(1e-5)

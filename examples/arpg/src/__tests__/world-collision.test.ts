@@ -25,6 +25,7 @@ function plainMap(): WorldMap {
     height,
     tiles: Array.from({ length: width * height }, () => ({ kind: 'path', walkable: true }) as never),
     ground: {} as HTMLCanvasElement,
+    wallCells: [],
     roof: {} as HTMLCanvasElement,
     groundX: 0,
     groundY: 0,

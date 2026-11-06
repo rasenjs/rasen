@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { nvnTexLayout, nvnTexLevelOffset, type NvnTextureDesc } from '../nvn-tex'
-import { nvnBlOffset, nvnDeswizzle, nvnDeswizzleGeometry, nvnSwizzle } from '../nvn-deswizzle'
+import { nvnTexLayout, nvnTexLevelOffset, type NvnTextureDesc } from '@rasenjs/assets'
+import { nvnBlOffset, nvnDeswizzle, nvnDeswizzleGeometry, nvnSwizzle } from '@rasenjs/assets'
 
 function desc(overrides: Partial<NvnTextureDesc>): NvnTextureDesc {
   return {

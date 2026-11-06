@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import golden from './fixtures/nvn-golden.json'
-import { nvnTexLayout, nvnTexLevelOffset, type NvnTextureDesc } from '../nvn-tex'
-import { nvnDeswizzle, nvnDeswizzleGeometry, nvnSwizzle } from '../nvn-deswizzle'
+import { nvnTexLayout, nvnTexLevelOffset, type NvnTextureDesc } from '@rasenjs/assets'
+import { nvnDeswizzle, nvnDeswizzleGeometry, nvnSwizzle } from '@rasenjs/assets'
 
 /**
  * Equivalence with the reference implementation.

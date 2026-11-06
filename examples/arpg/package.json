@@ -17,14 +17,13 @@
     "@rasenjs/animation": "workspace:*",
     "@rasenjs/assets": "workspace:*",
     "@rasenjs/canvas-2d": "workspace:*",
+    "@rasenjs/compiler": "workspace:*",
     "@rasenjs/core": "workspace:*",
     "@rasenjs/dom": "workspace:*",
     "@rasenjs/math": "workspace:*",
-    "@rasenjs/reactive-signals": "workspace:*",
-    "@rasenjs/vite-plugin-rasen": "workspace:*"
+    "@rasenjs/reactive-signals": "workspace:*"
   },
   "devDependencies": {
-    "@rasenjs/compiler": "workspace:*",
     "typescript": "^5.3.3",
     "vite": "^5.0.7"
   }

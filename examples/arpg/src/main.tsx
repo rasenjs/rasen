@@ -6,10 +6,8 @@
  * knows how a monster moves or how a sprite is drawn.
  */
 
-import { configureTags } from '@rasenjs/core'
 import { mount, setupKeyboard } from '@rasenjs/dom'
 import { ref, useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { circle, group, image, rect, sprite, text } from '@rasenjs/canvas-2d'
 import { createAudio } from './audio'
 import { Game, type EconomyContent, type LootIcon, type WorldContent } from './game'
 import { loadGameData, hasGameData, gameDataSummary } from './gamedata'
@@ -61,11 +59,8 @@ import { SkillButtonControl } from './input/aim-button'
 
 useReactiveRuntime()
 
-// canvas-2d components as lowercase JSX tags (types in `jsx.d.ts`). The DOM tags
-// — including `<canvas>` — are registered by `@rasenjs/dom`'s JSX runtime.
-configureTags({
-  '': { sprite, text, group, image, rect, circle },
-})
+// canvas-2d components bind as lowercase JSX tags through the vite config's
+// auto-import (types in `jsx.d.ts`).
 
 /**
  * The panels whose layout is `basedOn` another one, derived → base.

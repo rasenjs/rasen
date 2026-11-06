@@ -3,7 +3,7 @@
  *
  * TS resolves `jsxImportSource`'s JSX namespace from `<module>/jsx-runtime`, so
  * the augmentation targets `@rasenjs/dom/jsx-runtime`. The runtime side is
- * `configureTags` in `main.tsx`, with the same names — DOM and canvas share one
+ * the vite config's auto-import, with the same names — DOM and canvas share one
  * JSX syntax, which is Rasen's model.
  */
 import type {

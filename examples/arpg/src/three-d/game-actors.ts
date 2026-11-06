@@ -35,7 +35,13 @@ import { worldAngleToIso } from '../iso'
 import { PROP_KINDS, type ActorSlot, type Game, type Monster } from '../game'
 import { MONSTER_PART_MODELS, NPC_PART_MODELS, PROP_PART_MODELS } from './model'
 import type { Actor3D } from './actor-layer'
-import { AnimStateMachine, clipForMode, type ClipSet } from './anim-state'
+import {
+  animStateMachine,
+  CLIP_PREFIXES,
+  clipForMode,
+  type AnimStateMachine,
+  type ClipSet,
+} from './anim-state'
 import type { ActorMode } from '../d2/anim-art'
 import { loadAnimationRig } from './skinning'
 import { MODEL_UNITS_PER_TILE } from './projection'
@@ -283,7 +289,7 @@ function place(entry: Actor3D, x: number, y: number, facing: number, visible: bo
  * (`nu`/`wl`/`rn`/`a1`/`sc`/`gh`/`dd`) is the input: `game.heroAnimMode()` is
  * the same state source the 2D sheet animates from.
  */
-const heroMachine = new AnimStateMachine('hth', true)
+const heroMachine = animStateMachine('hth', true)
 
 /** Per-monster playback state (a monster keeps its clock across frames). */
 const monsterMachines = new Map<number, AnimStateMachine>()
@@ -334,7 +340,7 @@ function machineFor(
 ): AnimStateMachine {
   let machine = map.get(id)
   if (machine === undefined) {
-    machine = new AnimStateMachine(weaponMode, town)
+    machine = animStateMachine(weaponMode, town)
     map.set(id, machine)
   } else {
     machine.setTown(town)
@@ -366,7 +372,7 @@ export function syncActor3DPool(game: Game): void {
   // reaction, `dd` death → corpse), one-shots play to their retail length and
   // hand back to neutral, and every clip change crossfades in 0.2 s.
   heroMachine.setTown(game.inTown)
-  heroMachine.setWeaponMode(game.heroWeaponMode())
+  heroMachine.setPrefixes(CLIP_PREFIXES(game.heroWeaponMode()))
   // The locomotion clips step in place, so the clock runs on the ground the
   // hero actually covered: the clip advances by `distance / pace`, which leaves
   // the planted foot exactly where it was and stops the walk when the hero is
@@ -490,7 +496,7 @@ export function syncActor3DPool(game: Game): void {
     // falls back to bind pose in the layer instead of erroring.
     let machine = npcMachines.get(group)
     if (machine === undefined) {
-      machine = new AnimStateMachine('hth', true)
+      machine = animStateMachine('hth', true)
       npcMachines.set(group, machine)
     }
     const pose = machine.update(dt, 'nu', clipSetFor(group[0]?.modelKey ?? ''))

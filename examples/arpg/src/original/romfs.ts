@@ -14,7 +14,7 @@
  * mismatched game version fails loudly instead of decoding into wrong pixels.
  */
 
-import { md5Hex } from './md5'
+import { md5Hex } from '@rasenjs/assets'
 
 /** Where the bytes come from. The caller decides (File System Access API, Node fs, tests). */
 export interface RomfsSource {

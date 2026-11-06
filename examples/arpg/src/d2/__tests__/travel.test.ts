@@ -484,6 +484,7 @@ describe('the grid a swap hands the renderer', () => {
     const level = assemble(findPreset(tables, 'Act 1 - Town 1')!.id, 1)
     const art = {
       artAt: () => null,
+      wallArtAt: () => null,
       roofArtAt: () => null,
       stats: { built: 0, reused: 0 },
     }

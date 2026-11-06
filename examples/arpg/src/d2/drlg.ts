@@ -146,7 +146,7 @@
  * takes.
  */
 
-import { decodeDs1Cell, DS1_SUBTILES_PER_TILE, parseDs1, type Ds1File, type Ds1Object } from '../original/ds1'
+import { decodeDs1Cell, DS1_SUBTILES_PER_TILE, parseDs1, type Ds1File, type Ds1Object } from '@rasenjs/assets'
 import { parseDt1, type Dt1File } from './dt1'
 import type { Level, LevelRow, LevelTables, LvlTypeRow } from './levels'
 import type { Placement, PlaceableRecord } from './places'

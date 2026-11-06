@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import { parseDs1 } from '../src/original/ds1'
+import { parseDs1 } from '@rasenjs/assets'
 
 for (const f of ['/tmp/d2r-all/global/tiles/garden/colossalsummit/colossalsummit.ds1', '/tmp/d2r-all/global/tiles/act1/outdoors/trees.ds1']) {
   const bytes = new Uint8Array(fs.readFileSync(f))

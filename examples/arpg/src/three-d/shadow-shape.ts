@@ -1,14 +1,16 @@
 /**
- * The geometry of the contact shadow, as a pure function of the actor's
- * footprint and the sun.
+ * The geometry of a cast shadow: an actor's ground footprint swept along the
+ * light, with a penumbra band.
  *
- * Kept apart from the element (`./actor-shadow.ts`) so the shape can be
- * tested without a GL context: the numbers here are what decide whether the
- * shadow reads as a cast shadow (an actor's own outline, offset along the
- * sun, soft at the edges) or as a painted disc.
+ * A cast shadow is the silhouette swept by the sun, not a disc: the mesh built
+ * here is the outline's hull, offset by `height / tan(elevation)`, with an inset
+ * ring so the edge softens towards its far end. It is pure geometry with no GL
+ * dependency, so a shape can be judged (and regression-tested) without a
+ * context — which matters because "is this a shadow or a blob" is decided by
+ * these numbers alone.
  */
 
-import { ConvexHull } from './convex-hull'
+import { convexHull } from '@rasenjs/math'
 
 /**
  * How far the outline is inset towards its centre, as a fraction.
@@ -53,7 +55,6 @@ export interface ShadowMesh {
  * @param offsetZ the sweep's Z offset (world units)
  * @param originX the actor's ground position (the shadow's near end)
  * @param originZ the actor's ground position (the shadow's near end)
- * @param hull the convex hull builder (the caller owns it)
  * @param swept scratch for the footprint and its swept copy
  * @param outline scratch for the hull's points
  * @param vertices the mesh's vertices (xyz), written from index 0
@@ -67,7 +68,6 @@ export function buildShadowMesh(
   offsetZ: number,
   originX: number,
   originZ: number,
-  hull: ConvexHull,
   swept: Float32Array,
   outline: Float32Array,
   vertices: Float32Array,
@@ -83,7 +83,7 @@ export function buildShadowMesh(
     swept[at] = footprint[i * 2] + offsetX
     swept[at + 1] = footprint[i * 2 + 1] + offsetZ
   }
-  const outlineCount = hull.build(swept, footprintCount * 2, outline)
+  const outlineCount = convexHull(swept, footprintCount * 2, outline)
   if (outlineCount < 3) return { vertexCount: 0, indexCount: 0, outlineCount, centreX: 0, centreZ: 0 }
 
   let centreX = 0

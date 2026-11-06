@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { parseDs1 } from '../src/original/ds1'
+import { parseDs1 } from '@rasenjs/assets'
 
 const root = process.argv[2] ?? '/tmp/d2r-all'
 

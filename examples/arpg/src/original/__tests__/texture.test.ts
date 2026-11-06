@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { nvnSwizzle } from '../nvn-deswizzle'
-import type { NvnTextureDesc } from '../nvn-tex'
-import { decodeTexture, mipOffset, parseTextureHeader } from '../texture'
+import { nvnSwizzle } from '@rasenjs/assets'
+import type { NvnTextureDesc } from '@rasenjs/assets'
+import { decodeTexture, mipOffset, parseTextureHeader } from '@rasenjs/assets'
 
 /**
  * The `.texture` container, tested against assets fabricated here plus the
