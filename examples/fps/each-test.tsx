@@ -3,7 +3,7 @@
  * billboards (the mechanism behind FPS hit impacts).
  */
 
-import { configureTags, com } from '@rasenjs/core'
+import { com } from '@rasenjs/core'
 import { mount } from '@rasenjs/dom'
 import { ref } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
@@ -11,7 +11,6 @@ import { billboard, each, getRenderContext, type CameraConfig } from '@rasenjs/g
 import { forwardVector } from '@rasenjs/math'
 
 useReactiveRuntime()
-configureTags({ '': { billboard, each } })
 
 const log = document.getElementById('log')!
 const items = ref<Array<{ x: number; y: number; z: number; tex: HTMLCanvasElement }>>([])

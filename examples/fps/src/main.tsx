@@ -1,20 +1,18 @@
-import { configureTags, com, type Mountable } from '@rasenjs/core'
+import { com, type Mountable } from '@rasenjs/core'
 import { mount, when } from '@rasenjs/dom'
 import { ref } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
-import { group, mesh, skybox, billboard, each, getRenderContext, type CameraConfig, type GfxNode } from '@rasenjs/gfx'
+import { each, getRenderContext, type CameraConfig, type GfxNode } from '@rasenjs/gfx'
 import { Mat4x4f, vec3f, forwardVector, rightVector } from '@rasenjs/math'
 import { loadFPSAssets } from './assets'
 import { getLevelObjects, getEnemySpawns, getLevelWalls } from './level'
 import { Player, rayBoxIntersect } from './player'
 import { Enemy } from './enemy'
-import { weapon } from './weapon'
 import { setupKeyboard, bindLookControls } from './input'
 import { SoundManager } from './sound'
 import { createImpact, updateImpact, type Impact } from './impact'
 
 useReactiveRuntime()
-configureTags({ '': { mesh, group, skybox, weapon, billboard, each } })
 
 const viewW = ref(window.innerWidth)
 const viewH = ref(window.innerHeight)
@@ -54,8 +52,8 @@ interface AppProps {
   hitFrames: HTMLCanvasElement[]
 }
 
-const App = com((p: AppProps): Mountable<HTMLElement> => {
-  const { player, enemies, assets, levelObjs, muzzleFlash: mf, locked: lk, impacts, muzzleFlashes } = p
+const App = com((props: AppProps): Mountable<HTMLElement> => {
+  const { player, enemies, assets, levelObjs, muzzleFlash: mf, locked: lk, impacts, muzzleFlashes } = props
   // Main camera — flat CameraConfig consumed by <canvas camera={...}>. The
   // lookAt target is the eye plus the yaw/pitch forward vector. A plain
   // getter keeps the config reactive (re-evaluated on every dep change)

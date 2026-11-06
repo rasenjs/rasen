@@ -6,15 +6,16 @@
  *
  *   * `fs.readFileSync` + a PNG decoder supply raw bytes, since Perry has no
  *     DOM and therefore no `<img>`/`createImageBitmap`.
- *   * `setImageAdapter()` — the injection point `@rasenjs/assets` already
- *     exposes for native hosts — is how the decoded image reaches the loader.
+ *   * `setImageAdapter()` — the injection point `@rasenjs/core` exposes for
+ *     native hosts (`@rasenjs/assets` only consumes the slot) — is how the
+ *     decoded image reaches the loader.
  *
  * Everything above this file (Spine parsing, pose solving, geometry) comes
  * from `@rasenjs/assets` unchanged.
  */
 import * as fs from "fs";
 import * as zlib from "zlib";
-import { setImageAdapter, type ImageLike } from "@rasenjs/assets";
+import { setImageAdapter, type ImageLike } from "@rasenjs/core";
 
 /**
  * A decoded PNG: dimensions plus tightly packed RGBA8 pixels.

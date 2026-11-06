@@ -11,9 +11,14 @@
  *   * the module IMPORTS `jsx`/`jsxs` → the imported implementation is called.
  *
  * That second arm is what this module supplies: every `.tsx` file imports
- * `jsx`/`jsxs` from here so Perry routes the calls into `@rasenjs/core`'s JSX
- * runtime, where an element is a `Mountable` — the same thing the function-call
- * form (`Stack({ ... })`) produces.
+ * `jsx`/`jsxs` from here so Perry routes the calls into this tree's element
+ * factories, where an element is a `Mountable` — the same thing the
+ * function-call form (`Stack({ ... })`) produces.
+ *
+ * Rasen itself has no JSX runtime left (`@rasenjs/compiler` eliminates every
+ * JSX node; core's `jsx`/`jsxs` exports are gone), so the two functions are
+ * defined here: Perry's lowering wants a `jsx(type, props)` shape, and the
+ * type it is handed is already one of the factories below.
  *
  * ```tsx
  * import { jsx, jsxs } from "../perry-ui/jsx-runtime";
@@ -40,7 +45,7 @@
  * (`mountApp`, `hostWidget`) stay on the `../perry-ui` barrel, which is where a
  * caller looking for a function rather than an element will go.
  */
-import { jsx, jsxs, Fragment as coreFragment } from "@rasenjs/core";
+import { Fragment as coreFragment } from "@rasenjs/core";
 import type { Mountable } from "@rasenjs/core";
 import { each } from "@rasenjs/core/components";
 import type { EachProps } from "@rasenjs/core/components";
@@ -58,8 +63,21 @@ import {
 } from "./components";
 import type { PerryNode } from "./node";
 
-export { jsx, jsxs };
-export { jsx as jsxDEV };
+/**
+ * Perry's JSX lowering target.
+ *
+ * `type` is the tag binding the module resolved (`Stack`, `Text`, …) — a
+ * factory that takes props and returns a `Mountable` — so the call is exactly
+ * the hand-written form. `jsxs` is the multi-child spelling; both are the same
+ * function because children normalization happens inside the factories.
+ */
+function jsxFactory(type: unknown, props: unknown): Mountable<PerryNode> {
+  return (type as (p: unknown) => Mountable<PerryNode>)(props);
+}
+
+export const jsx = jsxFactory;
+export const jsxs = jsxFactory;
+export { jsxFactory as jsxDEV };
 
 /**
  * `Fragment` re-typed to this tree's node type.

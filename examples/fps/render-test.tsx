@@ -14,7 +14,7 @@
  * `window.__rt`.
  */
 
-import { configureTags, com } from '@rasenjs/core'
+import { com } from '@rasenjs/core'
 import { mount } from '@rasenjs/dom'
 import { ref } from '@rasenjs/reactive-signals'
 import { useReactiveRuntime } from '@rasenjs/reactive-signals'
@@ -22,7 +22,6 @@ import { billboard, getRenderContext, type CameraConfig } from '@rasenjs/gfx'
 import { forwardVector } from '@rasenjs/math'
 
 useReactiveRuntime()
-configureTags({ '': { billboard } })
 
 const log = document.getElementById('log')!
 
