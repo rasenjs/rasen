@@ -22,8 +22,32 @@ export type FragmentChild<N = unknown> =
  * Fragment config
  */
 export interface FragmentConfig<N> {
-  children: Array<FragmentChild<N>>
+  /** Any child shape — hand-written calls pass dirty arrays; normalized at entry. */
+  children?: unknown
   hooks?: FragmentHostHooks<N>
+}
+
+/**
+ * THE one children rule — coerce, flatten, drop nullish/booleans.
+ *
+ * Shared by core's `fragment()` entry, core's fallback `Fragment`, and the
+ * DOM/HTML host fragments (each previously hand-rolling its own copy). The
+ * compiler's emission mirrors it inline (`[…].flat(Infinity).filter(…)` in
+ * eliminate-jsx.ts) so compiled children arrive pre-normalized with no helper
+ * name to bind.
+ *
+ * Text, refs, mountable factories — and anything else that isn't nullish or a
+ * boolean — are kept: what a plain object does downstream belongs to the layer
+ * that accepts children, not to this rule.
+ */
+export function normalizeChildren(children: unknown): unknown[] {
+  if (children === null || children === undefined) return []
+  const flat: unknown[] = []
+  const flatten = (list: unknown[]) => {
+    for (const c of list) Array.isArray(c) ? flatten(c) : flat.push(c)
+  }
+  flatten(Array.isArray(children) ? (children as unknown[]) : [children])
+  return flat.filter((c) => c !== null && c !== undefined && typeof c !== 'boolean')
 }
 
 /**
@@ -93,7 +117,10 @@ function processChild<N>(
 export function fragment<N = unknown>(
   config: FragmentConfig<N>
 ): Mountable<N> {
-  const { children } = config
+  // Hand-written calls pass dirty children (single values, nested arrays,
+  // `false` from `cond && x`); one normalize at entry, one cast — ref-ness
+  // cannot be expressed in FragmentChild's type.
+  const children = normalizeChildren(config.children) as Array<FragmentChild<N>>
   return (node: N, mountHooks?: HostHooks<N>) => {
       const hooks = mountHooks ?? config.hooks
     const mounts = children.map(child => processChild(child, hooks))

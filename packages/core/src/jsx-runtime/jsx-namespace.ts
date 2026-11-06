@@ -1,10 +1,11 @@
 /**
  * Shared JSX namespace boilerplate.
  *
- * Every host package's `jsx-runtime.ts` declares an `export namespace JSX`
- * that TypeScript resolves when `jsxImportSource` points at that host. Three
- * members are identical across all hosts — `Element`, `ElementChildrenAttribute`
- * and `IntrinsicAttributes` — so they live here once and hosts reference them.
+ * Every host package's `jsx-runtime` entry — a types-only `.d.ts`, since JSX
+ * is compiled away — declares an `export namespace JSX` that TypeScript
+ * resolves when `jsxImportSource` points at that host. Three members are
+ * identical across all hosts — `Element`, `ElementChildrenAttribute` and
+ * `IntrinsicAttributes` — so they live here once and hosts reference them.
  *
  * Only `IntrinsicElements` is host-specific (each host's own tag set) and is
  * declared in the host's own namespace.

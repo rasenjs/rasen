@@ -30,9 +30,9 @@ export function escapeAttr(value: string): string {
 }
 
 /** React-style text child semantics: null / undefined / booleans render as an
- *  empty string; everything else is stringified. Matches jsx-runtime's
- *  processChildren skipping rules so compiled output stays aligned with the
- *  factory chain.
+ *  empty string; everything else is stringified. Matches the children filter
+ *  the JSX elimination pass emits (flat + drop nullish/boolean) so compiled
+ *  output stays aligned with the factory chain.
  *
  *  A *ref* is unwrapped first, through the active runtime: `Ref` is an opaque
  *  placeholder whose shape the reactive adapter defines (Vue's `.value`, TC39

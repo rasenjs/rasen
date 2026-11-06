@@ -12,6 +12,7 @@ export { match, switchCase, type MatchConfig } from './match'
 export { 
   fragment,
   f,
+  normalizeChildren,
   type FragmentConfig,
   type FragmentChild,
   type FragmentHostHooks

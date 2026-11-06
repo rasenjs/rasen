@@ -132,17 +132,14 @@ The compiler can emit these for you: `.map()` → `each`, `cond && <El/>` and
 
 ## JSX runtime
 
-`@rasenjs/core` provides the host-agnostic JSX runtime that host packages
-re-export and extend with their own tag table:
-
-```typescript
-import { jsx, jsxs, Fragment, registerTag, configureTags } from '@rasenjs/core'
-
-configureTags({ '': { div: myDivComponent, span: mySpanComponent } })
-```
-
-Lowercase tags are looked up in the registry (`configureTags` / `registerTag`),
-PascalCase tags are called directly as components, and `Fragment` is `<>…</>`.
+Rasen compiles JSX away (`@rasenjs/compiler` turns every tag into a factory
+call; bindings come from the app's `unplugin-auto-import` — see
+[JSX & the Compiler](https://github.com/rasenjs/rasen/tree/main/www/guide/advanced/jsx)),
+so what remains is the **type-checking surface**: each host's `jsx-runtime`
+entry is a types-only `.d.ts` (there is no `jsx()` at all), and `Fragment` is
+the structural `fragment()` this root aliases (`export { fragment as
+Fragment }`) for hosts to wrap with a text-capable variant. There is no tag
+registry — `registerTag` / `configureTags` are gone with it.
 
 ## Available adapters
 

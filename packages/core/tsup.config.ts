@@ -6,6 +6,7 @@ export default defineConfig({
     components: 'src/components/index.ts',
     utils: 'src/utils/index.ts',
     'html-tags': 'src/html-tags.ts',
+    'jsx-runtime-stub': 'src/jsx-runtime-stub.ts',
     'test-utils': 'src/test-utils.ts'
   },
   format: ['esm', 'cjs'],

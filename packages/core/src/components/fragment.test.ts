@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setReactiveRuntime, getReactiveRuntime, type ReactiveRuntime, type Ref } from '../reactive'
-import { fragment, type FragmentHostHooks } from './fragment'
+import { fragment, normalizeChildren, type FragmentHostHooks } from './fragment'
 
 // ============================================
 // 测试辅助工具
@@ -533,5 +533,35 @@ describe('fragment', () => {
       expect(warns).toHaveLength(1)
       expect(warns[0]).toContain('Reactive ref children require hooks')
     })
+  })
+})
+
+describe('normalizeChildren — the one children rule', () => {
+  it('coerces a single child, and nullish to an empty list', () => {
+    expect(normalizeChildren('solo')).toEqual(['solo'])
+    expect(normalizeChildren(42)).toEqual([42])
+    expect(normalizeChildren(null)).toEqual([])
+    expect(normalizeChildren(undefined)).toEqual([])
+  })
+
+  it('flattens nested arrays at every depth', () => {
+    expect(normalizeChildren(['a', ['b', ['c']], 'd'])).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('drops nullish and boolean children, keeps everything that renders', () => {
+    const fn = () => () => {}
+    expect(normalizeChildren([null, false, 'x', undefined, true, 42, fn])).toEqual([
+      'x',
+      42,
+      fn,
+    ])
+  })
+
+  it('fragment() normalizes dirty children at entry — false/null cannot crash it', () => {
+    const child = vi.fn(() => () => {})
+    const mount = fragment({ children: [null, false, child, undefined] })
+    const cleanup = mount({}, undefined)
+    expect(child).toHaveBeenCalledTimes(1)
+    cleanup?.()
   })
 })
